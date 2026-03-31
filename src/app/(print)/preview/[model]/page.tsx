@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { splitIntoPages } from "@/lib/datasheet/pagination";
+import { PrintToolbar } from "@/components/preview/print-toolbar";
 import type {
   Product,
   ProductLine,
@@ -61,6 +62,7 @@ export default async function PreviewPage({
 
   return (
     <>
+      <PrintToolbar model={product.model_name} />
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -76,11 +78,18 @@ body {
   font-size: 7pt;
   line-height: 1.4;
   background: #e0e0e0;
+  padding-top: 48px;
+}
+
+@media print {
+  body { padding-top: 0 !important; }
 }
 
 @media print {
   body { background: white; }
   .page { box-shadow: none !important; margin: 0 !important; }
+  .print-toolbar { display: none !important; }
+  .page:first-of-type { margin-top: 0 !important; }
 }
 
 .page {
