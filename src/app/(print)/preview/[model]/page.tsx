@@ -103,6 +103,7 @@ body {
     page-break-inside: avoid !important;
   }
   .page:not(:last-of-type) { page-break-after: always !important; }
+  .page:last-of-type { page-break-after: auto !important; }
   .print-toolbar { display: none !important; }
 }
 
@@ -181,15 +182,20 @@ body {
   font-weight: 500; font-size: 14pt; color: #03a9f4; margin-bottom: 10pt;
 }
 .features-box { background: #ebf8fe; padding: 18pt 28pt; }
-.features-columns { display: table; width: 100%; }
-.features-col { display: table-cell; vertical-align: top; padding-right: 16pt; }
-.features-col:first-child { width: 44%; }
-.features-col:last-child { width: 56%; padding-right: 0; }
+.features-columns { display: table; width: 100%; table-layout: fixed; }
+.features-col { display: table-cell; width: 50%; vertical-align: top; }
+.features-col:first-child { padding-right: 14pt; }
+.features-col:last-child { padding-left: 14pt; }
 .feature-item {
+  display: flex; align-items: baseline; gap: 6pt;
   font-weight: 400; font-size: 11pt; color: #4a4a4a;
   margin-bottom: 8pt; line-height: 1.35;
 }
-.feature-item::before { content: "●  "; color: #03a9f4; font-size: 7pt; vertical-align: 1pt; }
+.feature-bullet {
+  flex-shrink: 0; color: #4a4a4a; font-size: 6pt; line-height: 1;
+  margin-top: 4pt;
+}
+.feature-text { flex: 1; }
 
 /* Spec pages */
 .spec-page { padding: 0 35pt; }
@@ -291,14 +297,16 @@ body {
                 <div className="features-col">
                   {features.slice(0, midpoint).map((f, i) => (
                     <div key={i} className="feature-item">
-                      {f}
+                      <span className="feature-bullet">●</span>
+                      <span className="feature-text">{f}</span>
                     </div>
                   ))}
                 </div>
                 <div className="features-col">
                   {features.slice(midpoint).map((f, i) => (
                     <div key={i} className="feature-item">
-                      {f}
+                      <span className="feature-bullet">●</span>
+                      <span className="feature-text">{f}</span>
                     </div>
                   ))}
                 </div>
