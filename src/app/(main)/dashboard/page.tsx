@@ -49,6 +49,22 @@ export default async function DashboardPage() {
     data: { product_id: string; status: string }[] | null;
   };
 
+  // Fetch recent change logs
+  const { data: recentChanges } = await supabase
+    .from("change_logs")
+    .select(
+      `
+      id,
+      changes_summary,
+      edited_by,
+      created_at,
+      notified,
+      products (model_name)
+    `
+    )
+    .order("created_at", { ascending: false })
+    .limit(20);
+
   // Compute image readiness per product
   const imageReadiness = new Map<
     string,
@@ -94,6 +110,14 @@ export default async function DashboardPage() {
       <DashboardContent
         productLines={productLines ?? []}
         products={productSummaries}
+        recentChanges={(recentChanges ?? []).map((c) => ({
+          id: c.id,
+          model_name: (c.products as { model_name: string } | null)?.model_name ?? "—",
+          changes_summary: c.changes_summary,
+          edited_by: c.edited_by,
+          created_at: c.created_at,
+          notified: c.notified,
+        }))}
       />
     </div>
   );

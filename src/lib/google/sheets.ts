@@ -341,3 +341,86 @@ export async function loadProductFromSheets(
     spec_sections,
   };
 }
+
+/**
+ * Load ALL products from a sheet in batch — only 3 API calls total per product line.
+ * Returns a map of model_name → SheetProduct.
+ */
+export async function loadAllProductsFromSheet(
+  sheetId: string,
+  detailSpecsGid: string,
+  overviewGid: string
+): Promise<Map<string, SheetProduct>> {
+  const auth = getGoogleAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+
+  // 1 API call: get sheet tab names
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: sheetId,
+    fields: "sheets.properties",
+  });
+
+  const sheetsList = meta.data.sheets ?? [];
+  const detailSheet = sheetsList.find(
+    (s) => String(s.properties?.sheetId) === detailSpecsGid
+  );
+  const overviewSheet = sheetsList.find(
+    (s) => String(s.properties?.sheetId) === overviewGid
+  );
+
+  const detailName = detailSheet?.properties?.title ?? "Detail Specs";
+  const overviewName = overviewSheet?.properties?.title ?? "Web Overview";
+
+  // 2 API calls: fetch both tabs in parallel
+  const [detailRes, overviewRes] = await Promise.all([
+    sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `'${detailName}'`,
+      valueRenderOption: "UNFORMATTED_VALUE",
+    }),
+    sheets.spreadsheets.values.get({
+      spreadsheetId: sheetId,
+      range: `'${overviewName}'`,
+      valueRenderOption: "UNFORMATTED_VALUE",
+    }),
+  ]);
+
+  const detailRows = (detailRes.data.values ?? []) as unknown[][];
+  const overviewRows = (overviewRes.data.values ?? []) as unknown[][];
+
+  // Find "Model #" row to enumerate all model columns
+  const numRowIdx = findRowByLabel(detailRows, "Model #") ?? 2;
+  const nameRowIdx = findRowByLabel(detailRows, "Model Name") ?? 0;
+  const modelNumRow = detailRows[numRowIdx] ?? [];
+
+  const results = new Map<string, SheetProduct>();
+
+  for (let col = 1; col < modelNumRow.length; col++) {
+    const modelNum = String(modelNumRow[col] ?? "").trim();
+    if (!modelNum) continue;
+
+    const subtitle = getCell(detailRows[nameRowIdx], col);
+    if (subtitle.includes("Vivotek")) continue;
+
+    // Parse specs from cached detail data
+    const spec_sections = parseSpecSections(detailRows, col);
+
+    // Parse overview from cached overview data
+    const overviewCol = findModelColumn(overviewRows, modelNum);
+    let overviewData = { full_name: "", overview: "", features: [] as string[] };
+    if (overviewCol !== null) {
+      overviewData = parseOverviewData(overviewRows, overviewCol);
+    }
+
+    results.set(modelNum, {
+      model_name: modelNum,
+      subtitle,
+      full_name: overviewData.full_name || subtitle,
+      overview: overviewData.overview,
+      features: overviewData.features,
+      spec_sections,
+    });
+  }
+
+  return results;
+}

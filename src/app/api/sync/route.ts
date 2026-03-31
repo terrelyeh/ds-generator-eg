@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  listModelsFromSheet,
+  loadAllProductsFromSheet,
   loadProductFromSheets,
   getSheetMetadata,
 } from "@/lib/google/sheets";
 import { syncProductImages } from "@/lib/google/drive-images";
+import { sendNotifications } from "@/lib/notifications";
+import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
 import type { ProductLine } from "@/types/database";
 
@@ -56,6 +58,9 @@ export async function POST(request: Request) {
     errors: string[];
   }[] = [];
 
+  // Collect changes for notifications
+  const allChanges: ChangeEntry[] = [];
+
   for (const pl of linesToSync) {
     if (!pl.sheet_id || !pl.detail_specs_gid) continue;
 
@@ -73,27 +78,38 @@ export async function POST(request: Request) {
         // Drive API access may not be available; continue without metadata
       }
 
-      // List all models in this sheet
-      const models = await listModelsFromSheet(pl.sheet_id, pl.detail_specs_gid);
+      // Batch-load all models from both tabs in 3 API calls (instead of 3 per model)
+      let allProducts: Map<string, import("@/lib/google/sheets").SheetProduct>;
 
-      const modelsToSync = filterModel
-        ? models.filter((m) => m.model_name === filterModel)
-        : models;
+      if (filterModel) {
+        // Single model: use targeted fetch (3 API calls)
+        const single = await loadProductFromSheets(
+          pl.sheet_id,
+          pl.detail_specs_gid,
+          pl.overview_gid ?? "0",
+          filterModel
+        );
+        allProducts = new Map();
+        if (single) allProducts.set(filterModel, single);
+      } else {
+        // All models: batch fetch (3 API calls total per product line)
+        allProducts = await loadAllProductsFromSheet(
+          pl.sheet_id,
+          pl.detail_specs_gid,
+          pl.overview_gid ?? "0"
+        );
+      }
 
-      for (const model of modelsToSync) {
+      for (const [modelName, sheetData] of allProducts) {
         try {
-          // Load full product data from sheets
-          const sheetData = await loadProductFromSheets(
-            pl.sheet_id,
-            pl.detail_specs_gid,
-            pl.overview_gid ?? "0",
-            model.model_name
-          );
+          // Check if product already exists (for change detection)
+          const { data: existing } = await supabase
+            .from("products")
+            .select("id, subtitle, full_name, overview, features")
+            .eq("model_name", modelName)
+            .single();
 
-          if (!sheetData) {
-            lineResult.errors.push(`${model.model_name}: not found in sheet`);
-            continue;
-          }
+          const isNew = !existing;
 
           // Upsert product
           const { data: product, error: productError } = await supabase
@@ -116,14 +132,33 @@ export async function POST(request: Request) {
 
           if (productError || !product) {
             lineResult.errors.push(
-              `${model.model_name}: product upsert failed — ${productError?.message}`
+              `${modelName}: product upsert failed — ${productError?.message}`
             );
             continue;
           }
 
+          // Detect what changed
+          const changes: string[] = [];
+          if (isNew) {
+            changes.push("New product added");
+          } else {
+            if (existing.subtitle !== sheetData.subtitle) changes.push("subtitle");
+            if (existing.full_name !== sheetData.full_name) changes.push("full name");
+            if (existing.overview !== sheetData.overview) changes.push("overview");
+            if (JSON.stringify(existing.features) !== JSON.stringify(sheetData.features))
+              changes.push("features");
+            // Specs always get replaced, so we count them as changed
+            changes.push("specs");
+          }
+          const changeSummary = isNew
+            ? "New product added"
+            : changes.length > 0
+              ? `Updated: ${changes.join(", ")}`
+              : "Synced (no changes)";
+
           // Sync images from Google Drive → Supabase Storage
           try {
-            const images = await syncProductImages(model.model_name, supabase);
+            const images = await syncProductImages(modelName, supabase);
             if (images.product_image_url || images.hardware_image_url) {
               await supabase
                 .from("products")
@@ -155,13 +190,20 @@ export async function POST(request: Request) {
             product_line_id: pl.id,
             edited_by: metadata.last_editor,
             edited_at: metadata.last_modified,
-            changes_summary: `Synced from Google Sheets`,
+            changes_summary: changeSummary,
           });
 
-          lineResult.synced.push(model.model_name);
+          lineResult.synced.push(modelName);
+          allChanges.push({
+            product_name: modelName,
+            product_line: pl.label ?? pl.name,
+            changes_summary: changeSummary,
+            edited_by: metadata.last_editor,
+            edited_at: metadata.last_modified,
+          });
         } catch (err) {
           lineResult.errors.push(
-            `${model.model_name}: ${err instanceof Error ? err.message : String(err)}`
+            `${modelName}: ${err instanceof Error ? err.message : String(err)}`
           );
         }
       }
@@ -174,10 +216,28 @@ export async function POST(request: Request) {
     results.push(lineResult);
   }
 
+  // Send notifications for synced changes (non-blocking)
+  let notifyResult = null;
+  if (allChanges.length > 0) {
+    try {
+      notifyResult = await sendNotifications(allChanges);
+      // Mark change logs as notified if at least one channel succeeded
+      if (notifyResult.sent.length > 0) {
+        await supabase
+          .from("change_logs")
+          .update({ notified: true })
+          .eq("notified", false);
+      }
+    } catch {
+      // Notification failure should not break the sync response
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     timestamp: new Date().toISOString(),
     results,
+    notifications: notifyResult,
   });
 }
 

@@ -70,7 +70,7 @@ export default async function PreviewPage({
 
 @page { size: letter; margin: 0; }
 
-* { margin: 0; padding: 0; box-sizing: border-box; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 
 body {
   font-family: 'Roboto', sans-serif;
@@ -82,14 +82,11 @@ body {
 }
 
 @media print {
-  body { padding-top: 0 !important; }
-}
-
-@media print {
-  body { background: white; }
-  .page { box-shadow: none !important; margin: 0 !important; }
+  body { padding-top: 0 !important; background: white; margin: 0; }
+  .page { box-shadow: none !important; margin: 0 !important; page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
   .print-toolbar { display: none !important; }
-  .page:first-of-type { margin-top: 0 !important; }
+  html, body { height: auto; overflow: visible; }
 }
 
 .page {
@@ -169,12 +166,14 @@ body {
 }
 .features-box { background: #ebf8fe; padding: 18pt 28pt; }
 .features-columns { display: table; width: 100%; }
-.features-col { display: table-cell; width: 50%; vertical-align: top; padding-right: 16pt; }
+.features-col { display: table-cell; vertical-align: top; padding-right: 16pt; }
+.features-col:first-child { width: 44%; }
+.features-col:last-child { width: 56%; padding-right: 0; }
 .feature-item {
   font-weight: 400; font-size: 11pt; color: #4a4a4a;
-  margin-bottom: 8pt; padding-left: 14pt; text-indent: -14pt; line-height: 1.35;
+  margin-bottom: 8pt; line-height: 1.35;
 }
-.feature-item::before { content: "\\2022  "; color: #4a4a4a; }
+.feature-item::before { content: "●  "; color: #03a9f4; font-size: 7pt; vertical-align: 1pt; }
 
 /* Spec pages */
 .spec-page { padding: 0 35pt; }
