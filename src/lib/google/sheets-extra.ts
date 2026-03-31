@@ -48,6 +48,35 @@ async function fetchTab(
   return (res.data.values ?? []) as unknown[][];
 }
 
+/**
+ * Get hidden column indices for a specific tab using Sheets metadata API.
+ * Returns a Set of 0-based column indices that are hidden.
+ */
+async function getHiddenColumns(
+  sheetId: string,
+  gid: string
+): Promise<Set<number>> {
+  const auth = getGoogleAuth();
+  const sheets = google.sheets({ version: "v4", auth });
+  const meta = await sheets.spreadsheets.get({
+    spreadsheetId: sheetId,
+    fields: "sheets(properties,data.columnMetadata)",
+  });
+
+  const targetSheet = meta.data.sheets?.find(
+    (s) => String(s.properties?.sheetId) === gid
+  );
+  if (!targetSheet?.data?.[0]?.columnMetadata) return new Set();
+
+  const hidden = new Set<number>();
+  for (let i = 0; i < targetSheet.data[0].columnMetadata.length; i++) {
+    if (targetSheet.data[0].columnMetadata[i].hiddenByUser) {
+      hidden.add(i);
+    }
+  }
+  return hidden;
+}
+
 // ---------------------------------------------------------------------------
 // Revision Log
 // ---------------------------------------------------------------------------
@@ -166,13 +195,17 @@ export async function loadComparison(
   const tabName = await resolveTabName(sheetId, gid);
   if (!tabName) return { models: [], items: [] };
 
-  const rows = await fetchTab(sheetId, tabName);
+  // Fetch rows + hidden column info in parallel
+  const [rows, hiddenCols] = await Promise.all([
+    fetchTab(sheetId, tabName),
+    getHiddenColumns(sheetId, gid),
+  ]);
   if (rows.length < 3) return { models: [], items: [] };
 
   // Find the "Model #" or "Model Name" row to get model columns
   let modelRow = -1;
   let modelNameRow = -1;
-  for (let i = 0; i < Math.min(rows.length, 5); i++) {
+  for (let i = 0; i < Math.min(rows.length, 10); i++) {
     const label = cell(rows[i], 0).toLowerCase();
     const label1 = cell(rows[i], 1).toLowerCase();
     if (label === "model #" || label1 === "model #") {
@@ -187,10 +220,11 @@ export async function loadComparison(
   const idRow = modelRow >= 0 ? modelRow : modelNameRow >= 0 ? modelNameRow : 2;
   const startCol = cell(rows[idRow], 0) ? 0 : 1; // some sheets have empty col A
 
-  // Collect model names from the header row
+  // Collect model names from the header row, skipping hidden columns
   const models: string[] = [];
   const modelCols: number[] = [];
   for (let c = startCol; c < (rows[idRow]?.length ?? 0); c++) {
+    if (hiddenCols.has(c)) continue; // skip hidden columns
     const m = cell(rows[idRow], c);
     if (m && m !== "Model #" && m !== "Model Name" && !m.includes("Model")) {
       models.push(m);
@@ -198,31 +232,43 @@ export async function loadComparison(
     }
   }
 
-  // Parse spec data
+  // Parse spec data using DYNAMIC category detection.
+  // A category row = has text in col A but ALL model columns are empty.
+  // A data row = has text in col A AND at least one model column has a value.
   const items: SheetComparisonItem[] = [];
   let currentCategory = "";
-  const specCategories = new Set([
-    "Optics", "Video", "Audio", "Advanced AI Analytics",
-    "Storage", "System", "Mechanical", "Management Software",
-    "General", "Physical", "Interface", "Networking", "Network",
-    "Wireless", "Radio", "Performance", "Power", "Environment",
-    "Environmental", "Software", "Security", "Layer 2 Features",
-    "Layer 3 Features", "Management", "Standards", "Certifications",
-    "PoE", "Switching", "Ports", "Port", "LED",
-    "Technical Specifications",
-  ]);
 
-  // Start after the model row
+  // Skip known non-category labels in the header area
+  const skipLabels = new Set(["model #", "model name", "model", "subtitle"]);
+
   for (let i = idRow + 1; i < rows.length; i++) {
     const label = cell(rows[i], 0) || cell(rows[i], 1);
     if (!label) continue;
+    if (skipLabels.has(label.toLowerCase())) continue;
 
-    if (specCategories.has(label)) {
+    // Check if ANY model column has ANY text at all (even "-").
+    // A real category header row has completely blank model columns.
+    // "-" means "not applicable" and counts as data — it's NOT a blank cell.
+    let hasAnyText = false;
+    for (const col of modelCols) {
+      const val = cell(rows[i], col);
+      if (val) {
+        hasAnyText = true;
+        break;
+      }
+    }
+
+    if (!hasAnyText) {
+      // Category header row — all model columns are completely blank
       currentCategory = label;
       continue;
     }
 
-    if (!currentCategory) continue;
+    // Data row — belongs to current category
+    if (!currentCategory) {
+      // If no category yet, use a generic fallback
+      currentCategory = "General";
+    }
 
     for (let m = 0; m < models.length; m++) {
       const value = cell(rows[i], modelCols[m]);
@@ -257,19 +303,31 @@ export async function loadCloudComparison(
   const tabName = await resolveTabName(sheetId, gid);
   if (!tabName) return [];
 
-  const rows = await fetchTab(sheetId, tabName);
+  // Fetch rows + hidden column info in parallel
+  const [rows, hiddenCols] = await Promise.all([
+    fetchTab(sheetId, tabName),
+    getHiddenColumns(sheetId, gid),
+  ]);
   if (rows.length < 2) return [];
 
-  // Row 0 is headers
-  const headers = rows[0].map((h) => String(h ?? "").trim().replace(/\n/g, " "));
+  // Row 0 is headers — build visible header list
+  const allHeaders = rows[0].map((h) => String(h ?? "").trim().replace(/\n/g, " "));
 
-  // Find Model and Label columns
-  const modelCol = headers.findIndex(
+  // Find Model and Label columns (even if hidden, we still need them for identification)
+  const modelCol = allHeaders.findIndex(
     (h) => h.toLowerCase() === "model" || h.toLowerCase() === "model #" || h.toLowerCase() === "model name"
   );
-  const labelCol = headers.findIndex((h) => h.toLowerCase() === "label");
+  const labelCol = allHeaders.findIndex((h) => h.toLowerCase() === "label");
 
   if (modelCol < 0) return [];
+
+  // Build list of visible spec columns (skip hidden, model, label columns)
+  const specCols: number[] = [];
+  for (let c = 0; c < allHeaders.length; c++) {
+    if (c === modelCol || c === labelCol) continue;
+    if (hiddenCols.has(c)) continue; // skip hidden columns
+    if (allHeaders[c]) specCols.push(c);
+  }
 
   const results: SheetCloudComparison[] = [];
   for (let i = 1; i < rows.length; i++) {
@@ -279,11 +337,10 @@ export async function loadCloudComparison(
     const label = labelCol >= 0 ? cell(rows[i], labelCol) : "";
     const specs: Record<string, string> = {};
 
-    for (let c = 0; c < headers.length; c++) {
-      if (c === modelCol || c === labelCol) continue;
+    for (const c of specCols) {
       const val = cell(rows[i], c);
-      if (val && val !== "-" && headers[c]) {
-        specs[headers[c]] = val;
+      if (val && val !== "-") {
+        specs[allHeaders[c]] = val;
       }
     }
 
