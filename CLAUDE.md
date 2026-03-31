@@ -62,6 +62,8 @@ src/
 
 ## Architecture & Data Flow
 
+完整的同步機制、變更偵測、Telegram 通知流程詳見 [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md)。
+
 ### Google Sheets → Supabase Sync
 
 每個產品線有一個 Google Sheet，包含以下頁籤：
