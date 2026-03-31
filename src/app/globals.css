@@ -134,3 +134,9 @@
     @apply font-sans;
   }
 }
+
+/* Prevent Tailwind h-full / min-h-full from creating extra print pages */
+@media print {
+  html { height: auto !important; min-height: 0 !important; }
+  body { height: auto !important; min-height: 0 !important; }
+}

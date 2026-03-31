@@ -96,15 +96,23 @@ body {
     min-height: 0 !important;
     max-height: none !important;
     overflow: visible !important;
+    width: auto !important;
   }
   .page {
     box-shadow: none !important;
     margin: 0 !important;
     page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: visible !important;
+    page-break-after: always !important;
+    break-after: page !important;
   }
-  .page:not(:last-of-type) { page-break-after: always !important; }
-  .page:last-of-type { page-break-after: auto !important; }
+  .page:last-of-type {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+  }
   .print-toolbar { display: none !important; }
+  body::after { display: none !important; content: none !important; }
 }
 
 .page {
