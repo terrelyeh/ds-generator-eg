@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/layout/navbar";
 
@@ -25,6 +26,10 @@ export default function MainLayout({
       <footer className="border-t py-4 px-6 text-center text-xs text-muted-foreground">
         EnGenius Datasheet System
         {buildTime && <> &nbsp;·&nbsp; Deployed: {buildTime}</>}
+        &nbsp;·&nbsp;
+        <Link href="/docs/sync" className="text-engenius-blue hover:underline">
+          Sync & Notification Guide
+        </Link>
       </footer>
       <Toaster />
     </div>
