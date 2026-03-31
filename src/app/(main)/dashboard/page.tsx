@@ -63,7 +63,16 @@ export default async function DashboardPage() {
     `
     )
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(20) as {
+    data: {
+      id: string;
+      changes_summary: string;
+      edited_by: string | null;
+      created_at: string;
+      notified: boolean;
+      products: { model_name: string } | null;
+    }[] | null;
+  };
 
   // Compute image readiness per product
   const imageReadiness = new Map<
@@ -112,7 +121,7 @@ export default async function DashboardPage() {
         products={productSummaries}
         recentChanges={(recentChanges ?? []).map((c) => ({
           id: c.id,
-          model_name: (c.products as { model_name: string } | null)?.model_name ?? "—",
+          model_name: c.products?.model_name ?? "—",
           changes_summary: c.changes_summary,
           edited_by: c.edited_by,
           created_at: c.created_at,

@@ -34,7 +34,17 @@ export async function POST(request: Request) {
     )
     .eq("notified", false)
     .order("created_at", { ascending: true })
-    .limit(100);
+    .limit(100) as {
+    data: {
+      id: string;
+      changes_summary: string;
+      edited_by: string | null;
+      edited_at: string | null;
+      products: { model_name: string; product_line_id: string } | null;
+      product_lines: { label: string } | null;
+    }[] | null;
+    error: { message: string } | null;
+  };
 
   if (logsError) {
     return NextResponse.json(
@@ -49,8 +59,8 @@ export async function POST(request: Request) {
 
   // Build change entries for the notification
   const changes: ChangeEntry[] = logs.map((log) => {
-    const product = log.products as { model_name: string; product_line_id: string } | null;
-    const productLine = log.product_lines as { label: string } | null;
+    const product = log.products;
+    const productLine = log.product_lines;
     return {
       product_name: product?.model_name ?? "Unknown",
       product_line: productLine?.label ?? "Unknown",
