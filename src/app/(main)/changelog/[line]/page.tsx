@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
+import { LocalTime } from "@/components/changelog/local-time";
 import type { ProductLine } from "@/types/database";
 
 interface ChangeLogRow {
@@ -12,18 +13,6 @@ interface ChangeLogRow {
   notified: boolean;
   created_at: string;
   products: { model_name: string } | null;
-}
-
-function formatDateTime(dateStr: string | null) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
 }
 
 export default async function ChangeLogPage({
@@ -63,14 +52,10 @@ export default async function ChangeLogPage({
     .order("created_at", { ascending: false })
     .limit(200)) as { data: ChangeLogRow[] | null };
 
-  // Group by date
+  // Group by date (use ISO date string for stable server-side grouping)
   const grouped = new Map<string, ChangeLogRow[]>();
   for (const log of logs ?? []) {
-    const dateKey = new Date(log.created_at).toLocaleDateString("en-US", {
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    });
+    const dateKey = log.created_at.slice(0, 10); // "2026-03-31"
     if (!grouped.has(dateKey)) grouped.set(dateKey, []);
     grouped.get(dateKey)!.push(log);
   }
@@ -101,7 +86,7 @@ export default async function ChangeLogPage({
           {Array.from(grouped).map(([date, entries]) => (
             <div key={date}>
               <h2 className="mb-3 text-sm font-semibold text-muted-foreground uppercase tracking-wider">
-                {date}
+                <LocalTime iso={`${date}T00:00:00Z`} format="date" />
               </h2>
               <div className="rounded-lg border bg-card divide-y">
                 {entries.map((entry) => (
@@ -118,27 +103,42 @@ export default async function ChangeLogPage({
                       }
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline gap-2">
+                      <div className="flex items-baseline gap-2 flex-wrap">
                         <Link
                           href={`/product/${entry.products?.model_name ?? ""}`}
                           className="text-sm font-medium text-engenius-blue hover:underline"
                         >
                           {entry.products?.model_name ?? "Unknown"}
                         </Link>
-                        <span className="text-xs text-muted-foreground tabular-nums">
-                          {formatDateTime(entry.created_at)}
-                        </span>
+                        <LocalTime
+                          iso={entry.created_at}
+                          format="time"
+                          className="text-xs text-muted-foreground tabular-nums"
+                        />
                         {entry.changes_summary.startsWith("New product") && (
                           <Badge className="bg-green-100 text-green-700 text-[10px] px-1.5 py-0">
                             NEW
                           </Badge>
                         )}
                       </div>
-                      <p className="mt-0.5 text-sm text-foreground">
-                        {entry.changes_summary}
-                      </p>
+                      <div className="mt-1 space-y-0.5">
+                        {entry.changes_summary.split("\n").map((line, i) => (
+                          <p
+                            key={i}
+                            className={`text-sm ${
+                              line.startsWith("+")
+                                ? "text-green-600"
+                                : line.startsWith("-")
+                                  ? "text-red-500"
+                                  : "text-foreground"
+                            }`}
+                          >
+                            {line}
+                          </p>
+                        ))}
+                      </div>
                       {entry.edited_by && (
-                        <p className="mt-0.5 text-xs text-muted-foreground">
+                        <p className="mt-1 text-xs text-muted-foreground">
                           by {entry.edited_by}
                         </p>
                       )}

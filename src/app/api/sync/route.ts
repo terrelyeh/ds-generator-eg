@@ -102,7 +102,7 @@ export async function POST(request: Request) {
 
       for (const [modelName, sheetData] of allProducts) {
         try {
-          // Check if product already exists (for change detection)
+          // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
             .from("products")
             .select("id, subtitle, full_name, overview, features")
@@ -110,6 +110,85 @@ export async function POST(request: Request) {
             .single();
 
           const isNew = !existing;
+
+          // Deep diff: compare fields
+          const fieldChanges: string[] = [];
+          if (!isNew) {
+            if (existing.subtitle !== sheetData.subtitle)
+              fieldChanges.push(`Subtitle: "${existing.subtitle}" → "${sheetData.subtitle}"`);
+            if (existing.full_name !== sheetData.full_name)
+              fieldChanges.push(`Full name: "${existing.full_name}" → "${sheetData.full_name}"`);
+            if (existing.overview !== sheetData.overview)
+              fieldChanges.push("Overview updated");
+            if (JSON.stringify(existing.features) !== JSON.stringify(sheetData.features)) {
+              const oldF = (existing.features as string[]) ?? [];
+              const newF = sheetData.features;
+              const added = newF.filter((f) => !oldF.includes(f));
+              const removed = oldF.filter((f) => !newF.includes(f));
+              if (added.length > 0) fieldChanges.push(`Features added: ${added.length}`);
+              if (removed.length > 0) fieldChanges.push(`Features removed: ${removed.length}`);
+            }
+          }
+
+          // Deep diff: compare specs (before replacing)
+          const specChanges: string[] = [];
+          if (!isNew) {
+            const { data: oldSections } = await supabase
+              .from("spec_sections")
+              .select("category, spec_items (label, value)")
+              .eq("product_id", existing.id)
+              .order("sort_order");
+
+            const oldSpecMap = new Map<string, Map<string, string>>();
+            for (const s of oldSections ?? []) {
+              const items = new Map<string, string>();
+              for (const i of (s.spec_items as { label: string; value: string }[]) ?? []) {
+                items.set(i.label, i.value);
+              }
+              oldSpecMap.set(s.category, items);
+            }
+
+            const newSpecMap = new Map<string, Map<string, string>>();
+            for (const s of sheetData.spec_sections) {
+              const items = new Map<string, string>();
+              for (const i of s.items) items.set(i.label, i.value);
+              newSpecMap.set(s.category, items);
+            }
+
+            // New or removed sections
+            for (const cat of newSpecMap.keys()) {
+              if (!oldSpecMap.has(cat)) specChanges.push(`+ Section: ${cat}`);
+            }
+            for (const cat of oldSpecMap.keys()) {
+              if (!newSpecMap.has(cat)) specChanges.push(`- Section: ${cat}`);
+            }
+
+            // Changed items within shared sections
+            for (const [cat, newItems] of newSpecMap) {
+              const oldItems = oldSpecMap.get(cat);
+              if (!oldItems) continue;
+              for (const [label, newVal] of newItems) {
+                const oldVal = oldItems.get(label);
+                if (oldVal === undefined) {
+                  specChanges.push(`+ ${cat} > ${label}`);
+                } else if (oldVal !== newVal) {
+                  specChanges.push(`${cat} > ${label}: "${oldVal}" → "${newVal}"`);
+                }
+              }
+              for (const label of oldItems.keys()) {
+                if (!newItems.has(label)) specChanges.push(`- ${cat} > ${label}`);
+              }
+            }
+          }
+
+          const allFieldChanges = [...fieldChanges, ...specChanges];
+          const hasChanges = isNew || allFieldChanges.length > 0;
+
+          // Skip if nothing changed
+          if (!hasChanges) {
+            lineResult.synced.push(modelName);
+            continue;
+          }
 
           // Upsert product
           const { data: product, error: productError } = await supabase
@@ -137,24 +216,10 @@ export async function POST(request: Request) {
             continue;
           }
 
-          // Detect what changed
-          const changes: string[] = [];
-          if (isNew) {
-            changes.push("New product added");
-          } else {
-            if (existing.subtitle !== sheetData.subtitle) changes.push("subtitle");
-            if (existing.full_name !== sheetData.full_name) changes.push("full name");
-            if (existing.overview !== sheetData.overview) changes.push("overview");
-            if (JSON.stringify(existing.features) !== JSON.stringify(sheetData.features))
-              changes.push("features");
-            // Specs always get replaced, so we count them as changed
-            changes.push("specs");
-          }
+          // Build change summary
           const changeSummary = isNew
             ? "New product added"
-            : changes.length > 0
-              ? `Updated: ${changes.join(", ")}`
-              : "Synced (no changes)";
+            : allFieldChanges.join("\n");
 
           // Sync images from Google Drive → Supabase Storage
           try {
@@ -176,7 +241,7 @@ export async function POST(request: Request) {
             // Image sync is optional — continue without images
           }
 
-          // Replace spec sections + items (delete old, insert new)
+          // Replace spec sections + items
           await supabase
             .from("spec_sections")
             .delete()
@@ -184,7 +249,7 @@ export async function POST(request: Request) {
 
           await syncSpecSections(supabase, product.id, sheetData.spec_sections);
 
-          // Log the change
+          // Log the change (only when something actually changed)
           await supabase.from("change_logs").insert({
             product_id: product.id,
             product_line_id: pl.id,
