@@ -31,6 +31,82 @@ function formatDate(dateStr: string | null) {
   });
 }
 
+function ImageUploadButton({
+  modelName,
+  imageType,
+  currentUrl,
+  onUploaded,
+}: {
+  modelName: string;
+  imageType: "product" | "hardware";
+  currentUrl: string;
+  onUploaded: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("model", modelName);
+      formData.append("type", imageType);
+
+      const res = await fetch("/api/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Upload failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  const label = imageType === "product" ? "Product Image" : "Hardware Image";
+  const hasImage = currentUrl && !currentUrl.startsWith("cache/");
+
+  return (
+    <div className="flex flex-col items-center gap-2 rounded-lg border p-4">
+      {hasImage ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={currentUrl}
+          alt={`${modelName} ${imageType}`}
+          className="h-32 w-auto object-contain"
+        />
+      ) : (
+        <div className="flex h-32 w-32 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+          No image
+        </div>
+      )}
+      <span className="text-sm font-medium">{label}</span>
+      <label>
+        <span className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">
+          {uploading ? "Uploading..." : hasImage ? "Replace" : "Upload"}
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileChange}
+          disabled={uploading}
+        />
+      </label>
+    </div>
+  );
+}
+
 export function ProductDetail({ product, versions }: ProductDetailProps) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -86,31 +162,30 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
 
       <Separator />
 
-      {/* Image Readiness */}
+      {/* Product Images */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Image Assets</CardTitle>
+          <CardTitle className="text-base">Product Images</CardTitle>
         </CardHeader>
         <CardContent>
-          {product.image_assets.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No image assets tracked yet.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-3">
-              {product.image_assets.map((asset) => (
-                <Badge
-                  key={asset.id}
-                  variant={
-                    asset.status === "missing" ? "destructive" : "default"
-                  }
-                >
-                  {asset.image_type}
-                  {asset.label ? `: ${asset.label}` : ""} — {asset.status}
-                </Badge>
-              ))}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-4">
+            <ImageUploadButton
+              modelName={product.model_name}
+              imageType="product"
+              currentUrl={product.product_image}
+              onUploaded={() => router.refresh()}
+            />
+            <ImageUploadButton
+              modelName={product.model_name}
+              imageType="hardware"
+              currentUrl={product.hardware_image}
+              onUploaded={() => router.refresh()}
+            />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Images are automatically synced from Google Drive. You can also
+            upload manually here.
+          </p>
         </CardContent>
       </Card>
 

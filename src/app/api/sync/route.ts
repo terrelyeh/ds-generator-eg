@@ -5,6 +5,7 @@ import {
   loadProductFromSheets,
   getSheetMetadata,
 } from "@/lib/google/sheets";
+import { syncProductImages } from "@/lib/google/drive-images";
 import type { SheetSpecSection } from "@/lib/google/sheets";
 import type { ProductLine } from "@/types/database";
 
@@ -118,6 +119,26 @@ export async function POST(request: Request) {
               `${model.model_name}: product upsert failed — ${productError?.message}`
             );
             continue;
+          }
+
+          // Sync images from Google Drive → Supabase Storage
+          try {
+            const images = await syncProductImages(model.model_name, supabase);
+            if (images.product_image_url || images.hardware_image_url) {
+              await supabase
+                .from("products")
+                .update({
+                  ...(images.product_image_url && {
+                    product_image: images.product_image_url,
+                  }),
+                  ...(images.hardware_image_url && {
+                    hardware_image: images.hardware_image_url,
+                  }),
+                })
+                .eq("id", product.id);
+            }
+          } catch {
+            // Image sync is optional — continue without images
           }
 
           // Replace spec sections + items (delete old, insert new)
