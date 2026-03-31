@@ -189,6 +189,46 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
         </CardContent>
       </Card>
 
+      {/* Overview & Features */}
+      {(product.overview || product.features?.length > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Overview & Features</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Overview */}
+            {product.overview && (
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Overview
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/85">
+                  {product.overview}
+                </p>
+              </div>
+            )}
+
+            {/* Features */}
+            {product.features?.length > 0 && (
+              <div>
+                {product.overview && <Separator className="mb-5" />}
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Key Features
+                </h3>
+                <ul className="grid grid-cols-1 gap-x-8 gap-y-1.5 sm:grid-cols-2">
+                  {product.features.map((feature, i) => (
+                    <li key={i} className="flex items-baseline gap-2 text-sm">
+                      <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-engenius-blue/60" />
+                      <span className="text-foreground/85">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Specs Preview */}
       <Card>
         <CardHeader>
