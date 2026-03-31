@@ -103,7 +103,12 @@ async function sendTelegram(changes: ChangeEntry[]): Promise<void> {
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
 
-  const text = formatPlainText(changes);
+  let text = formatPlainText(changes);
+  // Telegram message limit is 4096 chars
+  if (text.length > 4000) {
+    text = text.slice(0, 3950) + "\n\n… (truncated)";
+  }
+
   const res = await fetch(
     `https://api.telegram.org/bot${token}/sendMessage`,
     {
@@ -112,7 +117,6 @@ async function sendTelegram(changes: ChangeEntry[]): Promise<void> {
       body: JSON.stringify({
         chat_id: chatId,
         text,
-        parse_mode: "HTML",
       }),
     }
   );

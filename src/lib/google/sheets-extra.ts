@@ -71,24 +71,13 @@ export interface SheetRevisionLog {
 function parseRevisionDate(raw: string): string | null {
   if (!raw) return null;
 
-  // Excel serial number (5+ digits, typically 40000-50000 range for 2009-2036)
-  if (/^\d{5,}$/.test(raw)) {
-    const serial = parseInt(raw);
-    // Excel epoch: 1899-12-30 (accounts for the Excel leap year bug)
-    const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
-    const y = date.getUTCFullYear();
-    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(date.getUTCDate()).padStart(2, "0");
-    return `${y}-${m}-${d}`;
-  }
-
   // "2024/02/26" or "2024-02-26"
   const isoMatch = raw.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})$/);
   if (isoMatch) {
     return `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`;
   }
 
-  // "20250207" (8 digits)
+  // "20250207" (8 digits, YYYYMMdd)
   const compact8 = raw.match(/^(\d{4})(\d{2})(\d{2})$/);
   if (compact8) {
     return `${compact8[1]}-${compact8[2]}-${compact8[3]}`;
@@ -109,6 +98,18 @@ function parseRevisionDate(raw: string): string | null {
     const now = new Date();
     const year = parseInt(month) > now.getMonth() + 1 ? now.getFullYear() - 1 : now.getFullYear();
     return `${year}-${month}-${day}`;
+  }
+
+  // Excel serial number (exactly 5 digits, range 30000-60000 for ~1982-2064)
+  if (/^\d{5}$/.test(raw)) {
+    const serial = parseInt(raw);
+    if (serial >= 30000 && serial <= 60000) {
+      const date = new Date(Date.UTC(1899, 11, 30) + serial * 86400000);
+      const y = date.getUTCFullYear();
+      const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(date.getUTCDate()).padStart(2, "0");
+      return `${y}-${m}-${d}`;
+    }
   }
 
   return null;
