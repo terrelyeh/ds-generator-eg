@@ -132,8 +132,8 @@ function parseOverviewData(
     if (label) rowMap.set(label, i);
   }
 
-  // Model Description
-  const descIdx = rowMap.get("Model Description");
+  // Model Name (previously "Model Description" in some sheets)
+  const descIdx = rowMap.get("Model Name") ?? rowMap.get("Model Description");
   if (descIdx !== undefined) {
     full_name = getCell(rows[descIdx], colIdx);
   }
@@ -156,7 +156,8 @@ function parseOverviewData(
     }
   }
 
-  // Features — single cell with newline-separated "* " entries
+  // Features — single cell with newline-separated entries
+  // Supports both "* Feature text" (bullet prefix) and plain lines
   for (const row of rows) {
     const label = String(row?.[0] ?? "").trim();
     if (label.includes("Key Feature Lists") || label.includes("Key Feature")) {
@@ -164,31 +165,13 @@ function parseOverviewData(
       if (cellValue) {
         for (const line of cellValue.split("\n")) {
           const trimmed = line.trim();
-          if (trimmed.startsWith("*")) {
-            const text = trimmed.replace(/^\*\s*/, "").trim();
-            if (text) features.push(text);
-          }
+          if (!trimmed) continue;
+          // Strip leading bullet markers: *, •, -, etc.
+          const text = trimmed.replace(/^[*•\-–]\s*/, "").trim();
+          if (text) features.push(text);
         }
       }
       if (features.length > 0) break;
-    }
-  }
-
-  // Fallback: features spread across multiple rows
-  if (features.length === 0) {
-    let inFeatures = false;
-    for (const row of rows) {
-      const label = String(row?.[0] ?? "").trim();
-      if (label.includes("Key Feature Lists")) { inFeatures = true; continue; }
-      if (inFeatures) {
-        if (label.startsWith("*")) {
-          let text = getCell(row, colIdx) || label;
-          text = text.replace(/^\*\s*/, "").trim();
-          if (text) features.push(text);
-        } else if (label) {
-          inFeatures = false;
-        }
-      }
     }
   }
 

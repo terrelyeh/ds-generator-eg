@@ -244,10 +244,12 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
                 <TableBody>
                   {section.items.map((item) => (
                     <TableRow key={item.id}>
-                      <TableCell className="w-1/3 text-sm font-medium text-muted-foreground">
+                      <TableCell className="w-1/3 text-sm text-muted-foreground">
                         {item.label}
                       </TableCell>
-                      <TableCell className="text-sm">{item.value}</TableCell>
+                      <TableCell className="text-sm text-right font-semibold">
+                        {item.value}
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
