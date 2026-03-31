@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -14,7 +13,6 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { ProductLine } from "@/types/database";
 
 interface ProductSummary {
@@ -79,6 +77,7 @@ function ProductTable({ products }: { products: ProductSummary[] }) {
     <Table>
       <TableHeader>
         <TableRow>
+          <TableHead className="w-[50px] text-center">#</TableHead>
           <TableHead>Model</TableHead>
           <TableHead>Description</TableHead>
           <TableHead>Version</TableHead>
@@ -89,8 +88,11 @@ function ProductTable({ products }: { products: ProductSummary[] }) {
         </TableRow>
       </TableHeader>
       <TableBody>
-        {products.map((product) => (
+        {products.map((product, index) => (
           <TableRow key={product.id}>
+            <TableCell className="text-center text-xs tabular-nums text-muted-foreground">
+              {index + 1}
+            </TableCell>
             <TableCell>
               <Link
                 href={`/product/${product.model_name}`}
@@ -132,6 +134,30 @@ function ProductTable({ products }: { products: ProductSummary[] }) {
   );
 }
 
+function KpiCard({
+  label,
+  value,
+  sub,
+}: {
+  label: string;
+  value: string | number;
+  sub?: string;
+}) {
+  return (
+    <div className="rounded-xl bg-engenius-blue/5 border border-engenius-blue/15 px-5 py-4">
+      <p className="text-xs font-medium uppercase tracking-wider text-engenius-blue/70">
+        {label}
+      </p>
+      <p className="mt-1 text-3xl font-semibold tabular-nums text-engenius-dark">
+        {value}
+      </p>
+      {sub && (
+        <p className="mt-0.5 text-xs text-muted-foreground">{sub}</p>
+      )}
+    </div>
+  );
+}
+
 export function DashboardContent({
   productLines,
   products,
@@ -169,67 +195,71 @@ export function DashboardContent({
 
   const totalProducts = products.length;
   const imagesReady = products.filter(
-    (p) => p.image_readiness.total > 0 && p.image_readiness.ready === p.image_readiness.total
+    (p) =>
+      p.image_readiness.total > 0 &&
+      p.image_readiness.ready === p.image_readiness.total
   ).length;
+
+  // Find the most recent edit across all products
+  const latestEdit = products.reduce<string | null>((latest, p) => {
+    const d = p.sheet_last_modified ?? p.updated_at;
+    if (!latest) return d;
+    return d > latest ? d : latest;
+  }, null);
 
   return (
     <div className="space-y-6">
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Total Products
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold tabular-nums">
-              {totalProducts}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Product Lines
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold tabular-nums">
-              {productLines.length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">
-              Images Ready
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-semibold tabular-nums">
-              {imagesReady}/{totalProducts}
-            </div>
-          </CardContent>
-        </Card>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
+        <KpiCard label="Total Products" value={totalProducts} />
+        <KpiCard label="Product Lines" value={productLines.length} />
+        <KpiCard
+          label="Images Ready"
+          value={`${imagesReady}/${totalProducts}`}
+          sub={imagesReady === totalProducts ? "All complete" : "Some missing"}
+        />
+        <KpiCard
+          label="Last Sync"
+          value={latestEdit ? formatDate(latestEdit) : "—"}
+          sub="From Google Sheets"
+        />
       </div>
 
       {/* Tabs + table */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex items-center justify-between">
-          <TabsList>
-            <TabsTrigger value="all">All ({products.length})</TabsTrigger>
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          {/* Product line tabs with background */}
+          <div className="flex gap-1 rounded-lg bg-muted p-1">
+            <button
+              onClick={() => setActiveTab("all")}
+              className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                activeTab === "all"
+                  ? "bg-engenius-blue text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background"
+              }`}
+            >
+              All ({products.length})
+            </button>
             {productLines.map((pl) => {
               const count = products.filter(
                 (p) => p.product_line_id === pl.id
               ).length;
+              if (count === 0) return null;
               return (
-                <TabsTrigger key={pl.id} value={pl.id}>
+                <button
+                  key={pl.id}
+                  onClick={() => setActiveTab(pl.id)}
+                  className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                    activeTab === pl.id
+                      ? "bg-engenius-blue text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background"
+                  }`}
+                >
                   {pl.label} ({count})
-                </TabsTrigger>
+                </button>
               );
             })}
-          </TabsList>
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -240,12 +270,10 @@ export function DashboardContent({
           </Button>
         </div>
 
-        <TabsContent value={activeTab} className="mt-4">
-          <div className="rounded-lg border bg-card">
-            <ProductTable products={filteredProducts} />
-          </div>
-        </TabsContent>
-      </Tabs>
+        <div className="rounded-lg border bg-card">
+          <ProductTable products={filteredProducts} />
+        </div>
+      </div>
     </div>
   );
 }
