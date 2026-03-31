@@ -179,19 +179,24 @@ export function DashboardContent({
   async function handleSync() {
     setSyncing(true);
     try {
-      const res = await fetch("/api/sync?force=true", { method: "POST" });
+      // Sync only the active product line
+      const activeLine = productLines.find((pl) => pl.id === activeTab);
+      const lineParam = activeLine
+        ? `&line=${encodeURIComponent(activeLine.name)}`
+        : "";
+      const res = await fetch(`/api/sync?force=true${lineParam}`, {
+        method: "POST",
+      });
       const data = await res.json();
       if (data.ok) {
         const totalSynced = data.results.reduce(
           (sum: number, r: { synced: string[] }) => sum + r.synced.length,
           0
         );
-        const totalSkipped = data.results.filter(
-          (r: { skipped?: boolean }) => r.skipped
-        ).length;
+        const lineName = activeLine?.label ?? "All";
         const msg = totalSynced > 0
-          ? `Sync complete: ${totalSynced} products updated.`
-          : `Sync complete: all data is up to date.`;
+          ? `${lineName}: ${totalSynced} products synced.`
+          : `${lineName}: all data is up to date.`;
         alert(msg);
         router.refresh();
       } else {

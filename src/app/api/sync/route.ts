@@ -86,8 +86,11 @@ export async function POST(request: Request) {
       };
       try {
         metadata = await getSheetMetadata(pl.sheet_id);
-      } catch {
-        // Drive API access may not be available; continue without metadata
+      } catch (driveErr) {
+        // Drive API not available — Smart Sync won't work, fall through to full sync
+        lineResult.errors.push(
+          `Drive API: ${driveErr instanceof Error ? driveErr.message : String(driveErr)}`
+        );
       }
 
       // Smart Sync: skip if sheet hasn't changed since last sync
