@@ -61,8 +61,16 @@ export async function POST(request: Request) {
     const lineResult = { line: pl.name, synced: [] as string[], errors: [] as string[] };
 
     try {
-      // Get sheet metadata (last modified, last editor)
-      const metadata = await getSheetMetadata(pl.sheet_id);
+      // Get sheet metadata (last modified, last editor) — optional, uses Drive API
+      let metadata: { last_modified: string | null; last_editor: string | null } = {
+        last_modified: null,
+        last_editor: null,
+      };
+      try {
+        metadata = await getSheetMetadata(pl.sheet_id);
+      } catch {
+        // Drive API access may not be available; continue without metadata
+      }
 
       // List all models in this sheet
       const models = await listModelsFromSheet(pl.sheet_id, pl.detail_specs_gid);
