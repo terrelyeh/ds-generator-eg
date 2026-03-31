@@ -63,6 +63,7 @@ export async function POST(request: Request) {
     synced: string[];
     errors: string[];
     skipped?: boolean;
+    debug?: { sheetModified: string | null; lastSynced: string | null };
   }[] = [];
 
   // Collect changes for notifications
@@ -71,7 +72,11 @@ export async function POST(request: Request) {
   for (const pl of linesToSync) {
     if (!pl.sheet_id || !pl.detail_specs_gid) continue;
 
-    const lineResult = { line: pl.name, synced: [] as string[], errors: [] as string[] };
+    const lineResult: typeof results[number] = { line: pl.name, synced: [], errors: [] };
+    let lineDebug: { sheetModified: string | null; lastSynced: string | null } = {
+      sheetModified: null,
+      lastSynced: pl.last_synced_at ?? null,
+    };
 
     try {
       // Get sheet metadata (last modified, last editor) — uses Drive API
@@ -86,14 +91,23 @@ export async function POST(request: Request) {
       }
 
       // Smart Sync: skip if sheet hasn't changed since last sync
+      const sheetModified = metadata.last_modified ? new Date(metadata.last_modified).getTime() : null;
+      const lastSynced = pl.last_synced_at ? new Date(pl.last_synced_at).getTime() : null;
+
+      lineDebug = {
+        sheetModified: metadata.last_modified,
+        lastSynced: pl.last_synced_at ?? null,
+      };
+      const debugInfo = lineDebug;
+
       if (
         !forceSync &&
         !filterModel &&
-        metadata.last_modified &&
-        pl.last_synced_at &&
-        new Date(metadata.last_modified) <= new Date(pl.last_synced_at)
+        sheetModified !== null &&
+        lastSynced !== null &&
+        sheetModified <= lastSynced
       ) {
-        results.push({ line: pl.name, synced: [], errors: [], skipped: true });
+        results.push({ line: pl.name, synced: [], errors: [], skipped: true, debug: debugInfo });
         continue;
       }
 
@@ -394,6 +408,7 @@ export async function POST(request: Request) {
       .update({ last_synced_at: new Date().toISOString() })
       .eq("id", pl.id);
 
+    lineResult.debug = lineDebug;
     results.push(lineResult);
   }
 
