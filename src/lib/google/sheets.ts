@@ -43,23 +43,25 @@ export interface SheetMetadata {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function getCell(row: string[] | undefined, colIdx: number): string {
+function getCell(row: unknown[] | undefined, colIdx: number): string {
   if (!row || colIdx >= row.length) return "";
-  return (row[colIdx] ?? "").trim();
+  const val = row[colIdx];
+  if (val == null) return "";
+  return String(val).trim();
 }
 
-function findModelColumn(rows: string[][], modelNumber: string): number | null {
+function findModelColumn(rows: unknown[][], modelNumber: string): number | null {
   for (let r = 0; r < Math.min(rows.length, 5); r++) {
     for (let c = 0; c < rows[r].length; c++) {
-      if (rows[r][c].trim() === modelNumber) return c;
+      if (String(rows[r][c] ?? "").trim() === modelNumber) return c;
     }
   }
   return null;
 }
 
-function findRowByLabel(rows: string[][], label: string): number | null {
+function findRowByLabel(rows: unknown[][], label: string): number | null {
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i]?.[0]?.trim() === label) return i;
+    if (String(rows[i]?.[0] ?? "").trim() === label) return i;
   }
   return null;
 }
@@ -68,7 +70,7 @@ function findRowByLabel(rows: string[][], label: string): number | null {
 // Parse spec sections from Detail Specs tab
 // ---------------------------------------------------------------------------
 
-function parseSpecSections(rows: string[][], colIdx: number): SheetSpecSection[] {
+function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[] {
   const sections: SheetSpecSection[] = [];
   let currentCategory: string | null = null;
   let currentItems: SheetSpecItem[] = [];
@@ -76,14 +78,14 @@ function parseSpecSections(rows: string[][], colIdx: number): SheetSpecSection[]
   // Find where "Technical Specifications" starts
   let startRow = 0;
   for (let i = 0; i < rows.length; i++) {
-    if (rows[i]?.[0]?.trim() === "Technical Specifications") {
+    if (String(rows[i]?.[0] ?? "").trim() === "Technical Specifications") {
       startRow = i + 1;
       break;
     }
   }
 
   for (let i = startRow; i < rows.length; i++) {
-    const label = rows[i]?.[0]?.trim() ?? "";
+    const label = String(rows[i]?.[0] ?? "").trim();
     const value = getCell(rows[i], colIdx);
 
     if (!label) continue;
@@ -116,7 +118,7 @@ function parseSpecSections(rows: string[][], colIdx: number): SheetSpecSection[]
 // ---------------------------------------------------------------------------
 
 function parseOverviewData(
-  rows: string[][],
+  rows: unknown[][],
   colIdx: number
 ): { full_name: string; overview: string; features: string[] } {
   let full_name = "";
@@ -126,7 +128,7 @@ function parseOverviewData(
   // Build label → row index map
   const rowMap = new Map<string, number>();
   for (let i = 0; i < rows.length; i++) {
-    const label = rows[i]?.[0]?.trim() ?? "";
+    const label = String(rows[i]?.[0] ?? "").trim();
     if (label) rowMap.set(label, i);
   }
 
@@ -138,7 +140,7 @@ function parseOverviewData(
 
   // Overview — prefer "Single Overview" (MKT rewrite)
   for (const row of rows) {
-    const label = row?.[0]?.trim() ?? "";
+    const label = String(row?.[0] ?? "").trim();
     if (label.includes("Single Overview")) {
       const val = getCell(row, colIdx);
       if (val) { overview = val; break; }
@@ -146,7 +148,7 @@ function parseOverviewData(
   }
   if (!overview) {
     for (const row of rows) {
-      const label = row?.[0]?.trim() ?? "";
+      const label = String(row?.[0] ?? "").trim();
       if (label.includes("Overview") && !label.includes("Single")) {
         const val = getCell(row, colIdx);
         if (val) { overview = val; break; }
@@ -156,7 +158,7 @@ function parseOverviewData(
 
   // Features — single cell with newline-separated "* " entries
   for (const row of rows) {
-    const label = row?.[0]?.trim() ?? "";
+    const label = String(row?.[0] ?? "").trim();
     if (label.includes("Key Feature Lists") || label.includes("Key Feature")) {
       const cellValue = getCell(row, colIdx);
       if (cellValue) {
@@ -176,7 +178,7 @@ function parseOverviewData(
   if (features.length === 0) {
     let inFeatures = false;
     for (const row of rows) {
-      const label = row?.[0]?.trim() ?? "";
+      const label = String(row?.[0] ?? "").trim();
       if (label.includes("Key Feature Lists")) { inFeatures = true; continue; }
       if (inFeatures) {
         if (label.startsWith("*")) {
@@ -242,7 +244,7 @@ export async function listModelsFromSheet(
     valueRenderOption: "UNFORMATTED_VALUE",
   });
 
-  const rows = (res.data.values ?? []) as string[][];
+  const rows = (res.data.values ?? []) as unknown[][];
   if (rows.length < 2) return [];
 
   // Find "Model #" row and "Model Name" row
@@ -307,8 +309,8 @@ export async function loadProductFromSheets(
     }),
   ]);
 
-  const detailRows = (detailRes.data.values ?? []) as string[][];
-  const overviewRows = (overviewRes.data.values ?? []) as string[][];
+  const detailRows = (detailRes.data.values ?? []) as unknown[][];
+  const overviewRows = (overviewRes.data.values ?? []) as unknown[][];
 
   // Find model column in detail tab
   const detailCol = findModelColumn(detailRows, modelNumber);
