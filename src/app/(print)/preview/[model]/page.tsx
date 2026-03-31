@@ -103,15 +103,16 @@ body {
     margin: 0 !important;
     background: white !important;
     height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
     overflow: visible !important;
   }
   .page {
     box-shadow: none !important;
     margin: 0 !important;
-    page-break-after: always !important;
     page-break-inside: avoid !important;
   }
-  .page:last-child { page-break-after: auto !important; }
+  .page:not(:last-of-type) { page-break-after: always !important; }
   .print-toolbar { display: none !important; }
 }
 
