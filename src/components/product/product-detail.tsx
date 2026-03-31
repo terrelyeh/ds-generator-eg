@@ -240,20 +240,27 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               <h3 className="mb-2 text-sm font-medium text-engenius-blue">
                 {section.category}
               </h3>
-              <Table>
-                <TableBody>
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[200px]" />
+                  <col />
+                </colgroup>
+                <tbody>
                   {section.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="w-1/3 text-sm text-right font-semibold text-muted-foreground">
+                    <tr
+                      key={item.id}
+                      className="border-b border-border last:border-b-0"
+                    >
+                      <td className="py-2.5 pr-4 text-right align-top text-sm font-semibold text-muted-foreground">
                         {item.label}
-                      </TableCell>
-                      <TableCell className="text-sm">
+                      </td>
+                      <td className="py-2.5 pl-4 align-top text-sm leading-relaxed break-words">
                         {item.value}
-                      </TableCell>
-                    </TableRow>
+                      </td>
+                    </tr>
                   ))}
-                </TableBody>
-              </Table>
+                </tbody>
+              </table>
             </div>
           ))}
           {product.spec_sections.length === 0 && (
