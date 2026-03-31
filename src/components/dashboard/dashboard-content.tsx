@@ -30,19 +30,9 @@ interface ProductSummary {
   image_readiness: { total: number; ready: number };
 }
 
-interface ChangeLogEntry {
-  id: string;
-  model_name: string;
-  changes_summary: string;
-  edited_by: string | null;
-  created_at: string;
-  notified: boolean;
-}
-
 interface DashboardContentProps {
   productLines: ProductLine[];
   products: ProductSummary[];
-  recentChanges?: ChangeLogEntry[];
 }
 
 function formatDate(dateStr: string | null) {
@@ -168,53 +158,9 @@ function KpiCard({
   );
 }
 
-function RecentChanges({ changes }: { changes: ChangeLogEntry[] }) {
-  if (changes.length === 0) {
-    return (
-      <div className="py-6 text-center text-sm text-muted-foreground">
-        No recent changes.
-      </div>
-    );
-  }
-
-  return (
-    <div className="divide-y">
-      {changes.map((c) => (
-        <div key={c.id} className="flex items-start gap-3 px-4 py-3">
-          <div
-            className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${
-              c.notified ? "bg-green-400" : "bg-amber-400"
-            }`}
-            title={c.notified ? "Notified" : "Pending notification"}
-          />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2">
-              <span className="text-sm font-medium text-foreground">
-                {c.model_name}
-              </span>
-              <span className="text-xs text-muted-foreground">
-                {formatDate(c.created_at)}
-              </span>
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {c.changes_summary}
-            </p>
-            {c.edited_by && (
-              <p className="text-xs text-muted-foreground/70">
-                by {c.edited_by}
-              </p>
-            )}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function DashboardContent({
   productLines,
   products,
-  recentChanges = [],
 }: DashboardContentProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState("all");
@@ -314,14 +260,26 @@ export function DashboardContent({
               );
             })}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? "Syncing..." : "Sync from Sheets"}
-          </Button>
+          <div className="flex gap-2">
+            {activeTab !== "all" && (
+              <Link
+                href={`/changelog/${encodeURIComponent(
+                  productLines.find((pl) => pl.id === activeTab)?.name ?? ""
+                )}`}
+                className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              >
+                Change Log
+              </Link>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSync}
+              disabled={syncing}
+            >
+              {syncing ? "Syncing..." : "Sync from Sheets"}
+            </Button>
+          </div>
         </div>
 
         <div className="rounded-lg border bg-card">
@@ -329,17 +287,6 @@ export function DashboardContent({
         </div>
       </div>
 
-      {/* Recent Changes */}
-      {recentChanges.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-foreground mb-3">
-            Recent Changes
-          </h2>
-          <div className="rounded-lg border bg-card">
-            <RecentChanges changes={recentChanges} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }
