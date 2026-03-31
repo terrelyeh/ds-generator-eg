@@ -7,6 +7,11 @@ import {
 } from "@/lib/google/sheets";
 import { syncProductImages } from "@/lib/google/drive-images";
 import { sendNotifications } from "@/lib/notifications";
+import {
+  loadRevisionLogs,
+  loadComparison,
+  loadCloudComparison,
+} from "@/lib/google/sheets-extra";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
 import type { ProductLine } from "@/types/database";
@@ -277,6 +282,84 @@ export async function POST(request: Request) {
         `Sheet error: ${err instanceof Error ? err.message : String(err)}`
       );
     }
+
+      // Sync extra tabs: Revision Log, Comparison, Cloud Comparison
+      try {
+        // Revision Log
+        if (pl.revision_log_gid) {
+          const revLogs = await loadRevisionLogs(pl.sheet_id, pl.revision_log_gid);
+          if (revLogs.length > 0) {
+            // Replace all revision logs for this product line
+            await supabase
+              .from("revision_logs")
+              .delete()
+              .eq("product_line_id", pl.id);
+            // Insert in batches of 50
+            for (let b = 0; b < revLogs.length; b += 50) {
+              const batch = revLogs.slice(b, b + 50).map((r) => ({
+                product_line_id: pl.id,
+                revision_date: r.revision_date,
+                parsed_date: r.parsed_date,
+                editor: r.editor,
+                action: r.action,
+                target_page: r.target_page,
+                change_type: r.change_type,
+                description: r.description,
+                mkt_close_date: r.mkt_close_date || null,
+              }));
+              await supabase.from("revision_logs").insert(batch);
+            }
+          }
+        }
+
+        // Comparison
+        if (pl.comparison_gid) {
+          const comp = await loadComparison(pl.sheet_id, pl.comparison_gid);
+          if (comp.items.length > 0) {
+            await supabase
+              .from("comparisons")
+              .delete()
+              .eq("product_line_id", pl.id);
+            for (let b = 0; b < comp.items.length; b += 50) {
+              const batch = comp.items.slice(b, b + 50).map((item, idx) => ({
+                product_line_id: pl.id,
+                model_name: item.model_name,
+                category: item.category,
+                label: item.label,
+                value: item.value,
+                sort_order: b + idx,
+              }));
+              await supabase.from("comparisons").insert(batch);
+            }
+          }
+        }
+
+        // Cloud Comparison
+        if (pl.cloud_comparison_gid) {
+          const cloud = await loadCloudComparison(
+            pl.sheet_id,
+            pl.cloud_comparison_gid
+          );
+          if (cloud.length > 0) {
+            await supabase
+              .from("cloud_comparisons")
+              .delete()
+              .eq("product_line_id", pl.id);
+            const batch = cloud.map((c, idx) => ({
+              product_line_id: pl.id,
+              model_name: c.model_name,
+              label: c.label || null,
+              specs: c.specs,
+              sort_order: idx,
+            }));
+            await supabase.from("cloud_comparisons").insert(batch);
+          }
+        }
+      } catch (err) {
+        lineResult.errors.push(
+          `Extra tabs: ${err instanceof Error ? err.message : String(err)}`
+        );
+      }
 
     results.push(lineResult);
   }

@@ -29,6 +29,9 @@ export interface Database {
           sheet_id: string | null;
           overview_gid: string | null;
           detail_specs_gid: string | null;
+          revision_log_gid: string | null;
+          comparison_gid: string | null;
+          cloud_comparison_gid: string | null;
           created_at: string;
         };
         Insert: Omit<
@@ -200,6 +203,62 @@ export interface Database {
           >;
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
       };
+      revision_logs: {
+        Row: {
+          id: string;
+          product_line_id: string | null;
+          revision_date: string | null;
+          parsed_date: string | null;
+          editor: string | null;
+          action: string | null;
+          target_page: string | null;
+          change_type: string | null;
+          description: string;
+          mkt_close_date: string | null;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["revision_logs"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["revision_logs"]["Row"], "id" | "created_at">>;
+        Update: Partial<Database["public"]["Tables"]["revision_logs"]["Insert"]>;
+      };
+      comparisons: {
+        Row: {
+          id: string;
+          product_line_id: string | null;
+          model_name: string;
+          category: string;
+          label: string;
+          value: string;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["comparisons"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["comparisons"]["Row"], "id" | "created_at">>;
+        Update: Partial<Database["public"]["Tables"]["comparisons"]["Insert"]>;
+      };
+      cloud_comparisons: {
+        Row: {
+          id: string;
+          product_line_id: string | null;
+          model_name: string;
+          label: string | null;
+          specs: Record<string, string>;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["cloud_comparisons"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["cloud_comparisons"]["Row"], "id" | "created_at">>;
+        Update: Partial<Database["public"]["Tables"]["cloud_comparisons"]["Insert"]>;
+      };
     };
     Enums: {
       image_type: ImageType;
@@ -219,6 +278,9 @@ export type ImageAsset = Database["public"]["Tables"]["image_assets"]["Row"];
 export type Version = Database["public"]["Tables"]["versions"]["Row"];
 export type ChangeLog = Database["public"]["Tables"]["change_logs"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type RevisionLog = Database["public"]["Tables"]["revision_logs"]["Row"];
+export type Comparison = Database["public"]["Tables"]["comparisons"]["Row"];
+export type CloudComparison = Database["public"]["Tables"]["cloud_comparisons"]["Row"];
 
 // Composite types for API responses
 export type ProductWithSpecs = Product & {

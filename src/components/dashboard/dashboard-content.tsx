@@ -262,14 +262,24 @@ export function DashboardContent({
           </div>
           <div className="flex gap-2">
             {activeTab !== "all" && (
-              <Link
-                href={`/changelog/${encodeURIComponent(
-                  productLines.find((pl) => pl.id === activeTab)?.name ?? ""
-                )}`}
-                className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              >
-                Change Log
-              </Link>
+              <>
+                <Link
+                  href={`/compare/${encodeURIComponent(
+                    productLines.find((pl) => pl.id === activeTab)?.name ?? ""
+                  )}`}
+                  className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  Compare
+                </Link>
+                <Link
+                  href={`/changelog/${encodeURIComponent(
+                    productLines.find((pl) => pl.id === activeTab)?.name ?? ""
+                  )}`}
+                  className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                >
+                  Change Log
+                </Link>
+              </>
             )}
             <Button
               variant="outline"
