@@ -73,18 +73,18 @@ export async function POST(request: Request) {
 
     const lineResult: typeof results[number] = { line: pl.name, synced: [], errors: [] };
 
+    // Get sheet metadata (last modified, last editor) — uses Drive API
+    let metadata: { last_modified: string | null; last_editor: string | null } = {
+      last_modified: null,
+      last_editor: null,
+    };
     try {
-      // Get sheet metadata (last modified, last editor) — uses Drive API
-      let metadata: { last_modified: string | null; last_editor: string | null } = {
-        last_modified: null,
-        last_editor: null,
-      };
-      try {
-        metadata = await getSheetMetadata(pl.sheet_id);
-      } catch {
-        // Drive API not available — Smart Sync won't work, fall through to full sync
-      }
+      metadata = await getSheetMetadata(pl.sheet_id);
+    } catch {
+      // Drive API not available — Smart Sync won't work, fall through to full sync
+    }
 
+    try {
       // Smart Sync: skip if sheet hasn't changed since last sync
       const sheetModified = metadata.last_modified ? new Date(metadata.last_modified).getTime() : null;
       const lastSynced = pl.last_synced_at ? new Date(pl.last_synced_at).getTime() : null;
@@ -249,14 +249,10 @@ export async function POST(request: Request) {
             continue;
           }
 
-          // Build change summary (text for notifications)
+          // Build change summary (compact one-liner for notifications)
           const changeSummary = isNew
             ? "New product added"
-            : details.map((d) => {
-                if (d.type === "added") return `+ ${d.field}: ${d.to}`;
-                if (d.type === "removed") return `- ${d.field}: ${d.from}`;
-                return `${d.field}: ${d.from} → ${d.to}`;
-              }).join("\n");
+            : buildSummaryText(details);
 
           // Sync images from Google Drive → Supabase Storage
           try {
@@ -345,10 +341,20 @@ export async function POST(request: Request) {
           }
         }
 
-        // Comparison
+        // Comparison (with diff detection)
         if (pl.comparison_gid) {
           const comp = await loadComparison(pl.sheet_id, pl.comparison_gid);
           if (comp.items.length > 0) {
+            // Fetch existing comparison data BEFORE replacing
+            const { data: existingComp } = await supabase
+              .from("comparisons")
+              .select("model_name, category, label, value")
+              .eq("product_line_id", pl.id);
+
+            // Diff comparison data
+            const compChanges = diffComparison(existingComp ?? [], comp.items);
+
+            // Replace all comparison data
             await supabase
               .from("comparisons")
               .delete()
@@ -363,6 +369,26 @@ export async function POST(request: Request) {
                 sort_order: b + idx,
               }));
               await supabase.from("comparisons").insert(batch);
+            }
+
+            // Log comparison changes if any
+            if (compChanges.details.length > 0) {
+              await supabase.from("change_logs").insert({
+                product_id: null,
+                product_line_id: pl.id,
+                edited_by: metadata.last_editor,
+                edited_at: metadata.last_modified,
+                changes_summary: `Comparison: ${compChanges.summary}`,
+                changes_detail: compChanges.details,
+              });
+
+              allChanges.push({
+                product_name: "[Comparison]",
+                product_line: pl.label ?? pl.name,
+                changes_summary: compChanges.summary,
+                edited_by: metadata.last_editor,
+                edited_at: metadata.last_modified,
+              });
             }
           }
         }
@@ -436,6 +462,126 @@ export async function GET(request: Request) {
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+/**
+ * Convert a ChangeDetail[] array into a compact one-line summary.
+ * e.g. "overview modified, 3 features added, 2 specs modified"
+ */
+function buildSummaryText(
+  details: { field: string; type: "added" | "removed" | "modified" }[]
+): string {
+  const parts: string[] = [];
+
+  // Top-level field changes (Overview, Subtitle, Full Name, Headline)
+  const fieldChanges = details.filter(
+    (d) =>
+      !d.field.includes(" > ") &&
+      !d.field.startsWith("Section: ") &&
+      d.field !== "Feature"
+  );
+  for (const d of fieldChanges) {
+    parts.push(`${d.field.toLowerCase()} ${d.type}`);
+  }
+
+  // Feature counts
+  const featAdded = details.filter((d) => d.field === "Feature" && d.type === "added").length;
+  const featRemoved = details.filter((d) => d.field === "Feature" && d.type === "removed").length;
+  if (featAdded) parts.push(`${featAdded} feature${featAdded > 1 ? "s" : ""} added`);
+  if (featRemoved) parts.push(`${featRemoved} feature${featRemoved > 1 ? "s" : ""} removed`);
+
+  // Section counts
+  const sectAdded = details.filter((d) => d.field.startsWith("Section: ") && d.type === "added").length;
+  const sectRemoved = details.filter((d) => d.field.startsWith("Section: ") && d.type === "removed").length;
+  if (sectAdded) parts.push(`${sectAdded} section${sectAdded > 1 ? "s" : ""} added`);
+  if (sectRemoved) parts.push(`${sectRemoved} section${sectRemoved > 1 ? "s" : ""} removed`);
+
+  // Spec item counts (fields containing " > ")
+  const specAdded = details.filter((d) => d.field.includes(" > ") && d.type === "added").length;
+  const specRemoved = details.filter((d) => d.field.includes(" > ") && d.type === "removed").length;
+  const specModified = details.filter((d) => d.field.includes(" > ") && d.type === "modified").length;
+  if (specAdded) parts.push(`${specAdded} spec${specAdded > 1 ? "s" : ""} added`);
+  if (specRemoved) parts.push(`${specRemoved} spec${specRemoved > 1 ? "s" : ""} removed`);
+  if (specModified) parts.push(`${specModified} spec${specModified > 1 ? "s" : ""} modified`);
+
+  return parts.join(", ") || "minor changes";
+}
+
+/**
+ * Diff old vs new comparison data and return a summary + detail array.
+ */
+function diffComparison(
+  oldRows: { model_name: string; category: string; label: string; value: string }[],
+  newRows: { model_name: string; category: string; label: string; value: string }[]
+): {
+  summary: string;
+  details: { field: string; from: string | null; to: string | null; type: "added" | "removed" | "modified" }[];
+} {
+  // Skip diff if this is the first load (no existing data = baseline)
+  if (oldRows.length === 0) {
+    return { summary: "", details: [] };
+  }
+
+  const makeKey = (r: { model_name: string; category: string; label: string }) =>
+    `${r.model_name}\x00${r.category}\x00${r.label}`;
+
+  const oldMap = new Map<string, string>();
+  const oldModels = new Set<string>();
+  for (const r of oldRows) {
+    oldMap.set(makeKey(r), r.value);
+    oldModels.add(r.model_name);
+  }
+
+  const newMap = new Map<string, string>();
+  const newModels = new Set<string>();
+  for (const r of newRows) {
+    newMap.set(makeKey(r), r.value);
+    newModels.add(r.model_name);
+  }
+
+  const details: { field: string; from: string | null; to: string | null; type: "added" | "removed" | "modified" }[] = [];
+
+  // New models
+  for (const m of newModels) {
+    if (!oldModels.has(m))
+      details.push({ field: `Model: ${m}`, from: null, to: "(added)", type: "added" });
+  }
+  // Removed models
+  for (const m of oldModels) {
+    if (!newModels.has(m))
+      details.push({ field: `Model: ${m}`, from: "(removed)", to: null, type: "removed" });
+  }
+
+  // Spec-level diff for models that exist in both
+  for (const [key, newVal] of newMap) {
+    const oldVal = oldMap.get(key);
+    const [model, cat, label] = key.split("\x00");
+    if (oldVal === undefined && oldModels.has(model)) {
+      details.push({ field: `${model} > ${cat} > ${label}`, from: null, to: newVal, type: "added" });
+    } else if (oldVal !== undefined && oldVal !== newVal) {
+      details.push({ field: `${model} > ${cat} > ${label}`, from: oldVal, to: newVal, type: "modified" });
+    }
+  }
+  for (const [key, oldVal] of oldMap) {
+    if (!newMap.has(key)) {
+      const [model, cat, label] = key.split("\x00");
+      if (newModels.has(model)) {
+        details.push({ field: `${model} > ${cat} > ${label}`, from: oldVal, to: null, type: "removed" });
+      }
+    }
+  }
+
+  // Build summary
+  const modelsAdded = details.filter((d) => d.field.startsWith("Model: ") && d.type === "added").length;
+  const modelsRemoved = details.filter((d) => d.field.startsWith("Model: ") && d.type === "removed").length;
+  const valuesChanged = details.filter((d) => !d.field.startsWith("Model: ")).length;
+
+  const parts: string[] = [];
+  if (modelsAdded) parts.push(`${modelsAdded} model${modelsAdded > 1 ? "s" : ""} added`);
+  if (modelsRemoved) parts.push(`${modelsRemoved} model${modelsRemoved > 1 ? "s" : ""} removed`);
+  if (valuesChanged) parts.push(`${valuesChanged} value${valuesChanged > 1 ? "s" : ""} changed`);
+
+  return { summary: parts.join(", "), details };
+}
 
 async function syncSpecSections(
   supabase: ReturnType<typeof createAdminClient>,

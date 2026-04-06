@@ -61,10 +61,13 @@ export async function POST(request: Request) {
   const changes: ChangeEntry[] = logs.map((log) => {
     const product = log.products;
     const productLine = log.product_lines;
+    const isComparison = !product && log.changes_summary.startsWith("Comparison:");
     return {
-      product_name: product?.model_name ?? "Unknown",
+      product_name: isComparison ? "[Comparison]" : (product?.model_name ?? "Unknown"),
       product_line: productLine?.label ?? "Unknown",
-      changes_summary: log.changes_summary,
+      changes_summary: isComparison
+        ? log.changes_summary.replace("Comparison: ", "")
+        : log.changes_summary,
       edited_by: log.edited_by,
       edited_at: log.edited_at,
     };

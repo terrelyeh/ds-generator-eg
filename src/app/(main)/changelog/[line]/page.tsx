@@ -167,12 +167,18 @@ export default async function ChangeLogPage({
                     >
                       {/* Entry header */}
                       <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/50 border-b">
-                        <Link
-                          href={`/product/${entry.products?.model_name ?? ""}`}
-                          className="text-sm font-semibold text-engenius-blue hover:underline"
-                        >
-                          {entry.products?.model_name ?? "Unknown"}
-                        </Link>
+                        {entry.products?.model_name ? (
+                          <Link
+                            href={`/product/${entry.products.model_name}`}
+                            className="text-sm font-semibold text-engenius-blue hover:underline"
+                          >
+                            {entry.products.model_name}
+                          </Link>
+                        ) : (
+                          <span className="text-sm font-semibold text-foreground">
+                            📊 Comparison Table
+                          </span>
+                        )}
                         <LocalTime
                           iso={entry.created_at}
                           format="time"

@@ -33,16 +33,27 @@ function formatPlainText(changes: ChangeEntry[]): string {
     "",
   ];
 
+  let totalProducts = 0;
+
   for (const [line, entries] of grouped) {
-    lines.push(`【${line}】`);
-    for (const e of entries) {
-      const editor = e.edited_by ? ` (by ${e.edited_by})` : "";
-      lines.push(`  • ${e.product_name}: ${e.changes_summary}${editor}`);
+    const products = entries.filter((e) => e.product_name !== "[Comparison]");
+    const comparison = entries.find((e) => e.product_name === "[Comparison]");
+    const countLabel = products.length > 0 ? ` ${products.length} product${products.length > 1 ? "s" : ""}` : "";
+    lines.push(`【${line}】${countLabel}`);
+    for (const e of products) {
+      lines.push(`  • ${e.product_name} — ${e.changes_summary}`);
+    }
+    if (comparison) {
+      lines.push(`  📊 Comparison — ${comparison.changes_summary}`);
     }
     lines.push("");
+    totalProducts += products.length;
   }
 
-  lines.push(`Total: ${changes.length} change(s)`);
+  const compCount = changes.filter((c) => c.product_name === "[Comparison]").length;
+  const compSuffix = compCount > 0 ? ` + ${compCount} comparison${compCount > 1 ? "s" : ""}` : "";
+  lines.push(`Total: ${totalProducts} product(s) updated${compSuffix}`);
+  lines.push(`🔗 Details → https://ds-generator-eg.vercel.app/changelog`);
   return lines.join("\n");
 }
 
@@ -56,22 +67,25 @@ function formatDiscordEmbed(changes: ChangeEntry[]) {
 
   const fields = [];
   for (const [line, entries] of grouped) {
-    const value = entries
-      .map((e) => {
-        const editor = e.edited_by ? ` _(${e.edited_by})_` : "";
-        return `• **${e.product_name}**: ${e.changes_summary}${editor}`;
-      })
-      .join("\n");
-    fields.push({ name: line, value, inline: false });
+    const lines: string[] = [];
+    for (const e of entries) {
+      if (e.product_name === "[Comparison]") {
+        lines.push(`📊 **Comparison** — ${e.changes_summary}`);
+      } else {
+        lines.push(`• **${e.product_name}** — ${e.changes_summary}`);
+      }
+    }
+    fields.push({ name: line, value: lines.join("\n"), inline: false });
   }
 
+  const totalProducts = changes.filter((c) => c.product_name !== "[Comparison]").length;
   return {
     embeds: [
       {
         title: "📋 Datasheet Sync Report",
         color: 0x03a9f4,
         fields,
-        footer: { text: `${changes.length} change(s)` },
+        footer: { text: `${totalProducts} product(s) updated` },
         timestamp: new Date().toISOString(),
       },
     ],
