@@ -47,7 +47,9 @@ export function Navbar() {
             className="h-7 w-auto"
           />
         </Link>
-        <span className="text-sm font-medium opacity-80">SpecHub</span>
+        <span className="text-lg font-semibold tracking-tight">
+          Product <span className="opacity-80">SpecHub</span>
+        </span>
 
         <button
           onClick={handleSync}

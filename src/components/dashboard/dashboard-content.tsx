@@ -111,26 +111,29 @@ function ProductTable({
   return (
     <Table>
       <TableHeader>
-        <TableRow>
-          <TableHead className="w-[42px] text-center">#</TableHead>
-          <TableHead>Model</TableHead>
-          <TableHead>Description</TableHead>
-          <TableHead className="w-[70px]">Version</TableHead>
-          <TableHead>Last Edited</TableHead>
-          <TableHead>Edited By</TableHead>
-          <TableHead className="w-[60px] text-center">Product</TableHead>
-          <TableHead className="w-[60px] text-center">Hardware</TableHead>
+        <TableRow className="border-b-2 border-border">
+          <TableHead className="w-[40px] text-center">#</TableHead>
+          <TableHead className="w-[120px]">Model #</TableHead>
+          <TableHead>Model Name</TableHead>
+          <TableHead className="w-[72px] text-center">Version</TableHead>
+          <TableHead className="w-[120px]">Last Edited</TableHead>
+          <TableHead className="w-[110px]">Edited By</TableHead>
+          <TableHead className="w-[68px] text-center">Product</TableHead>
+          <TableHead className="w-[72px] text-center">Hardware</TableHead>
           {isAP && (
             <TableHead className="w-[120px] text-center">
               Radio Pattern
             </TableHead>
           )}
-          <TableHead className="w-[80px]">Actions</TableHead>
+          <TableHead className="w-[72px]">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {products.map((product, index) => (
-          <TableRow key={product.id}>
+          <TableRow
+            key={product.id}
+            className={index % 2 === 1 ? "bg-muted/30" : ""}
+          >
             <TableCell className="text-center text-xs tabular-nums text-muted-foreground">
               {index + 1}
             </TableCell>
@@ -142,20 +145,20 @@ function ProductTable({
                 {product.model_name}
               </Link>
             </TableCell>
-            <TableCell className="max-w-[260px] truncate text-sm text-muted-foreground">
+            <TableCell className="text-muted-foreground">
               {product.subtitle || product.full_name}
             </TableCell>
-            <TableCell>
+            <TableCell className="text-center">
               <Badge variant="outline" className="tabular-nums">
                 v{product.current_version}
               </Badge>
             </TableCell>
-            <TableCell className="text-sm tabular-nums">
+            <TableCell className="tabular-nums">
               {formatDate(
                 product.sheet_last_modified ?? product.updated_at
               )}
             </TableCell>
-            <TableCell className="text-sm text-muted-foreground">
+            <TableCell className="text-muted-foreground">
               {product.sheet_last_editor ?? "—"}
             </TableCell>
             <TableCell className="text-center">
