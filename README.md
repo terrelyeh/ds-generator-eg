@@ -1,24 +1,25 @@
-# EnGenius Datasheet System
+# Product SpecHub
 
-自動化產品 Datasheet 生成系統，從 Google Sheets 同步產品資料，生成可列印的 PDF Datasheet。
+EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同步產品資料，提供規格比較、變更追蹤，並生成可列印的 PDF Datasheet。
 
 ## Features
 
 ### Dashboard
 - 產品線 tab 切換（Cloud AP / Cloud Switch / Cloud Camera）
 - 產品清單：Model、版本、圖片狀態、Radio Pattern（AP）、最後編輯資訊
-- 一鍵同步 Google Sheets 資料（per product line）
+- Navbar 一鍵同步所有產品線資料
+- Breadcrumb 導覽路徑貫穿所有子頁面
 
 ### Product Detail
 - Overview & Key Features（從 Google Sheets 同步）
-- 完整規格表（label 粗體靠右、value 自動斷行）
+- 完整規格表（分類 header + zebra striping）
 - 產品圖片管理（自動同步 + 手動上傳）
 - 版本紀錄與 PDF 下載
 
 ### Spec Comparison
-- 跨 model 規格比較表
+- 跨 model 規格比較表（支援 24+ model 橫向滾動）
 - 全域搜尋、欄位排序、Column 顯示/隱藏
-- Sticky header + pinned 左側欄位
+- Sticky header + pinned Category/Spec 欄位
 
 ### Change Log
 - Structured diff 表格（Field / From / To / Type）
@@ -36,8 +37,8 @@
 ### Automated Sync
 - 每日 09:00（台灣時間）自動同步 Google Sheets → Supabase
 - Smart Sync：比對 Google Drive `modifiedTime`，未變動則跳過
-- 變更偵測：field-level + spec-level deep diff
-- Telegram 通知：同步結果自動推送
+- 變更偵測：field-level + spec-level + comparison table deep diff
+- Telegram 通知：按產品線分組的精簡摘要格式
 
 ## Tech Stack
 
