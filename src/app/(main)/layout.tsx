@@ -23,13 +23,15 @@ export default function MainLayout({
     <div className="flex min-h-full flex-col">
       <Navbar />
       <main className="flex-1">{children}</main>
-      <footer className="border-t py-4 px-6 text-center text-xs text-muted-foreground">
-        Product SpecHub
-        {buildTime && <> &nbsp;·&nbsp; Deployed: {buildTime}</>}
-        &nbsp;·&nbsp;
-        <Link href="/docs/sync" className="text-engenius-blue hover:underline">
-          Sync & Notification Guide
-        </Link>
+      <footer className="border-t">
+        <div className="mx-auto max-w-[1400px] px-6 py-4 text-center text-xs text-muted-foreground">
+          Product SpecHub
+          {buildTime && <> &nbsp;·&nbsp; Deployed: {buildTime}</>}
+          &nbsp;·&nbsp;
+          <Link href="/docs/sync" className="text-engenius-blue hover:underline">
+            Sync & Notification Guide
+          </Link>
+        </div>
       </footer>
       <Toaster />
     </div>

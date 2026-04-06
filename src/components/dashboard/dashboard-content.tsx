@@ -43,16 +43,18 @@ function formatDate(dateStr: string | null) {
   });
 }
 
-/** Compact check/cross indicator */
-function ImgStatus({ ok }: { ok: boolean }) {
+/** Colored dot status indicator */
+function ImgStatus({ ok, label }: { ok: boolean; label: string }) {
   return ok ? (
-    <span className="text-green-600 text-sm font-medium" title="Ready">
-      ✓
-    </span>
+    <span
+      className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
+      title={`${label}: Ready`}
+    />
   ) : (
-    <span className="text-muted-foreground/40 text-sm" title="Missing">
-      ✗
-    </span>
+    <span
+      className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25"
+      title={`${label}: Missing`}
+    />
   );
 }
 
@@ -110,50 +112,55 @@ function ProductTable({
 
   return (
     <Table>
-      <TableHeader>
-        <TableRow className="border-b-2 border-border">
-          <TableHead className="w-[40px] text-center">#</TableHead>
-          <TableHead className="w-[120px]">Model #</TableHead>
-          <TableHead>Model Name</TableHead>
-          <TableHead className="w-[72px] text-center">Version</TableHead>
-          <TableHead className="w-[120px]">Last Edited</TableHead>
-          <TableHead className="w-[110px]">Edited By</TableHead>
-          <TableHead className="w-[68px] text-center">Product</TableHead>
-          <TableHead className="w-[72px] text-center">Hardware</TableHead>
+      <TableHeader className="[&_th]:sticky [&_th]:top-14 [&_th]:z-10 [&_th]:bg-muted">
+        <TableRow className="border-b-2 border-foreground/15">
+          <TableHead className="w-10 text-center">#</TableHead>
+          <TableHead className="w-36">Model #</TableHead>
+          <TableHead className="w-72">Model Name</TableHead>
+          <TableHead className="w-20 text-center">Version</TableHead>
+          <TableHead className="w-28">Last Edited</TableHead>
+          <TableHead className="w-28">Edited By</TableHead>
+          <TableHead className="w-16 text-center">Product</TableHead>
+          <TableHead className="w-16 text-center">Hardware</TableHead>
           {isAP && (
-            <TableHead className="w-[120px] text-center">
+            <TableHead className="w-28 text-center">
               Radio Pattern
             </TableHead>
           )}
-          <TableHead className="w-[72px]">Actions</TableHead>
+          <TableHead className="w-16">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {products.map((product, index) => (
           <TableRow
             key={product.id}
-            className={index % 2 === 1 ? "bg-muted/30" : ""}
+            className={`hover:bg-engenius-blue/[0.06] ${
+              index % 2 === 1 ? "bg-muted/30" : ""
+            }`}
           >
-            <TableCell className="text-center text-xs tabular-nums text-muted-foreground">
+            <TableCell className="text-center text-xs tabular-nums text-muted-foreground/60">
               {index + 1}
             </TableCell>
             <TableCell>
               <Link
                 href={`/product/${product.model_name}`}
-                className="font-medium text-engenius-blue hover:underline"
+                className="font-semibold text-engenius-blue hover:text-engenius-blue-dark transition-colors"
               >
                 {product.model_name}
               </Link>
             </TableCell>
-            <TableCell className="text-muted-foreground">
+            <TableCell
+              className="max-w-72 truncate text-muted-foreground"
+              title={product.subtitle || product.full_name}
+            >
               {product.subtitle || product.full_name}
             </TableCell>
             <TableCell className="text-center">
-              <Badge variant="outline" className="tabular-nums">
+              <Badge variant="outline" className="tabular-nums text-xs">
                 v{product.current_version}
               </Badge>
             </TableCell>
-            <TableCell className="tabular-nums">
+            <TableCell className="tabular-nums text-muted-foreground">
               {formatDate(
                 product.sheet_last_modified ?? product.updated_at
               )}
@@ -162,10 +169,10 @@ function ProductTable({
               {product.sheet_last_editor ?? "—"}
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_product_image} />
+              <ImgStatus ok={product.has_product_image} label="Product" />
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_hardware_image} />
+              <ImgStatus ok={product.has_hardware_image} label="Hardware" />
             </TableCell>
             {isAP && (
               <TableCell className="text-center">
@@ -176,9 +183,12 @@ function ProductTable({
               <Link
                 href={`/preview/${product.model_name}`}
                 target="_blank"
-                className="text-xs text-engenius-blue hover:underline"
+                className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
               >
                 Preview
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 3h8v8M13 3 6 10" />
+                </svg>
               </Link>
             </TableCell>
           </TableRow>
@@ -218,13 +228,22 @@ export function DashboardContent({
               <button
                 key={pl.id}
                 onClick={() => setActiveTab(pl.id)}
-                className={`rounded-md px-3.5 py-1.5 text-sm font-medium transition-colors ${
+                className={`cursor-pointer rounded-md px-3.5 py-1.5 text-sm font-medium transition-all ${
                   activeTab === pl.id
                     ? "bg-engenius-blue text-white shadow-sm"
                     : "text-muted-foreground hover:text-foreground hover:bg-background"
                 }`}
               >
-                {pl.label} ({count})
+                {pl.label}
+                <span
+                  className={`ml-1.5 tabular-nums ${
+                    activeTab === pl.id
+                      ? "text-white/70"
+                      : "text-muted-foreground/60"
+                  }`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -232,21 +251,27 @@ export function DashboardContent({
         <div className="flex gap-2">
           <Link
             href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M4 2v12M12 2v12M4 8h8" />
+            </svg>
             Compare
           </Link>
           <Link
             href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
           >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M3 4h10M3 8h7M3 12h5" />
+            </svg>
             Change Log
           </Link>
         </div>
       </div>
 
       {/* Product table */}
-      <div className="rounded-lg border bg-card">
+      <div className="rounded-lg border bg-card shadow-sm">
         <ProductTable
           products={filteredProducts}
           lineCategory={activeLine?.category ?? ""}

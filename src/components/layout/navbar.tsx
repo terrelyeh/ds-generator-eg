@@ -36,9 +36,9 @@ export function Navbar() {
   }
 
   return (
-    <header className="bg-engenius-blue text-white">
-      <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-6">
-        <Link href="/dashboard" className="flex items-center gap-2">
+    <header className="sticky top-0 z-50 bg-engenius-blue text-white shadow-md">
+      <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-6">
+        <Link href="/dashboard" className="flex items-center gap-3">
           <Image
             src="/logo/EnGenius-Logo-white.png"
             alt="EnGenius"
@@ -47,8 +47,8 @@ export function Navbar() {
             className="h-7 w-auto"
           />
         </Link>
-        <span className="text-lg font-semibold tracking-tight">
-          Product <span className="opacity-80">SpecHub</span>
+        <span className="font-heading text-xl font-extrabold tracking-tight">
+          Product SpecHub
         </span>
 
         <button
