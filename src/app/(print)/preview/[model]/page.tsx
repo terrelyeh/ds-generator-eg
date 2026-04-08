@@ -14,6 +14,23 @@ interface ProductQueryRow extends Product {
   spec_sections: (SpecSection & { spec_items: SpecItem[] })[];
 }
 
+/** Non-cloud product lines use gray theme instead of blue */
+const NON_CLOUD_CATEGORIES = new Set(["Unmanaged Switches", "Extenders"]);
+
+function getTheme(category: string) {
+  const isCloud = !NON_CLOUD_CATEGORIES.has(category);
+  return {
+    isCloud,
+    primary: isCloud ? "#03a9f4" : "#58595B",
+    headerBg: isCloud ? "#03a9f4" : "#58595B",
+    modelColor: isCloud ? "#03a9f4" : "#231f20",
+    sectionTitle: isCloud ? "#03a9f4" : "#231f20",
+    specLabel: isCloud ? "#03a9f4" : "#231f20",
+    featuresBox: isCloud ? "#ebf8fe" : "#f2f2f2",
+    subtitleColor: isCloud ? "#03a9f4" : "#58595B",
+  };
+}
+
 export default async function PreviewPage({
   params,
 }: {
@@ -56,6 +73,7 @@ export default async function PreviewPage({
     year: "numeric",
   });
   const productLine = product.product_lines;
+  const theme = getTheme(productLine.category);
   const qsgUrl = `https://qr.engenius.ai/qsg/${product.model_name.toLowerCase()}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   const totalPages = 1 + specPages.length + 1; // cover + specs + hardware
@@ -118,9 +136,9 @@ body {
 }
 
 /* Top bar */
-.top-bar { background: #03a9f4; height: 21.4pt; width: 100%; }
+.top-bar { background: ${theme.headerBg}; height: 21.4pt; width: 100%; }
 .top-bar-full {
-  background: #03a9f4; height: 94.5pt; width: 100%; position: relative;
+  background: ${theme.headerBg}; height: 94.5pt; width: 100%; position: relative;
 }
 .top-bar-full .logo-img {
   position: absolute; left: 36pt; top: 50%; transform: translateY(-50%); height: 27pt;
@@ -146,16 +164,29 @@ body {
 }
 .model-name {
   position: absolute; right: 27pt; top: 104pt;
-  font-weight: 500; font-size: 12pt; color: #03a9f4;
+  font-weight: 500; font-size: 12pt; color: ${theme.modelColor};
 }
-.product-subtitle {
+
+/* Cloud cover: subtitle next to cloud icon */
+.product-subtitle-cloud {
   position: absolute; left: 134pt; top: 138pt;
-  font-weight: 500; font-size: 19pt; color: #03a9f4;
+  font-weight: 500; font-size: 19pt; color: ${theme.subtitleColor};
 }
-.product-fullname {
+.product-fullname-cloud {
   position: absolute; left: 134pt; top: 160pt; right: 36pt;
   font-weight: 500; font-size: 24pt; color: #231f20; line-height: 1.15;
 }
+
+/* Non-cloud cover: subtitle aligned left (no cloud icon) */
+.product-subtitle-standard {
+  position: absolute; left: 36pt; top: 130pt;
+  font-weight: 500; font-size: 19pt; color: ${theme.subtitleColor};
+}
+.product-fullname-standard {
+  position: absolute; left: 36pt; top: 155pt; right: 36pt;
+  font-weight: 500; font-size: 24pt; color: #231f20; line-height: 1.15;
+}
+
 .product-image-container {
   position: absolute; right: 10pt; top: 330pt;
   width: 310pt; height: 270pt; text-align: center;
@@ -165,7 +196,7 @@ body {
 }
 
 .section-title {
-  font-weight: 500; font-size: 14pt; color: #03a9f4; margin-bottom: 8pt;
+  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle}; margin-bottom: 8pt;
 }
 .overview-section {
   position: absolute; left: 36pt; top: 270pt; width: 270pt;
@@ -178,9 +209,9 @@ body {
   position: absolute; left: 36pt; right: 36pt; bottom: 36pt;
 }
 .features-title {
-  font-weight: 500; font-size: 14pt; color: #03a9f4; margin-bottom: 10pt;
+  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle}; margin-bottom: 10pt;
 }
-.features-box { background: #ebf8fe; padding: 18pt 28pt; }
+.features-box { background: ${theme.featuresBox}; padding: 18pt 28pt; }
 .features-columns { display: table; width: 100%; table-layout: fixed; }
 .features-col { display: table-cell; width: 50%; vertical-align: top; }
 .features-col:first-child { padding-right: 14pt; }
@@ -199,7 +230,7 @@ body {
 /* Spec pages */
 .spec-page { padding: 0 35pt; }
 .spec-page-title {
-  font-weight: 500; font-size: 14pt; color: #03a9f4;
+  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
   padding-top: 27pt; margin-bottom: 18pt;
 }
 .spec-columns { display: table; width: 100%; table-layout: fixed; }
@@ -213,13 +244,13 @@ body {
 }
 .spec-category-header:first-child { margin-top: 0; }
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
-.spec-label { font-weight: 500; font-size: 7pt; color: #03a9f4; }
+.spec-label { font-weight: 500; font-size: 7pt; color: ${theme.specLabel}; }
 .spec-value { font-weight: 300; font-size: 7pt; color: #6f7073; margin-top: 1pt; }
 
 /* Hardware overview */
 .hardware-page { padding: 0 35pt; }
 .hardware-title {
-  font-weight: 500; font-size: 14pt; color: #03a9f4;
+  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
   padding-top: 31pt; margin-bottom: 16pt;
 }
 .hardware-image-container { text-align: center; margin: 10pt auto; }
@@ -267,14 +298,27 @@ body {
 
         <span className="model-name">{product.model_name}</span>
 
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="cloud-icon"
-          src="/logo/engenius_cloud_icon.png"
-          alt=""
-        />
-        <div className="product-subtitle">{product.subtitle}</div>
-        <div className="product-fullname">{product.headline || product.full_name}</div>
+        {theme.isCloud ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              className="cloud-icon"
+              src="/logo/engenius_cloud_icon.png"
+              alt=""
+            />
+            <div className="product-subtitle-cloud">{product.subtitle}</div>
+            <div className="product-fullname-cloud">
+              {product.headline || product.full_name}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="product-subtitle-standard">{product.subtitle}</div>
+            <div className="product-fullname-standard">
+              {product.headline || product.full_name}
+            </div>
+          </>
+        )}
 
         {product.product_image && (
           <div className="product-image-container">
