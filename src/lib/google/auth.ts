@@ -23,7 +23,7 @@ export function getGoogleAuth() {
     credentials,
     scopes: [
       "https://www.googleapis.com/auth/spreadsheets.readonly",
-      "https://www.googleapis.com/auth/drive.readonly",
+      "https://www.googleapis.com/auth/drive",
     ],
   });
 

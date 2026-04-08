@@ -34,6 +34,8 @@ export interface Database {
           cloud_comparison_gid: string | null;
           sort_order: number;
           ds_images_folder_id: string | null;
+          drive_folder_id: string | null;
+          ds_prefix: string;
           last_synced_at: string | null;
           created_at: string;
         };

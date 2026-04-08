@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  detectLatestVersion,
+  bumpVersion,
+  uploadPdfToDrive,
+} from "@/lib/google/drive-versions";
+import type { ProductLine } from "@/types/database";
 
 // Chromium binary URL for @sparticuz/chromium-min (downloaded at runtime)
 const CHROMIUM_URL =
@@ -11,8 +17,11 @@ export const maxDuration = 60;
 /**
  * POST /api/generate-pdf?model=ECC100
  *
- * Generates a PDF from the preview page using headless Chromium,
- * uploads to Supabase Storage, bumps version, returns download URL.
+ * 1. Detects latest version from Google Drive
+ * 2. Generates PDF from the preview page using headless Chromium
+ * 3. Uploads to Supabase Storage
+ * 4. Uploads to Google Drive (in the model's folder)
+ * 5. Bumps version in Supabase
  */
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -27,7 +36,7 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Get the product
+  // Get the product + product line info
   const { data: product, error: productError } = await supabase
     .from("products")
     .select("id, model_name, current_version, product_line_id")
@@ -41,11 +50,52 @@ export async function POST(request: Request) {
     );
   }
 
+  const { data: productLine } = (await supabase
+    .from("product_lines")
+    .select("*")
+    .eq("id", product.product_line_id)
+    .single()) as { data: ProductLine | null };
+
+  if (!productLine) {
+    return NextResponse.json(
+      { error: "Product line not found" },
+      { status: 404 }
+    );
+  }
+
   try {
+    // Step 1: Detect latest version from Google Drive
+    let driveVersion = null;
+    if (productLine.drive_folder_id) {
+      try {
+        driveVersion = await detectLatestVersion(
+          productLine.drive_folder_id,
+          productLine.ds_prefix ?? "DS_Cloud",
+          model
+        );
+      } catch (err) {
+        console.warn(
+          "Drive version detection failed, using Supabase version:",
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }
+
+    // Determine new version: Drive version takes priority, then Supabase
+    const newVersion = driveVersion
+      ? bumpVersion(driveVersion)
+      : (() => {
+          const currentVer = product.current_version || "1.0";
+          const parts = currentVer.split(".");
+          const major = parseInt(parts[0]) || 1;
+          const minor = (parseInt(parts[1]) || 0) + 1;
+          return `${major}.${minor}`;
+        })();
+
+    // Step 2: Generate PDF with headless Chromium
     const chromium = (await import("@sparticuz/chromium-min")).default;
     const puppeteer = (await import("puppeteer-core")).default;
 
-    // On Vercel, download chromium at runtime; locally, use installed Chrome
     const executablePath = process.env.VERCEL
       ? await chromium.executablePath(CHROMIUM_URL)
       : process.platform === "darwin"
@@ -61,7 +111,6 @@ export async function POST(request: Request) {
 
     const page = await browser.newPage();
 
-    // Build the preview URL
     const baseUrl =
       process.env.VERCEL_URL
         ? `https://${process.env.VERCEL_URL}`
@@ -72,25 +121,19 @@ export async function POST(request: Request) {
       timeout: 30000,
     });
 
-    // Generate PDF with US Letter size
-    const pdfBuffer = await page.pdf({
-      format: "Letter",
-      printBackground: true,
-      margin: { top: 0, right: 0, bottom: 0, left: 0 },
-    });
+    const pdfBuffer = Buffer.from(
+      await page.pdf({
+        format: "Letter",
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      })
+    );
 
     await browser.close();
 
-    // Bump version
-    const currentVer = product.current_version || "1.0";
-    const parts = currentVer.split(".");
-    const major = parseInt(parts[0]) || 1;
-    const minor = (parseInt(parts[1]) || 0) + 1;
-    const newVersion = `${major}.${minor}`;
-
-    // Upload to Supabase Storage
-    const today = new Date().toISOString().slice(0, 10).replace(/-/g, "");
-    const fileName = `DS_${model}_v${newVersion}_${today}.pdf`;
+    // Step 3: Upload to Supabase Storage
+    const dsPrefix = productLine.ds_prefix ?? "DS_Cloud";
+    const fileName = `${dsPrefix}_${model}_v${newVersion}.pdf`;
     const storagePath = `${model}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -102,33 +145,50 @@ export async function POST(request: Request) {
 
     if (uploadError) {
       return NextResponse.json(
-        { error: "PDF upload failed", details: uploadError.message },
+        { error: "PDF upload to Supabase failed", details: uploadError.message },
         { status: 500 }
       );
     }
 
-    // Get public URL
     const { data: urlData } = supabase.storage
       .from("datasheets")
       .getPublicUrl(storagePath);
 
     const pdfUrl = urlData.publicUrl;
 
-    // Create version record
+    // Step 4: Upload to Google Drive
+    let driveResult = null;
+    if (productLine.drive_folder_id) {
+      try {
+        driveResult = await uploadPdfToDrive(
+          productLine.drive_folder_id,
+          dsPrefix,
+          model,
+          newVersion,
+          pdfBuffer,
+          driveVersion
+        );
+      } catch (err) {
+        console.error(
+          "Drive upload failed (PDF still saved to Supabase):",
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }
+
+    // Step 5: Update Supabase records
     await supabase.from("versions").insert({
       product_id: product.id,
       version: newVersion,
-      changes: "PDF generated",
+      changes: `PDF generated${driveVersion ? ` (base: v${driveVersion.version})` : " (initial)"}`,
       pdf_storage_path: pdfUrl,
     });
 
-    // Update product's current version
     await supabase
       .from("products")
       .update({ current_version: newVersion })
       .eq("id", product.id);
 
-    // Log the change
     await supabase.from("change_logs").insert({
       product_id: product.id,
       product_line_id: product.product_line_id,
@@ -139,8 +199,11 @@ export async function POST(request: Request) {
       ok: true,
       model,
       version: newVersion,
+      baseVersion: driveVersion?.version ?? null,
       fileName,
       pdfUrl,
+      driveFileId: driveResult?.fileId ?? null,
+      driveLink: driveResult?.webViewLink ?? null,
     });
   } catch (err) {
     console.error("PDF generation error:", err);
