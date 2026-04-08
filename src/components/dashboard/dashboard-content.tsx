@@ -19,6 +19,7 @@ interface ProductSummary {
   subtitle: string;
   full_name: string;
   current_version: string;
+  status: string;
   has_product_image: boolean;
   has_hardware_image: boolean;
   radio_patterns: { band: string; h_plane: boolean; e_plane: boolean }[];
@@ -142,12 +143,15 @@ function ProductTable({
               {index + 1}
             </TableCell>
             <TableCell>
-              <Link
-                href={`/product/${product.model_name}`}
-                className="font-semibold text-engenius-blue hover:text-engenius-blue-dark transition-colors"
-              >
-                {product.model_name}
-              </Link>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href={`/product/${product.model_name}`}
+                  className="font-semibold text-engenius-blue hover:text-engenius-blue-dark transition-colors"
+                >
+                  {product.model_name}
+                </Link>
+                <StatusBadge status={product.status} />
+              </div>
             </TableCell>
             <TableCell
               className="max-w-72 truncate text-muted-foreground"
@@ -198,19 +202,40 @@ function ProductTable({
   );
 }
 
+/** Status badge */
+function StatusBadge({ status }: { status: string }) {
+  if (status === "active") return null;
+  const config = {
+    upcoming: { label: "Upcoming", className: "border-amber-300 text-amber-700 bg-amber-50" },
+    pending: { label: "Pending", className: "border-red-300 text-red-700 bg-red-50" },
+  }[status] ?? { label: status, className: "border-gray-300 text-gray-600 bg-gray-50" };
+
+  return (
+    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${config.className}`}>
+      {config.label}
+    </Badge>
+  );
+}
+
 export function DashboardContent({
   productLines,
   products,
 }: DashboardContentProps) {
+  const [showAll, setShowAll] = useState(false);
+
+  const visibleProducts = showAll
+    ? products
+    : products.filter((p) => p.status === "active" || !p.status);
+
   const firstLineWithProducts = productLines.find((pl) =>
-    products.some((p) => p.product_line_id === pl.id)
+    visibleProducts.some((p) => p.product_line_id === pl.id)
   );
   const [activeTab, setActiveTab] = useState(
     firstLineWithProducts?.id ?? productLines[0]?.id ?? ""
   );
 
   const activeLine = productLines.find((pl) => pl.id === activeTab);
-  const filteredProducts = products.filter(
+  const filteredProducts = visibleProducts.filter(
     (p) => p.product_line_id === activeTab
   );
 
@@ -220,7 +245,7 @@ export function DashboardContent({
       <div className="flex items-center justify-between">
         <div className="flex gap-1 rounded-lg bg-muted p-1">
           {productLines.map((pl) => {
-            const count = products.filter(
+            const count = visibleProducts.filter(
               (p) => p.product_line_id === pl.id
             ).length;
             if (count === 0) return null;
@@ -248,7 +273,24 @@ export function DashboardContent({
             );
           })}
         </div>
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
+              showAll
+                ? "border-engenius-blue/30 text-engenius-blue bg-engenius-blue/5"
+                : "text-muted-foreground hover:text-foreground hover:bg-accent"
+            }`}
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+              {showAll ? (
+                <path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm4-1 2 2 4-4" />
+              ) : (
+                <path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm10 0H5" />
+              )}
+            </svg>
+            {showAll ? "All" : "Active"}
+          </button>
           <Link
             href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
             className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"

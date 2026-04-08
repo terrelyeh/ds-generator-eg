@@ -8,6 +8,7 @@ interface ProductRow {
   subtitle: string;
   full_name: string;
   current_version: string;
+  status: string;
   product_image: string;
   hardware_image: string;
   sheet_last_modified: string | null;
@@ -40,6 +41,7 @@ export default async function DashboardPage() {
       subtitle,
       full_name,
       current_version,
+      status,
       product_image,
       hardware_image,
       sheet_last_modified,
@@ -106,6 +108,7 @@ export default async function DashboardPage() {
       subtitle: p.subtitle,
       full_name: p.full_name,
       current_version: p.current_version,
+      status: p.status || "active",
       has_product_image: hasProductImage,
       has_hardware_image: hasHardwareImage,
       radio_patterns: radioPatterns,

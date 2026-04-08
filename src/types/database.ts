@@ -36,6 +36,7 @@ export interface Database {
           ds_images_folder_id: string | null;
           drive_folder_id: string | null;
           ds_prefix: string;
+          solution: string;
           last_synced_at: string | null;
           created_at: string;
         };
@@ -59,6 +60,7 @@ export interface Database {
           product_image: string;
           hardware_image: string;
           current_version: string;
+          status: string;
           sheet_last_modified: string | null;
           sheet_last_editor: string | null;
           created_at: string;

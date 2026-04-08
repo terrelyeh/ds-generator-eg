@@ -234,6 +234,7 @@ export async function POST(request: Request) {
                 headline: sheetData.headline,
                 overview: sheetData.overview,
                 features: sheetData.features,
+                status: sheetData.status,
                 sheet_last_modified: metadata.last_modified,
                 sheet_last_editor: metadata.last_editor,
               },

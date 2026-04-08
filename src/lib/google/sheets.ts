@@ -32,6 +32,7 @@ export interface SheetProduct {
   overview: string;
   headline: string;
   features: string[];
+  status: string;
   spec_sections: SheetSpecSection[];
 }
 
@@ -121,10 +122,11 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
 function parseOverviewData(
   rows: unknown[][],
   colIdx: number
-): { full_name: string; headline: string; overview: string; features: string[] } {
+): { full_name: string; headline: string; overview: string; features: string[]; status: string } {
   let full_name = "";
   let headline = "";
   let overview = "";
+  let status = "active";
   const features: string[] = [];
 
   // Build label → row index map
@@ -144,6 +146,20 @@ function parseOverviewData(
   const headlineIdx = rowMap.get("Headline");
   if (headlineIdx !== undefined) {
     headline = getCell(rows[headlineIdx], colIdx);
+  }
+
+  // Status (Active / Upcoming / Pending)
+  for (const row of rows) {
+    const label = String(row?.[0] ?? "").trim().toLowerCase();
+    if (label === "status") {
+      const val = getCell(row, colIdx).toLowerCase().trim();
+      if (val === "upcoming") {
+        status = "upcoming";
+      } else if (val === "pending") {
+        status = "pending";
+      }
+      break;
+    }
   }
 
   // Overview — prefer "Single Overview" (MKT rewrite)
@@ -183,7 +199,7 @@ function parseOverviewData(
     }
   }
 
-  return { full_name, headline, overview, features };
+  return { full_name, headline, overview, features, status };
 }
 
 // ---------------------------------------------------------------------------
@@ -319,7 +335,7 @@ export async function loadProductFromSheets(
   const spec_sections = parseSpecSections(detailRows, detailCol);
 
   // Parse overview
-  let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[] };
+  let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active" };
   if (overviewCol !== null) {
     overviewData = parseOverviewData(overviewRows, overviewCol);
   }
@@ -331,6 +347,7 @@ export async function loadProductFromSheets(
     headline: overviewData.headline,
     overview: overviewData.overview,
     features: overviewData.features,
+    status: overviewData.status,
     spec_sections,
   };
 }
@@ -400,7 +417,7 @@ export async function loadAllProductsFromSheet(
 
     // Parse overview from cached overview data
     const overviewCol = findModelColumn(overviewRows, modelNum);
-    let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[] };
+    let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active" };
     if (overviewCol !== null) {
       overviewData = parseOverviewData(overviewRows, overviewCol);
     }
@@ -412,6 +429,7 @@ export async function loadAllProductsFromSheet(
       headline: overviewData.headline,
       overview: overviewData.overview,
       features: overviewData.features,
+      status: overviewData.status,
       spec_sections,
     });
   }
