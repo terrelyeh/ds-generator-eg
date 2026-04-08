@@ -86,10 +86,14 @@ export async function detectLatestVersion(
   for (const folder of folders) {
     if (!folder.id || !folder.name) continue;
 
-    // Verify folder name matches the expected pattern:
+    // Verify folder name matches exactly:
     // {prefix}_{model} or {prefix}_{model}_v{version}
+    // Must NOT match longer model names (e.g. ECC500 should not match ECC500Z)
     const expectedBase = `${dsPrefix}_${modelName}`;
     if (!folder.name.startsWith(expectedBase)) continue;
+    const remainder = folder.name.slice(expectedBase.length);
+    // After the base, only allow: "" (exact), "_v..." (versioned), or nothing else
+    if (remainder !== "" && !remainder.startsWith("_v")) continue;
 
     // Check 1: Version in folder name (old format)
     const folderVer = parseVersion(folder.name);
