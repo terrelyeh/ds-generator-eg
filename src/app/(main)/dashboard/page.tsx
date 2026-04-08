@@ -11,8 +11,6 @@ interface ProductRow {
   status: string;
   product_image: string;
   hardware_image: string;
-  sheet_last_modified: string | null;
-  sheet_last_editor: string | null;
   updated_at: string;
   product_line_id: string;
   product_lines: { name: string; label: string; category: string };
@@ -22,6 +20,13 @@ interface RadioPatternAsset {
   product_id: string;
   label: string;
   status: string;
+}
+
+interface ChangeLogRow {
+  product_id: string;
+  edited_at: string | null;
+  edited_by: string | null;
+  changes_summary: string;
 }
 
 export default async function DashboardPage() {
@@ -44,8 +49,6 @@ export default async function DashboardPage() {
       status,
       product_image,
       hardware_image,
-      sheet_last_modified,
-      sheet_last_editor,
       updated_at,
       product_line_id,
       product_lines (name, label, category)
@@ -60,6 +63,29 @@ export default async function DashboardPage() {
     .eq("image_type", "radio_pattern")) as {
     data: RadioPatternAsset[] | null;
   };
+
+  // Fetch latest change_log per product (for "Last Edited" column)
+  const { data: changeLogs } = (await supabase
+    .from("change_logs")
+    .select("product_id, edited_at, edited_by, changes_summary")
+    .not("product_id", "is", null)
+    .order("created_at", { ascending: false })) as {
+    data: ChangeLogRow[] | null;
+  };
+
+  // Build map: product_id → latest change_log
+  const latestChangeMap = new Map<
+    string,
+    { edited_at: string | null; edited_by: string | null; summary: string }
+  >();
+  for (const cl of changeLogs ?? []) {
+    if (!cl.product_id || latestChangeMap.has(cl.product_id)) continue;
+    latestChangeMap.set(cl.product_id, {
+      edited_at: cl.edited_at,
+      edited_by: cl.edited_by,
+      summary: cl.changes_summary,
+    });
+  }
 
   // Build radio pattern readiness map: product_id -> { band -> { h: bool, e: bool } }
   const radioMap = new Map<
@@ -102,6 +128,8 @@ export default async function DashboardPage() {
       }
     }
 
+    const latestChange = latestChangeMap.get(p.id);
+
     return {
       id: p.id,
       model_name: p.model_name,
@@ -112,8 +140,9 @@ export default async function DashboardPage() {
       has_product_image: hasProductImage,
       has_hardware_image: hasHardwareImage,
       radio_patterns: radioPatterns,
-      sheet_last_modified: p.sheet_last_modified,
-      sheet_last_editor: p.sheet_last_editor,
+      last_content_changed: latestChange?.edited_at ?? null,
+      last_change_by: latestChange?.edited_by ?? null,
+      last_change_summary: latestChange?.summary ?? null,
       updated_at: p.updated_at,
       product_line_id: p.product_line_id,
       product_line: p.product_lines,

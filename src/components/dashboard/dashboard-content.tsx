@@ -23,8 +23,9 @@ interface ProductSummary {
   has_product_image: boolean;
   has_hardware_image: boolean;
   radio_patterns: { band: string; h_plane: boolean; e_plane: boolean }[];
-  sheet_last_modified: string | null;
-  sheet_last_editor: string | null;
+  last_content_changed: string | null;
+  last_change_by: string | null;
+  last_change_summary: string | null;
   updated_at: string;
   product_line_id: string;
   product_line: { name: string; label: string; category: string };
@@ -119,8 +120,8 @@ function ProductTable({
           <TableHead className="w-36">Model #</TableHead>
           <TableHead className="w-72">Model Name</TableHead>
           <TableHead className="w-20 text-center">Version</TableHead>
-          <TableHead className="w-28">Last Edited</TableHead>
-          <TableHead className="w-28">Edited By</TableHead>
+          <TableHead className="w-28">Last Changed</TableHead>
+          <TableHead className="w-28">Changed By</TableHead>
           <TableHead className="w-16 text-center">Product</TableHead>
           <TableHead className="w-16 text-center">Hardware</TableHead>
           {isAP && (
@@ -164,13 +165,14 @@ function ProductTable({
                 v{product.current_version}
               </Badge>
             </TableCell>
-            <TableCell className="tabular-nums text-muted-foreground">
-              {formatDate(
-                product.sheet_last_modified ?? product.updated_at
-              )}
+            <TableCell
+              className="tabular-nums text-muted-foreground"
+              title={product.last_change_summary ?? ""}
+            >
+              {formatDate(product.last_content_changed)}
             </TableCell>
             <TableCell className="text-muted-foreground">
-              {product.sheet_last_editor ?? "—"}
+              {product.last_change_by ?? "—"}
             </TableCell>
             <TableCell className="text-center">
               <ImgStatus ok={product.has_product_image} label="Product" />

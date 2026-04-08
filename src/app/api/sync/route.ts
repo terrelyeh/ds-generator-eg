@@ -218,8 +218,15 @@ export async function POST(request: Request) {
 
           const hasChanges = isNew || details.length > 0;
 
-          // Skip if nothing changed
-          if (!hasChanges) {
+          // Even if no content changes, always update sheet metadata
+          if (!hasChanges && existing) {
+            await supabase
+              .from("products")
+              .update({
+                sheet_last_modified: metadata.last_modified,
+                sheet_last_editor: metadata.last_editor,
+              })
+              .eq("id", existing.id);
             lineResult.synced.push(modelName);
             continue;
           }

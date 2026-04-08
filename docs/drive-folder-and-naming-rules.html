@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product SpecHub — Google Drive 資料夾結構與命名規則</title>
+  <style>
+    :root {
+      --blue: #03a9f4;
+      --blue-dark: #0288d1;
+      --gray-dark: #2C3345;
+      --gray: #58595B;
+      --gray-light: #6f6f6f;
+      --gray-bg: #f8f9fa;
+      --border: #e2e5e9;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --green: #059669;
+      --green-bg: #ecfdf5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--gray-dark);
+      line-height: 1.7;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+      background: #fff;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--blue-dark);
+      margin-bottom: 4px;
+      border-bottom: 3px solid var(--blue);
+      padding-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gray-light);
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gray-dark);
+      margin: 40px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h2 .num {
+      display: inline-block;
+      background: var(--blue);
+      color: #fff;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      text-align: center;
+      line-height: 28px;
+      font-size: 14px;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gray);
+      margin: 24px 0 8px;
+    }
+
+    p { margin-bottom: 12px; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0 20px;
+      font-size: 14px;
+    }
+
+    thead th {
+      background: var(--gray-dark);
+      color: #fff;
+      font-weight: 600;
+      padding: 8px 12px;
+      text-align: left;
+      white-space: nowrap;
+    }
+
+    tbody td {
+      padding: 7px 12px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+    tbody tr:hover { background: rgba(3, 169, 244, 0.06); }
+
+    code {
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+      font-size: 13px;
+      background: #f0f2f5;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: #c7254e;
+    }
+
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 16px 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 12px 0 20px;
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+    }
+
+    pre .comment { color: #6c7086; }
+    pre .folder { color: #89b4fa; }
+    pre .file { color: #a6e3a1; }
+    pre .highlight { color: #f9e2af; }
+
+    .badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+
+    .badge-blue { background: rgba(3,169,244,0.12); color: var(--blue-dark); }
+    .badge-gray { background: #eee; color: var(--gray); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+    .badge-red { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+
+    .callout {
+      background: rgba(3,169,244,0.06);
+      border-left: 4px solid var(--blue);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      margin: 12px 0 20px;
+      font-size: 14px;
+    }
+
+    .callout-warn {
+      background: var(--amber-bg);
+      border-left-color: var(--amber);
+    }
+
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn strong { color: var(--amber); }
+
+    .checklist {
+      list-style: none;
+      padding: 0;
+    }
+
+    .checklist li {
+      padding: 6px 0 6px 28px;
+      position: relative;
+      font-size: 14px;
+    }
+
+    .checklist li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 9px;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .version-dash { color: #ccc; }
+
+    .toc {
+      background: var(--gray-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin: 20px 0 32px;
+    }
+
+    .toc-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: var(--gray);
+    }
+
+    .toc ol {
+      padding-left: 20px;
+      font-size: 14px;
+    }
+
+    .toc li { margin: 4px 0; }
+    .toc a { color: var(--blue-dark); text-decoration: none; }
+    .toc a:hover { text-decoration: underline; }
+
+    @media print {
+      body { max-width: 100%; padding: 20px; }
+      h2 { break-before: auto; }
+      table, pre { break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Product SpecHub</h1>
+<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-08</p>
+
+<nav class="toc">
+  <div class="toc-title">Table of Contents</div>
+  <ol>
+    <li><a href="#s1">產品線總覽</a></li>
+    <li><a href="#s2">Google Drive 資料夾結構</a></li>
+    <li><a href="#s3">Datasheet PDF 命名規則</a></li>
+    <li><a href="#s4">產品圖片命名規則 (DS Images)</a></li>
+    <li><a href="#s5">Google Sheets 規格表結構</a></li>
+    <li><a href="#s6">目前所有產品型號一覽</a></li>
+    <li><a href="#s7">自動同步機制</a></li>
+    <li><a href="#s8">快速檢查清單</a></li>
+  </ol>
+</nav>
+
+<!-- ========== 1 ========== -->
+<h2 id="s1"><span class="num">1</span>產品線總覽</h2>
+
+<p>系統目前支援 <strong>7 個產品線</strong>，分為兩大 Solution：</p>
+
+<table>
+  <thead>
+    <tr><th>#</th><th>產品線</th><th>Dashboard 標籤</th><th>Solution</th><th>DS Prefix</th><th>佈景主題</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>Cloud AP</td><td>Cloud AP</td><td><span class="badge badge-blue">Cloud</span></td><td><code>DS_Cloud</code></td><td><span class="badge badge-blue">藍色</span></td></tr>
+    <tr><td>2</td><td>Cloud Switch</td><td>Cloud SW</td><td><span class="badge badge-blue">Cloud</span></td><td><code>DS_Cloud</code></td><td><span class="badge badge-blue">藍色</span></td></tr>
+    <tr><td>3</td><td>Cloud Camera</td><td>Cloud Camera</td><td><span class="badge badge-blue">Cloud</span></td><td><code>DS_Cloud</code></td><td><span class="badge badge-blue">藍色</span></td></tr>
+    <tr><td>4</td><td>Cloud AI-NVS</td><td>Cloud NVS</td><td><span class="badge badge-blue">Cloud</span></td><td><code>DS_Cloud</code></td><td><span class="badge badge-blue">藍色</span></td></tr>
+    <tr><td>5</td><td>Cloud VPN Firewall</td><td>Cloud VPN FW</td><td><span class="badge badge-blue">Cloud</span></td><td><code>DS_Cloud</code></td><td><span class="badge badge-blue">藍色</span></td></tr>
+    <tr><td>6</td><td>Switch Extender</td><td>Extender</td><td><span class="badge badge-blue">Cloud</span></td><td><code>DS_Cloud</code></td><td><span class="badge badge-blue">藍色</span></td></tr>
+    <tr><td>7</td><td>Unmanaged Switch</td><td>Unmgd SW</td><td><span class="badge badge-gray">Unmanaged</span></td><td><code>DS_Unmanaged</code></td><td><span class="badge badge-gray">灰色</span></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>佈景主題說明:</strong> Cloud Solution 使用 EnGenius 藍色主題 (<code>#03a9f4</code>)，Unmanaged 使用灰色主題 (<code>#58595B</code>)。
+</div>
+
+<!-- ========== 2 ========== -->
+<h2 id="s2"><span class="num">2</span>Google Drive 資料夾結構</h2>
+
+<h3>2.1 總體架構</h3>
+<p>每個產品線在 Google Drive 上有 <strong>兩個重要的資料夾</strong>：</p>
+
+<pre>
+Google Drive
+├── <span class="folder">Cloud AP/</span>                          <span class="comment">&larr; DS 資料夾 (Datasheet PDF)</span>
+│   ├── <span class="folder">DS_Cloud_ECW526/</span>               <span class="comment">&larr; 各型號的子資料夾</span>
+│   │   ├── <span class="file">DS_Cloud_ECW526_v1.3.pdf</span>
+│   │   └── <span class="file">DS_Cloud_ECW526_v1.4.pdf</span>
+│   └── ...
+│
+├── <span class="folder">DS Images/</span>                         <span class="comment">&larr; 產品圖片資料夾</span>
+│   ├── <span class="folder">Cloud AP/</span>
+│   │   ├── <span class="file">ECW526_product.png</span>
+│   │   ├── <span class="file">ECW526_hardware.png</span>
+│   │   └── ...
+│   ├── <span class="folder">Cloud Switch/</span>
+│   ├── <span class="folder">Cloud Camera/</span>
+│   └── ...
+│
+├── <span class="folder">Cloud Switch/</span>
+├── <span class="folder">Cloud Camera/</span>
+├── <span class="folder">Cloud AI NVS/</span>
+├── <span class="folder">Cloud VPN Firewall/</span>
+└── ...
+</pre>
+
+<h3>2.2 共用資料夾</h3>
+
+<div class="callout callout-warn">
+  <strong>注意:</strong> Extender 和 Unmanaged Switch 因為型號較少，與 Cloud Switch 共用同一個 DS 資料夾和 DS Images 資料夾。
+</div>
+
+<table>
+  <thead><tr><th>產品線</th><th>DS 資料夾</th><th>DS Images 資料夾</th></tr></thead>
+  <tbody>
+    <tr><td>Cloud AP</td><td>Cloud AP/</td><td>DS Images/Cloud AP/</td></tr>
+    <tr><td>Cloud Switch</td><td>Cloud Switch/</td><td>DS Images/Cloud Switch/</td></tr>
+    <tr><td>Cloud Camera</td><td>Cloud Camera/</td><td>DS Images/Cloud Camera/</td></tr>
+    <tr><td>Cloud AI-NVS</td><td>Cloud AI NVS/</td><td>DS Images/Cloud AI NVS/</td></tr>
+    <tr><td>Cloud VPN Firewall</td><td>Cloud VPN Firewall/</td><td>DS Images/Cloud VPN Firewall/</td></tr>
+    <tr><td><strong>Extender</strong></td><td><strong>Cloud Switch/</strong> (共用)</td><td><strong>DS Images/Cloud Switch/</strong> (共用)</td></tr>
+    <tr><td><strong>Unmanaged Switch</strong></td><td><strong>Cloud Switch/</strong> (共用)</td><td><strong>DS Images/Cloud Switch/</strong> (共用)</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== 3 ========== -->
+<h2 id="s3"><span class="num">3</span>Datasheet PDF 命名規則</h2>
+
+<h3>3.1 子資料夾命名</h3>
+<p>每個型號在 DS 資料夾內有一個子資料夾：</p>
+<pre><span class="highlight">{DS_Prefix}_{Model}</span>/</pre>
+
+<p><strong>範例:</strong></p>
+<table>
+  <thead><tr><th>產品線</th><th>型號</th><th>資料夾名稱</th></tr></thead>
+  <tbody>
+    <tr><td>Cloud AP</td><td>ECW526</td><td><code>DS_Cloud_ECW526/</code></td></tr>
+    <tr><td>Cloud Switch</td><td>ECS5512FP</td><td><code>DS_Cloud_ECS5512FP/</code></td></tr>
+    <tr><td>Cloud Camera</td><td>ECC500</td><td><code>DS_Cloud_ECC500/</code></td></tr>
+    <tr><td>Cloud VPN FW</td><td>ESG510</td><td><code>DS_Cloud_ESG510/</code></td></tr>
+    <tr><td>Cloud NVS</td><td>EVS1004D</td><td><code>DS_Cloud_EVS1004D/</code></td></tr>
+    <tr><td>Extender</td><td>EXT1106</td><td><code>DS_Cloud_EXT1106/</code></td></tr>
+    <tr><td>Unmanaged SW</td><td>ES105</td><td><code>DS_Unmanaged_ES105/</code></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>歷史格式:</strong> 部分舊資料夾名稱包含版本號（如 <code>DS_Cloud_ECW526_v1.4/</code>），系統可自動辨識。新建的資料夾一律<strong>不帶版本號</strong>。
+</div>
+
+<h3>3.2 PDF 檔案命名</h3>
+<pre><span class="highlight">{DS_Prefix}_{Model}_v{Major}.{Minor}.pdf</span></pre>
+
+<p><strong>範例:</strong></p>
+<ul>
+  <li><code>DS_Cloud_ECW526_v1.4.pdf</code></li>
+  <li><code>DS_Cloud_ECS5512FP_v1.5.pdf</code></li>
+  <li><code>DS_Unmanaged_ES105_v1.0.pdf</code></li>
+</ul>
+
+<h3>3.3 版本規則</h3>
+<table>
+  <thead><tr><th>規則</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td>格式</td><td><code>v{Major}.{Minor}</code>&nbsp; 例: <code>v1.4</code></td></tr>
+    <tr><td>新產品</td><td>從 <code>v1.0</code> 開始</td></tr>
+    <tr><td>更新</td><td>Minor +1&nbsp; 例: <code>v1.4</code> &rarr; <code>v1.5</code></td></tr>
+    <tr><td>版本來源</td><td>系統自動掃描 DS 資料夾中的 PDF 檔名，取最新版本</td></tr>
+  </tbody>
+</table>
+
+<p><strong>版本偵測邏輯:</strong></p>
+<ol style="font-size:14px; padding-left:20px; margin-bottom:16px;">
+  <li>掃描型號對應的子資料夾</li>
+  <li>檢查資料夾名稱中的版本號（舊格式相容）</li>
+  <li>檢查資料夾內所有 PDF 檔名中的版本號</li>
+  <li>取最大版本號作為 base version</li>
+  <li>生成新 PDF 時自動 +1</li>
+</ol>
+
+<!-- ========== 4 ========== -->
+<h2 id="s4"><span class="num">4</span>產品圖片命名規則 (DS Images)</h2>
+
+<h3>4.1 檔案命名格式</h3>
+<pre><span class="highlight">{Model}_{type}.{ext}</span></pre>
+
+<table>
+  <thead><tr><th>圖片類型</th><th>type 名稱</th><th>說明</th><th>範例</th></tr></thead>
+  <tbody>
+    <tr><td>產品照</td><td><code>product</code></td><td>產品正面照 (白底去背)</td><td><code>ECW526_product.png</code></td></tr>
+    <tr><td>硬體標示圖</td><td><code>hardware</code></td><td>標示各介面/LED 位置</td><td><code>ECW526_hardware.png</code></td></tr>
+    <tr><td>Radio Pattern</td><td><code>H-plane</code> / <code>E-plane</code></td><td>AP 專用，天線輻射圖</td><td><code>ECW526_2.4G_H-plane.png</code></td></tr>
+  </tbody>
+</table>
+
+<p>系統同時搜尋 <code>.png</code> 和 <code>.jpg</code>，優先使用 <code>.png</code>。</p>
+
+<h3>4.2 Radio Pattern (僅 AP 產品線)</h3>
+<pre><span class="highlight">{Model}_{Band}_{Plane}.png</span></pre>
+
+<p><strong>範例:</strong></p>
+<ul>
+  <li><code>ECW526_2.4G_H-plane.png</code> / <code>ECW526_2.4G_E-plane.png</code></li>
+  <li><code>ECW526_5G_H-plane.png</code> / <code>ECW526_5G_E-plane.png</code></li>
+  <li><code>ECW536_6G_H-plane.png</code> / <code>ECW536_6G_E-plane.png</code> (Wi-Fi 6E)</li>
+</ul>
+
+<h3>4.3 完整範例</h3>
+<pre>
+<span class="folder">DS Images/Cloud AP/</span>
+├── <span class="file">ECW526_product.png</span>        <span class="comment">&larr; 產品照</span>
+├── <span class="file">ECW526_hardware.png</span>       <span class="comment">&larr; 硬體標示圖</span>
+├── <span class="file">ECW526_2.4G_H-plane.png</span>   <span class="comment">&larr; 2.4G H-plane</span>
+├── <span class="file">ECW526_2.4G_E-plane.png</span>   <span class="comment">&larr; 2.4G E-plane</span>
+├── <span class="file">ECW526_5G_H-plane.png</span>     <span class="comment">&larr; 5G H-plane</span>
+├── <span class="file">ECW526_5G_E-plane.png</span>     <span class="comment">&larr; 5G E-plane</span>
+└── ...
+
+<span class="folder">DS Images/Cloud Switch/</span>
+├── <span class="file">ECS5512FP_product.png</span>
+├── <span class="file">ECS5512FP_hardware.png</span>
+├── <span class="file">EXT1106_product.png</span>       <span class="comment">&larr; Extender 也放在這裡</span>
+├── <span class="file">EXT1106_hardware.png</span>
+├── <span class="file">ES105_product.png</span>         <span class="comment">&larr; Unmanaged 也放在這裡</span>
+├── <span class="file">ES105_hardware.png</span>
+└── ...
+</pre>
+
+<!-- ========== 5 ========== -->
+<h2 id="s5"><span class="num">5</span>Google Sheets 規格表結構</h2>
+
+<p>每個產品線有一個 Google Sheet，包含以下頁籤：</p>
+
+<table>
+  <thead><tr><th>頁籤</th><th>用途</th><th>資料流向</th></tr></thead>
+  <tbody>
+    <tr><td>Web Overview</td><td>產品名稱、Headline、Overview、Features、<strong>Status</strong></td><td>&rarr; products 表</td></tr>
+    <tr><td>Detail Specs</td><td>技術規格 (各 category)</td><td>&rarr; spec_sections + spec_items</td></tr>
+    <tr><td>Comparison</td><td>產品比較表</td><td>&rarr; comparisons</td></tr>
+    <tr><td>Revision Log</td><td>變更紀錄</td><td>&rarr; revision_logs</td></tr>
+  </tbody>
+</table>
+
+<h3>5.1 Web Overview 必要欄位</h3>
+<table>
+  <thead><tr><th>Column A 標籤</th><th>說明</th><th>範例</th></tr></thead>
+  <tbody>
+    <tr><td><code>Model Name</code></td><td>產品全名</td><td>Cloud Managed AI Wi-Fi 6 2x2 Indoor Access Point</td></tr>
+    <tr><td><code>Model Number</code></td><td>型號 (系統 Key)</td><td>ECW526</td></tr>
+    <tr><td><code>Status</code></td><td><strong>產品狀態</strong></td><td>Active / Upcoming / Pending</td></tr>
+    <tr><td><code>Headline</code></td><td>一行標語</td><td>High-Performance Tri-Band Wi-Fi 6E Access Point</td></tr>
+    <tr><td><code>Single Overview</code></td><td>單一段落 Overview</td><td>(優先使用此欄位)</td></tr>
+    <tr><td><code>Key Feature Lists</code></td><td>條列式功能 (換行分隔)</td><td>- Feature 1<br>- Feature 2</td></tr>
+  </tbody>
+</table>
+
+<h3>5.2 產品狀態 (Status)</h3>
+<table>
+  <thead><tr><th>Google Sheet 填寫</th><th>系統狀態</th><th>Dashboard 顯示</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>留空 或 <code>Active</code></td>
+      <td><code>active</code></td>
+      <td>正常顯示 (無標籤)</td>
+      <td>在售產品，列入 Datasheet 生成</td>
+    </tr>
+    <tr>
+      <td><code>Upcoming</code></td>
+      <td><code>upcoming</code></td>
+      <td><span class="badge badge-amber">Upcoming</span></td>
+      <td>即將上市，規格已建立但尚未發布</td>
+    </tr>
+    <tr>
+      <td><code>Pending</code></td>
+      <td><code>pending</code></td>
+      <td><span class="badge badge-red">Pending</span></td>
+      <td>暫不發布 (停產/問題/評估中)</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>篩選:</strong> Dashboard 預設只顯示 <strong>Active</strong> 產品，點右上角「Active / All」按鈕可切換顯示全部。
+</div>
+
+<!-- ========== 6 ========== -->
+<h2 id="s6"><span class="num">6</span>目前所有產品型號一覽</h2>
+
+<h3>Cloud AP (25 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>ECW115</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW120</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW130</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW160</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW200</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW201L-AC</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW201L-PoE</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW210L</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW212L</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW215</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW220</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW220S</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW230</td><td>v1.2</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW230S</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW260</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW270</td><td>v1.2</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW336</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW510</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW515</td><td>v1.2</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW516L</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW520</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW526</td><td>v1.4</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW536</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW536S</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECW560</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Cloud Switch (21 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>ECS1008P</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1112FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1528</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1528FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1528P</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1528T</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1552</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1552FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS1552P</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS205L</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS208L</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2310FP</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2510FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2512</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2512FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2528FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2530FP</td><td>v1.0</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS2552FP</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS5512</td><td>v1.3</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS5512F</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECS5512FP</td><td>v1.5</td><td><span class="badge badge-green">Active</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Cloud Camera (7 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>ECC100</td><td>v1.0</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECC100Z</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECC120</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECC120Z</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECC500</td><td>v1.0</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECC500Z</td><td>v1.0</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ECC600</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Cloud NVS (3 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>EVS1002D</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>EVS1004D</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>EVS3004U</td><td class="version-dash">&mdash;</td><td><span class="badge badge-red">Pending</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Cloud VPN Firewall (4 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>ESG320</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ESG510</td><td>v1.6</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ESG610</td><td>v1.6</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ESG620</td><td>v1.6</td><td><span class="badge badge-green">Active</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Extender (3 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>EXT1105P</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>EXT1106</td><td>v1.1</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>EXT1109P</td><td class="version-dash">&mdash;</td><td><span class="badge badge-red">Pending</span></td></tr>
+  </tbody>
+</table>
+
+<h3>Unmanaged Switch (3 models)</h3>
+<table>
+  <thead><tr><th>型號</th><th>目前版本</th><th>狀態</th></tr></thead>
+  <tbody>
+    <tr><td>ES105</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ES108</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+    <tr><td>ES110FP</td><td class="version-dash">&mdash;</td><td><span class="badge badge-green">Active</span></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  版本顯示「<span class="version-dash">&mdash;</span>」表示 Google Drive DS 資料夾中尚未找到對應的 PDF 檔案。
+</div>
+
+<!-- ========== 7 ========== -->
+<h2 id="s7"><span class="num">7</span>自動同步機制</h2>
+
+<h3>同步排程</h3>
+<table>
+  <thead><tr><th>方式</th><th>觸發時間</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr><td>自動</td><td>每天 09:00 (台灣時間)</td><td>Vercel Cron 自動觸發，僅同步有變更的產品線</td></tr>
+    <tr><td>手動</td><td>隨時</td><td>Dashboard 右上角「Sync」按鈕，強制同步所有產品線</td></tr>
+  </tbody>
+</table>
+
+<h3>同步流程</h3>
+<ol style="font-size:14px; padding-left:20px; margin-bottom:16px; line-height:2;">
+  <li>讀取 Google Sheet (Web Overview + Detail Specs) &rarr; 更新產品資料 + 規格</li>
+  <li>掃描 DS Images 資料夾 &rarr; 同步產品圖片到 Supabase Storage</li>
+  <li>掃描 DS 資料夾 &rarr; 偵測最新 Datasheet 版本號</li>
+  <li>比對現有資料 &rarr; 偵測變更 &rarr; 記錄 Change Log</li>
+  <li>有變更時 &rarr; 發送 Telegram 通知</li>
+</ol>
+
+<!-- ========== 8 ========== -->
+<h2 id="s8"><span class="num">8</span>快速檢查清單</h2>
+
+<p>新增一個產品時，需要確認以下事項：</p>
+
+<ul class="checklist">
+  <li>Google Sheet <strong>Web Overview</strong> 填寫完整 (Model Name, Model Number, Status, Headline, Single Overview, Key Feature Lists)</li>
+  <li>Google Sheet <strong>Detail Specs</strong> 填寫完整</li>
+  <li>DS Images 資料夾放入 <code>{Model}_product.png</code></li>
+  <li>DS Images 資料夾放入 <code>{Model}_hardware.png</code></li>
+  <li>(AP only) DS Images 放入 Radio Pattern 圖片</li>
+  <li>確認 <strong>Status</strong> 欄位正確 (Active / Upcoming / Pending)</li>
+  <li>執行一次 Sync 確認資料正確匯入</li>
+</ul>
+
+</body>
+</html>

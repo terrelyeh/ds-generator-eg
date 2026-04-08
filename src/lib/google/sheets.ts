@@ -221,7 +221,7 @@ export async function getSheetMetadata(sheetId: string): Promise<SheetMetadata> 
 
   return {
     last_modified: res.data.modifiedTime ?? null,
-    last_editor: res.data.lastModifyingUser?.emailAddress ?? null,
+    last_editor: res.data.lastModifyingUser?.emailAddress ?? res.data.lastModifyingUser?.displayName ?? null,
   };
 }
 
