@@ -32,6 +32,7 @@ export interface Database {
           revision_log_gid: string | null;
           comparison_gid: string | null;
           cloud_comparison_gid: string | null;
+          sort_order: number;
           last_synced_at: string | null;
           created_at: string;
         };

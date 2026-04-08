@@ -29,7 +29,7 @@ export default async function DashboardPage() {
   const { data: productLines } = (await supabase
     .from("product_lines")
     .select("*")
-    .order("name")) as { data: ProductLine[] | null };
+    .order("sort_order")) as { data: ProductLine[] | null };
 
   const { data: products } = (await supabase
     .from("products")
