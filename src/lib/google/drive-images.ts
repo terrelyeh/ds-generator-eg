@@ -2,8 +2,31 @@ import { google } from "googleapis";
 import { getGoogleAuth } from "./auth";
 
 /**
- * Find a file in Google Drive by exact name.
- * Returns the Drive file ID or null if not found.
+ * Find a file by exact name within a specific Google Drive folder.
+ * Returns the Drive file ID and mimeType, or null if not found.
+ */
+async function findFileInFolder(
+  folderId: string,
+  fileName: string
+): Promise<{ id: string; mimeType: string } | null> {
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: "v3", auth });
+
+  const res = await drive.files.list({
+    q: `'${folderId}' in parents and name = '${fileName}' and mimeType contains 'image/' and trashed = false`,
+    fields: "files(id, name, mimeType)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    pageSize: 1,
+  });
+
+  const file = res.data.files?.[0];
+  if (!file?.id || !file.mimeType) return null;
+  return { id: file.id, mimeType: file.mimeType };
+}
+
+/**
+ * Find a file by exact name across all accessible Google Drive files (fallback).
  */
 async function findFileByName(
   fileName: string
@@ -46,12 +69,18 @@ export interface ImageSyncResult {
 }
 
 /**
- * Find, download, and upload product images from Google Drive to Supabase Storage.
- * Returns the public URLs of the uploaded images.
+ * Naming rule:
+ *   {Model}_product.png   — product photo (cover page)
+ *   {Model}_hardware.png  — hardware overview photo
+ *   {Model}_radio_{Band}_{Plane}.png — radio pattern (AP only, e.g. ECW526_radio_2.4G_H.png)
+ *
+ * Images are searched in the product line's DS Images folder first,
+ * then fall back to a global Drive search.
  */
 export async function syncProductImages(
   modelName: string,
-  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>
+  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  dsImagesFolderId?: string | null
 ): Promise<ImageSyncResult> {
   const result: ImageSyncResult = {
     product_image_url: null,
@@ -64,39 +93,48 @@ export async function syncProductImages(
   ];
 
   for (const { suffix, key } of imageTypes) {
-    const fileName = `${modelName}_${suffix}.png`;
+    // Try .png first, then .jpg
+    for (const ext of ["png", "jpg"]) {
+      const fileName = `${modelName}_${suffix}.${ext}`;
 
-    try {
-      const file = await findFileByName(fileName);
-      if (!file) continue;
+      try {
+        // Search in DS Images folder first, then fallback to global search
+        const file = dsImagesFolderId
+          ? (await findFileInFolder(dsImagesFolderId, fileName)) ??
+            (await findFileByName(fileName))
+          : await findFileByName(fileName);
 
-      const buffer = await downloadFile(file.id);
-      const storagePath = `images/${modelName}/${fileName}`;
+        if (!file) continue;
 
-      // Upload to Supabase Storage (upsert to overwrite if exists)
-      const { error } = await supabase.storage
-        .from("datasheets")
-        .upload(storagePath, buffer, {
-          contentType: file.mimeType,
-          upsert: true,
-        });
+        const buffer = await downloadFile(file.id);
+        const storagePath = `images/${modelName}/${modelName}_${suffix}.${ext}`;
 
-      if (error) {
-        console.error(`Failed to upload ${fileName}:`, error.message);
-        continue;
+        // Upload to Supabase Storage (upsert to overwrite if exists)
+        const { error } = await supabase.storage
+          .from("datasheets")
+          .upload(storagePath, buffer, {
+            contentType: file.mimeType,
+            upsert: true,
+          });
+
+        if (error) {
+          console.error(`Failed to upload ${fileName}:`, error.message);
+          continue;
+        }
+
+        // Get public URL
+        const { data: urlData } = supabase.storage
+          .from("datasheets")
+          .getPublicUrl(storagePath);
+
+        result[key] = urlData.publicUrl;
+        break; // Found this image type, skip other extensions
+      } catch (err) {
+        console.error(
+          `Failed to sync ${fileName}:`,
+          err instanceof Error ? err.message : String(err)
+        );
       }
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("datasheets")
-        .getPublicUrl(storagePath);
-
-      result[key] = urlData.publicUrl;
-    } catch (err) {
-      console.error(
-        `Failed to sync ${fileName}:`,
-        err instanceof Error ? err.message : String(err)
-      );
     }
   }
 

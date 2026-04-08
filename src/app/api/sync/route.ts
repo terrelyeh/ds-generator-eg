@@ -256,7 +256,7 @@ export async function POST(request: Request) {
 
           // Sync images from Google Drive → Supabase Storage
           try {
-            const images = await syncProductImages(modelName, supabase);
+            const images = await syncProductImages(modelName, supabase, pl.ds_images_folder_id);
             if (images.product_image_url || images.hardware_image_url) {
               await supabase
                 .from("products")

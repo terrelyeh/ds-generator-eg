@@ -33,6 +33,7 @@ export interface Database {
           comparison_gid: string | null;
           cloud_comparison_gid: string | null;
           sort_order: number;
+          ds_images_folder_id: string | null;
           last_synced_at: string | null;
           created_at: string;
         };
