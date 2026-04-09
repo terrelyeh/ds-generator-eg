@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { uploadImageToDrive } from "@/lib/google/drive-images";
 
 /**
  * POST /api/upload-image
  *
- * Upload a product image (product or hardware) to Supabase Storage.
+ * Upload a product image (product or hardware) to Supabase Storage + Google Drive.
  * Expects multipart form data with:
  *   - file: the image file
  *   - model: model name (e.g. "ECC100")
@@ -32,10 +33,10 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Verify product exists
+  // Verify product exists and get its product line's DS Images folder
   const { data: product } = await supabase
     .from("products")
-    .select("id")
+    .select("id, product_line_id")
     .eq("model_name", model)
     .single();
 
@@ -46,12 +47,18 @@ export async function POST(request: Request) {
     );
   }
 
-  // Upload to Supabase Storage
+  const { data: productLine } = await supabase
+    .from("product_lines")
+    .select("ds_images_folder_id")
+    .eq("id", product.product_line_id)
+    .single();
+
+  const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split(".").pop() || "png";
   const fileName = `${model}_${imageType}.${ext}`;
   const storagePath = `images/${model}/${fileName}`;
-  const buffer = Buffer.from(await file.arrayBuffer());
 
+  // 1. Upload to Supabase Storage
   const { error: uploadError } = await supabase.storage
     .from("datasheets")
     .upload(storagePath, buffer, {
@@ -73,16 +80,38 @@ export async function POST(request: Request) {
 
   const publicUrl = urlData.publicUrl;
 
-  // Update product record
+  // 2. Update product record
   const field = imageType === "product" ? "product_image" : "hardware_image";
   await supabase
     .from("products")
     .update({ [field]: publicUrl })
     .eq("id", product.id);
 
+  // 3. Upload to Google Drive DS Images folder (async, non-blocking)
+  let driveFileId: string | null = null;
+  const dsFolderId = productLine?.ds_images_folder_id;
+  if (dsFolderId) {
+    try {
+      driveFileId = await uploadImageToDrive(
+        dsFolderId,
+        fileName,
+        buffer,
+        file.type
+      );
+    } catch (err) {
+      console.error(
+        `Drive upload failed for ${fileName}:`,
+        err instanceof Error ? err.message : String(err)
+      );
+      // Don't fail the request — Supabase upload succeeded
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     url: publicUrl,
     field,
+    driveFileId,
+    driveUploaded: !!driveFileId,
   });
 }

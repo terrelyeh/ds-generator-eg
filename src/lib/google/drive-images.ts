@@ -1,4 +1,5 @@
 import { google } from "googleapis";
+import { Readable } from "stream";
 import { getGoogleAuth } from "./auth";
 
 /**
@@ -61,6 +62,52 @@ async function downloadFile(fileId: string): Promise<Buffer> {
   );
 
   return Buffer.from(res.data as ArrayBuffer);
+}
+
+/**
+ * Upload an image file to a Google Drive folder.
+ * If a file with the same name exists, it will be updated (overwritten).
+ * Returns the Drive file ID.
+ */
+export async function uploadImageToDrive(
+  folderId: string,
+  fileName: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<string> {
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: "v3", auth });
+
+  // Check if file already exists in the folder
+  const existing = await findFileInFolder(folderId, fileName);
+
+  if (existing) {
+    // Update existing file
+    const res = await drive.files.update({
+      fileId: existing.id,
+      media: {
+        mimeType,
+        body: Readable.from(buffer),
+      },
+      supportsAllDrives: true,
+    });
+    return res.data.id!;
+  } else {
+    // Create new file
+    const res = await drive.files.create({
+      requestBody: {
+        name: fileName,
+        parents: [folderId],
+      },
+      media: {
+        mimeType,
+        body: Readable.from(buffer),
+      },
+      fields: "id",
+      supportsAllDrives: true,
+    });
+    return res.data.id!;
+  }
 }
 
 export interface ImageSyncResult {
