@@ -113,11 +113,17 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
 
-  async function handleGeneratePdf() {
+  const [showGenMenu, setShowGenMenu] = useState(false);
+
+  const currentVer = product.current_version || "0.0";
+  const hasExistingVersion = currentVer !== "0.0";
+
+  async function handleGeneratePdf(mode: "regenerate" | "new") {
+    setShowGenMenu(false);
     setGenerating(true);
     try {
       const res = await fetch(
-        `/api/generate-pdf?model=${encodeURIComponent(product.model_name)}`,
+        `/api/generate-pdf?model=${encodeURIComponent(product.model_name)}&mode=${mode}`,
         { method: "POST" }
       );
       const data = await res.json();
@@ -186,9 +192,89 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               Preview Datasheet
             </Button>
           </Link>
-          <Button size="sm" onClick={handleGeneratePdf} disabled={generating}>
-            {generating ? "Generating..." : "Generate PDF"}
-          </Button>
+          <div className="relative">
+            <div className="flex">
+              <Button
+                size="sm"
+                className="rounded-r-none"
+                onClick={() =>
+                  handleGeneratePdf(hasExistingVersion ? "regenerate" : "new")
+                }
+                disabled={generating}
+              >
+                {generating
+                  ? "Generating..."
+                  : hasExistingVersion
+                    ? `Regenerate v${currentVer}`
+                    : "Generate PDF"}
+              </Button>
+              {hasExistingVersion && (
+                <Button
+                  size="sm"
+                  className="rounded-l-none border-l border-white/20 px-2"
+                  onClick={() => setShowGenMenu(!showGenMenu)}
+                  disabled={generating}
+                >
+                  <svg
+                    className="h-3 w-3"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M3 5l3 3 3-3" />
+                  </svg>
+                </Button>
+              )}
+            </div>
+            {showGenMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border bg-popover p-1 shadow-md">
+                <button
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors"
+                  onClick={() => handleGeneratePdf("regenerate")}
+                >
+                  <svg
+                    className="h-4 w-4 text-muted-foreground"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+                    <path d="M14 1v4h-4M2 15v-4h4" />
+                  </svg>
+                  <div className="text-left">
+                    <div className="font-medium">
+                      Regenerate v{currentVer}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      覆蓋當前版本的 PDF
+                    </div>
+                  </div>
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors"
+                  onClick={() => handleGeneratePdf("new")}
+                >
+                  <svg
+                    className="h-4 w-4 text-muted-foreground"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M8 3v10M3 8h10" />
+                  </svg>
+                  <div className="text-left">
+                    <div className="font-medium">New Version</div>
+                    <div className="text-xs text-muted-foreground">
+                      建立新版本 PDF
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

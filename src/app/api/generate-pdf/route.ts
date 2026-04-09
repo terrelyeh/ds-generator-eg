@@ -26,6 +26,7 @@ export const maxDuration = 60;
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
+  const mode = searchParams.get("mode") ?? "regenerate"; // "regenerate" | "new"
 
   if (!model) {
     return NextResponse.json(
@@ -81,16 +82,26 @@ export async function POST(request: Request) {
       }
     }
 
-    // Determine new version: Drive version takes priority, then Supabase
-    const newVersion = driveVersion
-      ? bumpVersion(driveVersion)
-      : (() => {
-          const currentVer = product.current_version || "1.0";
-          const parts = currentVer.split(".");
-          const major = parseInt(parts[0]) || 1;
-          const minor = (parseInt(parts[1]) || 0) + 1;
-          return `${major}.${minor}`;
-        })();
+    // Determine version based on mode
+    const isRegenerate = mode === "regenerate";
+    const currentVer = product.current_version || "0.0";
+    const hasExistingVersion = currentVer !== "0.0";
+
+    let newVersion: string;
+    if (isRegenerate && hasExistingVersion) {
+      // Regenerate: reuse the same version (overwrite PDF)
+      newVersion = currentVer;
+    } else {
+      // New version: bump from Drive or Supabase
+      newVersion = driveVersion
+        ? bumpVersion(driveVersion)
+        : (() => {
+            const parts = currentVer.split(".");
+            const major = parseInt(parts[0]) || 1;
+            const minor = (parseInt(parts[1]) || 0) + 1;
+            return `${major}.${minor}`;
+          })();
+    }
 
     // Step 2: Generate PDF with headless Chromium
     const chromium = (await import("@sparticuz/chromium-min")).default;
@@ -177,12 +188,44 @@ export async function POST(request: Request) {
     }
 
     // Step 5: Update Supabase records
-    await supabase.from("versions").insert({
-      product_id: product.id,
-      version: newVersion,
-      changes: `PDF generated${driveVersion ? ` (base: v${driveVersion.version})` : " (initial)"}`,
-      pdf_storage_path: pdfUrl,
-    });
+    if (isRegenerate && hasExistingVersion) {
+      // Regenerate: update existing version record's PDF and timestamp
+      const { data: existingVersion } = await supabase
+        .from("versions")
+        .select("id")
+        .eq("product_id", product.id)
+        .eq("version", newVersion)
+        .order("generated_at", { ascending: false })
+        .limit(1)
+        .single();
+
+      if (existingVersion) {
+        await supabase
+          .from("versions")
+          .update({
+            pdf_storage_path: pdfUrl,
+            changes: `PDF regenerated`,
+            generated_at: new Date().toISOString(),
+          })
+          .eq("id", existingVersion.id);
+      } else {
+        // No existing version record (e.g. version came from Drive scan), create one
+        await supabase.from("versions").insert({
+          product_id: product.id,
+          version: newVersion,
+          changes: `PDF regenerated`,
+          pdf_storage_path: pdfUrl,
+        });
+      }
+    } else {
+      // New version: insert new record
+      await supabase.from("versions").insert({
+        product_id: product.id,
+        version: newVersion,
+        changes: `PDF generated${driveVersion ? ` (base: v${driveVersion.version})` : " (initial)"}`,
+        pdf_storage_path: pdfUrl,
+      });
+    }
 
     await supabase
       .from("products")
@@ -192,7 +235,9 @@ export async function POST(request: Request) {
     await supabase.from("change_logs").insert({
       product_id: product.id,
       product_line_id: product.product_line_id,
-      changes_summary: `Generated PDF v${newVersion}`,
+      changes_summary: isRegenerate
+        ? `Regenerated PDF v${newVersion}`
+        : `Generated PDF v${newVersion}`,
     });
 
     return NextResponse.json({
