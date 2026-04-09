@@ -20,6 +20,26 @@ export type UserRole = "admin" | "pm" | "mkt" | "viewer";
 export interface Database {
   public: {
     Tables: {
+      solutions: {
+        Row: {
+          id: string;
+          name: string;
+          slug: string;
+          label: string;
+          icon: string | null;
+          sort_order: number;
+          color_primary: string;
+          color_scheme: string;
+          ds_template: string;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["solutions"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["solutions"]["Row"], "id" | "created_at">>;
+        Update: Partial<Database["public"]["Tables"]["solutions"]["Insert"]>;
+      };
       product_lines: {
         Row: {
           id: string;
@@ -37,6 +57,7 @@ export interface Database {
           drive_folder_id: string | null;
           ds_prefix: string;
           solution: string;
+          solution_id: string;
           last_synced_at: string | null;
           created_at: string;
         };
@@ -278,6 +299,7 @@ export interface Database {
 }
 
 // Convenience type aliases
+export type Solution = Database["public"]["Tables"]["solutions"]["Row"];
 export type ProductLine = Database["public"]["Tables"]["product_lines"]["Row"];
 export type Product = Database["public"]["Tables"]["products"]["Row"];
 export type SpecSection = Database["public"]["Tables"]["spec_sections"]["Row"];
