@@ -28,10 +28,76 @@
       color: var(--gray-dark);
       font-size: 16px;
       line-height: 1.8;
-      max-width: 1040px;
-      margin: 0 auto;
-      padding: 48px 32px 80px;
       background: #fff;
+      margin: 0;
+      padding: 0;
+    }
+
+    .page-layout {
+      display: flex;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    /* Left sidebar TOC */
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      border-right: 1px solid var(--border);
+      padding: 32px 20px;
+      background: var(--gray-bg);
+    }
+
+    .sidebar-title {
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--gray-light);
+      margin-bottom: 16px;
+    }
+
+    .sidebar ol {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar li {
+      margin: 0;
+    }
+
+    .sidebar a {
+      display: block;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      color: var(--gray);
+      text-decoration: none;
+      transition: all 0.15s;
+      line-height: 1.4;
+    }
+
+    .sidebar a:hover {
+      background: rgba(3,169,244,0.08);
+      color: var(--blue-dark);
+    }
+
+    .sidebar a.active {
+      background: rgba(3,169,244,0.12);
+      color: var(--blue-dark);
+      font-weight: 600;
+    }
+
+    /* Main content */
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      padding: 48px 48px 80px;
     }
 
     h1 {
@@ -189,55 +255,51 @@
 
     .version-dash { color: #ccc; }
 
-    .toc {
-      background: var(--gray-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px 20px;
-      margin: 20px 0 32px;
-    }
-
-    .toc-title {
-      font-weight: 700;
-      font-size: 16px;
-      margin-bottom: 10px;
-      color: var(--gray);
-    }
-
-    .toc ol {
-      padding-left: 24px;
-      font-size: 15px;
-    }
-
-    .toc li { margin: 4px 0; }
-    .toc a { color: var(--blue-dark); text-decoration: none; }
-    .toc a:hover { text-decoration: underline; }
-
     @media print {
-      body { max-width: 100%; padding: 20px; }
+      .sidebar { display: none; }
+      .main-content { padding: 20px; }
       h2 { break-before: auto; }
       table, pre { break-inside: avoid; }
+    }
+
+    @media (max-width: 768px) {
+      .page-layout { flex-direction: column; }
+      .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 20px;
+      }
+      .main-content { padding: 24px 20px 60px; }
     }
   </style>
 </head>
 <body>
 
-<h1>Product SpecHub</h1>
-<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-08</p>
+<div class="page-layout">
 
-<nav class="toc">
-  <div class="toc-title">Table of Contents</div>
+<!-- Left Sidebar TOC -->
+<nav class="sidebar">
+  <div class="sidebar-title">Contents</div>
   <ol>
     <li><a href="#s1">產品線總覽</a></li>
-    <li><a href="#s2">Google Drive 資料夾結構</a></li>
-    <li><a href="#s3">Datasheet PDF 命名規則</a></li>
-    <li><a href="#s4">產品圖片命名規則 (DS Images)</a></li>
-    <li><a href="#s5">Google Sheets 規格表結構</a></li>
-    <li><a href="#s6">目前所有產品型號一覽</a></li>
+    <li><a href="#s2">Drive 資料夾結構</a></li>
+    <li><a href="#s3">PDF 命名規則</a></li>
+    <li><a href="#s4">圖片命名規則</a></li>
+    <li><a href="#s5">Sheets 規格表結構</a></li>
+    <li><a href="#s6">產品型號一覽</a></li>
     <li><a href="#s7">自動同步機制</a></li>
     <li><a href="#s8">快速檢查清單</a></li>
   </ol>
 </nav>
+
+<!-- Main Content -->
+<div class="main-content">
+
+<h1>Product SpecHub</h1>
+<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-08</p>
 
 <!-- ========== 1 ========== -->
 <h2 id="s1"><span class="num">1</span>產品線總覽</h2>
@@ -629,6 +691,30 @@ Google Drive
   <li>確認 <strong>Status</strong> 欄位正確 (Active / Upcoming / Pending)</li>
   <li>執行一次 Sync 確認資料正確匯入</li>
 </ul>
+
+</div><!-- /main-content -->
+</div><!-- /page-layout -->
+
+<script>
+// Highlight active TOC item on scroll
+(function() {
+  const sections = document.querySelectorAll('h2[id]');
+  const links = document.querySelectorAll('.sidebar a');
+
+  function update() {
+    let current = '';
+    for (const s of sections) {
+      if (s.getBoundingClientRect().top <= 80) current = s.id;
+    }
+    links.forEach(a => {
+      a.classList.toggle('active', a.getAttribute('href') === '#' + current);
+    });
+  }
+
+  window.addEventListener('scroll', update, { passive: true });
+  update();
+})();
+</script>
 
 </body>
 </html>
