@@ -118,6 +118,10 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
   const currentVer = product.current_version || "0.0";
   const hasExistingVersion = currentVer !== "0.0";
 
+  const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
+  const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
+  const canGenerate = hasProductImage && hasHardwareImage;
+
   async function handleGeneratePdf(mode: "regenerate" | "new") {
     setShowGenMenu(false);
     setGenerating(true);
@@ -193,14 +197,23 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
             </Button>
           </Link>
           <div className="relative">
+            {!canGenerate && (
+              <p className="absolute -top-6 right-0 text-[11px] text-red-500 whitespace-nowrap">
+                {!hasProductImage && !hasHardwareImage
+                  ? "Missing product & hardware images"
+                  : !hasProductImage
+                    ? "Missing product image"
+                    : "Missing hardware image"}
+              </p>
+            )}
             <div className="flex">
               <Button
                 size="sm"
-                className="rounded-r-none"
+                className={hasExistingVersion ? "rounded-r-none" : ""}
                 onClick={() =>
                   handleGeneratePdf(hasExistingVersion ? "regenerate" : "new")
                 }
-                disabled={generating}
+                disabled={generating || !canGenerate}
               >
                 {generating
                   ? "Generating..."
@@ -213,7 +226,7 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
                   size="sm"
                   className="rounded-l-none border-l border-white/20 px-2"
                   onClick={() => setShowGenMenu(!showGenMenu)}
-                  disabled={generating}
+                  disabled={generating || !canGenerate}
                 >
                   <svg
                     className="h-3 w-3"
