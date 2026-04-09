@@ -120,7 +120,15 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
 
   const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
   const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
-  const canGenerate = hasProductImage && hasHardwareImage;
+  const hasOverview = !!product.overview && product.overview.trim().length > 0;
+  const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
+  const canGenerate = hasProductImage && hasHardwareImage && hasOverview && hasFeatures;
+
+  const missingItems: string[] = [];
+  if (!hasProductImage) missingItems.push("Product Image");
+  if (!hasHardwareImage) missingItems.push("Hardware Image");
+  if (!hasOverview) missingItems.push("Overview");
+  if (!hasFeatures) missingItems.push("Features");
 
   async function handleGeneratePdf(mode: "regenerate" | "new") {
     setShowGenMenu(false);
@@ -199,11 +207,7 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
           <div className="relative">
             {!canGenerate && (
               <p className="absolute -top-6 right-0 text-[11px] text-red-500 whitespace-nowrap">
-                {!hasProductImage && !hasHardwareImage
-                  ? "Missing product & hardware images"
-                  : !hasProductImage
-                    ? "Missing product image"
-                    : "Missing hardware image"}
+                Missing: {missingItems.join(", ")}
               </p>
             )}
             <div className="flex">
