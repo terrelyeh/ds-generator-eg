@@ -31,6 +31,10 @@ export default function MainLayout({
           <Link href="/docs/sync" className="text-engenius-blue hover:underline">
             Sync & Notification Guide
           </Link>
+          &nbsp;·&nbsp;
+          <a href="/docs/drive-folder-and-naming-rules.html" className="text-engenius-blue hover:underline" target="_blank" rel="noopener noreferrer">
+            Drive Folder & Naming Rules
+          </a>
         </div>
       </footer>
       <Toaster />
