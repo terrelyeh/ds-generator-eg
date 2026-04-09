@@ -26,34 +26,35 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       color: var(--gray-dark);
-      line-height: 1.7;
-      max-width: 960px;
+      font-size: 16px;
+      line-height: 1.8;
+      max-width: 1040px;
       margin: 0 auto;
-      padding: 40px 24px 80px;
+      padding: 48px 32px 80px;
       background: #fff;
     }
 
     h1 {
-      font-size: 28px;
+      font-size: 36px;
       font-weight: 700;
       color: var(--blue-dark);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
       border-bottom: 3px solid var(--blue);
-      padding-bottom: 12px;
+      padding-bottom: 14px;
     }
 
     .subtitle {
-      font-size: 14px;
+      font-size: 16px;
       color: var(--gray-light);
-      margin-bottom: 32px;
+      margin-bottom: 36px;
     }
 
     h2 {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 700;
       color: var(--gray-dark);
-      margin: 40px 0 16px;
-      padding-bottom: 8px;
+      margin: 48px 0 20px;
+      padding-bottom: 10px;
       border-bottom: 2px solid var(--border);
     }
 
@@ -61,43 +62,43 @@
       display: inline-block;
       background: var(--blue);
       color: #fff;
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 6px;
       text-align: center;
-      line-height: 28px;
-      font-size: 14px;
-      margin-right: 8px;
+      line-height: 32px;
+      font-size: 16px;
+      margin-right: 10px;
       vertical-align: middle;
     }
 
     h3 {
-      font-size: 16px;
+      font-size: 19px;
       font-weight: 600;
       color: var(--gray);
-      margin: 24px 0 8px;
+      margin: 28px 0 10px;
     }
 
-    p { margin-bottom: 12px; }
+    p { margin-bottom: 14px; }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 12px 0 20px;
-      font-size: 14px;
+      margin: 14px 0 24px;
+      font-size: 15px;
     }
 
     thead th {
       background: var(--gray-dark);
       color: #fff;
       font-weight: 600;
-      padding: 8px 12px;
+      padding: 10px 14px;
       text-align: left;
       white-space: nowrap;
     }
 
     tbody td {
-      padding: 7px 12px;
+      padding: 9px 14px;
       border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
@@ -107,9 +108,9 @@
 
     code {
       font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
-      font-size: 13px;
+      font-size: 14px;
       background: #f0f2f5;
-      padding: 2px 6px;
+      padding: 2px 7px;
       border-radius: 4px;
       color: #c7254e;
     }
@@ -117,12 +118,12 @@
     pre {
       background: #1e1e2e;
       color: #cdd6f4;
-      padding: 16px 20px;
+      padding: 20px 24px;
       border-radius: 8px;
       overflow-x: auto;
-      font-size: 13px;
-      line-height: 1.6;
-      margin: 12px 0 20px;
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 14px 0 24px;
       font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
     }
 
@@ -133,9 +134,9 @@
 
     .badge {
       display: inline-block;
-      font-size: 11px;
+      font-size: 13px;
       font-weight: 600;
-      padding: 2px 8px;
+      padding: 3px 10px;
       border-radius: 10px;
       white-space: nowrap;
     }
@@ -149,10 +150,10 @@
     .callout {
       background: rgba(3,169,244,0.06);
       border-left: 4px solid var(--blue);
-      padding: 12px 16px;
+      padding: 14px 20px;
       border-radius: 0 8px 8px 0;
-      margin: 12px 0 20px;
-      font-size: 14px;
+      margin: 14px 0 24px;
+      font-size: 15px;
     }
 
     .callout-warn {
@@ -169,9 +170,9 @@
     }
 
     .checklist li {
-      padding: 6px 0 6px 28px;
+      padding: 8px 0 8px 30px;
       position: relative;
-      font-size: 14px;
+      font-size: 15px;
     }
 
     .checklist li::before {
@@ -198,14 +199,14 @@
 
     .toc-title {
       font-weight: 700;
-      font-size: 14px;
-      margin-bottom: 8px;
+      font-size: 16px;
+      margin-bottom: 10px;
       color: var(--gray);
     }
 
     .toc ol {
-      padding-left: 20px;
-      font-size: 14px;
+      padding-left: 24px;
+      font-size: 15px;
     }
 
     .toc li { margin: 4px 0; }
@@ -358,7 +359,7 @@ Google Drive
 </table>
 
 <p><strong>版本偵測邏輯:</strong></p>
-<ol style="font-size:14px; padding-left:20px; margin-bottom:16px;">
+<ol style="font-size:15px; padding-left:20px; margin-bottom:16px;">
   <li>掃描型號對應的子資料夾</li>
   <li>檢查資料夾名稱中的版本號（舊格式相容）</li>
   <li>檢查資料夾內所有 PDF 檔名中的版本號</li>
@@ -606,7 +607,7 @@ Google Drive
 </table>
 
 <h3>同步流程</h3>
-<ol style="font-size:14px; padding-left:20px; margin-bottom:16px; line-height:2;">
+<ol style="font-size:15px; padding-left:20px; margin-bottom:16px; line-height:2;">
   <li>讀取 Google Sheet (Web Overview + Detail Specs) &rarr; 更新產品資料 + 規格</li>
   <li>掃描 DS Images 資料夾 &rarr; 同步產品圖片到 Supabase Storage</li>
   <li>掃描 DS 資料夾 &rarr; 偵測最新 Datasheet 版本號</li>
