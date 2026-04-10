@@ -109,6 +109,85 @@ function ImageUploadButton({
   );
 }
 
+function RadioPatternSlot({
+  modelName,
+  band,
+  plane,
+  label,
+  hasImage,
+  imageUrl,
+  onUploaded,
+}: {
+  modelName: string;
+  band: string;
+  plane: string;
+  label: string;
+  hasImage: boolean;
+  imageUrl?: string;
+  onUploaded: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("model", modelName);
+      formData.append("type", "radio_pattern");
+      formData.append("label", label);
+      const res = await fetch("/api/upload-image", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Upload failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  return (
+    <div
+      className={`flex w-36 flex-col items-center gap-2 rounded-lg border-2 border-dashed p-3 transition-colors ${
+        hasImage
+          ? "border-green-300 bg-green-50"
+          : "border-gray-200 bg-gray-50 hover:border-engenius-blue/30"
+      }`}
+    >
+      {hasImage && imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={`${modelName} ${label}`} className="h-16 w-auto object-contain" />
+      ) : (
+        <svg className="h-10 w-10 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+        </svg>
+      )}
+      <span className={`text-xs font-medium ${hasImage ? "text-green-700" : "text-gray-400"}`}>
+        {band} {plane}
+      </span>
+      <label>
+        <span className="inline-flex h-6 cursor-pointer items-center rounded border border-input bg-background px-2 text-[10px] font-medium shadow-xs hover:bg-accent transition-colors">
+          {uploading ? "..." : hasImage ? "Replace" : "Upload"}
+        </span>
+        <input
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleUpload}
+          disabled={uploading}
+        />
+      </label>
+    </div>
+  );
+}
+
 export function ProductDetail({ product, versions }: ProductDetailProps) {
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -354,42 +433,24 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               </h4>
               <div className="flex flex-wrap gap-4">
                 {radioPatternSlots.map((slot) => {
+                  const slotLabel = `${slot.band} ${slot.plane}`;
                   const asset = product.image_assets.find(
                     (a) =>
                       a.image_type === "radio_pattern" &&
-                      a.label === `${slot.band} ${slot.plane}`
+                      a.label === slotLabel
                   );
                   const hasImage = asset && asset.status !== "missing" && asset.file_url;
                   return (
-                    <div
+                    <RadioPatternSlot
                       key={`${slot.band}-${slot.plane}`}
-                      className={`flex h-28 w-36 flex-col items-center justify-center rounded-lg border-2 border-dashed ${
-                        hasImage
-                          ? "border-green-300 bg-green-50"
-                          : "border-gray-200 bg-gray-50"
-                      }`}
-                    >
-                      {hasImage ? (
-                        <div className="flex flex-col items-center gap-1">
-                          <svg className="h-6 w-6 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-xs font-medium text-green-700">
-                            {slot.band} {slot.plane}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-1">
-                          <svg className="h-6 w-6 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
-                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
-                          </svg>
-                          <span className="text-xs font-medium text-gray-400">
-                            {slot.band} {slot.plane}
-                          </span>
-                          <span className="text-[10px] text-gray-300">Missing</span>
-                        </div>
-                      )}
-                    </div>
+                      modelName={product.model_name}
+                      band={slot.band}
+                      plane={slot.plane}
+                      label={slotLabel}
+                      hasImage={!!hasImage}
+                      imageUrl={hasImage ? asset!.file_url! : undefined}
+                      onUploaded={() => router.refresh()}
+                    />
                   );
                 })}
               </div>
