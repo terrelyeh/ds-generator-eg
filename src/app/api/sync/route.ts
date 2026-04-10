@@ -127,7 +127,7 @@ export async function POST(request: Request) {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
             .from("products")
-            .select("id, subtitle, full_name, headline, overview, features, status")
+            .select("id, subtitle, full_name, headline, overview, features, status, product_image, hardware_image")
             .eq("model_name", modelName)
             .single();
 
@@ -218,14 +218,28 @@ export async function POST(request: Request) {
 
           const hasChanges = isNew || details.length > 0;
 
-          // Even if no content changes, always update sheet metadata
+          // Even if no content changes, always update sheet metadata + sync missing images
           if (!hasChanges && existing) {
+            const missingImages =
+              !existing.product_image || existing.product_image.startsWith("cache/") ||
+              !existing.hardware_image || existing.hardware_image.startsWith("cache/");
+
+            const updateFields: Record<string, unknown> = {
+              sheet_last_modified: metadata.last_modified,
+              sheet_last_editor: metadata.last_editor,
+            };
+
+            if (missingImages) {
+              try {
+                const imgResult = await syncProductImages(modelName, supabase, pl.ds_images_folder_id);
+                if (imgResult.product_image_url) updateFields.product_image = imgResult.product_image_url;
+                if (imgResult.hardware_image_url) updateFields.hardware_image = imgResult.hardware_image_url;
+              } catch { /* image sync failure is non-fatal */ }
+            }
+
             await supabase
               .from("products")
-              .update({
-                sheet_last_modified: metadata.last_modified,
-                sheet_last_editor: metadata.last_editor,
-              })
+              .update(updateFields)
               .eq("id", existing.id);
             lineResult.synced.push(modelName);
             continue;
