@@ -32,10 +32,13 @@ interface ChangeLogRow {
 
 export default async function SolutionDashboardPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ solution: string }>;
+  searchParams: Promise<{ line?: string }>;
 }) {
   const { solution: solutionSlug } = await params;
+  const { line: lineSlug } = await searchParams;
   const supabase = createAdminClient();
 
   // Verify solution exists
@@ -179,11 +182,19 @@ export default async function SolutionDashboardPage({
     };
   });
 
+  // Resolve ?line= slug to product line ID
+  const initialLineId = lineSlug
+    ? (productLines ?? []).find(
+        (pl) => pl.name.toLowerCase().replace(/\s+/g, "-") === lineSlug
+      )?.id
+    : undefined;
+
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
       <DashboardContent
         productLines={productLines ?? []}
         products={productSummaries}
+        initialLineId={initialLineId}
       />
     </div>
   );

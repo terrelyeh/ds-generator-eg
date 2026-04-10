@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -222,7 +223,10 @@ function StatusBadge({ status }: { status: string }) {
 export function DashboardContent({
   productLines,
   products,
-}: DashboardContentProps) {
+  initialLineId,
+}: DashboardContentProps & { initialLineId?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const [showAll, setShowAll] = useState(false);
 
   const visibleProducts = showAll
@@ -233,8 +237,17 @@ export function DashboardContent({
     visibleProducts.some((p) => p.product_line_id === pl.id)
   );
   const [activeTab, setActiveTab] = useState(
-    firstLineWithProducts?.id ?? productLines[0]?.id ?? ""
+    initialLineId ?? firstLineWithProducts?.id ?? productLines[0]?.id ?? ""
   );
+
+  function handleTabChange(lineId: string) {
+    setActiveTab(lineId);
+    const pl = productLines.find((p) => p.id === lineId);
+    if (pl) {
+      const slug = pl.name.toLowerCase().replace(/\s+/g, "-");
+      router.replace(`${pathname}?line=${slug}`, { scroll: false });
+    }
+  }
 
   const activeLine = productLines.find((pl) => pl.id === activeTab);
   const filteredProducts = visibleProducts.filter(
@@ -254,7 +267,7 @@ export function DashboardContent({
             return (
               <button
                 key={pl.id}
-                onClick={() => setActiveTab(pl.id)}
+                onClick={() => handleTabChange(pl.id)}
                 className={`cursor-pointer rounded-md px-3.5 py-1.5 text-sm font-medium transition-all ${
                   activeTab === pl.id
                     ? "bg-engenius-blue text-white shadow-sm"
