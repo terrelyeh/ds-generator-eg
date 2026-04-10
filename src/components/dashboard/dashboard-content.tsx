@@ -295,93 +295,82 @@ export function DashboardContent({
   );
 
   return (
-    <div className="space-y-4">
-      {/* Tabs + nav actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 rounded-lg bg-muted p-1">
-          {productLines.map((pl) => {
-            const count = visibleProducts.filter(
-              (p) => p.product_line_id === pl.id
-            ).length;
-            if (count === 0) return null;
-            return (
-              <button
-                key={pl.id}
-                onClick={() => handleTabChange(pl.id)}
-                className={`cursor-pointer rounded-md px-3.5 py-1.5 text-sm font-medium transition-all ${
+    <div className="space-y-3">
+      {/* Row 1: Product line tabs */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1">
+        {productLines.map((pl) => {
+          const count = visibleProducts.filter(
+            (p) => p.product_line_id === pl.id
+          ).length;
+          if (count === 0) return null;
+          return (
+            <button
+              key={pl.id}
+              onClick={() => handleTabChange(pl.id)}
+              className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+                activeTab === pl.id
+                  ? "bg-engenius-blue text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background"
+              }`}
+            >
+              {pl.label}
+              <span
+                className={`ml-1 tabular-nums ${
                   activeTab === pl.id
-                    ? "bg-engenius-blue text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background"
+                    ? "text-white/60"
+                    : "text-muted-foreground/50"
                 }`}
               >
-                {pl.label}
-                <span
-                  className={`ml-1.5 tabular-nums ${
-                    activeTab === pl.id
-                      ? "text-white/70"
-                      : "text-muted-foreground/60"
-                  }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowAll(!showAll)}
-            className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors ${
-              showAll
-                ? "border-engenius-blue/30 text-engenius-blue bg-engenius-blue/5"
-                : "text-muted-foreground hover:text-foreground hover:bg-accent"
-            }`}
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Row 2: Actions */}
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={() => setShowAll(!showAll)}
+          className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+            showAll
+              ? "bg-engenius-blue/10 text-engenius-blue"
+              : "text-muted-foreground hover:text-foreground hover:bg-muted"
+          }`}
+        >
+          {showAll ? "All" : "Active"}
+        </button>
+        <span className="text-border">|</span>
+        <Link
+          href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
+          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          Compare
+        </Link>
+        <Link
+          href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
+          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          Changelog
+        </Link>
+        <span className="text-border">|</span>
+        <button
+          onClick={handleSync}
+          disabled={syncing}
+          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          <svg
+            className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`}
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              {showAll ? (
-                <path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm4-1 2 2 4-4" />
-              ) : (
-                <path d="M1 8a7 7 0 1 0 14 0A7 7 0 0 0 1 8Zm10 0H5" />
-              )}
-            </svg>
-            {showAll ? "All" : "Active"}
-          </button>
-          <Link
-            href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M4 2v12M12 2v12M4 8h8" />
-            </svg>
-            Compare
-          </Link>
-          <Link
-            href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <path d="M3 4h10M3 8h7M3 12h5" />
-            </svg>
-            Change Log
-          </Link>
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="inline-flex items-center gap-1.5 rounded-md bg-engenius-blue px-3 py-1.5 text-sm font-medium text-white hover:bg-engenius-blue/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.5"
-            >
-              <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
-              <path d="M14 1v4h-4M2 15v-4h4" />
-            </svg>
-            {syncing ? "Syncing..." : `Sync ${activeLine?.label ?? ""}`}
-          </button>
-        </div>
+            <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+            <path d="M14 1v4h-4M2 15v-4h4" />
+          </svg>
+          {syncing ? "Syncing..." : "Sync"}
+        </button>
       </div>
 
       {/* Product table */}
