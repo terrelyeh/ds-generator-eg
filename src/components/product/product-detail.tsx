@@ -282,11 +282,11 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
         </span>
       </nav>
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-6">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">
+      {/* Sticky Header */}
+      <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">
               {product.model_name}
             </h1>
             {hasExistingVersion ? (
@@ -298,17 +298,10 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
                 No version
               </span>
             )}
+            <span className="hidden sm:inline text-sm text-muted-foreground/60 truncate">
+              {product.full_name}
+            </span>
           </div>
-          <p className="mt-2 text-base text-foreground/70">
-            {product.full_name}
-          </p>
-          <p className="mt-1.5 text-xs text-muted-foreground/60">
-            Last edited{" "}
-            {formatDate(product.sheet_last_modified ?? product.updated_at)}
-            {product.sheet_last_editor &&
-              ` by ${product.sheet_last_editor}`}
-          </p>
-        </div>
         <div className="flex flex-shrink-0 gap-3">
           <Link href={`/preview/${product.model_name}`} target="_blank">
             <Button variant="outline" size="default">
@@ -404,7 +397,15 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
             )}
           </div>
         </div>
+        </div>
       </div>
+
+      {/* Sub-header info */}
+      <p className="text-xs text-muted-foreground/50">
+        Last edited{" "}
+        {formatDate(product.sheet_last_modified ?? product.updated_at)}
+        {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
+      </p>
 
       <Separator />
 
