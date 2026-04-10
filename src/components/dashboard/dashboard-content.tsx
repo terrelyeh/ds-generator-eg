@@ -163,7 +163,9 @@ function ProductTable({
             </TableCell>
             <TableCell className="text-center">
               <Badge variant="outline" className="tabular-nums text-xs">
-                v{product.current_version}
+                {product.current_version && product.current_version !== "0.0"
+                  ? `v${product.current_version}`
+                  : "—"}
               </Badge>
             </TableCell>
             <TableCell

@@ -211,7 +211,9 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               {product.model_name}
             </h1>
             <Badge variant="outline" className="tabular-nums">
-              v{product.current_version}
+              {product.current_version && product.current_version !== "0.0"
+                ? `v${product.current_version}`
+                : "—"}
             </Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
