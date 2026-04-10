@@ -401,7 +401,7 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
       </div>
 
       {/* Sub-header info */}
-      <p className="text-xs text-muted-foreground/50">
+      <p className="-mt-4 text-xs text-muted-foreground">
         Last edited{" "}
         {formatDate(product.sheet_last_modified ?? product.updated_at)}
         {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
