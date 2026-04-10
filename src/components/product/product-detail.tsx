@@ -121,9 +121,13 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
   const isAP = product.product_line.category === "APs";
 
   // Determine which radio pattern slots to show for AP products
-  // Wi-Fi 6E/7 models (name contains 5xx/6xx series or "6G" in specs) get 6G slots
+  // Check "Operating Frequency" spec for 6GHz support
   const has6G = isAP && product.spec_sections.some((s) =>
-    s.items.some((i) => /\b6\s*GHz\b/i.test(i.value) || /\b6G\b/i.test(i.value))
+    s.items.some(
+      (i) =>
+        i.label.toLowerCase().includes("operating frequency") &&
+        /6\s*GHz/i.test(i.value)
+    )
   );
   const radioPatternSlots = isAP
     ? [
