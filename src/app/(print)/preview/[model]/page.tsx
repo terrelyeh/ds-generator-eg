@@ -80,7 +80,16 @@ export default async function PreviewPage({
 
   return (
     <>
-      <PrintToolbar model={product.model_name} />
+      <PrintToolbar
+        model={product.model_name}
+        currentVersion={product.current_version || "0.0"}
+        canGenerate={
+          !!product.product_image && !product.product_image.startsWith("cache/") &&
+          !!product.hardware_image && !product.hardware_image.startsWith("cache/") &&
+          !!product.overview && product.overview.trim().length > 0 &&
+          Array.isArray(product.features) && product.features.length > 0
+        }
+      />
       <style
         dangerouslySetInnerHTML={{
           __html: `
