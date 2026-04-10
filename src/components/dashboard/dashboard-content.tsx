@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import { toast } from "sonner";
 import {
   Table,
   TableBody,
@@ -251,6 +252,43 @@ export function DashboardContent({
     }
   }
 
+  const [syncing, setSyncing] = useState(false);
+
+  async function handleSync() {
+    if (!activeLine) return;
+    setSyncing(true);
+    try {
+      const res = await fetch(
+        `/api/sync?force=true&line=${encodeURIComponent(activeLine.name)}`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (data.ok) {
+        const result = data.results?.[0];
+        const synced: string[] = result?.synced ?? [];
+        const errors: string[] = result?.errors ?? [];
+
+        if (synced.length === 0 && errors.length === 0) {
+          toast.success(`${activeLine.label} is up to date`);
+        } else {
+          toast.success(`${activeLine.label} synced`, {
+            description: synced.length > 0
+              ? `${synced.length} models: ${synced.join(", ")}${errors.length > 0 ? ` | ${errors.length} errors` : ""}`
+              : `${errors.length} errors`,
+            duration: 8000,
+          });
+        }
+        router.refresh();
+      } else {
+        toast.error(`Sync failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   const activeLine = productLines.find((pl) => pl.id === activeTab);
   const filteredProducts = visibleProducts.filter(
     (p) => p.product_line_id === activeTab
@@ -326,6 +364,23 @@ export function DashboardContent({
             </svg>
             Change Log
           </Link>
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-1.5 rounded-md bg-engenius-blue px-3 py-1.5 text-sm font-medium text-white hover:bg-engenius-blue/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+            >
+              <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+              <path d="M14 1v4h-4M2 15v-4h4" />
+            </svg>
+            {syncing ? "Syncing..." : `Sync ${activeLine?.label ?? ""}`}
+          </button>
         </div>
       </div>
 
