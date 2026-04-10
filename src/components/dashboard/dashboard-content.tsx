@@ -116,7 +116,7 @@ function ProductTable({
         <TableRow className="border-b-2 border-foreground/15">
           <TableHead className="w-8 text-center">#</TableHead>
           <TableHead className="w-28">Model #</TableHead>
-          <TableHead>Model Name</TableHead>
+          <TableHead className="w-56">Model Name</TableHead>
           <TableHead className="w-16 text-center">Version</TableHead>
           <TableHead className="w-24">Last Changed</TableHead>
           <TableHead className="w-14 text-center">OV</TableHead>
