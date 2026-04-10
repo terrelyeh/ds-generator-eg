@@ -109,7 +109,7 @@ export async function detectLatestVersion(
       }
     }
 
-    // Check 2: Version in PDF file names inside the folder (both formats)
+    // Check 2: Version in PDF file names inside the folder
     try {
       const filesRes = await drive.files.list({
         q: `'${folder.id}' in parents and mimeType = 'application/pdf' and name contains '${modelName}' and trashed = false`,
@@ -134,6 +134,60 @@ export async function detectLatestVersion(
       }
     } catch {
       // Skip if we can't list files in this folder
+    }
+
+    // Check 3: Version subfolders inside the model folder
+    // e.g. DS_Cloud_ECC100/ → DS_Cloud_ECC100_v1.0/ , DS_Cloud_ECC100_v1.1/
+    try {
+      const subFoldersRes = await drive.files.list({
+        q: `'${folder.id}' in parents and mimeType = 'application/vnd.google-apps.folder' and name contains '${modelName}' and trashed = false`,
+        fields: "files(id, name)",
+        supportsAllDrives: true,
+        includeItemsFromAllDrives: true,
+        pageSize: 50,
+      });
+
+      for (const sub of subFoldersRes.data.files ?? []) {
+        if (!sub.name || !sub.id) continue;
+        // Check version in subfolder name
+        const subVer = parseVersion(sub.name);
+        if (subVer && (!best || compareVersions(subVer, best) > 0)) {
+          best = {
+            version: `${subVer.major}.${subVer.minor}`,
+            major: subVer.major,
+            minor: subVer.minor,
+            folderId: sub.id,
+            folderName: sub.name,
+          };
+        }
+
+        // Also check PDFs inside the subfolder
+        try {
+          const subFilesRes = await drive.files.list({
+            q: `'${sub.id}' in parents and mimeType = 'application/pdf' and name contains '${modelName}' and trashed = false`,
+            fields: "files(name)",
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true,
+            pageSize: 20,
+          });
+
+          for (const sf of subFilesRes.data.files ?? []) {
+            if (!sf.name) continue;
+            const sfVer = parseVersion(sf.name);
+            if (sfVer && (!best || compareVersions(sfVer, best) > 0)) {
+              best = {
+                version: `${sfVer.major}.${sfVer.minor}`,
+                major: sfVer.major,
+                minor: sfVer.minor,
+                folderId: sub.id,
+                folderName: sub.name,
+              };
+            }
+          }
+        } catch { /* skip */ }
+      }
+    } catch {
+      // Skip if we can't list subfolders
     }
   }
 
