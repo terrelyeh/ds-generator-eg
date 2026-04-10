@@ -10,6 +10,8 @@ interface ProductRow {
   full_name: string;
   current_version: string;
   status: string;
+  overview: string;
+  features: string[];
   product_image: string;
   hardware_image: string;
   updated_at: string;
@@ -72,6 +74,8 @@ export default async function SolutionDashboardPage({
         full_name,
         current_version,
         status,
+        overview,
+        features,
         product_image,
         hardware_image,
         updated_at,
@@ -170,6 +174,8 @@ export default async function SolutionDashboardPage({
       full_name: p.full_name,
       current_version: p.current_version,
       status: p.status || "active",
+      has_overview: !!p.overview && p.overview.trim().length > 0,
+      has_features: Array.isArray(p.features) && p.features.length > 0,
       has_product_image: hasProductImage,
       has_hardware_image: hasHardwareImage,
       radio_patterns: radioPatterns,

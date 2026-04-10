@@ -24,6 +24,8 @@ interface ProductSummary {
   status: string;
   has_product_image: boolean;
   has_hardware_image: boolean;
+  has_overview: boolean;
+  has_features: boolean;
   radio_patterns: { band: string; h_plane: boolean; e_plane: boolean }[];
   last_content_changed: string | null;
   last_change_by: string | null;
@@ -118,16 +120,16 @@ function ProductTable({
     <Table>
       <TableHeader className="[&_th]:sticky [&_th]:top-14 [&_th]:z-10 [&_th]:bg-muted">
         <TableRow className="border-b-2 border-foreground/15">
-          <TableHead className="w-10 text-center">#</TableHead>
-          <TableHead className="w-36">Model #</TableHead>
-          <TableHead className="w-72">Model Name</TableHead>
-          <TableHead className="w-20 text-center">Version</TableHead>
-          <TableHead className="w-28">Last Changed</TableHead>
-          <TableHead className="w-28">Changed By</TableHead>
-          <TableHead className="w-16 text-center">Product</TableHead>
-          <TableHead className="w-16 text-center">Hardware</TableHead>
+          <TableHead className="w-8 text-center">#</TableHead>
+          <TableHead className="w-28">Model #</TableHead>
+          <TableHead>Model Name</TableHead>
+          <TableHead className="w-16 text-center">Version</TableHead>
+          <TableHead className="w-24">Last Changed</TableHead>
+          <TableHead className="w-24">Changed By</TableHead>
+          <TableHead className="w-20 text-center">Content</TableHead>
+          <TableHead className="w-20 text-center">Images</TableHead>
           {isAP && (
-            <TableHead className="w-28 text-center">
+            <TableHead className="w-24 text-center">
               Radio Pattern
             </TableHead>
           )}
@@ -179,10 +181,16 @@ function ProductTable({
               {product.last_change_by ?? "—"}
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_product_image} label="Product" />
+              <div className="flex items-center justify-center gap-2">
+                <ImgStatus ok={product.has_overview} label="OV" />
+                <ImgStatus ok={product.has_features} label="FT" />
+              </div>
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_hardware_image} label="Hardware" />
+              <div className="flex items-center justify-center gap-2">
+                <ImgStatus ok={product.has_product_image} label="Prod" />
+                <ImgStatus ok={product.has_hardware_image} label="HW" />
+              </div>
             </TableCell>
             {isAP && (
               <TableCell className="text-center">
