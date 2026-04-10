@@ -61,7 +61,7 @@ export function SolutionSidebar({
   solutions: SolutionItem[];
 }) {
   const pathname = usePathname();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
 
   // Extract current solution slug from pathname: /dashboard/cloud → cloud
   const currentSlug = pathname.split("/")[2] ?? "";
