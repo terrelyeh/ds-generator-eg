@@ -118,6 +118,28 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
   const currentVer = product.current_version || "0.0";
   const hasExistingVersion = currentVer !== "0.0";
 
+  const isAP = product.product_line.category === "APs";
+
+  // Determine which radio pattern slots to show for AP products
+  // Wi-Fi 6E/7 models (name contains 5xx/6xx series or "6G" in specs) get 6G slots
+  const has6G = isAP && product.spec_sections.some((s) =>
+    s.items.some((i) => /\b6\s*GHz\b/i.test(i.value) || /\b6G\b/i.test(i.value))
+  );
+  const radioPatternSlots = isAP
+    ? [
+        { band: "2.4G", plane: "H-plane" },
+        { band: "2.4G", plane: "E-plane" },
+        { band: "5G", plane: "H-plane" },
+        { band: "5G", plane: "E-plane" },
+        ...(has6G
+          ? [
+              { band: "6G", plane: "H-plane" },
+              { band: "6G", plane: "E-plane" },
+            ]
+          : []),
+      ]
+    : [];
+
   const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
   const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
   const hasOverview = !!product.overview && product.overview.trim().length > 0;
@@ -317,6 +339,57 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               onUploaded={() => router.refresh()}
             />
           </div>
+
+          {/* Radio Pattern placeholders (AP only) */}
+          {isAP && (
+            <div className="mt-6">
+              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                Radio Patterns
+              </h4>
+              <div className="flex flex-wrap gap-4">
+                {radioPatternSlots.map((slot) => {
+                  const asset = product.image_assets.find(
+                    (a) =>
+                      a.image_type === "radio_pattern" &&
+                      a.label === `${slot.band} ${slot.plane}`
+                  );
+                  const hasImage = asset && asset.status !== "missing" && asset.file_url;
+                  return (
+                    <div
+                      key={`${slot.band}-${slot.plane}`}
+                      className={`flex h-28 w-36 flex-col items-center justify-center rounded-lg border-2 border-dashed ${
+                        hasImage
+                          ? "border-green-300 bg-green-50"
+                          : "border-gray-200 bg-gray-50"
+                      }`}
+                    >
+                      {hasImage ? (
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className="h-6 w-6 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs font-medium text-green-700">
+                            {slot.band} {slot.plane}
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1">
+                          <svg className="h-6 w-6 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+                            <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                          </svg>
+                          <span className="text-xs font-medium text-gray-400">
+                            {slot.band} {slot.plane}
+                          </span>
+                          <span className="text-[10px] text-gray-300">Missing</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <p className="mt-3 text-xs text-muted-foreground">
             Images are automatically synced from Google Drive. You can also
             upload manually here.
