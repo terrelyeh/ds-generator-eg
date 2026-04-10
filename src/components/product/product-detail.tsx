@@ -264,14 +264,7 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm">
         <Link
-          href="/dashboard"
-          className="text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Dashboard
-        </Link>
-        <span className="text-muted-foreground/40">/</span>
-        <Link
-          href={`/compare/${encodeURIComponent(product.product_line.name)}`}
+          href={`/dashboard/cloud?line=${product.product_line.name.toLowerCase().replace(/\s+/g, "-")}`}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           {product.product_line.label}
