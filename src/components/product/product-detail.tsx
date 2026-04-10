@@ -283,31 +283,35 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
       </nav>
 
       {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-6">
+        <div className="min-w-0">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight">
               {product.model_name}
             </h1>
-            <Badge variant="outline" className="tabular-nums">
-              {product.current_version && product.current_version !== "0.0"
-                ? `v${product.current_version}`
-                : "—"}
-            </Badge>
+            {hasExistingVersion ? (
+              <span className="rounded-md bg-engenius-blue/10 px-2.5 py-1 text-sm font-semibold tabular-nums text-engenius-blue">
+                v{currentVer}
+              </span>
+            ) : (
+              <span className="rounded-md bg-muted px-2.5 py-1 text-sm font-medium text-muted-foreground">
+                No version
+              </span>
+            )}
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className="mt-2 text-base text-foreground/70">
             {product.full_name}
           </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
+          <p className="mt-1.5 text-xs text-muted-foreground/60">
             Last edited{" "}
             {formatDate(product.sheet_last_modified ?? product.updated_at)}
             {product.sheet_last_editor &&
               ` by ${product.sheet_last_editor}`}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-shrink-0 gap-3">
           <Link href={`/preview/${product.model_name}`} target="_blank">
-            <Button variant="outline" size="sm">
+            <Button variant="outline" size="default">
               Preview Datasheet
             </Button>
           </Link>
@@ -319,7 +323,7 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
             )}
             <div className="flex">
               <Button
-                size="sm"
+                size="default"
                 className={hasExistingVersion ? "rounded-r-none" : ""}
                 onClick={() =>
                   handleGeneratePdf(hasExistingVersion ? "regenerate" : "new")
@@ -334,8 +338,8 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               </Button>
               {hasExistingVersion && (
                 <Button
-                  size="sm"
-                  className="rounded-l-none border-l border-white/20 px-2"
+                  size="default"
+                  className="rounded-l-none border-l border-white/20 px-2.5"
                   onClick={() => setShowGenMenu(!showGenMenu)}
                   disabled={generating || !canGenerate}
                 >
