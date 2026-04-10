@@ -50,17 +50,11 @@ function formatDate(dateStr: string | null) {
 }
 
 /** Colored dot status indicator */
-function ImgStatus({ ok, label }: { ok: boolean; label: string }) {
+function ImgStatus({ ok }: { ok: boolean }) {
   return ok ? (
-    <span
-      className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500"
-      title={`${label}: Ready`}
-    />
+    <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
   ) : (
-    <span
-      className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25"
-      title={`${label}: Missing`}
-    />
+    <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25" />
   );
 }
 
@@ -125,9 +119,10 @@ function ProductTable({
           <TableHead>Model Name</TableHead>
           <TableHead className="w-16 text-center">Version</TableHead>
           <TableHead className="w-24">Last Changed</TableHead>
-          <TableHead className="w-24">Changed By</TableHead>
-          <TableHead className="w-20 text-center">Content</TableHead>
-          <TableHead className="w-20 text-center">Images</TableHead>
+          <TableHead className="w-14 text-center">OV</TableHead>
+          <TableHead className="w-14 text-center">FT</TableHead>
+          <TableHead className="w-14 text-center">Prod</TableHead>
+          <TableHead className="w-14 text-center">HW</TableHead>
           {isAP && (
             <TableHead className="w-24 text-center">
               Radio Pattern
@@ -177,20 +172,17 @@ function ProductTable({
             >
               {formatDate(product.last_content_changed)}
             </TableCell>
-            <TableCell className="text-muted-foreground">
-              {product.last_change_by ?? "—"}
+            <TableCell className="text-center">
+              <ImgStatus ok={product.has_overview} />
             </TableCell>
             <TableCell className="text-center">
-              <div className="flex items-center justify-center gap-2">
-                <ImgStatus ok={product.has_overview} label="OV" />
-                <ImgStatus ok={product.has_features} label="FT" />
-              </div>
+              <ImgStatus ok={product.has_features} />
             </TableCell>
             <TableCell className="text-center">
-              <div className="flex items-center justify-center gap-2">
-                <ImgStatus ok={product.has_product_image} label="Prod" />
-                <ImgStatus ok={product.has_hardware_image} label="HW" />
-              </div>
+              <ImgStatus ok={product.has_product_image} />
+            </TableCell>
+            <TableCell className="text-center">
+              <ImgStatus ok={product.has_hardware_image} />
             </TableCell>
             {isAP && (
               <TableCell className="text-center">
