@@ -315,11 +315,13 @@ body {
 }
 
 .product-image-container {
-  position: absolute; right: 10pt; top: 330pt;
-  width: 310pt; height: 270pt; text-align: center;
+  position: absolute; right: 10pt;
+  top: 210pt; bottom: 260pt;
+  width: 310pt;
+  display: flex; align-items: center; justify-content: center;
 }
 .product-image-container img {
-  max-width: 290pt; max-height: 260pt; object-fit: contain;
+  max-width: 290pt; max-height: 100%; object-fit: contain;
 }
 
 .section-title {
@@ -439,11 +441,6 @@ ${isCJK ? `
 .product-subtitle-cloud,
 .product-subtitle-standard {
   font-size: 17pt;
-}
-
-/* Product image: move up to match original layout */
-.product-image-container {
-  top: 290pt;
 }
 
 /* Overview: match original InDesign sizing and contrast */
