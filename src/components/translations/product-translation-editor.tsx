@@ -119,6 +119,7 @@ export function ProductTranslationEditor({
   const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
   // Translation notes from AI
+  const [headlineNotes, setHeadlineNotes] = useState("");
   const [overviewNotes, setOverviewNotes] = useState("");
   const [featuresNotes, setFeaturesNotes] = useState("");
 
@@ -146,6 +147,7 @@ export function ProductTranslationEditor({
     setHwImage(t?.hardware_image ?? "");
     setQrLabel(t?.qr_label ?? "");
     setQrUrl(t?.qr_url ?? "");
+    setHeadlineNotes("");
     setOverviewNotes("");
     setFeaturesNotes("");
     setDirty(false);
@@ -581,6 +583,7 @@ export function ProductTranslationEditor({
                 const data = await res.json();
                 if (data.ok) {
                   setHeadlineTrans(data.translated);
+                  setHeadlineNotes(data.notes || "");
                   setDirty(true);
                   toast.success(`Headline translated by ${data.provider}`);
                 } else {
@@ -630,6 +633,7 @@ export function ProductTranslationEditor({
               className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
             />
           </div>
+          {headlineNotes && <TranslationNotes notes={headlineNotes} onDismiss={() => setHeadlineNotes("")} />}
         </CardContent>
       </Card>
 
