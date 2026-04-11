@@ -68,6 +68,7 @@ interface TranslationData {
   translation_mode: "light" | "full";
   overview: string | null;
   features: string[] | null;
+  confirmed: boolean;
 }
 
 interface ProductTranslationEditorProps {
@@ -91,6 +92,10 @@ export function ProductTranslationEditor({
   // Enabled locales = locales that have a record in product_translations
   const [enabledLocales, setEnabledLocales] = useState<string[]>(
     existingTranslations.map((t) => t.locale)
+  );
+  // Track which locales have been confirmed (explicitly Saved)
+  const [confirmedLocales, setConfirmedLocales] = useState<Set<string>>(
+    new Set(existingTranslations.filter((t) => t.confirmed).map((t) => t.locale))
   );
   const [showAddMenu, setShowAddMenu] = useState(false);
 
@@ -272,11 +277,17 @@ export function ProductTranslationEditor({
           translation_mode: mode,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
+          confirm: true,
         }),
       });
       const data = await res.json();
       if (data.ok) {
-        toast.success("Translation saved");
+        setConfirmedLocales((prev) => new Set([...prev, activeLocale]));
+        toast.success(
+          confirmedLocales.has(activeLocale)
+            ? "Translation updated"
+            : `${currentLocaleInfo?.label} translation confirmed — PDF generation is now available`
+        );
         setDirty(false);
         router.refresh();
       } else {
@@ -451,6 +462,17 @@ export function ProductTranslationEditor({
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Draft / Confirmed badge */}
+          {confirmedLocales.has(activeLocale) ? (
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200">
+              Confirmed
+            </span>
+          ) : (
+            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+              Draft
+            </span>
+          )}
+
           <button
             onClick={handlePreview}
             disabled={previewing}
@@ -462,7 +484,7 @@ export function ProductTranslationEditor({
             </svg>
           </button>
           <Button onClick={handleSave} disabled={saving || !dirty} size="sm">
-            {saving ? "Saving..." : "Save"}
+            {saving ? "Saving..." : "Save & Confirm"}
           </Button>
         </div>
       </div>

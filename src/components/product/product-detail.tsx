@@ -242,6 +242,7 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
 
   const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
   const localesWithTranslations = translations.map((t) => t.locale);
+  const confirmedLocales = new Set(translations.filter((t) => t.confirmed).map((t) => t.locale));
 
   async function handleGeneratePdf(mode: "regenerate" | "new", locale = "en") {
     setShowGenMenu(false);
@@ -431,37 +432,46 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
                           </span>
                         </div>
                         {hasTranslation ? (
-                          <div className="flex gap-1.5">
-                            {localeVer ? (
-                              <>
-                                <button
-                                  className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
-                                  onClick={() => handleGeneratePdf("regenerate", l.value)}
+                          <div className="flex flex-col gap-1.5">
+                            {confirmedLocales.has(l.value) ? (
+                              <div className="flex gap-1.5">
+                                {localeVer ? (
+                                  <>
+                                    <button
+                                      className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                      onClick={() => handleGeneratePdf("regenerate", l.value)}
+                                    >
+                                      Regen v{localeVer}
+                                    </button>
+                                    <button
+                                      className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                      onClick={() => handleGeneratePdf("new", l.value)}
+                                    >
+                                      New Ver
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                    onClick={() => handleGeneratePdf("new", l.value)}
+                                  >
+                                    Generate v1.0
+                                  </button>
+                                )}
+                                <Link
+                                  href={`/preview/${product.model_name}?lang=${l.value}&mode=full`}
+                                  target="_blank"
+                                  className="rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
                                 >
-                                  Regen v{localeVer}
-                                </button>
-                                <button
-                                  className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
-                                  onClick={() => handleGeneratePdf("new", l.value)}
-                                >
-                                  New Ver
-                                </button>
-                              </>
+                                  Preview
+                                </Link>
+                              </div>
                             ) : (
-                              <button
-                                className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
-                                onClick={() => handleGeneratePdf("new", l.value)}
-                              >
-                                Generate v1.0
-                              </button>
+                              <div className="flex items-center gap-2">
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Draft</span>
+                                <span className="text-xs text-muted-foreground/60">Save translation to enable PDF generation</span>
+                              </div>
                             )}
-                            <Link
-                              href={`/preview/${product.model_name}?lang=${l.value}&mode=full`}
-                              target="_blank"
-                              className="rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
-                            >
-                              Preview
-                            </Link>
                           </div>
                         ) : (
                           <p className="text-xs text-muted-foreground/60">No translation yet</p>
@@ -525,6 +535,7 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
             translation_mode: t.translation_mode,
             overview: t.overview,
             features: t.features,
+            confirmed: t.confirmed,
           }))}
         />
       )}

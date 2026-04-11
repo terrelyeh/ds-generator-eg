@@ -11,16 +11,19 @@ import { createAdminClient } from "@/lib/supabase/admin";
  *   translation_mode: "light" | "full",
  *   overview: string | null,
  *   features: string[] | null,
+ *   confirm?: boolean,    // true = explicit Save (marks as confirmed)
+ *                         // false/omitted = auto-save for Preview (keeps current confirmed status)
  * }
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { product_id, locale, translation_mode, overview, features } = body as {
+  const { product_id, locale, translation_mode, overview, features, confirm } = body as {
     product_id: string;
     locale: string;
     translation_mode: "light" | "full";
     overview: string | null;
     features: string[] | null;
+    confirm?: boolean;
   };
 
   if (!product_id || !locale) {
@@ -29,19 +32,23 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  const upsertData: Record<string, unknown> = {
+    product_id,
+    locale,
+    translation_mode: translation_mode || "light",
+    overview: overview?.trim() || null,
+    features: features ?? null,
+    translated_at: new Date().toISOString(),
+  };
+
+  // Only set confirmed=true on explicit Save, never set it back to false
+  if (confirm) {
+    upsertData.confirmed = true;
+  }
+
   const { error } = await supabase
     .from("product_translations" as "products")
-    .upsert(
-      {
-        product_id,
-        locale,
-        translation_mode: translation_mode || "light",
-        overview: overview?.trim() || null,
-        features: features ?? null,
-        translated_at: new Date().toISOString(),
-      },
-      { onConflict: "product_id,locale" }
-    );
+    .upsert(upsertData, { onConflict: "product_id,locale" });
 
   if (error) {
     return NextResponse.json(
@@ -50,7 +57,7 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, confirmed: !!confirm });
 }
 
 /**

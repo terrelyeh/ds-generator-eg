@@ -299,6 +299,7 @@ export interface Database {
           translation_mode: "light" | "full";
           overview: string | null;
           features: string[] | null;
+          confirmed: boolean;
           translated_at: string;
           translated_by: string | null;
         };
