@@ -11,6 +11,16 @@ import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
 
+/** Safe JSON parse for API responses — handles non-JSON error pages */
+async function safeJson(res: Response): Promise<{ ok?: boolean; translated?: string; notes?: string; provider?: string; error?: string }> {
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text.slice(0, 200) };
+  }
+}
+
 /** Collapsible panel showing AI translation notes */
 function TranslationNotes({
   notes,
@@ -234,9 +244,9 @@ export function ProductTranslationEditor({
           provider: selectedProvider,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.ok) {
-        setOverview(data.translated);
+        setOverview(data.translated ?? "");
         setOverviewNotes(data.notes || "");
         setDirty(true);
         toast.success(`Overview translated by ${data.provider}`);
@@ -265,7 +275,7 @@ export function ProductTranslationEditor({
           provider: selectedProvider,
         }),
       });
-      const data = await res.json();
+      const data = await safeJson(res);
       if (data.ok) {
         const lines = (data.translated as string).split("\n").filter((l: string) => l.trim());
         const result = englishFeatures.map((_, i) => lines[i] ?? "");
@@ -581,9 +591,9 @@ export function ProductTranslationEditor({
                     provider: selectedProvider,
                   }),
                 });
-                const data = await res.json();
+                const data = await safeJson(res);
                 if (data.ok) {
-                  setHeadlineTrans(data.translated);
+                  setHeadlineTrans(data.translated ?? "");
                   setHeadlineNotes(data.notes || "");
                   setDirty(true);
                   toast.success(`Headline translated by ${data.provider}`);
