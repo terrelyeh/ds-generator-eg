@@ -32,6 +32,7 @@ export function SpecLabelTranslationsEditor({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [aiTranslating, setAiTranslating] = useState(false);
+  const [aiNotes, setAiNotes] = useState("");
 
   const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
@@ -59,6 +60,7 @@ export function SpecLabelTranslationsEditor({
     }
 
     setAiTranslating(true);
+    const allNotes: string[] = [];
     try {
       // Translate section headers
       if (emptySection.length > 0) {
@@ -81,6 +83,7 @@ export function SpecLabelTranslationsEditor({
             if (lines[i]) updated[`section:${name}`] = lines[i];
           });
           setTranslations(updated);
+          if (data.notes) allNotes.push(data.notes);
         }
       }
 
@@ -107,10 +110,12 @@ export function SpecLabelTranslationsEditor({
             });
             return updated;
           });
+          if (data.notes) allNotes.push(data.notes);
         }
       }
 
       setDirty(true);
+      if (allNotes.length > 0) setAiNotes(allNotes.join("\n\n"));
       toast.success(`AI translated ${emptySection.length + emptySpec.length} empty fields`);
     } catch (err) {
       toast.error(`AI translation failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -243,6 +248,29 @@ export function SpecLabelTranslationsEditor({
           </Button>
         </div>
       </div>
+
+      {/* AI Translation notes */}
+      {aiNotes && (
+        <div className="rounded-lg border border-indigo-200 bg-indigo-50 overflow-hidden">
+          <div className="flex items-center justify-between px-3 py-2">
+            <span className="flex items-center gap-1.5 text-xs font-medium text-indigo-700">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+                <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z" />
+              </svg>
+              翻譯筆記
+            </span>
+            <button
+              onClick={() => setAiNotes("")}
+              className="text-xs text-indigo-400 hover:text-indigo-600 transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+          <div className="px-3 pb-3 text-xs text-indigo-700 leading-relaxed whitespace-pre-wrap">
+            {aiNotes}
+          </div>
+        </div>
+      )}
 
       {/* Warning banner */}
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

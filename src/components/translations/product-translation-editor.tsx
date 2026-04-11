@@ -11,6 +11,58 @@ import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
 
+/** Collapsible panel showing AI translation notes */
+function TranslationNotes({
+  notes,
+  onDismiss,
+  className = "",
+}: {
+  notes: string;
+  onDismiss: () => void;
+  className?: string;
+}) {
+  const [expanded, setExpanded] = useState(true);
+
+  return (
+    <div className={`rounded-lg border border-indigo-200 bg-indigo-50 overflow-hidden transition-all ${className}`}>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between px-3 py-2 text-xs font-medium text-indigo-700 hover:bg-indigo-100 transition-colors"
+      >
+        <span className="flex items-center gap-1.5">
+          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M8 1.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM0 8a8 8 0 1116 0A8 8 0 010 8zm6.5-.25A.75.75 0 017.25 7h1a.75.75 0 01.75.75v2.75h.25a.75.75 0 010 1.5h-2a.75.75 0 010-1.5h.25v-2h-.25a.75.75 0 01-.75-.75zM8 6a1 1 0 100-2 1 1 0 000 2z" />
+          </svg>
+          翻譯筆記
+        </span>
+        <span className="flex items-center gap-2">
+          <svg
+            className={`h-3 w-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+            viewBox="0 0 12 12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M3 5l3 3 3-3" />
+          </svg>
+          <span
+            onClick={(e) => { e.stopPropagation(); onDismiss(); }}
+            className="text-indigo-400 hover:text-indigo-600 transition-colors"
+            title="Dismiss"
+          >
+            ✕
+          </span>
+        </span>
+      </button>
+      {expanded && (
+        <div className="px-3 pb-3 text-xs text-indigo-700 leading-relaxed whitespace-pre-wrap">
+          {notes}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface TranslationData {
   locale: string;
   translation_mode: "light" | "full";
@@ -54,6 +106,10 @@ export function ProductTranslationEditor({
 
   const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
+  // Translation notes from AI
+  const [overviewNotes, setOverviewNotes] = useState("");
+  const [featuresNotes, setFeaturesNotes] = useState("");
+
   // Build state from existing translations
   const existing = existingTranslations.find((t) => t.locale === activeLocale);
   const [mode, setMode] = useState<"light" | "full">(existing?.translation_mode ?? "light");
@@ -69,6 +125,8 @@ export function ProductTranslationEditor({
     setMode(t?.translation_mode ?? "light");
     setOverview(t?.overview ?? "");
     setFeatures(t?.features ?? englishFeatures.map(() => ""));
+    setOverviewNotes("");
+    setFeaturesNotes("");
     setDirty(false);
   }
 
@@ -156,6 +214,7 @@ export function ProductTranslationEditor({
       const data = await res.json();
       if (data.ok) {
         setOverview(data.translated);
+        setOverviewNotes(data.notes || "");
         setDirty(true);
         toast.success(`Overview translated by ${data.provider}`);
       } else {
@@ -188,6 +247,7 @@ export function ProductTranslationEditor({
         const lines = (data.translated as string).split("\n").filter((l: string) => l.trim());
         const result = englishFeatures.map((_, i) => lines[i] ?? "");
         setFeatures(result);
+        setFeaturesNotes(data.notes || "");
         setDirty(true);
         toast.success(`${lines.length} features translated by ${data.provider}`);
       } else {
@@ -467,6 +527,7 @@ export function ProductTranslationEditor({
               }`}
             />
           </div>
+          {overviewNotes && <TranslationNotes notes={overviewNotes} onDismiss={() => setOverviewNotes("")} />}
         </CardContent>
       </Card>
 
@@ -529,6 +590,7 @@ export function ProductTranslationEditor({
               </div>
             ))}
           </div>
+          {featuresNotes && <TranslationNotes notes={featuresNotes} onDismiss={() => setFeaturesNotes("")} className="mt-4" />}
         </CardContent>
       </Card>
 

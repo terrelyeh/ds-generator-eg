@@ -58,6 +58,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       translated: result.translated,
+      notes: result.notes,
       provider: result.provider,
     });
   } catch (err) {

@@ -77,7 +77,7 @@ export async function translate(opts: {
   contentType: "overview" | "features" | "spec_labels";
   productLine?: string;
   providerId?: ProviderId;
-}): Promise<{ translated: string; provider: string }> {
+}): Promise<{ translated: string; notes: string; provider: string }> {
   const {
     source,
     targetLocale,
@@ -91,7 +91,23 @@ export async function translate(opts: {
 
   const userMessage = `Translate the following to ${targetLocale}:\n\n${source}`;
 
-  const translated = await provider.translate(systemPrompt, userMessage);
+  const raw = await provider.translate(systemPrompt, userMessage);
 
-  return { translated: translated.trim(), provider: provider.name };
+  // Parse JSON response
+  let translated: string;
+  let notes = "";
+
+  try {
+    // Try to extract JSON from response (handle potential markdown code fences)
+    const jsonStr = raw.replace(/^```json?\s*/i, "").replace(/\s*```$/i, "").trim();
+    const parsed = JSON.parse(jsonStr);
+    translated = parsed.translated ?? "";
+    notes = parsed.notes ?? "";
+  } catch {
+    // Fallback: if AI didn't return valid JSON, use raw text as translation
+    translated = raw.trim();
+    notes = "";
+  }
+
+  return { translated, notes, provider: provider.name };
 }

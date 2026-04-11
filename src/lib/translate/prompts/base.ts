@@ -14,4 +14,15 @@ Your role is to TRANSLATE AND IMPROVE the source text:
 - Do NOT add information that isn't in the source
 - Do NOT make the text longer than necessary
 
-IMPORTANT: Return ONLY the translated text. No explanations, no notes, no markdown formatting.`;
+IMPORTANT: You MUST return a valid JSON object with this exact structure:
+{
+  "translated": "the translated text here",
+  "notes": "用繁體中文說明你在這次翻譯中做了哪些優化、改善了什麼、為什麼這樣翻。2-4 句話即可。"
+}
+
+The "notes" field must be in Traditional Chinese (繁體中文), explaining:
+- What you improved compared to a literal translation
+- Any terminology choices you made and why
+- Any source text issues you noticed and how you handled them
+
+Return ONLY the JSON object. No markdown, no code fences, no extra text.`;
