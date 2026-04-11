@@ -457,11 +457,11 @@ ${isCJK ? `
   font-size: 13pt;
 }
 
-/* Features */
+/* Features: slightly smaller than overview */
 .feature-item {
   font-weight: 500;
-  font-size: 11pt;
-  line-height: 1.45;
+  font-size: 10pt;
+  line-height: 1.4;
   color: #444444;
 }
 .feature-text {
