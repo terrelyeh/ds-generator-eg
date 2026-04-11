@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { splitIntoPages } from "@/lib/datasheet/pagination";
+import { getDict } from "@/lib/datasheet/locales";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import type {
   Product,
@@ -33,10 +34,17 @@ function getTheme(category: string) {
 
 export default async function PreviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ model: string }>;
+  searchParams: Promise<{ lang?: string; mode?: string }>;
 }) {
   const { model } = await params;
+  const { lang = "en", mode = "light" } = await searchParams;
+
+  const dict = getDict(lang);
+  const isTranslated = lang !== "en";
+
   const supabase = await createClient();
 
   const { data } = await supabase
@@ -54,20 +62,70 @@ export default async function PreviewPage({
   const product = data as ProductQueryRow | null;
   if (!product) notFound();
 
+  // --- Load translations if non-English ---
+  let translatedOverview: string | null = null;
+  let translatedFeatures: string[] | null = null;
+  let specLabelMap: Record<string, string> = {};
+  let sectionLabelMap: Record<string, string> = {};
+
+  if (isTranslated) {
+    // Per-product translation (overview + features)
+    const { data: pt } = await supabase
+      .from("product_translations" as "products")
+      .select("overview, features, translation_mode")
+      .eq("product_id", model)
+      .eq("locale", lang)
+      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string } | null };
+
+    if (pt) {
+      translatedOverview = pt.overview;
+      translatedFeatures = pt.features;
+    }
+
+    // Per-product-line spec label translations (only if full mode)
+    if (mode === "full") {
+      const { data: slt } = await supabase
+        .from("spec_label_translations" as "products")
+        .select("original_label, translated_label, label_type")
+        .eq("product_line_id", product.product_line_id)
+        .eq("locale", lang) as { data: { original_label: string; translated_label: string | null; label_type: string }[] | null };
+
+      if (slt) {
+        for (const row of slt) {
+          if (!row.translated_label) continue;
+          if (row.label_type === "spec") {
+            specLabelMap[row.original_label] = row.translated_label;
+          } else {
+            sectionLabelMap[row.original_label] = row.translated_label;
+          }
+        }
+      }
+    }
+  }
+
+  // --- Build spec sections (with optional label translation) ---
   const specSections = (product.spec_sections ?? [])
     .sort((a, b) => a.sort_order - b.sort_order)
     .map((s) => ({
-      category: s.category,
+      category: sectionLabelMap[s.category] ?? s.category,
       items: (s.spec_items ?? [])
         .sort((a, b) => a.sort_order - b.sort_order)
-        .map((i) => ({ label: i.label, value: i.value })),
+        .map((i) => ({
+          label: specLabelMap[i.label] ?? i.label,
+          value: i.value,
+        })),
     }));
 
   const specPages = splitIntoPages(specSections);
-  const features = product.features ?? [];
+
+  // --- Resolve display content ---
+  const overview = (isTranslated && translatedOverview) ? translatedOverview : product.overview;
+  const features = (isTranslated && translatedFeatures) ? translatedFeatures : (product.features ?? []);
   const midpoint = Math.ceil(features.length / 2);
-  const version = product.current_version || "1.0";
-  const today = new Date().toLocaleDateString("en-US", {
+
+  const currentVersions = product.current_versions as Record<string, string> | null;
+  const version = currentVersions?.[lang] || product.current_version || "1.0";
+  const today = new Date().toLocaleDateString(dict.dateLocale, {
     month: "2-digit",
     day: "2-digit",
     year: "numeric",
@@ -77,6 +135,23 @@ export default async function PreviewPage({
   const qsgUrl = `https://qr.engenius.ai/qsg/${product.model_name.toLowerCase()}`;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   const totalPages = 1 + specPages.length + 1; // cover + specs + hardware
+
+  // Font: add Noto Sans JP for Japanese, Noto Sans TC for Chinese
+  const fontImports = [
+    "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap",
+    ...(lang === "ja"
+      ? ["https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap"]
+      : []),
+    ...(lang === "zh-TW"
+      ? ["https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&display=swap"]
+      : []),
+  ];
+
+  const fontFamily = lang === "ja"
+    ? "'Noto Sans JP', 'Roboto', sans-serif"
+    : lang === "zh-TW"
+      ? "'Noto Sans TC', 'Roboto', sans-serif"
+      : "'Roboto', sans-serif";
 
   return (
     <>
@@ -89,11 +164,12 @@ export default async function PreviewPage({
           !!product.overview && product.overview.trim().length > 0 &&
           Array.isArray(product.features) && product.features.length > 0
         }
+        locale={lang}
       />
       <style
         dangerouslySetInnerHTML={{
           __html: `
-@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap');
+${fontImports.map((url) => `@import url('${url}');`).join("\n")}
 
 @page { size: letter; margin: 0; }
 
@@ -106,7 +182,7 @@ html, body {
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: ${fontFamily};
   color: #6f6f6f;
   font-size: 7pt;
   line-height: 1.4;
@@ -300,7 +376,7 @@ body {
             alt="EnGenius"
           />
           <div className="title-area">
-            <span className="title-prefix">Datasheet |</span>
+            <span className="title-prefix">{dict.datasheet}</span>
             <span className="title-category"> {productLine.label}</span>
           </div>
         </div>
@@ -337,19 +413,19 @@ body {
         )}
 
         <div className="overview-section">
-          <div className="section-title">Overview</div>
-          <div className="overview-text">{product.overview}</div>
+          <div className="section-title">{dict.overview}</div>
+          <div className="overview-text">{overview}</div>
         </div>
 
         {features.length > 0 && (
           <div className="features-wrapper">
-            <div className="features-title">Features &amp; Benefits</div>
+            <div className="features-title">{dict.featuresAndBenefits}</div>
             <div className="features-box">
               <div className="features-columns">
                 <div className="features-col">
                   {features.slice(0, midpoint).map((f, i) => (
                     <div key={i} className="feature-item">
-                      <span className="feature-bullet">●</span>
+                      <span className="feature-bullet">{"\u25CF"}</span>
                       <span className="feature-text">{f}</span>
                     </div>
                   ))}
@@ -357,7 +433,7 @@ body {
                 <div className="features-col">
                   {features.slice(midpoint).map((f, i) => (
                     <div key={i} className="feature-item">
-                      <span className="feature-bullet">●</span>
+                      <span className="feature-bullet">{"\u25CF"}</span>
                       <span className="feature-text">{f}</span>
                     </div>
                   ))}
@@ -375,7 +451,7 @@ body {
         <div key={pageIdx} className="page">
           <div className="top-bar" />
           <div className="spec-page">
-            <div className="spec-page-title">Technical Specifications</div>
+            <div className="spec-page-title">{dict.technicalSpecifications}</div>
             <div className="spec-columns">
               <div className="spec-col">
                 {page.left.map((section, si) => (
@@ -417,7 +493,7 @@ body {
       <div className="page">
         <div className="top-bar" />
         <div className="hardware-page">
-          <div className="hardware-title">Hardware Overview</div>
+          <div className="hardware-title">{dict.hardwareOverview}</div>
           {product.hardware_image && (
             <div className="hardware-image-container">
               {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -433,22 +509,7 @@ body {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src="/logo/EnGenius-Logo-gray.png" alt="EnGenius" />
               </div>
-              <div className="footer-disclaimer">
-                Features and specifications subject to change without notice.
-                Trademarks and registered trademarks are the property of their
-                respective owners. These limits are designed to provide
-                reasonable protection against harmful interference in a
-                residential installation. This equipment generates, uses, and can
-                radiate radio frequency energy and, if not installed and used in
-                accordance with the instructions, may cause harmful interference
-                to radio communications. Operation of this equipment in a
-                residential area is likely to cause harmful interference in which
-                case the user will be required to correct the interference at
-                his/her own expense. Prior to installing any surveillance
-                equipment, it is your responsibility to ensure the installation
-                is in compliance with local, state and federal video and audio
-                surveillance and privacy laws.
-              </div>
+              <div className="footer-disclaimer">{dict.disclaimer}</div>
               <div className="footer-version">
                 Version {version} &nbsp; {today}
               </div>
@@ -458,7 +519,7 @@ body {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={qrCodeUrl} alt="QR Code" />
               </div>
-              <div className="footer-qr-label">Quick Start Guide</div>
+              <div className="footer-qr-label">{dict.quickStartGuide}</div>
             </div>
           </div>
         </div>

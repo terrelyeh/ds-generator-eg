@@ -109,6 +109,25 @@ export default async function SolutionDashboardPage({
       })
     : { data: [] as ChangeLogRow[] };
 
+  // Fetch translation locales per product (model_name based)
+  const productModelNames = (products ?? []).map((p) => p.model_name);
+  const { data: translationRows } = productModelNames.length
+    ? ((await supabase
+        .from("product_translations" as "products")
+        .select("product_id, locale")
+        .in("product_id", productModelNames)) as {
+        data: { product_id: string; locale: string }[] | null;
+      })
+    : { data: [] as { product_id: string; locale: string }[] };
+
+  // Build map: model_name → locales[]
+  const translationLocalesMap = new Map<string, string[]>();
+  for (const t of translationRows ?? []) {
+    const existing = translationLocalesMap.get(t.product_id) ?? [];
+    existing.push(t.locale);
+    translationLocalesMap.set(t.product_id, existing);
+  }
+
   // Build map: product_id → latest change_log
   const latestChangeMap = new Map<
     string,
@@ -185,6 +204,7 @@ export default async function SolutionDashboardPage({
       updated_at: p.updated_at,
       product_line_id: p.product_line_id,
       product_line: p.product_lines,
+      translation_locales: translationLocalesMap.get(p.model_name) ?? [],
     };
   });
 

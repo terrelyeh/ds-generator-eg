@@ -15,18 +15,19 @@ const CHROMIUM_URL =
 export const maxDuration = 60;
 
 /**
- * POST /api/generate-pdf?model=ECC100
+ * POST /api/generate-pdf?model=ECC100&mode=regenerate&lang=en
  *
- * 1. Detects latest version from Google Drive
+ * 1. Detects latest version from Google Drive (locale-aware)
  * 2. Generates PDF from the preview page using headless Chromium
  * 3. Uploads to Supabase Storage
- * 4. Uploads to Google Drive (in the model's folder)
+ * 4. Uploads to Google Drive (locale-specific folder)
  * 5. Bumps version in Supabase
  */
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
   const mode = searchParams.get("mode") ?? "regenerate"; // "regenerate" | "new"
+  const lang = searchParams.get("lang") ?? "en";
 
   if (!model) {
     return NextResponse.json(
@@ -35,12 +36,13 @@ export async function POST(request: Request) {
     );
   }
 
+  const isLocalized = lang !== "en";
   const supabase = createAdminClient();
 
   // Get the product + product line info
   const { data: product, error: productError } = await supabase
     .from("products")
-    .select("id, model_name, current_version, product_line_id")
+    .select("id, model_name, current_version, current_versions, product_line_id")
     .eq("model_name", model)
     .single();
 
@@ -65,42 +67,64 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Step 1: Detect latest version from Google Drive
-    let driveVersion = null;
-    if (productLine.drive_folder_id) {
-      try {
-        driveVersion = await detectLatestVersion(
-          productLine.drive_folder_id,
-          productLine.ds_prefix ?? "DS_Cloud",
-          model
-        );
-      } catch (err) {
-        console.warn(
-          "Drive version detection failed, using Supabase version:",
-          err instanceof Error ? err.message : String(err)
-        );
-      }
-    }
+    const dsPrefix = productLine.ds_prefix ?? "DS_Cloud";
+    const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
 
-    // Determine version based on mode
-    const isRegenerate = mode === "regenerate";
-    const currentVer = product.current_version || "0.0";
-    const hasExistingVersion = currentVer !== "0.0";
-
+    // Step 1: Determine version
     let newVersion: string;
-    if (isRegenerate && hasExistingVersion) {
-      // Regenerate: reuse the same version (overwrite PDF)
-      newVersion = currentVer;
+
+    if (isLocalized) {
+      // Locale versions are independent — tracked in current_versions JSONB
+      const currentLocaleVer = currentVersions[lang] || "0.0";
+      const isRegenerate = mode === "regenerate";
+      const hasExistingVersion = currentLocaleVer !== "0.0";
+
+      if (isRegenerate && hasExistingVersion) {
+        newVersion = currentLocaleVer;
+      } else {
+        if (hasExistingVersion) {
+          const parts = currentLocaleVer.split(".");
+          const major = parseInt(parts[0]) || 1;
+          const minor = (parseInt(parts[1]) || 0) + 1;
+          newVersion = `${major}.${minor}`;
+        } else {
+          newVersion = "1.0";
+        }
+      }
     } else {
-      // New version: bump from Drive or Supabase
-      newVersion = driveVersion
-        ? bumpVersion(driveVersion)
-        : (() => {
-            const parts = currentVer.split(".");
-            const major = parseInt(parts[0]) || 1;
-            const minor = (parseInt(parts[1]) || 0) + 1;
-            return `${major}.${minor}`;
-          })();
+      // English version — existing logic with Drive detection
+      let driveVersion = null;
+      if (productLine.drive_folder_id) {
+        try {
+          driveVersion = await detectLatestVersion(
+            productLine.drive_folder_id,
+            dsPrefix,
+            model
+          );
+        } catch (err) {
+          console.warn(
+            "Drive version detection failed, using Supabase version:",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+
+      const isRegenerate = mode === "regenerate";
+      const currentVer = product.current_version || "0.0";
+      const hasExistingVersion = currentVer !== "0.0";
+
+      if (isRegenerate && hasExistingVersion) {
+        newVersion = currentVer;
+      } else {
+        newVersion = driveVersion
+          ? bumpVersion(driveVersion)
+          : (() => {
+              const parts = currentVer.split(".");
+              const major = parseInt(parts[0]) || 1;
+              const minor = (parseInt(parts[1]) || 0) + 1;
+              return `${major}.${minor}`;
+            })();
+      }
     }
 
     // Step 2: Generate PDF with headless Chromium
@@ -127,7 +151,13 @@ export async function POST(request: Request) {
         ? `https://${process.env.VERCEL_URL}`
         : `http://localhost:${process.env.PORT || 3000}`;
 
-    await page.goto(`${baseUrl}/preview/${model}`, {
+    // Pass lang and mode to the preview page
+    const translationMode = isLocalized ? "full" : "light"; // Default to full for localized PDFs
+    const previewUrl = isLocalized
+      ? `${baseUrl}/preview/${model}?lang=${lang}&mode=${translationMode}`
+      : `${baseUrl}/preview/${model}`;
+
+    await page.goto(previewUrl, {
       waitUntil: "networkidle0",
       timeout: 30000,
     });
@@ -143,8 +173,8 @@ export async function POST(request: Request) {
     await browser.close();
 
     // Step 3: Upload to Supabase Storage
-    const dsPrefix = productLine.ds_prefix ?? "DS_Cloud";
-    const fileName = `${dsPrefix}_${model}_v${newVersion}.pdf`;
+    const langSuffix = isLocalized ? `_${lang}` : "";
+    const fileName = `${dsPrefix}_${model}_v${newVersion}${langSuffix}.pdf`;
     const storagePath = `${model}/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -167,7 +197,7 @@ export async function POST(request: Request) {
 
     const pdfUrl = urlData.publicUrl;
 
-    // Step 4: Upload to Google Drive
+    // Step 4: Upload to Google Drive (locale-specific folder)
     let driveResult = null;
     if (productLine.drive_folder_id) {
       try {
@@ -177,7 +207,8 @@ export async function POST(request: Request) {
           model,
           newVersion,
           pdfBuffer,
-          driveVersion
+          null, // For localized, always create new folder if needed
+          isLocalized ? lang : undefined
         );
       } catch (err) {
         console.error(
@@ -188,13 +219,19 @@ export async function POST(request: Request) {
     }
 
     // Step 5: Update Supabase records
+    const isRegenerate = mode === "regenerate";
+    const hasExistingVersion = isLocalized
+      ? (currentVersions[lang] || "0.0") !== "0.0"
+      : (product.current_version || "0.0") !== "0.0";
+
     if (isRegenerate && hasExistingVersion) {
-      // Regenerate: update existing version record's PDF and timestamp
+      // Try to update existing version record
       const { data: existingVersion } = await supabase
         .from("versions")
         .select("id")
         .eq("product_id", product.id)
         .eq("version", newVersion)
+        .eq("locale", lang)
         .order("generated_at", { ascending: false })
         .limit(1)
         .single();
@@ -209,42 +246,55 @@ export async function POST(request: Request) {
           })
           .eq("id", existingVersion.id);
       } else {
-        // No existing version record (e.g. version came from Drive scan), create one
         await supabase.from("versions").insert({
           product_id: product.id,
           version: newVersion,
+          locale: lang,
           changes: `PDF regenerated`,
           pdf_storage_path: pdfUrl,
         });
       }
     } else {
-      // New version: insert new record
       await supabase.from("versions").insert({
         product_id: product.id,
         version: newVersion,
-        changes: `PDF generated${driveVersion ? ` (base: v${driveVersion.version})` : " (initial)"}`,
+        locale: lang,
+        changes: `PDF generated${hasExistingVersion ? ` (new version)` : " (initial)"}`,
         pdf_storage_path: pdfUrl,
       });
     }
 
-    await supabase
-      .from("products")
-      .update({ current_version: newVersion })
-      .eq("id", product.id);
+    // Update current_version(s)
+    if (isLocalized) {
+      const updatedVersions = { ...currentVersions, [lang]: newVersion };
+      await supabase
+        .from("products")
+        .update({ current_versions: updatedVersions })
+        .eq("id", product.id);
+    } else {
+      const updatedVersions = { ...currentVersions, en: newVersion };
+      await supabase
+        .from("products")
+        .update({
+          current_version: newVersion,
+          current_versions: updatedVersions,
+        })
+        .eq("id", product.id);
+    }
 
     await supabase.from("change_logs").insert({
       product_id: product.id,
       product_line_id: product.product_line_id,
       changes_summary: isRegenerate
-        ? `Regenerated PDF v${newVersion}`
-        : `Generated PDF v${newVersion}`,
+        ? `Regenerated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`
+        : `Generated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`,
     });
 
     return NextResponse.json({
       ok: true,
       model,
+      locale: lang,
       version: newVersion,
-      baseVersion: driveVersion?.version ?? null,
       fileName,
       pdfUrl,
       driveFileId: driveResult?.fileId ?? null,

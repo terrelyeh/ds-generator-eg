@@ -10,6 +10,7 @@ import type {
   HardwareLabel,
   ImageAsset,
   Version,
+  ProductTranslation,
 } from "@/types/database";
 
 interface ProductQueryRow extends Product {
@@ -70,11 +71,18 @@ export default async function ProductPage({
     .eq("product_id", product.id)
     .order("generated_at", { ascending: false }) as { data: Version[] | null };
 
+  // Fetch existing translations for this product
+  const { data: translationData } = (await supabase
+    .from("product_translations" as "products")
+    .select("*")
+    .eq("product_id", model)) as { data: ProductTranslation[] | null };
+
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
       <ProductDetail
         product={productWithSpecs}
         versions={versionData ?? []}
+        translations={translationData ?? []}
       />
     </div>
   );

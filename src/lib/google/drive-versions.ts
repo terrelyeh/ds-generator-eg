@@ -218,21 +218,51 @@ export async function uploadPdfToDrive(
   modelName: string,
   version: string,
   pdfBuffer: Buffer,
-  existingVersion: VersionInfo | null
+  existingVersion: VersionInfo | null,
+  locale?: string
 ): Promise<{ fileId: string; webViewLink: string }> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
-  const pdfFileName = `${dsPrefix}_${modelName}_v${version}.pdf`;
+  const langSuffix = locale ? `_${locale}` : "";
+  const pdfFileName = `${dsPrefix}_${modelName}_v${version}${langSuffix}.pdf`;
 
   let targetFolderId: string;
 
-  if (existingVersion) {
+  if (locale) {
+    // Locale-specific folder: DS_Cloud_ECC100_ja/
+    const localeFolderName = `${dsPrefix}_${modelName}_${locale}`;
+
+    // Search for existing locale folder
+    const localeFolderRes = await drive.files.list({
+      q: `'${driveFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${localeFolderName}' and trashed = false`,
+      fields: "files(id)",
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      pageSize: 1,
+    });
+
+    const existing = localeFolderRes.data.files?.[0];
+    if (existing?.id) {
+      targetFolderId = existing.id;
+    } else {
+      // Create locale folder
+      const folderRes = await drive.files.create({
+        requestBody: {
+          name: localeFolderName,
+          mimeType: "application/vnd.google-apps.folder",
+          parents: [driveFolderId],
+        },
+        supportsAllDrives: true,
+        fields: "id",
+      });
+      targetFolderId = folderRes.data.id!;
+    }
+  } else if (existingVersion) {
     const folderHasVersion = parseVersion(existingVersion.folderName) !== null;
 
     if (folderHasVersion) {
       // Old format folder (e.g. DS_Cloud_ECW526_v1.4/) — upload to same folder
-      // The old version PDF stays, new one is added alongside it
       targetFolderId = existingVersion.folderId;
     } else {
       // New format folder (e.g. DS_Cloud_ECW526/) — upload into it

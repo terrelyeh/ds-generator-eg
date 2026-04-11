@@ -33,6 +33,7 @@ interface ProductSummary {
   updated_at: string;
   product_line_id: string;
   product_line: { name: string; label: string; category: string };
+  translation_locales: string[];
 }
 
 interface DashboardContentProps {
@@ -118,6 +119,7 @@ function ProductTable({
           <TableHead className="w-28">Model #</TableHead>
           <TableHead className="w-56">Model Name</TableHead>
           <TableHead className="w-16 text-center">Version</TableHead>
+          <TableHead className="w-20">Lang</TableHead>
           <TableHead className="w-24">Last Changed</TableHead>
           <TableHead className="w-14 text-center">OV</TableHead>
           <TableHead className="w-14 text-center">FT</TableHead>
@@ -165,6 +167,19 @@ function ProductTable({
                   ? `v${product.current_version}`
                   : "—"}
               </Badge>
+            </TableCell>
+            <TableCell>
+              <div className="flex gap-1">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">EN</span>
+                {product.translation_locales.map((loc) => (
+                  <span
+                    key={loc}
+                    className="rounded bg-engenius-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-engenius-blue"
+                  >
+                    {loc.toUpperCase()}
+                  </span>
+                ))}
+              </div>
             </TableCell>
             <TableCell
               className="tabular-nums text-muted-foreground"
@@ -352,6 +367,12 @@ export function DashboardContent({
           className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
         >
           Changelog
+        </Link>
+        <Link
+          href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
+          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        >
+          Translations
         </Link>
         <span className="text-border">|</span>
         <button

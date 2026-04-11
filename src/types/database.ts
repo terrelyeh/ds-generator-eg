@@ -81,6 +81,7 @@ export interface Database {
           product_image: string;
           hardware_image: string;
           current_version: string;
+          current_versions: Record<string, string>;
           status: string;
           sheet_last_modified: string | null;
           sheet_last_editor: string | null;
@@ -170,6 +171,7 @@ export interface Database {
           id: string;
           product_id: string;
           version: string;
+          locale: string;
           changes: string;
           pdf_storage_path: string | null;
           generated_by: string | null;
@@ -289,6 +291,40 @@ export interface Database {
           Partial<Pick<Database["public"]["Tables"]["cloud_comparisons"]["Row"], "id" | "created_at">>;
         Update: Partial<Database["public"]["Tables"]["cloud_comparisons"]["Insert"]>;
       };
+      product_translations: {
+        Row: {
+          id: string;
+          product_id: string;
+          locale: string;
+          translation_mode: "light" | "full";
+          overview: string | null;
+          features: string[] | null;
+          translated_at: string;
+          translated_by: string | null;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["product_translations"]["Row"],
+          "id" | "translated_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["product_translations"]["Row"], "id" | "translated_at" | "overview" | "features" | "translated_by">>;
+        Update: Partial<Database["public"]["Tables"]["product_translations"]["Insert"]>;
+      };
+      spec_label_translations: {
+        Row: {
+          id: string;
+          product_line_id: string;
+          locale: string;
+          original_label: string;
+          translated_label: string | null;
+          label_type: "spec" | "section";
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["spec_label_translations"]["Row"],
+          "id"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["spec_label_translations"]["Row"], "id" | "translated_label">>;
+        Update: Partial<Database["public"]["Tables"]["spec_label_translations"]["Insert"]>;
+      };
     };
     Enums: {
       image_type: ImageType;
@@ -312,6 +348,8 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type RevisionLog = Database["public"]["Tables"]["revision_logs"]["Row"];
 export type Comparison = Database["public"]["Tables"]["comparisons"]["Row"];
 export type CloudComparison = Database["public"]["Tables"]["cloud_comparisons"]["Row"];
+export type ProductTranslation = Database["public"]["Tables"]["product_translations"]["Row"];
+export type SpecLabelTranslation = Database["public"]["Tables"]["spec_label_translations"]["Row"];
 
 // Composite types for API responses
 export type ProductWithSpecs = Product & {

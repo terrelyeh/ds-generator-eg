@@ -6,9 +6,10 @@ interface PrintToolbarProps {
   model: string;
   currentVersion: string;
   canGenerate: boolean;
+  locale?: string;
 }
 
-export function PrintToolbar({ model, currentVersion, canGenerate }: PrintToolbarProps) {
+export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en" }: PrintToolbarProps) {
   const [generating, setGenerating] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
@@ -92,6 +93,11 @@ export function PrintToolbar({ model, currentVersion, canGenerate }: PrintToolba
     >
       <span>
         Preview: <strong>{model}</strong>
+        {locale !== "en" && (
+          <span style={{ marginLeft: 6, background: "rgba(255,255,255,0.15)", borderRadius: 4, padding: "2px 6px", fontSize: 11, fontWeight: 500 }}>
+            {locale.toUpperCase()}
+          </span>
+        )}
         {hasExistingVersion && (
           <span style={{ marginLeft: 8, opacity: 0.6, fontSize: 12 }}>v{currentVersion}</span>
         )}

@@ -15,11 +15,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { ProductWithSpecs, Version } from "@/types/database";
+import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
+import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
+import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
 
 interface ProductDetailProps {
   product: ProductWithSpecs;
   versions: Version[];
+  translations?: ProductTranslation[];
 }
 
 function formatDate(dateStr: string | null) {
@@ -188,11 +191,13 @@ function RadioPatternSlot({
   );
 }
 
-export function ProductDetail({ product, versions }: ProductDetailProps) {
+export function ProductDetail({ product, versions, translations = [] }: ProductDetailProps) {
+  const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
 
   const [showGenMenu, setShowGenMenu] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
 
   const currentVer = product.current_version || "0.0";
   const hasExistingVersion = currentVer !== "0.0";
@@ -235,12 +240,16 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
   if (!hasOverview) missingItems.push("Overview");
   if (!hasFeatures) missingItems.push("Features");
 
-  async function handleGeneratePdf(mode: "regenerate" | "new") {
+  const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
+  const localesWithTranslations = translations.map((t) => t.locale);
+
+  async function handleGeneratePdf(mode: "regenerate" | "new", locale = "en") {
     setShowGenMenu(false);
+    setShowLangMenu(false);
     setGenerating(true);
     try {
       const res = await fetch(
-        `/api/generate-pdf?model=${encodeURIComponent(product.model_name)}&mode=${mode}`,
+        `/api/generate-pdf?model=${encodeURIComponent(product.model_name)}&mode=${mode}&lang=${locale}`,
         { method: "POST" }
       );
       const data = await res.json();
@@ -389,6 +398,81 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               </div>
             )}
           </div>
+
+          {/* 🌐 Other Languages button (方案 C) */}
+          {localesWithTranslations.length > 0 && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => setShowLangMenu(!showLangMenu)}
+                disabled={generating}
+                className="px-2.5"
+                title="Other Languages"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
+                </svg>
+              </Button>
+              {showLangMenu && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border bg-popover p-2 shadow-md">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Other Languages</div>
+                  {SUPPORTED_LOCALES.filter((l) => l.value !== "en").map((l) => {
+                    const hasTranslation = localesWithTranslations.includes(l.value);
+                    const localeVer = currentVersions[l.value];
+                    return (
+                      <div key={l.value} className="rounded-sm px-2 py-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-sm font-medium">
+                            {l.flag} {l.label}
+                            {localeVer && (
+                              <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">v{localeVer}</span>
+                            )}
+                          </span>
+                        </div>
+                        {hasTranslation ? (
+                          <div className="flex gap-1.5">
+                            {localeVer ? (
+                              <>
+                                <button
+                                  className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                  onClick={() => handleGeneratePdf("regenerate", l.value)}
+                                >
+                                  Regen v{localeVer}
+                                </button>
+                                <button
+                                  className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                  onClick={() => handleGeneratePdf("new", l.value)}
+                                >
+                                  New Ver
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                onClick={() => handleGeneratePdf("new", l.value)}
+                              >
+                                Generate v1.0
+                              </button>
+                            )}
+                            <Link
+                              href={`/preview/${product.model_name}?lang=${l.value}&mode=full`}
+                              target="_blank"
+                              className="rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                            >
+                              Preview
+                            </Link>
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60">No translation yet</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
         </div>
       </div>
@@ -400,9 +484,53 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
         {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
       </p>
 
+      {/* Tab switcher */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("detail")}
+          className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            activeTab === "detail"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Detail
+        </button>
+        <button
+          onClick={() => setActiveTab("translations")}
+          className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            activeTab === "translations"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Translations
+          {translations.length > 0 && (
+            <span className="ml-1.5 tabular-nums text-muted-foreground/50">{translations.length}</span>
+          )}
+        </button>
+      </div>
+
       <Separator />
 
+      {/* Translations tab */}
+      {activeTab === "translations" && (
+        <ProductTranslationEditor
+          modelName={product.model_name}
+          productLineName={product.product_line.name}
+          englishOverview={product.overview ?? ""}
+          englishFeatures={product.features ?? []}
+          existingTranslations={translations.map((t) => ({
+            locale: t.locale,
+            translation_mode: t.translation_mode,
+            overview: t.overview,
+            features: t.features,
+          }))}
+        />
+      )}
+
       {/* Product Images */}
+      {activeTab === "detail" && (<>
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Product Images</CardTitle>
@@ -554,7 +682,7 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
         </CardContent>
       </Card>
 
-      {/* Version History */}
+      {/* Version History — grouped by locale */}
       <Card className="shadow-sm">
         <CardHeader>
           <CardTitle className="text-base">Version History</CardTitle>
@@ -565,64 +693,85 @@ export function ProductDetail({ product, versions }: ProductDetailProps) {
               No versions generated yet.
             </p>
           ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b-2 border-foreground/10">
-                  <TableHead className="w-24">Version</TableHead>
-                  <TableHead className="w-32">Date</TableHead>
-                  <TableHead>Changes</TableHead>
-                  <TableHead className="w-24">PDF</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {versions.map((v, idx) => (
-                  <TableRow
-                    key={v.id}
-                    className={`hover:bg-engenius-blue/[0.06] ${
-                      idx % 2 === 1 ? "bg-muted/30" : ""
-                    }`}
-                  >
-                    <TableCell className="font-medium tabular-nums">
-                      v{v.version}
-                    </TableCell>
-                    <TableCell className="text-sm tabular-nums text-muted-foreground">
-                      {formatDate(v.generated_at)}
-                    </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
-                      {v.changes || "—"}
-                    </TableCell>
-                    <TableCell>
-                      {v.pdf_storage_path ? (
-                        <a
-                          href={v.pdf_storage_path}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
-                        >
-                          Download
-                          <svg
-                            className="h-3 w-3"
-                            viewBox="0 0 16 16"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                          >
-                            <path d="M5 3h8v8M13 3 6 10" />
-                          </svg>
-                        </a>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">
-                          —
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="space-y-6">
+              {/* Group versions by locale */}
+              {Object.entries(
+                versions.reduce<Record<string, typeof versions>>((acc, v) => {
+                  const loc = v.locale || "en";
+                  if (!acc[loc]) acc[loc] = [];
+                  acc[loc].push(v);
+                  return acc;
+                }, {})
+              )
+                .sort(([a], [b]) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)))
+                .map(([loc, locVersions]) => {
+                  const localeInfo = SUPPORTED_LOCALES.find((l) => l.value === loc);
+                  return (
+                    <div key={loc}>
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {localeInfo ? `${localeInfo.flag} ${localeInfo.label}` : loc.toUpperCase()}
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-foreground/10">
+                            <TableHead className="w-24">Version</TableHead>
+                            <TableHead className="w-32">Date</TableHead>
+                            <TableHead>Changes</TableHead>
+                            <TableHead className="w-24">PDF</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {locVersions.map((v, idx) => (
+                            <TableRow
+                              key={v.id}
+                              className={`hover:bg-engenius-blue/[0.06] ${
+                                idx % 2 === 1 ? "bg-muted/30" : ""
+                              }`}
+                            >
+                              <TableCell className="font-medium tabular-nums">
+                                v{v.version}
+                              </TableCell>
+                              <TableCell className="text-sm tabular-nums text-muted-foreground">
+                                {formatDate(v.generated_at)}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {v.changes || "—"}
+                              </TableCell>
+                              <TableCell>
+                                {v.pdf_storage_path ? (
+                                  <a
+                                    href={v.pdf_storage_path}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                  >
+                                    Download
+                                    <svg
+                                      className="h-3 w-3"
+                                      viewBox="0 0 16 16"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                    >
+                                      <path d="M5 3h8v8M13 3 6 10" />
+                                    </svg>
+                                  </a>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })}
+            </div>
           )}
         </CardContent>
       </Card>
+      </>)}
     </div>
   );
 }
