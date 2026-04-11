@@ -69,6 +69,7 @@ interface TranslationData {
   overview: string | null;
   features: string[] | null;
   headline: string | null;
+  hardware_image: string | null;
   qr_label: string | null;
   qr_url: string | null;
   confirmed: boolean;
@@ -128,6 +129,8 @@ export function ProductTranslationEditor({
   const [features, setFeatures] = useState<string[]>(
     existing?.features ?? englishFeatures.map(() => "")
   );
+  const [hwImage, setHwImage] = useState(existing?.hardware_image ?? "");
+  const [hwUploading, setHwUploading] = useState(false);
   const [qrLabel, setQrLabel] = useState(existing?.qr_label ?? "");
   const [qrUrl, setQrUrl] = useState(existing?.qr_url ?? "");
 
@@ -139,6 +142,7 @@ export function ProductTranslationEditor({
     setHeadlineTrans(t?.headline ?? "");
     setOverview(t?.overview ?? "");
     setFeatures(t?.features ?? englishFeatures.map(() => ""));
+    setHwImage(t?.hardware_image ?? "");
     setQrLabel(t?.qr_label ?? "");
     setQrUrl(t?.qr_url ?? "");
     setOverviewNotes("");
@@ -289,6 +293,7 @@ export function ProductTranslationEditor({
           headline: headlineTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
+          hardware_image: hwImage || null,
           qr_label: qrLabel || null,
           qr_url: qrUrl || null,
           confirm: true,
@@ -347,6 +352,7 @@ export function ProductTranslationEditor({
           headline: headlineTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
+          hardware_image: hwImage || null,
           qr_label: qrLabel || null,
           qr_url: qrUrl || null,
         }),
@@ -677,6 +683,73 @@ export function ProductTranslationEditor({
             ))}
           </div>
           {featuresNotes && <TranslationNotes notes={featuresNotes} onDismiss={() => setFeaturesNotes("")} className="mt-4" />}
+        </CardContent>
+      </Card>
+
+      {/* Hardware Image (locale-specific) */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Hardware Image</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-3 text-xs text-muted-foreground">
+            Upload a locale-specific hardware image with translated labels. If empty, the English version will be used.
+          </p>
+          <div className="flex items-center gap-4">
+            {hwImage ? (
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={hwImage} alt="Hardware" className="h-24 w-auto rounded border object-contain" />
+                <button
+                  onClick={() => { setHwImage(""); setDirty(true); }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="flex h-24 w-32 items-center justify-center rounded border-2 border-dashed border-muted-foreground/20 bg-muted/30 text-xs text-muted-foreground/40">
+                No image
+              </div>
+            )}
+            <label>
+              <span className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-accent transition-colors">
+                {hwUploading ? "Uploading..." : hwImage ? "Replace" : "Upload"}
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                disabled={hwUploading}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  setHwUploading(true);
+                  try {
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    formData.append("model", modelName);
+                    formData.append("type", "hardware");
+                    formData.append("locale", activeLocale);
+                    const res = await fetch("/api/upload-image", { method: "POST", body: formData });
+                    const data = await res.json();
+                    if (data.ok && data.url) {
+                      setHwImage(data.url);
+                      setDirty(true);
+                      toast.success("Hardware image uploaded");
+                    } else {
+                      toast.error(`Upload failed: ${data.error || "Unknown error"}`);
+                    }
+                  } catch (err) {
+                    toast.error(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+                  } finally {
+                    setHwUploading(false);
+                    e.target.value = "";
+                  }
+                }}
+              />
+            </label>
+          </div>
         </CardContent>
       </Card>
 

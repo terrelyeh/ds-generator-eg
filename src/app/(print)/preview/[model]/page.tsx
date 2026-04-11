@@ -66,6 +66,7 @@ export default async function PreviewPage({
   let translatedOverview: string | null = null;
   let translatedFeatures: string[] | null = null;
   let translatedHeadline: string | null = null;
+  let localeHardwareImage: string | null = null;
   let customQrLabel: string | null = null;
   let customQrUrl: string | null = null;
   let specLabelMap: Record<string, string> = {};
@@ -75,15 +76,16 @@ export default async function PreviewPage({
     // Per-product translation (overview + features)
     const { data: pt } = await supabase
       .from("product_translations" as "products")
-      .select("overview, features, translation_mode, headline, qr_label, qr_url")
+      .select("overview, features, translation_mode, headline, hardware_image, qr_label, qr_url")
       .eq("product_id", model)
       .eq("locale", lang)
-      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; qr_label: string | null; qr_url: string | null } | null };
+      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null } | null };
 
     if (pt) {
       translatedOverview = pt.overview;
       translatedFeatures = pt.features;
       translatedHeadline = pt.headline;
+      localeHardwareImage = pt.hardware_image;
       customQrLabel = pt.qr_label;
       customQrUrl = pt.qr_url;
     }
@@ -560,10 +562,10 @@ ${isCJK ? `
         <div className="top-bar" />
         <div className="hardware-page">
           <div className="hardware-title">{dict.hardwareOverview}</div>
-          {product.hardware_image && (
+          {(localeHardwareImage || product.hardware_image) && (
             <div className="hardware-image-container">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={product.hardware_image} alt="Hardware Overview" />
+              <img src={localeHardwareImage || product.hardware_image} alt="Hardware Overview" />
             </div>
           )}
         </div>

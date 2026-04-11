@@ -300,6 +300,7 @@ export interface Database {
           overview: string | null;
           features: string[] | null;
           headline: string | null;
+          hardware_image: string | null;
           qr_label: string | null;
           qr_url: string | null;
           confirmed: boolean;

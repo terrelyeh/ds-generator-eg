@@ -537,6 +537,7 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
             overview: t.overview,
             features: t.features,
             headline: t.headline,
+            hardware_image: t.hardware_image,
             qr_label: t.qr_label,
             qr_url: t.qr_url,
             confirmed: t.confirmed,
