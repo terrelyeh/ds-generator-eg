@@ -446,23 +446,24 @@ ${isCJK ? `
   top: 290pt;
 }
 
-/* Overview */
+/* Overview: match original InDesign sizing and contrast */
 .overview-text {
-  font-size: 10pt;
+  font-size: 10.5pt;
   line-height: 1.5;
-  color: #58595B;
+  color: #3a3a3a;
 }
 
-/* Section titles: slightly smaller */
+/* Section titles */
 .section-title,
 .features-title {
   font-size: 13pt;
 }
 
-/* Features */
+/* Features: darker text to match original */
 .feature-item {
-  font-size: 10pt;
+  font-size: 10.5pt;
   line-height: 1.45;
+  color: #3a3a3a;
 }
 .feature-text {
   line-break: strict;
