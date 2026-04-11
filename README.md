@@ -35,6 +35,23 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
 
+### Multi-Language Datasheet
+- **日文 / 繁體中文** 翻譯支援（可擴展更多語言）
+- 選擇性啟用：每個型號獨立決定需不需要多語言版本
+- **兩種翻譯模式**：Light（標題+內容）/ Full（+規格表 label）
+- **AI 翻譯**：支援 Claude、GPT-4o、Gemini，翻譯同時改善原文品質
+- **翻譯筆記**：AI 翻譯後顯示做了哪些優化的說明
+- **翻譯詞庫**（Glossary）：公司級術語字典，AI 自動遵循
+- **Draft / Confirmed 流程**：Preview 可隨時預覽，Save & Confirm 後才能生成 PDF
+- 每個語言版本號獨立管理，Drive 獨立資料夾
+- CJK 排版優化：禁則處理、兩端對齊、專用字型
+- 語言專屬 Hardware Image 支援（不同語言的標註圖）
+- QR Code 標籤和連結可按語言自訂
+
+### Settings
+- **API Key 管理** — 在前端直接設定 AI 翻譯 API Key（Anthropic / OpenAI / Google AI）
+- **翻譯詞庫**（Glossary）— 管理公司認可的翻譯術語，分 Global 和產品線專屬
+
 ### Automated Sync
 - 每日 09:00（台灣時間）自動同步 Google Sheets → Supabase
 - Smart Sync：比對 Google Drive `modifiedTime`，未變動則跳過
@@ -56,6 +73,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 | Database | Supabase (PostgreSQL + Storage) |
 | Data Source | Google Sheets API + Drive API |
 | PDF | Puppeteer + Browser Print |
+| AI Translation | Claude / GPT-4o / Gemini (multi-provider) |
 | Deployment | Vercel + Vercel Cron |
 | Notifications | Telegram Bot API |
 
@@ -107,3 +125,8 @@ Deployed on Vercel with automatic deploys from `main` branch.
 | `TELEGRAM_BOT_TOKEN` | Telegram bot token for notifications |
 | `TELEGRAM_CHAT_ID` | Telegram chat/group ID |
 | `CRON_SECRET` | Secret for Vercel Cron authorization |
+| `ANTHROPIC_API_KEY` | (Optional) Anthropic API key for Claude translation |
+| `OPENAI_API_KEY` | (Optional) OpenAI API key for GPT-4o translation |
+| `GOOGLE_AI_API_KEY` | (Optional) Google AI API key for Gemini translation |
+
+> AI translation API keys can also be configured via the Settings page (stored in DB, takes priority over env vars).

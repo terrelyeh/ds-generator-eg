@@ -39,40 +39,56 @@ Cloud Camera, Cloud AI-NVS, Cloud VPN Firewall, Switch Extender, Unmanaged Switc
 ```
 src/
   app/
-    (main)/                    # Route group: pages with Navbar + Solution sidebar
-      dashboard/
-        page.tsx               # Redirect → /dashboard/{first-solution}
-        layout.tsx             # Solution sidebar + content area
-        [solution]/page.tsx    # Per-solution dashboard (reads ?line= for tab)
-        [solution]/loading.tsx # Skeleton
+    (main)/
+      dashboard/[solution]/page.tsx    # Per-solution dashboard (reads ?line= for tab)
       compare/[line]/page.tsx
       changelog/[line]/page.tsx
-      product/[model]/page.tsx  # Product detail (sticky header, images, specs, versions)
+      product/[model]/page.tsx         # Product detail (sticky header, tabs: Detail/Translations)
+      translations/[line]/page.tsx     # Per-product-line spec label translations
+      settings/page.tsx                # API key management
+      settings/glossary/page.tsx       # Translation glossary management
     (print)/
-      preview/[model]/page.tsx # Datasheet HTML preview (blue/gray theme)
-    api/sync/route.ts          # Google Sheets → Supabase sync (per-line or all)
-    api/generate-pdf/route.ts  # Puppeteer PDF: regenerate or new version mode
-    api/upload-image/route.ts  # Upload to Supabase + Google Drive (product/hardware/radio_pattern)
+      preview/[model]/page.tsx         # Datasheet HTML preview (?lang=ja&mode=full)
+    api/
+      sync/route.ts                    # Google Sheets → Supabase sync
+      generate-pdf/route.ts            # Puppeteer PDF (?model=X&lang=ja&mode=regenerate)
+      upload-image/route.ts            # Upload to Supabase + Google Drive
+      translate/route.ts               # AI translation endpoint (multi-provider)
+      translations/product/route.ts    # CRUD product translations (POST/DELETE)
+      translations/spec-labels/route.ts # Save spec label translations
+      detect-locale-version/route.ts   # Detect locale PDF version from Drive
+      settings/route.ts                # API key CRUD
+      settings/providers/route.ts      # Which AI providers have keys configured
+      glossary/route.ts                # Translation glossary CRUD
   components/
-    layout/
-      navbar.tsx               # Top navbar (no sync button — moved to dashboard)
-      solution-sidebar.tsx     # Collapsible left sidebar with solution icons
-    dashboard/dashboard-content.tsx  # Tabs, per-line sync, product table
-    product/product-detail.tsx # Sticky header, image upload, radio pattern slots, version dropdown
-    preview/print-toolbar.tsx  # Regenerate/New Version + Print Draft
+    layout/navbar.tsx, solution-sidebar.tsx
+    dashboard/dashboard-content.tsx     # Tabs + Lang column + Translations link
+    product/product-detail.tsx          # Detail/Translations tabs, 🌐 menu, version history by locale
+    preview/print-toolbar.tsx           # Locale badge
+    translations/
+      product-translation-editor.tsx    # Enable/disable lang, headline/overview/features/HW image/QR
+      spec-label-editor.tsx             # Per-product-line spec label + section header translations
+    settings/
+      settings-page.tsx                 # API key cards
+      glossary-editor.tsx               # Glossary CRUD with scope/search
     compare/compare-table.tsx
-    ui/
   lib/
-    google/sheets.ts           # Parse Web Overview (incl. Status) + Detail Specs
-    google/sheets-extra.ts     # Parse Revision Log, Comparison, Cloud Comparison
-    google/drive-images.ts     # Sync images Drive↔Storage + uploadImageToDrive()
-    google/drive-versions.ts   # detectLatestVersion() + bumpVersion() + uploadPdfToDrive()
-    google/auth.ts             # Service account auth (drive scope = read/write)
-    supabase/admin.ts
-    supabase/server.ts
-    datasheet/pagination.ts
-    notifications/index.ts
-  types/database.ts            # Supabase DB types (incl. solutions table)
+    google/drive-versions.ts           # detectLatestVersion() + detectLocaleVersion() + getLocaleSuffix()
+    translate/
+      index.ts                         # 5-layer prompt assembly + JSON response parsing
+      types.ts                         # Provider types, AVAILABLE_PROVIDERS
+      use-providers.ts                 # Client hook: fetch provider availability
+      providers/claude.ts, openai.ts, gemini.ts
+      prompts/
+        base.ts                        # Layer 1: base translate+improve instructions
+        locales/ja.ts, zh-TW.ts        # Layer 2: locale-specific rules
+        product-lines/cloud-camera.ts  # Layer 3: product line terminology
+        content-types.ts               # Layer 4: overview/features/spec_labels rules
+                                       # Layer 5: glossary (loaded from DB at runtime)
+    datasheet/locales/                 # Locale dictionaries for fixed UI strings
+      en.ts, ja.ts, zh-TW.ts, types.ts, index.ts
+    settings.ts                        # getApiKey(): DB first, env var fallback
+  types/database.ts
 ```
 
 ## Architecture & Data Flow
@@ -128,6 +144,29 @@ Product Page 手動上傳 ──→ Supabase Storage + Google Drive DS Images/
 - 前置條件檢查：Product Image + Hardware Image + Overview + Features 都齊全才能 Generate
 - Preview toolbar 和 Model page 都有相同的 Regenerate/New Version 選項
 - 版本偵測支援三層結構（Camera 用）：`DS_Cloud_ECC100/DS_Cloud_ECC100_v1.1/xxx.pdf`
+- **多語言 PDF**：`/api/generate-pdf?model=X&lang=ja&mode=new`，每語言獨立版本號
+
+### Multi-Language Datasheet
+
+完整規則詳見 [`/docs/drive-folder-and-naming-rules.html#s9`](public/docs/drive-folder-and-naming-rules.html)。
+
+**架構要點**：
+- 翻譯分兩層：per-product（`product_translations`：headline/overview/features/HW image/QR）+ per-product-line（`spec_label_translations`：spec labels 共用）
+- 兩種模式：**Light**（只翻標題+內容）vs **Full**（+規格表 label）
+- **Draft / Confirmed 流程**：Enable → 翻譯 → Preview（auto-save but stays Draft）→ Save & Confirm → Generate PDF
+- 版本獨立：`products.current_versions` JSONB 存各語言版本（`{"en":"1.1","ja":"1.0"}`）
+- `versions` 表有 `locale` 欄位，Version History 按語言分組
+- Drive 資料夾：`DS_Cloud_ECC100_ja/`、`DS_Cloud_ECC100_zh/`（zh-TW → zh 映射在 `getLocaleSuffix()`）
+- CJK 排版：`line-break: strict` + `text-align: justify` + Noto Sans JP/TC 字型
+- Preview URL：`/preview/[model]?lang=ja&mode=full`
+
+**AI 翻譯系統**：
+- 5 層 Prompt：base → locale → product-line → content-type → glossary（from DB）
+- 多 provider：Claude Sonnet/Opus、GPT-4o、Gemini 2.5 Pro
+- API Key 優先順序：`app_settings` DB 表 > env var
+- 回傳 JSON `{ translated, notes }` — notes 用繁中說明做了什麼優化
+- `translation_glossary` 表存公司詞庫，scope 分 global 和 per-product-line
+- 新增產品線 prompt：在 `src/lib/translate/prompts/product-lines/` 加檔案 + 在 `index.ts` 的 `productLinePrompts` 註冊
 
 
 ## Brand & Visual System
@@ -151,10 +190,14 @@ auth.users → profiles
 Key tables:
 - `solutions` — id, name, slug, label, color_primary, ds_template, sort_order
 - `product_lines` — solution_id (FK), ds_prefix, ds_images_folder_id, drive_folder_id, sort_order
-- `products` — status (active/upcoming/pending), current_version
-- `versions` — version, pdf_storage_path, changes, generated_at（per-model PDF history）
-- `change_logs` — per-product content diff history（Dashboard "Last Changed" 從這裡取）
-- `image_assets` — radio_pattern 多張圖（label: "2.4G H-plane" 等）
+- `products` — status, current_version, **current_versions** (JSONB: `{"en":"1.1","ja":"1.0"}`)
+- `versions` — version, **locale**, pdf_storage_path, changes, generated_at
+- `change_logs` — per-product content diff history
+- `image_assets` — radio_pattern 多張圖
+- `product_translations` — per-product per-locale: headline, overview, features, hardware_image, qr_label, qr_url, translation_mode, **confirmed**
+- `spec_label_translations` — per-product-line per-locale: original_label → translated_label, label_type (spec/section)
+- `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
+- `app_settings` — key-value store for API keys etc.
 
 ## Conventions
 
@@ -165,10 +208,10 @@ Key tables:
 
 ### UI Layout Conventions
 
-- **Dashboard 兩行 toolbar**: Row 1 = product line tabs (`text-xs whitespace-nowrap`)；Row 2 = Active toggle | Compare Changelog | Sync（文字連結風格，pipe 分隔）
+- **Dashboard 兩行 toolbar**: Row 1 = product line tabs；Row 2 = Active toggle | Compare Changelog **Translations** | Sync + **Lang column** 顯示已啟用語言 badges
 - **Product page sticky header**: `sticky top-14 z-20` — model name + version badge + buttons 固定
 - **Breadcrumb**: 簡化為 `[ProductLine] / [Model]`，ProductLine 連結帶 `?line=` 回正確 tab
-- **Dashboard 表格欄位**: #, Model#, Model Name(w-56), Version, Last Changed, OV, FT, Prod, HW, [Radio Pattern], Actions
+- **Dashboard 表格欄位**: #, Model#, Model Name, Version, **Lang**, Last Changed, OV, FT, Prod, HW, [Radio Pattern], Actions
 - **Solution sidebar**: 預設收合（`collapsed: true`），只顯示 icon
 - **Datasheet 佈景**: Cloud = 藍色 `#03a9f4`，Unmanaged = 灰色 `#58595B`（由 `product_lines.category` 判斷）
 
@@ -178,10 +221,10 @@ Key tables:
 
 ### 🔜 Next Steps
 
-1. **多國語言 Datasheet** — 即將討論架構
-2. **產品照片補齊** — Cloud VPN FW（4 models 全部缺圖）優先，AP 需 radio pattern
-3. **多張 Hardware 圖支援** — 部分型號需 front/rear/bottom 最多 3 張，已討論命名規則但尚未實作
-4. **Drive 版本 bulk update** — AP/SW 產品線的版本尚未用新的 3-layer 偵測邏輯更新
+1. **多國語言擴展到其他產品線** — Camera 已完成，需為 AP/Switch/NVS/VPN FW 等建立 product-line prompt（`prompts/product-lines/`）
+2. **翻譯 feedback 偵測** — AI 翻譯後使用者修改了某些詞，Save 時自動偵測差異，建議加入詞庫
+3. **產品照片補齊** — Cloud VPN FW（4 models 全部缺圖）優先，AP 需 radio pattern
+4. **多張 Hardware 圖支援** — 部分型號需 front/rear/bottom 最多 3 張
 5. **NVS 命名不一致** — Drive 用 "NVS" prefix，系統 model 用 "EVS"，需解決
 6. **Extender/Unmgd SW 的 ds_prefix** — Unmanaged 實際 PDF 用 `DS_Unmanaged_Switch_ES105`（中間有 Switch），但 ds_prefix 設為 `DS_Unmanaged`
 
@@ -196,6 +239,7 @@ npm run lint   # ESLint check
 - Vercel 自動部署 main branch
 - Vercel Cron: `vercel.json` → `"0 1 * * *"` (每天 09:00 台灣時間)
 - 需要的 env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CRON_SECRET`
+- AI 翻譯 env vars（可選，也可在 Settings 頁面設定）：`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`
 
 ## Common Pitfalls
 
@@ -207,3 +251,6 @@ npm run lint   # ESLint check
 6. **Web Overview features 格式** — Sheet 裡的 Key Feature Lists 是純換行分隔文字（非 `* ` bullet 格式），parser 需要處理兩種格式。label 欄位本身可能含換行（如 `"Key Feature Lists \n (條列式功能)"`），用 `includes()` 匹配而非 exact match
 7. **Compare table 欄位壓縮** — table 必須用 `min-w-max`（非 `w-full`），否則 24+ model 欄位會被壓縮到容器寬度。搭配 `overflow-auto` 讓表格在卡片內橫向滾動
 8. **Table sticky header 需要 `overflow-x-clip`** — base Table 元件的容器用 `overflow-x-clip`（非 `overflow-x-auto`），否則 `position: sticky` 無法穿透 scroll container 生效
+9. **Supabase 不認得新建的 table** — `product_translations` 等新表的 query 會被 TypeScript 推斷為 `never`。解法：`supabase.from("product_translations" as "products")` + 手動 `as { data: T | null }` 型別斷言
+10. **AI 翻譯 JSON 解析** — prompt 要求回 JSON `{ translated, notes }`，但有些 model 會加 markdown code fence。`index.ts` 有 fallback：strip ``` 後 parse，失敗就當 plain text
+11. **zh-TW locale 在 Drive 用 zh** — `getLocaleSuffix("zh-TW")` 回傳 `"zh"`，資料夾命名和 PDF 檔名用 `_zh` 不用 `_zh-TW`
