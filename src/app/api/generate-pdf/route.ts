@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   detectLatestVersion,
+  detectLocaleVersion,
   bumpVersion,
   uploadPdfToDrive,
+  getLocaleSuffix,
 } from "@/lib/google/drive-versions";
 import type { ProductLine } from "@/types/database";
 
@@ -74,22 +76,40 @@ export async function POST(request: Request) {
     let newVersion: string;
 
     if (isLocalized) {
-      // Locale versions are independent — tracked in current_versions JSONB
-      const currentLocaleVer = currentVersions[lang] || "0.0";
+      // Locale versions — check Drive first, then DB fallback
+      let driveLocaleVersion = null;
+      if (productLine.drive_folder_id) {
+        try {
+          driveLocaleVersion = await detectLocaleVersion(
+            productLine.drive_folder_id,
+            dsPrefix,
+            model,
+            lang
+          );
+        } catch (err) {
+          console.warn(
+            "Drive locale version detection failed:",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+
+      const currentLocaleVer = driveLocaleVersion?.version || currentVersions[lang] || "0.0";
       const isRegenerate = mode === "regenerate";
       const hasExistingVersion = currentLocaleVer !== "0.0";
 
       if (isRegenerate && hasExistingVersion) {
         newVersion = currentLocaleVer;
       } else {
-        if (hasExistingVersion) {
-          const parts = currentLocaleVer.split(".");
-          const major = parseInt(parts[0]) || 1;
-          const minor = (parseInt(parts[1]) || 0) + 1;
-          newVersion = `${major}.${minor}`;
-        } else {
-          newVersion = "1.0";
-        }
+        newVersion = driveLocaleVersion
+          ? bumpVersion(driveLocaleVersion)
+          : (() => {
+              if (currentLocaleVer === "0.0") return "1.0";
+              const parts = currentLocaleVer.split(".");
+              const major = parseInt(parts[0]) || 1;
+              const minor = (parseInt(parts[1]) || 0) + 1;
+              return `${major}.${minor}`;
+            })();
       }
     } else {
       // English version — existing logic with Drive detection
@@ -173,7 +193,7 @@ export async function POST(request: Request) {
     await browser.close();
 
     // Step 3: Upload to Supabase Storage
-    const langSuffix = isLocalized ? `_${lang}` : "";
+    const langSuffix = isLocalized ? `_${getLocaleSuffix(lang)}` : "";
     const fileName = `${dsPrefix}_${model}_v${newVersion}${langSuffix}.pdf`;
     const storagePath = `${model}/${fileName}`;
 

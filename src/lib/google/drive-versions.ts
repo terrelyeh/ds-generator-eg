@@ -19,6 +19,19 @@ import { getGoogleAuth } from "./auth";
  *   PDF:     {prefix}_{model}_v{version}.pdf
  */
 
+/**
+ * Map locale codes to Drive folder suffixes.
+ * e.g. "zh-TW" → "zh" (shorter, matching existing convention)
+ */
+const LOCALE_FOLDER_SUFFIX: Record<string, string> = {
+  "zh-TW": "zh",
+  // ja stays as "ja", add more mappings as needed
+};
+
+export function getLocaleSuffix(locale: string): string {
+  return LOCALE_FOLDER_SUFFIX[locale] ?? locale;
+}
+
 interface VersionInfo {
   version: string; // e.g. "1.4"
   major: number;
@@ -204,6 +217,83 @@ export function bumpVersion(current: VersionInfo | null): string {
 }
 
 /**
+ * Detect the latest version of a localized datasheet from Google Drive.
+ *
+ * Scans for locale-specific folders like: DS_Cloud_ECC100_ja/
+ * Then checks PDF filenames inside for version numbers.
+ *
+ * @param driveFolderId - Product line's parent Drive folder ID
+ * @param dsPrefix - Filename prefix (e.g. "DS_Cloud")
+ * @param modelName - Product model name (e.g. "ECC100")
+ * @param locale - Language code (e.g. "ja", "zh-TW")
+ */
+export async function detectLocaleVersion(
+  driveFolderId: string,
+  dsPrefix: string,
+  modelName: string,
+  locale: string
+): Promise<VersionInfo | null> {
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: "v3", auth });
+
+  // Search for locale-specific folder: DS_Cloud_ECC100_ja
+  const localeFolderName = `${dsPrefix}_${modelName}_${getLocaleSuffix(locale)}`;
+
+  const foldersRes = await drive.files.list({
+    q: `'${driveFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${localeFolderName}' and trashed = false`,
+    fields: "files(id, name)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    pageSize: 1,
+  });
+
+  const folder = foldersRes.data.files?.[0];
+  if (!folder?.id) return null;
+
+  // Scan PDFs inside the locale folder for version numbers
+  let best: VersionInfo | null = null;
+
+  try {
+    const filesRes = await drive.files.list({
+      q: `'${folder.id}' in parents and mimeType = 'application/pdf' and name contains '${modelName}' and trashed = false`,
+      fields: "files(name)",
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      pageSize: 50,
+    });
+
+    for (const file of filesRes.data.files ?? []) {
+      if (!file.name) continue;
+      const fileVer = parseVersion(file.name);
+      if (fileVer && (!best || compareVersions(fileVer, best) > 0)) {
+        best = {
+          version: `${fileVer.major}.${fileVer.minor}`,
+          major: fileVer.major,
+          minor: fileVer.minor,
+          folderId: folder.id,
+          folderName: folder.name!,
+        };
+      }
+    }
+  } catch {
+    // Skip if we can't list files
+  }
+
+  // If no versioned PDFs found but folder exists, assume it has content
+  if (!best && folder.id) {
+    best = {
+      version: "1.0",
+      major: 1,
+      minor: 0,
+      folderId: folder.id,
+      folderName: folder.name!,
+    };
+  }
+
+  return best;
+}
+
+/**
  * Upload a generated PDF to Google Drive.
  *
  * For old-format folders (with version in name), creates a new folder.
@@ -231,7 +321,7 @@ export async function uploadPdfToDrive(
 
   if (locale) {
     // Locale-specific folder: DS_Cloud_ECC100_ja/
-    const localeFolderName = `${dsPrefix}_${modelName}_${locale}`;
+    const localeFolderName = `${dsPrefix}_${modelName}_${getLocaleSuffix(locale)}`;
 
     // Search for existing locale folder
     const localeFolderRes = await drive.files.list({

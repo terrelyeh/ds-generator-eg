@@ -297,11 +297,31 @@ export function ProductTranslationEditor({
       const data = await res.json();
       if (data.ok) {
         setConfirmedLocales((prev) => new Set([...prev, activeLocale]));
-        toast.success(
-          confirmedLocales.has(activeLocale)
-            ? "Translation updated"
-            : `${currentLocaleInfo?.label} translation confirmed — PDF generation is now available`
-        );
+
+        // Detect existing Drive version for this locale (syncs to DB)
+        if (!confirmedLocales.has(activeLocale)) {
+          fetch(`/api/detect-locale-version?model=${encodeURIComponent(modelName)}&lang=${activeLocale}`)
+            .then((r) => r.json())
+            .then((d) => {
+              if (d.version) {
+                toast.success(
+                  `${currentLocaleInfo?.label} confirmed — detected existing v${d.version} from Drive`
+                );
+              } else {
+                toast.success(
+                  `${currentLocaleInfo?.label} translation confirmed — PDF generation is now available`
+                );
+              }
+            })
+            .catch(() => {
+              toast.success(
+                `${currentLocaleInfo?.label} translation confirmed — PDF generation is now available`
+              );
+            });
+        } else {
+          toast.success("Translation updated");
+        }
+
         setDirty(false);
         router.refresh();
       } else {
