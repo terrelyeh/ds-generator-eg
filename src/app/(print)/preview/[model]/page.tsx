@@ -393,15 +393,44 @@ ${isCJK ? `
   text-justify: inter-ideograph;
 }
 
-/* Overview: slightly tighter line height for CJK */
-.overview-text {
-  line-height: 1.55;
-  font-size: 10pt;
+/* Headline: bold + prevent ugly mid-word breaks like 内|蔵 */
+.product-fullname-cloud,
+.product-fullname-standard {
+  font-weight: 700;
+  font-size: 22pt;
+  line-height: 1.25;
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
-/* Features: justify for clean edges */
+/* Subtitle: slightly smaller for CJK balance */
+.product-subtitle-cloud,
+.product-subtitle-standard {
+  font-size: 17pt;
+}
+
+/* Product image: move up to match original layout */
+.product-image-container {
+  top: 290pt;
+}
+
+/* Overview: smaller + tighter to match original InDesign layout */
+.overview-text {
+  font-size: 9pt;
+  line-height: 1.45;
+  color: #58595B;
+}
+
+/* Section titles: slightly smaller */
+.section-title,
+.features-title {
+  font-size: 13pt;
+}
+
+/* Features */
 .feature-item {
-  line-height: 1.5;
+  font-size: 10pt;
+  line-height: 1.45;
 }
 .feature-text {
   line-break: strict;
@@ -411,7 +440,7 @@ ${isCJK ? `
   text-justify: inter-ideograph;
 }
 
-/* Spec labels: slightly larger for CJK readability */
+/* Spec labels */
 .spec-label {
   font-size: 6.5pt;
   line-height: 1.5;
@@ -425,9 +454,9 @@ ${isCJK ? `
   letter-spacing: 0.5pt;
 }
 
-/* Footer disclaimer: tighter for CJK */
+/* Footer disclaimer */
 .footer-disclaimer {
-  line-height: 1.55;
+  line-height: 1.5;
 }
 ` : ""}
 `,
