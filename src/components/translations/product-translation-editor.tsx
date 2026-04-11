@@ -616,7 +616,7 @@ export function ProductTranslationEditor({
           </Button>
           </div>
           <p className="text-[11px] text-muted-foreground/60">
-            支援部分粗體：用 <code className="rounded bg-muted px-1 text-[10px]">**粗體文字**</code> 包住要加粗的部分。換行會反映在 Datasheet 上。
+            用 <code className="rounded bg-muted px-1 text-[10px]">**粗體文字**</code> 標記粗體部分。按 Enter 手動斷行，或寫成一行讓系統自動斷行。
           </p>
         </CardHeader>
         <CardContent className="space-y-3">
