@@ -1,3 +1,4 @@
+import { getApiKey } from "@/lib/settings";
 import type { TranslateProvider } from "../types";
 
 function createClaudeProvider(modelId: string, name: string): TranslateProvider {
@@ -5,8 +6,8 @@ function createClaudeProvider(modelId: string, name: string): TranslateProvider 
     id: modelId,
     name,
     async translate(systemPrompt: string, userMessage: string): Promise<string> {
-      const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) throw new Error("ANTHROPIC_API_KEY not set");
+      const apiKey = await getApiKey("anthropic_api_key", "ANTHROPIC_API_KEY");
+      if (!apiKey) throw new Error("Anthropic API Key 尚未設定。請到 Settings 頁面輸入。");
 
       const model = modelId === "claude-opus"
         ? "claude-opus-4-6"

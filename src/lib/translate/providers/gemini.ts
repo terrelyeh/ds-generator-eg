@@ -1,11 +1,12 @@
+import { getApiKey } from "@/lib/settings";
 import type { TranslateProvider } from "../types";
 
 export const gemini25Pro: TranslateProvider = {
   id: "gemini-2.5-pro",
   name: "Gemini 2.5 Pro",
   async translate(systemPrompt: string, userMessage: string): Promise<string> {
-    const apiKey = process.env.GOOGLE_AI_API_KEY;
-    if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not set");
+    const apiKey = await getApiKey("google_ai_api_key", "GOOGLE_AI_API_KEY");
+    if (!apiKey) throw new Error("Google AI API Key 尚未設定。請到 Settings 頁面輸入。");
 
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,

@@ -1,11 +1,12 @@
+import { getApiKey } from "@/lib/settings";
 import type { TranslateProvider } from "../types";
 
 export const gpt4o: TranslateProvider = {
   id: "gpt-4o",
   name: "GPT-4o",
   async translate(systemPrompt: string, userMessage: string): Promise<string> {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+    const apiKey = await getApiKey("openai_api_key", "OPENAI_API_KEY");
+    if (!apiKey) throw new Error("OpenAI API Key 尚未設定。請到 Settings 頁面輸入。");
 
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
