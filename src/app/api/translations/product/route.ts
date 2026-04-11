@@ -52,3 +52,34 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ ok: true });
 }
+
+/**
+ * DELETE /api/translations/product
+ * Remove a product translation (disable a locale).
+ * Body: { product_id: string, locale: string }
+ */
+export async function DELETE(request: Request) {
+  const body = await request.json();
+  const { product_id, locale } = body as { product_id: string; locale: string };
+
+  if (!product_id || !locale) {
+    return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+
+  const { error } = await supabase
+    .from("product_translations" as "products")
+    .delete()
+    .eq("product_id", product_id)
+    .eq("locale", locale);
+
+  if (error) {
+    return NextResponse.json(
+      { error: "Delete failed", details: error.message },
+      { status: 500 }
+    );
+  }
+
+  return NextResponse.json({ ok: true });
+}

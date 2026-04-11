@@ -36,11 +36,21 @@ export function ProductTranslationEditor({
   const router = useRouter();
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
 
-  const [activeLocale, setActiveLocale] = useState<string>(localeOptions[0]?.value ?? "ja");
+  // Enabled locales = locales that have a record in product_translations
+  const [enabledLocales, setEnabledLocales] = useState<string[]>(
+    existingTranslations.map((t) => t.locale)
+  );
+  const [showAddMenu, setShowAddMenu] = useState(false);
+
+  const [activeLocale, setActiveLocale] = useState<string>(
+    enabledLocales[0] ?? ""
+  );
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [translatingOverview, setTranslatingOverview] = useState(false);
   const [translatingFeatures, setTranslatingFeatures] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
+  const [disabling, setDisabling] = useState(false);
 
   const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
@@ -60,6 +70,65 @@ export function ProductTranslationEditor({
     setOverview(t?.overview ?? "");
     setFeatures(t?.features ?? englishFeatures.map(() => ""));
     setDirty(false);
+  }
+
+  async function handleEnableLocale(locale: string) {
+    setShowAddMenu(false);
+    // Create empty record in DB to mark as enabled
+    try {
+      await fetch("/api/translations/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: modelName,
+          locale,
+          translation_mode: "light",
+          overview: null,
+          features: null,
+        }),
+      });
+      setEnabledLocales((prev) => [...prev, locale]);
+      switchLocale(locale);
+      setDirty(false);
+      router.refresh();
+      toast.success(`${SUPPORTED_LOCALES.find((l) => l.value === locale)?.label} enabled`);
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  async function handleDisableLocale(locale: string) {
+    const localeLabel = SUPPORTED_LOCALES.find((l) => l.value === locale)?.label ?? locale;
+    if (!confirm(`Disable ${localeLabel}? This will delete all translations for this language.`)) return;
+
+    setDisabling(true);
+    try {
+      const res = await fetch("/api/translations/product", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ product_id: modelName, locale }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        setEnabledLocales((prev) => prev.filter((l) => l !== locale));
+        // Switch to another locale or clear
+        const remaining = enabledLocales.filter((l) => l !== locale);
+        if (remaining.length > 0) {
+          switchLocale(remaining[0]);
+        } else {
+          setActiveLocale("");
+        }
+        setDirty(false);
+        router.refresh();
+        toast.success(`${localeLabel} disabled`);
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDisabling(false);
+    }
   }
 
   function handleFeatureChange(index: number, value: string) {
@@ -160,10 +229,7 @@ export function ProductTranslationEditor({
     }
   }
 
-  const [previewing, setPreviewing] = useState(false);
-
   async function handlePreview() {
-    // Auto-save before opening preview so the preview page can read from DB
     setPreviewing(true);
     try {
       await fetch("/api/translations/product", {
@@ -180,36 +246,113 @@ export function ProductTranslationEditor({
       setDirty(false);
       window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
     } catch {
-      // Even if save fails, still try to open preview
       window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
     } finally {
       setPreviewing(false);
     }
   }
 
-  const currentLocaleInfo = SUPPORTED_LOCALES.find((l) => l.value === activeLocale)!;
-  const isTranslating = translatingOverview || translatingFeatures;
+  const currentLocaleInfo = SUPPORTED_LOCALES.find((l) => l.value === activeLocale);
+  const availableToAdd = localeOptions.filter((l) => !enabledLocales.includes(l.value));
 
+  // --- No languages enabled state ---
+  if (enabledLocales.length === 0) {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/20 py-16 px-8">
+          <svg className="h-12 w-12 text-muted-foreground/30 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+            <path d="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Z" />
+            <path d="M3.6 9h16.8M3.6 15h16.8" />
+            <path d="M12 3a15 15 0 0 1 4 9 15 15 0 0 1-4 9 15 15 0 0 1-4-9 15 15 0 0 1 4-9Z" />
+          </svg>
+          <p className="text-sm font-medium text-muted-foreground mb-1">
+            No languages enabled for this product
+          </p>
+          <p className="text-xs text-muted-foreground/60 mb-6">
+            Enable a language to start translating the datasheet
+          </p>
+          <div className="relative">
+            <Button
+              variant="outline"
+              onClick={() => setShowAddMenu(!showAddMenu)}
+            >
+              + Enable Language
+            </Button>
+            {showAddMenu && (
+              <div className="absolute left-1/2 -translate-x-1/2 top-full z-10 mt-2 w-52 rounded-md border bg-popover p-1 shadow-md">
+                {localeOptions.map((l) => (
+                  <button
+                    key={l.value}
+                    onClick={() => handleEnableLocale(l.value)}
+                    className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors"
+                  >
+                    <span>{l.flag}</span>
+                    <span>{l.label}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Languages enabled, show editor ---
   return (
     <div className="space-y-6">
-      {/* Language selector + mode */}
+      {/* Language tabs + controls */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Language tabs */}
           <div className="flex gap-1 rounded-lg bg-muted p-1">
-            {localeOptions.map((l) => (
-              <button
-                key={l.value}
-                onClick={() => switchLocale(l.value)}
-                className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
-                  activeLocale === l.value
-                    ? "bg-engenius-blue text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background"
-                }`}
-              >
-                {l.flag} {l.label}
-              </button>
-            ))}
+            {enabledLocales.map((loc) => {
+              const info = SUPPORTED_LOCALES.find((l) => l.value === loc);
+              if (!info) return null;
+              return (
+                <button
+                  key={loc}
+                  onClick={() => switchLocale(loc)}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+                    activeLocale === loc
+                      ? "bg-engenius-blue text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background"
+                  }`}
+                >
+                  {info.flag} {info.label}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Add language button */}
+          {availableToAdd.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowAddMenu(!showAddMenu)}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M8 3v10M3 8h10" />
+                </svg>
+                Add
+              </button>
+              {showAddMenu && (
+                <div className="absolute left-0 top-full z-10 mt-1 w-48 rounded-md border bg-popover p-1 shadow-md">
+                  {availableToAdd.map((l) => (
+                    <button
+                      key={l.value}
+                      onClick={() => handleEnableLocale(l.value)}
+                      className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors"
+                    >
+                      <span>{l.flag}</span>
+                      <span>{l.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           <Separator orientation="vertical" className="h-6" />
 
@@ -227,7 +370,7 @@ export function ProductTranslationEditor({
 
           <Separator orientation="vertical" className="h-6" />
 
-          {/* AI Model selector with availability */}
+          {/* AI Model selector */}
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-muted-foreground">AI Model:</label>
             <select
@@ -310,7 +453,7 @@ export function ProductTranslationEditor({
           </div>
           <div>
             <label className="text-xs font-medium text-muted-foreground">
-              {currentLocaleInfo.flag} {currentLocaleInfo.label}
+              {currentLocaleInfo?.flag} {currentLocaleInfo?.label}
             </label>
             <textarea
               value={overview}
@@ -368,7 +511,7 @@ export function ProductTranslationEditor({
                 <div>
                   {i === 0 && (
                     <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                      {currentLocaleInfo.flag} {currentLocaleInfo.label}
+                      {currentLocaleInfo?.flag} {currentLocaleInfo?.label}
                     </label>
                   )}
                   <input
@@ -401,6 +544,17 @@ export function ProductTranslationEditor({
           </Link>
         </div>
       )}
+
+      {/* Disable language */}
+      <div className="flex justify-end">
+        <button
+          onClick={() => handleDisableLocale(activeLocale)}
+          disabled={disabling}
+          className="inline-flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium text-red-500 hover:text-red-700 hover:bg-red-50 transition-colors disabled:opacity-50"
+        >
+          {disabling ? "Removing..." : `Disable ${currentLocaleInfo?.label ?? activeLocale}`}
+        </button>
+      </div>
     </div>
   );
 }
