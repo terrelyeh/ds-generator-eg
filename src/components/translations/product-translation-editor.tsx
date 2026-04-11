@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
+import { useProviders } from "@/lib/translate/use-providers";
 
 interface TranslationData {
   locale: string;
@@ -40,7 +41,8 @@ export function ProductTranslationEditor({
   const [dirty, setDirty] = useState(false);
   const [translatingOverview, setTranslatingOverview] = useState(false);
   const [translatingFeatures, setTranslatingFeatures] = useState(false);
-  const [providerId, setProviderId] = useState("claude-sonnet");
+
+  const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
   // Build state from existing translations
   const existing = existingTranslations.find((t) => t.locale === activeLocale);
@@ -79,7 +81,7 @@ export function ProductTranslationEditor({
           target_locale: activeLocale,
           content_type: "overview",
           product_line: productLineName,
-          provider: providerId,
+          provider: selectedProvider,
         }),
       });
       const data = await res.json();
@@ -109,13 +111,12 @@ export function ProductTranslationEditor({
           target_locale: activeLocale,
           content_type: "features",
           product_line: productLineName,
-          provider: providerId,
+          provider: selectedProvider,
         }),
       });
       const data = await res.json();
       if (data.ok) {
         const lines = (data.translated as string).split("\n").filter((l: string) => l.trim());
-        // Pad or trim to match source count
         const result = englishFeatures.map((_, i) => lines[i] ?? "");
         setFeatures(result);
         setDirty(true);
@@ -159,13 +160,41 @@ export function ProductTranslationEditor({
     }
   }
 
+  const [previewing, setPreviewing] = useState(false);
+
+  async function handlePreview() {
+    // Auto-save before opening preview so the preview page can read from DB
+    setPreviewing(true);
+    try {
+      await fetch("/api/translations/product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product_id: modelName,
+          locale: activeLocale,
+          translation_mode: mode,
+          overview: overview || null,
+          features: features.some((f) => f.trim()) ? features : null,
+        }),
+      });
+      setDirty(false);
+      window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
+    } catch {
+      // Even if save fails, still try to open preview
+      window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
   const currentLocaleInfo = SUPPORTED_LOCALES.find((l) => l.value === activeLocale)!;
+  const isTranslating = translatingOverview || translatingFeatures;
 
   return (
     <div className="space-y-6">
       {/* Language selector + mode */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex gap-1 rounded-lg bg-muted p-1">
             {localeOptions.map((l) => (
               <button
@@ -198,49 +227,78 @@ export function ProductTranslationEditor({
 
           <Separator orientation="vertical" className="h-6" />
 
+          {/* AI Model selector with availability */}
           <div className="flex items-center gap-2">
             <label className="text-xs font-medium text-muted-foreground">AI Model:</label>
             <select
-              value={providerId}
-              onChange={(e) => setProviderId(e.target.value)}
+              value={selectedProvider}
+              onChange={(e) => setSelectedProvider(e.target.value)}
               className="rounded-md border border-input bg-background px-2 py-1 text-xs"
             >
-              {AVAILABLE_PROVIDERS.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              {AVAILABLE_PROVIDERS.map((p) => {
+                const available = availability[p.id];
+                return (
+                  <option key={p.id} value={p.id} disabled={!available}>
+                    {available ? "✓ " : "✗ "}{p.name}{!available ? " (no key)" : ""}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href={`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`}
-            target="_blank"
-            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent transition-colors"
+          <button
+            onClick={handlePreview}
+            disabled={previewing}
+            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent transition-colors disabled:opacity-50"
           >
-            Preview
+            {previewing ? "Saving..." : "Preview"}
             <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M5 3h8v8M13 3 6 10" />
             </svg>
-          </Link>
+          </button>
           <Button onClick={handleSave} disabled={saving || !dirty} size="sm">
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
 
+      {/* No provider warning */}
+      {!hasAnyProvider && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          No AI translation API keys configured.{" "}
+          <Link href="/settings" className="font-medium underline hover:text-amber-900">
+            Go to Settings
+          </Link>{" "}
+          to add one, or enter translations manually below.
+        </div>
+      )}
+
       {/* Overview */}
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Overview</CardTitle>
           <Button
-            variant="outline"
             size="sm"
             onClick={handleAiTranslateOverview}
-            disabled={translatingOverview || !englishOverview}
-            className="text-xs"
+            disabled={translatingOverview || !englishOverview || !hasAnyProvider}
+            className={`text-xs transition-all ${
+              translatingOverview
+                ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse"
+                : ""
+            }`}
           >
-            {translatingOverview ? "Translating..." : "AI Translate"}
+            {translatingOverview ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M8 1a7 7 0 1 0 7 7" />
+                </svg>
+                正在翻譯中...
+              </span>
+            ) : (
+              "AI Translate"
+            )}
           </Button>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -259,7 +317,11 @@ export function ProductTranslationEditor({
               onChange={(e) => { setOverview(e.target.value); setDirty(true); }}
               placeholder="Enter translated overview..."
               rows={4}
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+              className={`mt-1 w-full rounded-md border px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30 transition-colors ${
+                translatingOverview
+                  ? "border-amber-300 bg-amber-50"
+                  : "border-input bg-background"
+              }`}
             />
           </div>
         </CardContent>
@@ -270,13 +332,25 @@ export function ProductTranslationEditor({
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Features &amp; Benefits</CardTitle>
           <Button
-            variant="outline"
             size="sm"
             onClick={handleAiTranslateFeatures}
-            disabled={translatingFeatures || englishFeatures.length === 0}
-            className="text-xs"
+            disabled={translatingFeatures || englishFeatures.length === 0 || !hasAnyProvider}
+            className={`text-xs transition-all ${
+              translatingFeatures
+                ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse"
+                : ""
+            }`}
           >
-            {translatingFeatures ? "Translating..." : "AI Translate"}
+            {translatingFeatures ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M8 1a7 7 0 1 0 7 7" />
+                </svg>
+                正在翻譯中...
+              </span>
+            ) : (
+              "AI Translate"
+            )}
           </Button>
         </CardHeader>
         <CardContent>
@@ -302,7 +376,11 @@ export function ProductTranslationEditor({
                     value={features[i] ?? ""}
                     onChange={(e) => handleFeatureChange(i, e.target.value)}
                     placeholder="Translated feature..."
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                    className={`w-full rounded-md border px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30 transition-colors ${
+                      translatingFeatures
+                        ? "border-amber-300 bg-amber-50"
+                        : "border-input bg-background"
+                    }`}
                   />
                 </div>
               </div>

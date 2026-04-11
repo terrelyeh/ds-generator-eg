@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
+import { useProviders } from "@/lib/translate/use-providers";
 
 interface SpecLabelTranslationsEditorProps {
   productLineId: string;
@@ -31,7 +32,8 @@ export function SpecLabelTranslationsEditor({
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [aiTranslating, setAiTranslating] = useState(false);
-  const [providerId, setProviderId] = useState("claude-sonnet");
+
+  const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
   const currentLocale = localeOptions.find((l) => l.value === locale) ?? localeOptions[0];
@@ -68,7 +70,7 @@ export function SpecLabelTranslationsEditor({
             target_locale: locale,
             content_type: "spec_labels",
             product_line: productLineLabel,
-            provider: providerId,
+            provider: selectedProvider,
           }),
         });
         const data = await res.json();
@@ -92,7 +94,7 @@ export function SpecLabelTranslationsEditor({
             target_locale: locale,
             content_type: "spec_labels",
             product_line: productLineLabel,
-            provider: providerId,
+            provider: selectedProvider,
           }),
         });
         const data = await res.json();
@@ -200,21 +202,39 @@ export function SpecLabelTranslationsEditor({
 
           <div className="flex items-center gap-2">
             <select
-              value={providerId}
-              onChange={(e) => setProviderId(e.target.value)}
+              value={selectedProvider}
+              onChange={(e) => setSelectedProvider(e.target.value)}
               className="rounded-md border border-input bg-background px-2 py-1 text-xs"
             >
-              {AVAILABLE_PROVIDERS.map((p) => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
+              {AVAILABLE_PROVIDERS.map((p) => {
+                const available = availability[p.id];
+                return (
+                  <option key={p.id} value={p.id} disabled={!available}>
+                    {available ? "✓ " : "✗ "}{p.name}{!available ? " (no key)" : ""}
+                  </option>
+                );
+              })}
             </select>
             <Button
-              variant="outline"
               onClick={handleAiTranslateEmpty}
-              disabled={aiTranslating}
+              disabled={aiTranslating || !hasAnyProvider}
               size="default"
+              className={`transition-all ${
+                aiTranslating
+                  ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse"
+                  : ""
+              }`}
             >
-              {aiTranslating ? "Translating..." : "AI Translate Empty Fields"}
+              {aiTranslating ? (
+                <span className="flex items-center gap-1.5">
+                  <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8 1a7 7 0 1 0 7 7" />
+                  </svg>
+                  正在翻譯中...
+                </span>
+              ) : (
+                "AI Translate Empty Fields"
+              )}
             </Button>
           </div>
 
