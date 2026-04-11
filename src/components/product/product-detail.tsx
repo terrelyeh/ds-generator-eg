@@ -530,11 +530,15 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
           productLineName={product.product_line.name}
           englishOverview={product.overview ?? ""}
           englishFeatures={product.features ?? []}
+          englishHeadline={product.headline || product.full_name}
           existingTranslations={translations.map((t) => ({
             locale: t.locale,
             translation_mode: t.translation_mode,
             overview: t.overview,
             features: t.features,
+            headline: t.headline,
+            qr_label: t.qr_label,
+            qr_url: t.qr_url,
             confirmed: t.confirmed,
           }))}
         />

@@ -6,7 +6,8 @@ export const en: DatasheetDict = {
   featuresAndBenefits: "Features & Benefits",
   technicalSpecifications: "Technical Specifications",
   hardwareOverview: "Hardware Overview",
-  quickStartGuide: "Quick Start Guide",
+  defaultQrLabel: "Quick Start Guide",
+  defaultQrUrl: "https://qr.engenius.ai/qsg/{model}",
   disclaimer:
     "Features and specifications subject to change without notice. " +
     "Trademarks and registered trademarks are the property of their respective owners. " +
@@ -15,4 +16,5 @@ export const en: DatasheetDict = {
     "Operation of this equipment in a residential area is likely to cause harmful interference in which case the user will be required to correct the interference at his/her own expense. " +
     "Prior to installing any surveillance equipment, it is your responsibility to ensure the installation is in compliance with local, state and federal video and audio surveillance and privacy laws.",
   dateLocale: "en-US",
+  bullet: "\u25CF",
 };

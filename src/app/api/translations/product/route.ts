@@ -17,12 +17,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { product_id, locale, translation_mode, overview, features, confirm } = body as {
+  const { product_id, locale, translation_mode, overview, features, headline, qr_label, qr_url, confirm } = body as {
     product_id: string;
     locale: string;
     translation_mode: "light" | "full";
     overview: string | null;
     features: string[] | null;
+    headline?: string | null;
+    qr_label?: string | null;
+    qr_url?: string | null;
     confirm?: boolean;
   };
 
@@ -36,8 +39,11 @@ export async function POST(request: Request) {
     product_id,
     locale,
     translation_mode: translation_mode || "light",
+    headline: headline?.trim() || null,
     overview: overview?.trim() || null,
     features: features ?? null,
+    qr_label: qr_label?.trim() || null,
+    qr_url: qr_url?.trim() || null,
     translated_at: new Date().toISOString(),
   };
 

@@ -65,6 +65,9 @@ export default async function PreviewPage({
   // --- Load translations if non-English ---
   let translatedOverview: string | null = null;
   let translatedFeatures: string[] | null = null;
+  let translatedHeadline: string | null = null;
+  let customQrLabel: string | null = null;
+  let customQrUrl: string | null = null;
   let specLabelMap: Record<string, string> = {};
   let sectionLabelMap: Record<string, string> = {};
 
@@ -72,14 +75,17 @@ export default async function PreviewPage({
     // Per-product translation (overview + features)
     const { data: pt } = await supabase
       .from("product_translations" as "products")
-      .select("overview, features, translation_mode")
+      .select("overview, features, translation_mode, headline, qr_label, qr_url")
       .eq("product_id", model)
       .eq("locale", lang)
-      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string } | null };
+      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; qr_label: string | null; qr_url: string | null } | null };
 
     if (pt) {
       translatedOverview = pt.overview;
       translatedFeatures = pt.features;
+      translatedHeadline = pt.headline;
+      customQrLabel = pt.qr_label;
+      customQrUrl = pt.qr_url;
     }
 
     // Per-product-line spec label translations (only if full mode)
@@ -121,6 +127,7 @@ export default async function PreviewPage({
   // --- Resolve display content ---
   const overview = (isTranslated && translatedOverview) ? translatedOverview : product.overview;
   const features = (isTranslated && translatedFeatures) ? translatedFeatures : (product.features ?? []);
+  const headline = (isTranslated && translatedHeadline) ? translatedHeadline : (product.headline || product.full_name);
   const midpoint = Math.ceil(features.length / 2);
 
   const currentVersions = product.current_versions as Record<string, string> | null;
@@ -132,7 +139,11 @@ export default async function PreviewPage({
   });
   const productLine = product.product_lines;
   const theme = getTheme(productLine.category);
-  const qsgUrl = `https://qr.engenius.ai/qsg/${product.model_name.toLowerCase()}`;
+
+  // QR: custom per-product-translation > locale default
+  const qrLabel = customQrLabel || dict.defaultQrLabel;
+  const qrUrlTemplate = customQrUrl || dict.defaultQrUrl;
+  const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   const totalPages = 1 + specPages.length + 1; // cover + specs + hardware
 
@@ -448,14 +459,14 @@ ${isCJK ? `
             />
             <div className="product-subtitle-cloud">{product.subtitle}</div>
             <div className="product-fullname-cloud">
-              {product.headline || product.full_name}
+              {headline}
             </div>
           </>
         ) : (
           <>
             <div className="product-subtitle-standard">{product.subtitle}</div>
             <div className="product-fullname-standard">
-              {product.headline || product.full_name}
+              {headline}
             </div>
           </>
         )}
@@ -480,7 +491,7 @@ ${isCJK ? `
                 <div className="features-col">
                   {features.slice(0, midpoint).map((f, i) => (
                     <div key={i} className="feature-item">
-                      <span className="feature-bullet">{"\u25CF"}</span>
+                      <span className="feature-bullet">{dict.bullet}</span>
                       <span className="feature-text">{f}</span>
                     </div>
                   ))}
@@ -488,7 +499,7 @@ ${isCJK ? `
                 <div className="features-col">
                   {features.slice(midpoint).map((f, i) => (
                     <div key={i} className="feature-item">
-                      <span className="feature-bullet">{"\u25CF"}</span>
+                      <span className="feature-bullet">{dict.bullet}</span>
                       <span className="feature-text">{f}</span>
                     </div>
                   ))}
@@ -574,7 +585,7 @@ ${isCJK ? `
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={qrCodeUrl} alt="QR Code" />
               </div>
-              <div className="footer-qr-label">{dict.quickStartGuide}</div>
+              <div className="footer-qr-label">{qrLabel}</div>
             </div>
           </div>
         </div>

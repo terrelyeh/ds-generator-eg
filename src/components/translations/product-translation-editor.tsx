@@ -68,11 +68,15 @@ interface TranslationData {
   translation_mode: "light" | "full";
   overview: string | null;
   features: string[] | null;
+  headline: string | null;
+  qr_label: string | null;
+  qr_url: string | null;
   confirmed: boolean;
 }
 
 interface ProductTranslationEditorProps {
   modelName: string;
+  englishHeadline: string;
   productLineName: string;
   englishOverview: string;
   englishFeatures: string[];
@@ -81,6 +85,7 @@ interface ProductTranslationEditorProps {
 
 export function ProductTranslationEditor({
   modelName,
+  englishHeadline,
   productLineName,
   englishOverview,
   englishFeatures,
@@ -118,18 +123,24 @@ export function ProductTranslationEditor({
   // Build state from existing translations
   const existing = existingTranslations.find((t) => t.locale === activeLocale);
   const [mode, setMode] = useState<"light" | "full">(existing?.translation_mode ?? "light");
+  const [headlineTrans, setHeadlineTrans] = useState(existing?.headline ?? "");
   const [overview, setOverview] = useState(existing?.overview ?? "");
   const [features, setFeatures] = useState<string[]>(
     existing?.features ?? englishFeatures.map(() => "")
   );
+  const [qrLabel, setQrLabel] = useState(existing?.qr_label ?? "");
+  const [qrUrl, setQrUrl] = useState(existing?.qr_url ?? "");
 
   function switchLocale(locale: string) {
     if (dirty && !confirm("You have unsaved changes. Switch language anyway?")) return;
     setActiveLocale(locale);
     const t = existingTranslations.find((t) => t.locale === locale);
     setMode(t?.translation_mode ?? "light");
+    setHeadlineTrans(t?.headline ?? "");
     setOverview(t?.overview ?? "");
     setFeatures(t?.features ?? englishFeatures.map(() => ""));
+    setQrLabel(t?.qr_label ?? "");
+    setQrUrl(t?.qr_url ?? "");
     setOverviewNotes("");
     setFeaturesNotes("");
     setDirty(false);
@@ -275,8 +286,11 @@ export function ProductTranslationEditor({
           product_id: modelName,
           locale: activeLocale,
           translation_mode: mode,
+          headline: headlineTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
+          qr_label: qrLabel || null,
+          qr_url: qrUrl || null,
           confirm: true,
         }),
       });
@@ -310,8 +324,11 @@ export function ProductTranslationEditor({
           product_id: modelName,
           locale: activeLocale,
           translation_mode: mode,
+          headline: headlineTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
+          qr_label: qrLabel || null,
+          qr_url: qrUrl || null,
         }),
       });
       setDirty(false);
@@ -500,6 +517,33 @@ export function ProductTranslationEditor({
         </div>
       )}
 
+      {/* Product Headline */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Product Headline</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">English (source)</label>
+            <p className="mt-1 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              {englishHeadline || <span className="italic">No headline</span>}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">
+              {currentLocaleInfo?.flag} {currentLocaleInfo?.label}
+            </label>
+            <input
+              type="text"
+              value={headlineTrans}
+              onChange={(e) => { setHeadlineTrans(e.target.value); setDirty(true); }}
+              placeholder="Translated headline..."
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Overview */}
       <Card className="shadow-sm">
         <CardHeader className="flex flex-row items-center justify-between space-y-0">
@@ -613,6 +657,41 @@ export function ProductTranslationEditor({
             ))}
           </div>
           {featuresNotes && <TranslationNotes notes={featuresNotes} onDismiss={() => setFeaturesNotes("")} className="mt-4" />}
+        </CardContent>
+      </Card>
+
+      {/* QR Code Settings */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">QR Code (Footer)</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                QR Label <span className="text-muted-foreground/40">(default: {SUPPORTED_LOCALES.find(l => l.value === activeLocale)?.value === "en" ? "Quick Start Guide" : "Contact Us"})</span>
+              </label>
+              <input
+                type="text"
+                value={qrLabel}
+                onChange={(e) => { setQrLabel(e.target.value); setDirty(true); }}
+                placeholder="Contact Us"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                QR URL <span className="text-muted-foreground/40">(leave empty for default)</span>
+              </label>
+              <input
+                type="text"
+                value={qrUrl}
+                onChange={(e) => { setQrUrl(e.target.value); setDirty(true); }}
+                placeholder="https://www.engenius.co.jp/contact"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 

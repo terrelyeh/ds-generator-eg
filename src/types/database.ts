@@ -299,6 +299,9 @@ export interface Database {
           translation_mode: "light" | "full";
           overview: string | null;
           features: string[] | null;
+          headline: string | null;
+          qr_label: string | null;
+          qr_url: string | null;
           confirmed: boolean;
           translated_at: string;
           translated_by: string | null;
