@@ -147,6 +147,8 @@ export default async function PreviewPage({
       : []),
   ];
 
+  const isCJK = lang === "ja" || lang === "zh-TW";
+
   const fontFamily = lang === "ja"
     ? "'Noto Sans JP', 'Roboto', sans-serif"
     : lang === "zh-TW"
@@ -362,6 +364,59 @@ body {
 }
 .footer-qr img { width: 41pt; height: 41pt; display: block; }
 .footer-qr-label { font-weight: 400; font-size: 7pt; color: #6b7580; margin-top: 2pt; }
+
+${isCJK ? `
+/* CJK Typography — 禁則處理 + proper line breaking */
+.overview-text,
+.feature-text,
+.spec-label,
+.spec-value,
+.footer-disclaimer,
+.spec-category-header {
+  line-break: strict;
+  word-break: normal;
+  overflow-wrap: break-word;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+/* Overview: slightly tighter line height for CJK */
+.overview-text {
+  line-height: 1.55;
+  font-size: 10pt;
+}
+
+/* Features: justify for clean edges */
+.feature-item {
+  line-height: 1.5;
+}
+.feature-text {
+  line-break: strict;
+  word-break: normal;
+  overflow-wrap: break-word;
+  text-align: justify;
+  text-justify: inter-ideograph;
+}
+
+/* Spec labels: slightly larger for CJK readability */
+.spec-label {
+  font-size: 6.5pt;
+  line-height: 1.5;
+}
+.spec-value {
+  line-height: 1.5;
+}
+
+/* Section headers */
+.spec-category-header {
+  letter-spacing: 0.5pt;
+}
+
+/* Footer disclaimer: tighter for CJK */
+.footer-disclaimer {
+  line-height: 1.55;
+}
+` : ""}
 `,
         }}
       />
