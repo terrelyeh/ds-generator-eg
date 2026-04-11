@@ -443,12 +443,12 @@ ${isCJK ? `
   font-size: 17pt;
 }
 
-/* Overview: match original InDesign weight and contrast */
+/* Overview */
 .overview-text {
   font-weight: 500;
   font-size: 11pt;
   line-height: 1.5;
-  color: #333333;
+  color: #444444;
 }
 
 /* Section titles */
@@ -457,12 +457,12 @@ ${isCJK ? `
   font-size: 13pt;
 }
 
-/* Features: match overview weight and contrast */
+/* Features */
 .feature-item {
   font-weight: 500;
   font-size: 11pt;
   line-height: 1.45;
-  color: #333333;
+  color: #444444;
 }
 .feature-text {
   line-break: strict;
@@ -472,12 +472,14 @@ ${isCJK ? `
   text-justify: inter-ideograph;
 }
 
-/* Spec labels */
+/* Spec: bump weight for Zen Kaku Gothic New Latin glyphs */
 .spec-label {
-  font-size: 6.5pt;
+  font-size: 7pt;
+  font-weight: 500;
   line-height: 1.5;
 }
 .spec-value {
+  font-weight: 400;
   line-height: 1.5;
 }
 
