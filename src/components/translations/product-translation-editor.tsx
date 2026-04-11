@@ -573,7 +573,7 @@ export function ProductTranslationEditor({
                   body: JSON.stringify({
                     source: englishHeadline,
                     target_locale: activeLocale,
-                    content_type: "overview",
+                    content_type: "headline",
                     product_line: productLineName,
                     provider: selectedProvider,
                   }),

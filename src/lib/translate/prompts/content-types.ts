@@ -3,6 +3,18 @@
  */
 
 export const contentTypePrompts: Record<string, string> = {
+  headline: `## Content Type: Product Headline
+
+You are translating a product TITLE — this appears as the main heading on a datasheet cover page.
+- This is NOT a sentence or description — it's a title/heading
+- Use concise noun-phrase style (名詞句スタイル for Japanese)
+- NO sentence endings (です/ます/である for Japanese; 的/了 for Chinese)
+- Stack key descriptors: product type + key differentiating features
+- Keep it to 1-2 lines maximum
+- Think of it like a product packaging title or a trade show banner
+- Restructure word order if it reads more naturally in the target language
+- Output: a single line of translated title text`,
+
   overview: `## Content Type: Product Overview
 
 You are translating a product overview paragraph (2-3 sentences).

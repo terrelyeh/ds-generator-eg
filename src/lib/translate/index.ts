@@ -119,7 +119,7 @@ async function buildSystemPrompt(
 export async function translate(opts: {
   source: string;
   targetLocale: string;
-  contentType: "overview" | "features" | "spec_labels";
+  contentType: "headline" | "overview" | "features" | "spec_labels";
   productLine?: string;
   providerId?: ProviderId;
 }): Promise<{ translated: string; notes: string; provider: string }> {
