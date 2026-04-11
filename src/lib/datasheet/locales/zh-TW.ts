@@ -3,9 +3,9 @@ import type { DatasheetDict } from "./types";
 export const zhTW: DatasheetDict = {
   datasheet: "\u898F\u683C\u8868 |",
   overview: "\u7522\u54C1\u6982\u8FF0",
-  featuresAndBenefits: "\u7522\u54C1\u7279\u9EDE\u8207\u512A\u52E2",
+  featuresAndBenefits: "\u529F\u80FD\u4ECB\u7D39",
   technicalSpecifications: "\u6280\u8853\u898F\u683C",
-  hardwareOverview: "\u786C\u9AD4\u6982\u89C0",
+  hardwareOverview: "\u7522\u54C1\u5916\u89C0",
   defaultQrLabel: "Contact Us",
   defaultQrUrl: "https://www.engenius.com.tw/contact",
   disclaimer:
