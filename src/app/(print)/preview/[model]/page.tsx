@@ -475,7 +475,7 @@ ${isCJK ? `
 /* Spec: bump weight for Zen Kaku Gothic New Latin glyphs */
 .spec-label {
   font-size: 7pt;
-  font-weight: 500;
+  font-weight: 600;
   line-height: 1.5;
 }
 .spec-value {
