@@ -502,6 +502,19 @@ export function ProductTranslationEditor({
               })}
             </select>
           </div>
+
+          <Separator orientation="vertical" className="h-6" />
+
+          <Link
+            href={`/settings/glossary?locale=${activeLocale}`}
+            className="inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Translation Glossary"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1 3.5A1.5 1.5 0 012.5 2h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 009.62 4H13.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z" />
+            </svg>
+            Glossary
+          </Link>
         </div>
 
         <div className="flex items-center gap-3">

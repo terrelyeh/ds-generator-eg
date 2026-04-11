@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -242,6 +243,17 @@ export function SpecLabelTranslationsEditor({
               )}
             </Button>
           </div>
+
+          <Link
+            href={`/settings/glossary?locale=${locale}`}
+            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent transition-colors"
+            title="Translation Glossary"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
+              <path d="M1 3.5A1.5 1.5 0 012.5 2h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 009.62 4H13.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z" />
+            </svg>
+            Glossary
+          </Link>
 
           <Button onClick={handleSave} disabled={saving || !dirty} size="default">
             {saving ? "Saving..." : "Save All"}
