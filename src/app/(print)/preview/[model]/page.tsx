@@ -446,7 +446,7 @@ ${isCJK ? `
 /* Overview */
 .overview-text {
   font-weight: 500;
-  font-size: 11pt;
+  font-size: 11.5pt;
   line-height: 1.5;
   color: #444444;
 }
@@ -460,7 +460,7 @@ ${isCJK ? `
 /* Features: slightly smaller than overview */
 .feature-item {
   font-weight: 500;
-  font-size: 10pt;
+  font-size: 10.5pt;
   line-height: 1.4;
   color: #444444;
 }
