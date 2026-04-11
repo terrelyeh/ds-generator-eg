@@ -32,6 +32,33 @@ function getTheme(category: string) {
   };
 }
 
+/**
+ * Parse **bold** markdown in text → React elements with <strong>.
+ * E.g. "**クラウド管理型 AI**\n256GB 搭載" → [<strong>クラウド管理型 AI</strong>, <br/>, "256GB 搭載"]
+ */
+function parseHeadlineMarkup(text: string): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  // Split by newlines first
+  const lines = text.split("\n");
+  lines.forEach((line, lineIdx) => {
+    if (lineIdx > 0) nodes.push(<br key={`br-${lineIdx}`} />);
+    // Parse **bold** within each line
+    const parts = line.split(/(\*\*[^*]+\*\*)/g);
+    parts.forEach((part, partIdx) => {
+      if (part.startsWith("**") && part.endsWith("**")) {
+        nodes.push(
+          <strong key={`${lineIdx}-${partIdx}`}>
+            {part.slice(2, -2)}
+          </strong>
+        );
+      } else if (part) {
+        nodes.push(part);
+      }
+    });
+  });
+  return nodes;
+}
+
 export default async function PreviewPage({
   params,
   searchParams,
@@ -149,21 +176,21 @@ export default async function PreviewPage({
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   const totalPages = 1 + specPages.length + 1; // cover + specs + hardware
 
-  // Font: add Noto Sans JP for Japanese, Noto Sans TC for Chinese
+  // Font: Zen Kaku Gothic New for JA, Noto Sans TC for ZH-TW
   const fontImports = [
-    "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap",
+    "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap",
     ...(lang === "ja"
-      ? ["https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500&display=swap"]
+      ? ["https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap"]
       : []),
     ...(lang === "zh-TW"
-      ? ["https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500&display=swap"]
+      ? ["https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap"]
       : []),
   ];
 
   const isCJK = lang === "ja" || lang === "zh-TW";
 
   const fontFamily = lang === "ja"
-    ? "'Noto Sans JP', 'Roboto', sans-serif"
+    ? "'Zen Kaku Gothic New', 'Roboto', sans-serif"
     : lang === "zh-TW"
       ? "'Noto Sans TC', 'Roboto', sans-serif"
       : "'Roboto', sans-serif";
@@ -393,14 +420,19 @@ ${isCJK ? `
   text-justify: inter-ideograph;
 }
 
-/* Headline: bold + prevent ugly mid-word breaks like 内|蔵 */
+/* Headline: prevent ugly mid-word breaks like 内|蔵 */
 .product-fullname-cloud,
 .product-fullname-standard {
-  font-weight: 700;
+  font-weight: 500;
   font-size: 22pt;
   line-height: 1.25;
   word-break: keep-all;
   overflow-wrap: break-word;
+}
+/* Bold parts within headline (via **text** markup) */
+.product-fullname-cloud strong,
+.product-fullname-standard strong {
+  font-weight: 700;
 }
 
 /* Subtitle: slightly smaller for CJK balance */
@@ -414,10 +446,10 @@ ${isCJK ? `
   top: 290pt;
 }
 
-/* Overview: smaller + tighter to match original InDesign layout */
+/* Overview */
 .overview-text {
-  font-size: 9pt;
-  line-height: 1.45;
+  font-size: 10pt;
+  line-height: 1.5;
   color: #58595B;
 }
 
@@ -490,14 +522,14 @@ ${isCJK ? `
             />
             <div className="product-subtitle-cloud">{product.subtitle}</div>
             <div className="product-fullname-cloud">
-              {headline}
+              {parseHeadlineMarkup(headline)}
             </div>
           </>
         ) : (
           <>
             <div className="product-subtitle-standard">{product.subtitle}</div>
             <div className="product-fullname-standard">
-              {headline}
+              {parseHeadlineMarkup(headline)}
             </div>
           </>
         )}

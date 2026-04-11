@@ -561,8 +561,9 @@ export function ProductTranslationEditor({
 
       {/* Product Headline */}
       <Card className="shadow-sm">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Product Headline</CardTitle>
+        <CardHeader className="space-y-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base">Product Headline</CardTitle>
           <Button
             size="sm"
             onClick={async () => {
@@ -613,6 +614,10 @@ export function ProductTranslationEditor({
               "AI Translate"
             )}
           </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground/60">
+            支援部分粗體：用 <code className="rounded bg-muted px-1 text-[10px]">**粗體文字**</code> 包住要加粗的部分。換行會反映在 Datasheet 上。
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
@@ -625,12 +630,12 @@ export function ProductTranslationEditor({
             <label className="text-xs font-medium text-muted-foreground">
               {currentLocaleInfo?.flag} {currentLocaleInfo?.label}
             </label>
-            <input
-              type="text"
+            <textarea
               value={headlineTrans}
               onChange={(e) => { setHeadlineTrans(e.target.value); setDirty(true); }}
               placeholder="Translated headline..."
-              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+              rows={2}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30 resize-none"
             />
           </div>
           {headlineNotes && <TranslationNotes notes={headlineNotes} onDismiss={() => setHeadlineNotes("")} />}
