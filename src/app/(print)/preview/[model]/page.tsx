@@ -488,9 +488,17 @@ ${isCJK ? `
   letter-spacing: 0.5pt;
 }
 
-/* Footer disclaimer */
+/* Footer */
 .footer-disclaimer {
+  font-size: 6pt;
+  font-weight: 400;
+  color: #555555;
   line-height: 1.5;
+}
+.footer-version {
+  font-size: 6pt;
+  font-weight: 400;
+  color: #555555;
 }
 ` : ""}
 `,
