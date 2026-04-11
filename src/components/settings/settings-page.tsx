@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -260,6 +261,23 @@ export function SettingsPage() {
               );
             })
           )}
+        </CardContent>
+      </Card>
+
+      {/* Glossary link */}
+      <Card className="shadow-sm">
+        <CardContent className="flex items-center justify-between py-5">
+          <div>
+            <h3 className="text-sm font-semibold">Translation Glossary</h3>
+            <p className="text-xs text-muted-foreground">
+              Manage company-approved translation terms. AI will follow these terms when translating.
+            </p>
+          </div>
+          <Link href="/settings/glossary">
+            <Button variant="outline" size="sm">
+              Manage Glossary
+            </Button>
+          </Link>
         </CardContent>
       </Card>
 

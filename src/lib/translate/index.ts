@@ -1,3 +1,4 @@
+import { createAdminClient } from "@/lib/supabase/admin";
 import { claudeSonnet, claudeOpus } from "./providers/claude";
 import { gpt4o } from "./providers/openai";
 import { gemini25Pro } from "./providers/gemini";
@@ -42,13 +43,51 @@ const productLinePrompts: Record<string, string> = {
   // "Cloud Switch": cloudSwitchPrompt,
 };
 
-// --- Assemble system prompt from 4 layers ---
+// --- Layer 5: Load glossary from DB ---
 
-function buildSystemPrompt(
+async function loadGlossaryPrompt(
+  targetLocale: string,
+  productLine: string | undefined
+): Promise<string> {
+  try {
+    const supabase = createAdminClient();
+
+    // Fetch global terms + product-line-specific terms
+    const scopes = ["global"];
+    if (productLine) scopes.push(productLine);
+
+    const { data } = await supabase
+      .from("translation_glossary" as "products")
+      .select("english_term, translated_term, scope")
+      .eq("locale", targetLocale)
+      .in("scope", scopes)
+      .order("english_term") as {
+      data: { english_term: string; translated_term: string; scope: string }[] | null;
+    };
+
+    if (!data || data.length === 0) return "";
+
+    const lines = data.map((g) => `- "${g.english_term}" → ${g.translated_term}`);
+
+    return `## Company Translation Glossary
+
+The following terms MUST be translated exactly as specified. These are company-approved translations:
+
+${lines.join("\n")}
+
+IMPORTANT: Always use the glossary terms above. Do not use alternative translations for these terms.`;
+  } catch {
+    return "";
+  }
+}
+
+// --- Assemble system prompt from 5 layers ---
+
+async function buildSystemPrompt(
   targetLocale: string,
   productLine: string | undefined,
   contentType: string
-): string {
+): Promise<string> {
   const parts = [basePrompt];
 
   // Layer 2: locale
@@ -64,6 +103,12 @@ function buildSystemPrompt(
   // Layer 4: content type
   if (contentTypePrompts[contentType]) {
     parts.push(contentTypePrompts[contentType]);
+  }
+
+  // Layer 5: glossary (from DB)
+  const glossaryPrompt = await loadGlossaryPrompt(targetLocale, productLine);
+  if (glossaryPrompt) {
+    parts.push(glossaryPrompt);
   }
 
   return parts.join("\n\n");
@@ -87,7 +132,7 @@ export async function translate(opts: {
   } = opts;
 
   const provider = getProvider(providerId);
-  const systemPrompt = buildSystemPrompt(targetLocale, productLine, contentType);
+  const systemPrompt = await buildSystemPrompt(targetLocale, productLine, contentType);
 
   const userMessage = `Translate the following to ${targetLocale}:\n\n${source}`;
 
