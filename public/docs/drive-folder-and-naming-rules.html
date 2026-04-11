@@ -292,6 +292,7 @@
     <li><a href="#s6">產品型號一覽</a></li>
     <li><a href="#s7">自動同步機制</a></li>
     <li><a href="#s8">快速檢查清單</a></li>
+    <li><a href="#s9">多國語言 Datasheet</a></li>
   </ol>
 </nav>
 
@@ -299,7 +300,7 @@
 <div class="main-content">
 
 <h1>Product SpecHub</h1>
-<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-08</p>
+<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-11</p>
 
 <!-- ========== 1 ========== -->
 <h2 id="s1"><span class="num">1</span>產品線總覽</h2>
@@ -691,6 +692,200 @@ Google Drive
   <li>確認 <strong>Status</strong> 欄位正確 (Active / Upcoming / Pending)</li>
   <li>執行一次 Sync 確認資料正確匯入</li>
 </ul>
+
+<!-- ========== 9 ========== -->
+<h2 id="s9"><span class="num">9</span>多國語言 Datasheet</h2>
+
+<p>系統支援為個別產品生成多國語言版本的 Datasheet。每個語言版本有獨立的翻譯內容、版本號、Drive 資料夾。</p>
+
+<h3>9.1 支援的語言</h3>
+<table>
+  <thead><tr><th>語言</th><th>Locale Code</th><th>Drive 資料夾後綴</th><th>PDF 檔名後綴</th></tr></thead>
+  <tbody>
+    <tr><td>🇺🇸 English</td><td><code>en</code></td><td>(無，預設)</td><td>(無)</td></tr>
+    <tr><td>🇯🇵 Japanese</td><td><code>ja</code></td><td><code>_ja</code></td><td><code>_ja</code></td></tr>
+    <tr><td>🇹🇼 Traditional Chinese</td><td><code>zh-TW</code></td><td><code>_zh</code></td><td><code>_zh</code></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>注意:</strong> 繁體中文在系統內使用 <code>zh-TW</code> 作為 locale code，但在 Drive 資料夾和 PDF 檔名中使用簡化的 <code>zh</code>。
+</div>
+
+<h3>9.2 Drive 資料夾結構</h3>
+<p>每個語言版本有獨立的子資料夾，命名規則為 <code>{DS_Prefix}_{Model}_{locale}/</code>：</p>
+
+<pre>
+<span class="folder">Cloud Camera/</span>
+├── <span class="folder">DS_Cloud_ECC100/</span>              <span class="comment">&larr; 🇺🇸 英文版</span>
+│   ├── <span class="file">DS_Cloud_ECC100_v1.0.pdf</span>
+│   └── <span class="file">DS_Cloud_ECC100_v1.1.pdf</span>
+│
+├── <span class="folder">DS_Cloud_ECC100_ja/</span>           <span class="comment">&larr; 🇯🇵 日文版（獨立資料夾）</span>
+│   ├── <span class="file">DS_Cloud_ECC100_v1.0_ja.pdf</span>
+│   └── <span class="file">DS_Cloud_ECC100_v1.1_ja.pdf</span>
+│
+├── <span class="folder">DS_Cloud_ECC100_zh/</span>           <span class="comment">&larr; 🇹🇼 繁中版（獨立資料夾）</span>
+│   └── <span class="file">DS_Cloud_ECC100_v1.0_zh.pdf</span>
+│
+├── <span class="folder">DS_Cloud_ECC500/</span>
+└── ...
+</pre>
+
+<h3>9.3 PDF 檔案命名</h3>
+<pre><span class="highlight">{DS_Prefix}_{Model}_v{Major}.{Minor}_{locale}.pdf</span></pre>
+
+<p><strong>範例:</strong></p>
+<table>
+  <thead><tr><th>語言</th><th>檔名</th></tr></thead>
+  <tbody>
+    <tr><td>🇺🇸 English</td><td><code>DS_Cloud_ECC100_v1.1.pdf</code></td></tr>
+    <tr><td>🇯🇵 Japanese</td><td><code>DS_Cloud_ECC100_v1.1_ja.pdf</code></td></tr>
+    <tr><td>🇹🇼 Traditional Chinese</td><td><code>DS_Cloud_ECC100_v1.0_zh.pdf</code></td></tr>
+  </tbody>
+</table>
+
+<h3>9.4 版本獨立管理</h3>
+<p>每個語言的版本號<strong>各自獨立</strong>，互不影響：</p>
+
+<table>
+  <thead><tr><th>型號</th><th>🇺🇸 EN</th><th>🇯🇵 JA</th><th>🇹🇼 ZH</th></tr></thead>
+  <tbody>
+    <tr><td>ECC100</td><td>v1.1</td><td>v1.0</td><td>—</td></tr>
+    <tr><td>ECC500</td><td>v1.0</td><td>—</td><td>v1.0</td></tr>
+  </tbody>
+</table>
+
+<ul style="font-size:15px; padding-left:20px; margin: 10px 0 16px;">
+  <li><strong>Regenerate</strong> — 覆蓋該語言的當前版本 PDF</li>
+  <li><strong>New Version</strong> — 該語言的 minor 版本 +1（例 v1.0 → v1.1）</li>
+  <li>版本偵測：系統自動掃描語言資料夾中的 PDF 檔名，取最新版本</li>
+</ul>
+
+<h3>9.5 翻譯範圍</h3>
+<p>翻譯分為兩種模式：</p>
+
+<table>
+  <thead><tr><th>模式</th><th>翻譯內容</th><th>不翻譯</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><span class="badge badge-blue">Light</span></td>
+      <td>
+        <ul style="margin:0; padding-left:18px; font-size:14px;">
+          <li>頁面標題 (概要、特長・メリット、技術仕様 等)</li>
+          <li>Product Headline (產品大標題)</li>
+          <li>Overview 內文</li>
+          <li>Features & Benefits 條列</li>
+          <li>QR Code 標籤 & 連結</li>
+          <li>Footer 免責聲明</li>
+        </ul>
+      </td>
+      <td>規格表的 Section Header 和 Spec Label</td>
+    </tr>
+    <tr>
+      <td><span class="badge badge-amber">Full</span></td>
+      <td>
+        <ul style="margin:0; padding-left:18px; font-size:14px;">
+          <li>所有 Light 模式的內容</li>
+          <li>規格表 Section Header (如 General → 一般仕様)</li>
+          <li>規格表 Spec Label (如 Operating Temperature → 動作温度)</li>
+        </ul>
+      </td>
+      <td>Spec Value（數值永遠維持英文）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>9.6 Hardware 圖片</h3>
+<p>Hardware Overview 頁面的圖片可以依語言不同而使用不同版本（如標註文字為日文）。</p>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li>在翻譯頁面上傳語言專屬的 Hardware Image</li>
+  <li>有上傳 → 使用該語言版本的圖片</li>
+  <li>未上傳 → fallback 使用英文版的 Hardware Image</li>
+</ul>
+
+<h3>9.7 翻譯工作流程</h3>
+<ol style="font-size:15px; padding-left:20px; margin-bottom:16px; line-height:2;">
+  <li>進入產品的 <strong>Translations</strong> tab</li>
+  <li>點 <strong>+ Enable Language</strong> 啟用語言（如 Japanese）→ 狀態為 <span class="badge badge-amber">Draft</span></li>
+  <li>翻譯 Product Headline、Overview、Features（手動輸入或 AI 翻譯）</li>
+  <li>(選) 上傳語言專屬的 Hardware Image</li>
+  <li>(選) 設定 QR Code 標籤和連結</li>
+  <li>點 <strong>Preview</strong> 確認排版效果</li>
+  <li>點 <strong>Save & Confirm</strong> → 狀態變為 <span class="badge badge-green">Confirmed</span></li>
+  <li>從 🌐 按鈕 <strong>Generate PDF</strong></li>
+</ol>
+
+<div class="callout callout-warn">
+  <strong>重要:</strong> 必須 <strong>Save & Confirm</strong> 之後才能 Generate PDF。Preview 可以隨時使用但不算正式確認。
+</div>
+
+<h3>9.8 Spec Label 翻譯（Full 模式）</h3>
+<p>Spec Label 翻譯是 <strong>per-product-line（產品線層級）</strong>，同一產品線的所有型號共用同一套翻譯。</p>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li>入口：Dashboard toolbar → <strong>Translations</strong> 連結</li>
+  <li>每個產品線獨立一個管理頁面</li>
+  <li>包含 Section Header 翻譯 + Spec Label 翻譯</li>
+  <li>修改會影響該產品線所有型號的 Full 模式 Datasheet</li>
+</ul>
+
+<h3>9.9 AI 翻譯 & 詞庫</h3>
+<p>系統內建 AI 翻譯功能，支援多家 AI 模型：</p>
+
+<table>
+  <thead><tr><th>Provider</th><th>模型</th><th>需要 API Key</th></tr></thead>
+  <tbody>
+    <tr><td>Anthropic</td><td>Claude Sonnet 4.6 / Opus 4.6</td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+    <tr><td>OpenAI</td><td>GPT-4o</td><td><code>OPENAI_API_KEY</code></td></tr>
+    <tr><td>Google AI</td><td>Gemini 2.5 Pro</td><td><code>GOOGLE_AI_API_KEY</code></td></tr>
+  </tbody>
+</table>
+
+<p>API Key 可以在 <strong>Settings</strong> 頁面設定（存到 DB），或透過 Vercel 環境變數設定。Settings 優先於 env var。</p>
+
+<p><strong>AI 翻譯特點:</strong></p>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li>翻譯同時<strong>改善原文品質</strong>（修正不通順的句子結構、統一術語）</li>
+  <li>5 層 Prompt 系統：基礎翻譯規則 → 語言規則 → 產品線術語 → 內容類型規則 → 公司詞庫</li>
+  <li>翻譯完成後顯示<strong>翻譯筆記</strong>（用繁體中文說明做了哪些優化）</li>
+  <li>AI Model 下拉只顯示已設定 API Key 的模型，未設定的會反灰</li>
+</ul>
+
+<p><strong>翻譯詞庫 (Glossary):</strong></p>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li>在 <strong>Settings → Manage Glossary</strong> 管理公司認可的翻譯術語</li>
+  <li>詞庫分 <strong>Global</strong>（全公司通用）和<strong>產品線專屬</strong>（如只套用於 Cloud Camera）</li>
+  <li>AI 翻譯時自動載入詞庫，確保術語一致性</li>
+  <li>範例：<code>Night Vision</code> → <code>ナイトビジョン</code> (JA) / <code>夜視</code> (ZH)</li>
+</ul>
+
+<h3>9.10 CJK 排版</h3>
+<p>日文 / 中文版 Datasheet 自動套用以下排版規則：</p>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li><strong>禁則處理 (line-break: strict)</strong> — 句號、逗號不出現在行首</li>
+  <li><strong>兩端對齊 (text-align: justify)</strong> — 右邊不參差不齊</li>
+  <li><strong>CJK 字型</strong> — 日文使用 Noto Sans JP，繁中使用 Noto Sans TC</li>
+  <li>行高和字級針對 CJK 文字微調，確保可讀性</li>
+</ul>
+
+<h3>9.11 各語言預設值</h3>
+<table>
+  <thead><tr><th>項目</th><th>🇺🇸 English</th><th>🇯🇵 Japanese</th><th>🇹🇼 Traditional Chinese</th></tr></thead>
+  <tbody>
+    <tr><td>Header 標題</td><td>Datasheet |</td><td>データシート |</td><td>規格表 |</td></tr>
+    <tr><td>Overview 標題</td><td>Overview</td><td>概要</td><td>產品概述</td></tr>
+    <tr><td>Features 標題</td><td>Features & Benefits</td><td>特長・メリット</td><td>產品特點與優勢</td></tr>
+    <tr><td>Spec 標題</td><td>Technical Specifications</td><td>技術仕様</td><td>技術規格</td></tr>
+    <tr><td>Hardware 標題</td><td>Hardware Overview</td><td>ハードウェア概要</td><td>硬體概觀</td></tr>
+    <tr><td>QR 標籤</td><td>Quick Start Guide</td><td>Contact Us</td><td>Contact Us</td></tr>
+    <tr><td>QR 連結</td><td>qr.engenius.ai/qsg/{model}</td><td>engenius.co.jp/contact</td><td>engenius.com.tw/contact</td></tr>
+    <tr><td>Bullet 符號</td><td>●</td><td>●</td><td>●</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>自訂 QR:</strong> QR 標籤和連結可以在每個產品的翻譯頁面中個別覆寫。留空則使用上表中的語言預設值。
+</div>
 
 </div><!-- /main-content -->
 </div><!-- /page-layout -->
