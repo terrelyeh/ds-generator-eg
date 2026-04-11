@@ -110,6 +110,7 @@ export function ProductTranslationEditor({
   );
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [translatingHeadline, setTranslatingHeadline] = useState(false);
   const [translatingOverview, setTranslatingOverview] = useState(false);
   const [translatingFeatures, setTranslatingFeatures] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -558,8 +559,57 @@ export function ProductTranslationEditor({
 
       {/* Product Headline */}
       <Card className="shadow-sm">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Product Headline</CardTitle>
+          <Button
+            size="sm"
+            onClick={async () => {
+              if (!englishHeadline) return;
+              setTranslatingHeadline(true);
+              try {
+                const res = await fetch("/api/translate", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    source: englishHeadline,
+                    target_locale: activeLocale,
+                    content_type: "overview",
+                    product_line: productLineName,
+                    provider: selectedProvider,
+                  }),
+                });
+                const data = await res.json();
+                if (data.ok) {
+                  setHeadlineTrans(data.translated);
+                  setDirty(true);
+                  toast.success(`Headline translated by ${data.provider}`);
+                } else {
+                  toast.error(`Translation failed: ${data.error}`);
+                }
+              } catch (err) {
+                toast.error(`Translation failed: ${err instanceof Error ? err.message : String(err)}`);
+              } finally {
+                setTranslatingHeadline(false);
+              }
+            }}
+            disabled={translatingHeadline || !englishHeadline || !hasAnyProvider}
+            className={`text-xs transition-all ${
+              translatingHeadline
+                ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse"
+                : ""
+            }`}
+          >
+            {translatingHeadline ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M8 1a7 7 0 1 0 7 7" />
+                </svg>
+                正在翻譯中...
+              </span>
+            ) : (
+              "AI Translate"
+            )}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
