@@ -241,7 +241,14 @@ export function KnowledgeBase() {
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Coming Soon</span>
                           ) : null}
                         </CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">{config.description}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {config.description}
+                          {typeStat?.last_updated && (
+                            <span className="ml-2 text-muted-foreground/40">
+                              Last indexed: {formatDate(typeStat.last_updated)}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
 
