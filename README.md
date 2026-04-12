@@ -40,17 +40,24 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - 選擇性啟用：每個型號獨立決定需不需要多語言版本
 - **兩種翻譯模式**：Light（標題+內容）/ Full（+規格表 label）
 - **AI 翻譯**：支援 Claude、GPT-4o、Gemini，翻譯同時改善原文品質
-- **翻譯筆記**：AI 翻譯後顯示做了哪些優化的說明
+- **翻譯筆記**：AI 翻譯後顯示做了哪些優化的中文說明
 - **翻譯詞庫**（Glossary）：公司級術語字典，AI 自動遵循
 - **Draft / Confirmed 流程**：Preview 可隨時預覽，Save & Confirm 後才能生成 PDF
 - 每個語言版本號獨立管理，Drive 獨立資料夾
-- CJK 排版優化：禁則處理、兩端對齊、專用字型
+- CJK 排版優化：禁則處理、兩端對齊、per-locale 專用字型
 - 語言專屬 Hardware Image 支援（不同語言的標註圖）
+- Headline 支援 `**粗體**` 標記，可手動斷行
+- Subtitle 可按語言覆寫
 - QR Code 標籤和連結可按語言自訂
 
 ### Settings
-- **API Key 管理** — 在前端直接設定 AI 翻譯 API Key（Anthropic / OpenAI / Google AI）
-- **翻譯詞庫**（Glossary）— 管理公司認可的翻譯術語，分 Global 和產品線專屬
+- **Settings 導航頁** — 三個獨立管理區塊，各自獨立頁面
+- **API Key 管理**（`/settings/api-keys`）— 設定 AI 翻譯 API Key，存到 DB，優先於 Vercel env var
+- **翻譯詞庫**（`/settings/glossary`）— 公司認可翻譯術語，分 Global 和產品線專屬
+- **Typography**（`/settings/typography`）— 每個語言獨立的字型、字級、字重設定
+  - Google Font 選擇器（預設 + 自定義 URL 添加）
+  - Split layout：左設定、右即時 Datasheet Preview（可縮放）
+  - 分組欄位：Headline / Overview / Features / Specifications / Footer
 
 ### Automated Sync
 - 每日 09:00（台灣時間）自動同步 Google Sheets → Supabase

@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-04-11
+> Last updated: 2026-04-12
 
 ## Project Overview
 
@@ -45,8 +45,10 @@ src/
       changelog/[line]/page.tsx
       product/[model]/page.tsx         # Product detail (sticky header, tabs: Detail/Translations)
       translations/[line]/page.tsx     # Per-product-line spec label translations
-      settings/page.tsx                # API key management
+      settings/page.tsx                # Settings navigation hub (3 cards)
+      settings/api-keys/page.tsx       # API key management
       settings/glossary/page.tsx       # Translation glossary management
+      settings/typography/page.tsx     # Font + size/weight per locale (split layout with live preview)
     (print)/
       preview/[model]/page.tsx         # Datasheet HTML preview (?lang=ja&mode=full)
     api/
@@ -59,6 +61,8 @@ src/
       detect-locale-version/route.ts   # Detect locale PDF version from Drive
       settings/route.ts                # API key CRUD
       settings/providers/route.ts      # Which AI providers have keys configured
+      settings/typography/route.ts     # Typography settings per locale (GET/POST/DELETE)
+      settings/fonts/route.ts          # Custom Google Font management per locale
       glossary/route.ts                # Translation glossary CRUD
   components/
     layout/navbar.tsx, solution-sidebar.tsx
@@ -69,8 +73,10 @@ src/
       product-translation-editor.tsx    # Enable/disable lang, headline/overview/features/HW image/QR
       spec-label-editor.tsx             # Per-product-line spec label + section header translations
     settings/
-      settings-page.tsx                 # API key cards
+      settings-page.tsx                 # Navigation hub (3 cards → api-keys/glossary/typography)
+      api-keys-editor.tsx               # API key cards with masked values
       glossary-editor.tsx               # Glossary CRUD with scope/search
+      typography-editor.tsx             # Split layout: left settings + right live preview iframe
     compare/compare-table.tsx
   lib/
     google/drive-versions.ts           # detectLatestVersion() + detectLocaleVersion() + getLocaleSuffix()
@@ -85,8 +91,9 @@ src/
         product-lines/cloud-camera.ts  # Layer 3: product line terminology
         content-types.ts               # Layer 4: overview/features/spec_labels rules
                                        # Layer 5: glossary (loaded from DB at runtime)
-    datasheet/locales/                 # Locale dictionaries for fixed UI strings
-      en.ts, ja.ts, zh-TW.ts, types.ts, index.ts
+    datasheet/
+      locales/en.ts, ja.ts, zh-TW.ts   # Locale dictionaries for fixed UI strings
+      typography.ts                     # TypographySettings type, defaults per locale, FONT_OPTIONS, TYPOGRAPHY_GROUPS
     settings.ts                        # getApiKey(): DB first, env var fallback
   types/database.ts
 ```
@@ -151,14 +158,15 @@ Product Page 手動上傳 ──→ Supabase Storage + Google Drive DS Images/
 完整規則詳見 [`/docs/drive-folder-and-naming-rules.html#s9`](public/docs/drive-folder-and-naming-rules.html)。
 
 **架構要點**：
-- 翻譯分兩層：per-product（`product_translations`：headline/overview/features/HW image/QR）+ per-product-line（`spec_label_translations`：spec labels 共用）
+- 翻譯分兩層：per-product（`product_translations`：headline/subtitle/overview/features/HW image/QR）+ per-product-line（`spec_label_translations`：spec labels 共用）
 - 兩種模式：**Light**（只翻標題+內容）vs **Full**（+規格表 label）
 - **Draft / Confirmed 流程**：Enable → 翻譯 → Preview（auto-save but stays Draft）→ Save & Confirm → Generate PDF
 - 版本獨立：`products.current_versions` JSONB 存各語言版本（`{"en":"1.1","ja":"1.0"}`）
-- `versions` 表有 `locale` 欄位，Version History 按語言分組
 - Drive 資料夾：`DS_Cloud_ECC100_ja/`、`DS_Cloud_ECC100_zh/`（zh-TW → zh 映射在 `getLocaleSuffix()`）
-- CJK 排版：`line-break: strict` + `text-align: justify` + Noto Sans JP/TC 字型
-- Preview URL：`/preview/[model]?lang=ja&mode=full`
+- Headline 支援 `**粗體**` markdown → 渲染為 `<strong>`（`parseHeadlineMarkup()` in preview）
+- CJK 排版：shared base（禁則處理+justify）+ per-locale CSS 動態從 DB 讀取（`typography_${lang}` in `app_settings`）
+- **Typography Settings**（`/settings/typography`）：字型選擇（Google Fonts）+ 字級/字重/顏色 per-locale，split layout 左設定右 preview
+- 自定義 Google Font：貼 URL 自動解析（`parseGoogleFontUrl()`），存 `app_settings` as `custom_fonts_${locale}`
 
 **AI 翻譯系統**：
 - 5 層 Prompt：base → locale → product-line → content-type → glossary（from DB）
@@ -194,10 +202,10 @@ Key tables:
 - `versions` — version, **locale**, pdf_storage_path, changes, generated_at
 - `change_logs` — per-product content diff history
 - `image_assets` — radio_pattern 多張圖
-- `product_translations` — per-product per-locale: headline, overview, features, hardware_image, qr_label, qr_url, translation_mode, **confirmed**
+- `product_translations` — per-product per-locale: headline, **subtitle**, overview, features, hardware_image, qr_label, qr_url, translation_mode, **confirmed**
 - `spec_label_translations` — per-product-line per-locale: original_label → translated_label, label_type (spec/section)
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
-- `app_settings` — key-value store for API keys etc.
+- `app_settings` — key-value store: API keys, `typography_${locale}` (JSON), `custom_fonts_${locale}` (JSON)
 
 ## Conventions
 
@@ -254,3 +262,5 @@ npm run lint   # ESLint check
 9. **Supabase 不認得新建的 table** — `product_translations` 等新表的 query 會被 TypeScript 推斷為 `never`。解法：`supabase.from("product_translations" as "products")` + 手動 `as { data: T | null }` 型別斷言
 10. **AI 翻譯 JSON 解析** — prompt 要求回 JSON `{ translated, notes }`，但有些 model 會加 markdown code fence。`index.ts` 有 fallback：strip ``` 後 parse，失敗就當 plain text
 11. **zh-TW locale 在 Drive 用 zh** — `getLocaleSuffix("zh-TW")` 回傳 `"zh"`，資料夾命名和 PDF 檔名用 `_zh` 不用 `_zh-TW`
+12. **Gemini API 需要 `responseMimeType: "application/json"`** — 不加的話 Gemini 2.5 Pro 回傳格式不穩定，有時帶 markdown code fence。加了之後穩定回 JSON。Model 名稱用 `gemini-2.5-pro-latest`
+13. **Preview CSS 動態化** — per-locale 的字級/字重/顏色不再 hardcode 在 CSS，而是從 `app_settings` 讀 `typography_${lang}` JSON，fallback 到 `TYPOGRAPHY_DEFAULTS[lang]`
