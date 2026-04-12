@@ -41,10 +41,10 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
 ];
 
 const SUMMARY_CARDS = [
-  { key: "types", label: "Source Types", icon: "📁", tip: "Number of active content source categories" },
-  { key: "sources", label: "Sources", icon: "📄", tip: "Total number of individual documents indexed" },
-  { key: "chunks", label: "Chunks", icon: "🧩", tip: "Each source is split into chunks for precise search" },
-  { key: "tokens", label: "Tokens", icon: "🔤", tip: "Total text volume — more tokens = richer search results" },
+  { key: "types", label: "Source Types", sub: "已啟用的內容來源類別" },
+  { key: "sources", label: "Sources", sub: "已索引的產品 / 文件數量" },
+  { key: "chunks", label: "Chunks", sub: "切割後的搜尋片段" },
+  { key: "tokens", label: "Tokens", sub: "文字總量" },
 ];
 
 function formatDate(dateStr: string | null) {
@@ -178,13 +178,10 @@ export function KnowledgeBase() {
       <div className="grid grid-cols-4 gap-4">
         {SUMMARY_CARDS.map((card) => (
           <Card key={card.key} className="shadow-sm">
-            <CardContent className="pt-5 pb-4 px-5">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-lg">{card.icon}</span>
-                <span className="text-xs text-muted-foreground/50" title={card.tip}>?</span>
-              </div>
-              <div className="text-2xl font-bold tabular-nums">{summaryValues[card.key]}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{card.label}</div>
+            <CardContent className="pt-4 pb-4 px-5">
+              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{card.label}</div>
+              <div className="text-3xl font-bold tabular-nums mt-1">{summaryValues[card.key]}</div>
+              <div className="text-xs text-muted-foreground/60 mt-1">{card.sub}</div>
             </CardContent>
           </Card>
         ))}
