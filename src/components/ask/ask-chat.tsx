@@ -22,10 +22,6 @@ interface Message {
   provider?: string;
 }
 
-interface IndexStats {
-  product_spec?: { count: number; sources: number; last_updated: string | null };
-}
-
 interface PersonaOption {
   id: string;
   name: string;
@@ -58,26 +54,10 @@ export function AskChat() {
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
-  const [stats, setStats] = useState<IndexStats | null>(null);
-  const [indexedSources, setIndexedSources] = useState<{ source_id: string; title: string; chunks: number; total_tokens: number; last_updated: string }[]>([]);
-  const [indexing, setIndexing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  function refreshStats() {
-    fetch("/api/documents?source_type=product_spec")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.ok) {
-          setStats(d.stats);
-          setIndexedSources(d.sources ?? []);
-        }
-      })
-      .catch(() => {});
-  }
-
-  // Load index stats, personas, and available providers
+  // Load personas and available providers
   useEffect(() => {
-    refreshStats();
     fetch("/api/ask")
       .then((r) => r.json())
       .then((d) => { if (d.ok) setPersonas(d.personas); })
@@ -91,7 +71,7 @@ export function AskChat() {
   // Auto-scroll to bottom
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages]);
+  }, [messages, loading]);
 
   async function handleSubmit(question?: string) {
     const q = (question ?? input).trim();
@@ -143,42 +123,6 @@ export function AskChat() {
     }
   }
 
-  async function handleIndex() {
-    setIndexing(true);
-    try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "ingest", source_type: "product_spec" }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        const errorDetail = data.errors?.length
-          ? `\n\nErrors (${data.errors.length}):\n${data.errors.slice(0, 5).join("\n")}${data.errors.length > 5 ? `\n...and ${data.errors.length - 5} more` : ""}`
-          : "";
-        const msg = `Indexed ${data.processed} chunks (${data.skipped} unchanged).${errorDetail}`;
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: msg },
-        ]);
-        // Refresh stats
-        refreshStats();
-      } else {
-        setMessages((prev) => [
-          ...prev,
-          { role: "assistant", content: `Index failed: ${data.error}` },
-        ]);
-      }
-    } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: `Index failed: ${err instanceof Error ? err.message : String(err)}` },
-      ]);
-    } finally {
-      setIndexing(false);
-    }
-  }
-
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -186,114 +130,77 @@ export function AskChat() {
     }
   }
 
+  function handleClear() {
+    setMessages([]);
+  }
+
   const isEmpty = messages.length === 0;
-  const specStats = stats?.product_spec;
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Ask SpecHub</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Ask questions about EnGenius products and specifications. Powered by AI + vector search.
-        </p>
-      </div>
-
-      {/* Index status bar */}
-      <div className="rounded-lg border bg-muted/30">
-        <div className="flex items-center justify-between px-4 py-2.5">
-          <div className="flex items-center gap-3 text-sm">
-            {specStats ? (
-              <>
-                <span className="inline-flex items-center gap-1.5">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span className="font-medium">{specStats.sources} products</span>
-                  <span className="text-muted-foreground">indexed ({specStats.count} chunks: overview + specs)</span>
-                </span>
-                {specStats.last_updated && (
-                  <span className="text-xs text-muted-foreground">
-                    Last: {new Date(specStats.last_updated).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
-                  </span>
-                )}
-              </>
-            ) : (
-              <span className="text-muted-foreground">No products indexed yet</span>
-            )}
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleIndex}
-            disabled={indexing}
-            className="text-xs"
-          >
-            {indexing ? "Indexing..." : specStats ? "Re-index" : "Index Products"}
-          </Button>
+    <div className="flex flex-col" style={{ height: "calc(100vh - 120px)" }}>
+      {/* Compact header */}
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <h1 className="text-xl font-bold tracking-tight">Ask SpecHub</h1>
+          <p className="text-xs text-muted-foreground">
+            AI-powered product query — ask in English or Chinese
+          </p>
         </div>
-        {/* Expandable indexed products list */}
-        {indexedSources.length > 0 && (
-          <details className="border-t">
-            <summary className="cursor-pointer px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
-              View indexed products ({indexedSources.length})
-            </summary>
-            <div className="px-4 pb-3 max-h-48 overflow-y-auto">
-              <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 text-xs">
-                {indexedSources.map((s) => (
-                  <span key={s.source_id} className="text-muted-foreground truncate" title={s.title}>
-                    {s.source_id}
-                  </span>
-                ))}
-              </div>
-              <p className="mt-2 text-[11px] text-muted-foreground/50">
-                Each product has 2 chunks: Overview (name, subtitle, overview text, features) + Specifications (full spec table)
-              </p>
-            </div>
-          </details>
-        )}
-      </div>
-
-      {/* Persona selector */}
-      {personas.length > 0 && (
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Persona:</span>
-          <div className="flex gap-1 rounded-lg bg-muted p-1">
-            {personas.map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setPersona(p.id)}
-                title={p.description}
-                className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
-                  persona === p.id
-                    ? "bg-engenius-blue text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background"
-                }`}
-              >
-                {p.icon && <span className="mr-1">{p.icon}</span>}
-                {p.name}
-              </button>
-            ))}
-          </div>
+          {/* Persona selector */}
+          {personas.length > 0 && (
+            <div className="flex gap-1 rounded-lg bg-muted p-0.5">
+              {personas.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setPersona(p.id)}
+                  title={p.description}
+                  className={`cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap transition-all ${
+                    persona === p.id
+                      ? "bg-engenius-blue text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background"
+                  }`}
+                >
+                  {p.icon && <span className="mr-0.5">{p.icon}</span>}
+                  {p.name}
+                </button>
+              ))}
+            </div>
+          )}
+          {messages.length > 0 && (
+            <button
+              onClick={handleClear}
+              className="rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Clear conversation"
+            >
+              Clear
+            </button>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Chat area */}
-      <Card className="flex flex-col shadow-sm" style={{ height: "calc(100vh - 390px)", minHeight: 400 }}>
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-6">
+      {/* Chat area — takes all remaining space */}
+      <Card className="flex flex-col flex-1 shadow-sm overflow-hidden">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="text-4xl mb-4">🔍</div>
-              <h2 className="text-lg font-semibold mb-2">Ask anything about EnGenius products</h2>
-              <p className="text-sm text-muted-foreground mb-6 max-w-md">
-                I can compare specs, find models with specific features, or explain technical details.
+              <div className="text-5xl mb-5 opacity-80">
+                <svg className="h-12 w-12 mx-auto text-engenius-blue/40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              </div>
+              <h2 className="text-lg font-semibold mb-1.5">Ask anything about EnGenius products</h2>
+              <p className="text-sm text-muted-foreground mb-8 max-w-md">
+                Compare specs, find models with specific features, or get technical details.
               </p>
 
               {/* Example questions */}
-              <div className="grid grid-cols-2 gap-2 max-w-lg">
+              <div className="grid grid-cols-2 gap-2 max-w-lg w-full">
                 {EXAMPLE_QUESTIONS.map((q) => (
                   <button
                     key={q}
                     onClick={() => handleSubmit(q)}
-                    className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground hover:border-engenius-blue/40 hover:text-foreground transition-colors"
+                    className="rounded-lg border px-3 py-2.5 text-left text-xs text-muted-foreground hover:border-engenius-blue/40 hover:text-foreground hover:bg-muted/30 transition-all"
                   >
                     {q}
                   </button>
@@ -349,11 +256,17 @@ export function AskChat() {
             ))
           )}
 
+          {/* Loading animation */}
           {loading && (
             <div className="flex justify-start">
               <div className="bg-muted rounded-xl px-4 py-3">
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span className="animate-pulse">Thinking...</span>
+                <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className="flex gap-1">
+                    <span className="h-2 w-2 rounded-full bg-engenius-blue/60 animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="h-2 w-2 rounded-full bg-engenius-blue/60 animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="h-2 w-2 rounded-full bg-engenius-blue/60 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
+                  <span className="text-xs">Searching specs & generating answer...</span>
                 </div>
               </div>
             </div>
@@ -361,7 +274,7 @@ export function AskChat() {
         </div>
 
         {/* Input area */}
-        <div className="border-t p-4 space-y-2.5">
+        <div className="border-t px-4 py-3 space-y-2">
           {/* Provider selector */}
           <div className="flex items-center gap-2">
             <span className="text-[11px] text-muted-foreground/60">AI:</span>
