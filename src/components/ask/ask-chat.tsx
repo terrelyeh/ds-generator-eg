@@ -87,10 +87,12 @@ const PROVIDERS: ProviderGroup[] = [
 const EXAMPLE_QUESTIONS = [
   "哪些 AP 支援 WiFi 7？",
   "ECC100 和 ECC500 差在哪裡？",
-  "Which switches support PoE++?",
+  "哪些 Switch 支援 PoE++？",
   "推薦一台適合戶外的攝影機",
   "ESG510 的 VPN throughput 是多少？",
-  "List all cameras with built-in storage",
+  "有內建儲存空間的攝影機有哪些？",
+  "Cloud AP 和 Fit AP 有什麼差別？",
+  "ECS5512FP 最多可以供電幾台 AP？",
 ];
 
 export function AskChat() {
@@ -210,12 +212,16 @@ export function AskChat() {
   async function handleLoadSession(id: string) {
     try {
       const res = await fetch(`/api/chat-sessions?id=${id}`);
-      const data = await res.json();
+      if (!res.ok) return;
+      const rawText = await res.text();
+      let data;
+      try { data = JSON.parse(rawText); } catch { return; }
       if (data.ok && data.session) {
-        setMessages(data.session.messages ?? []);
+        const msgs = Array.isArray(data.session.messages) ? data.session.messages : [];
+        setMessages(msgs);
         setSessionId(id);
         setPersona(data.session.persona || "default");
-        setProvider(data.session.provider || "gemini-flash");
+        setProvider(data.session.provider || "gemini-2.5-flash");
         setShowSidebar(false);
       }
     } catch { /* ignore */ }
@@ -302,43 +308,45 @@ export function AskChat() {
 
       {/* ===== Main area ===== */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Header row */}
-        <div className="flex items-center gap-3 mb-3 flex-shrink-0">
-          <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0" title="Conversation history">
-            <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
-          </button>
-          <div className="flex-shrink-0">
-            <h1 className="text-lg font-bold tracking-tight leading-tight">Ask SpecHub</h1>
-            <p className="text-xs text-muted-foreground">AI-powered product query</p>
+        {/* Header */}
+        <div className="mb-3 flex-shrink-0 space-y-2">
+          {/* Title row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Conversation history">
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+              </button>
+              <h1 className="text-lg font-bold tracking-tight">Ask SpecHub</h1>
+            </div>
+            {messages.length > 0 && (
+              <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
+                + New
+              </button>
+            )}
           </div>
 
-          {/* Persona pills */}
-          <div className="flex-1 min-w-0">
-            {personas.length > 0 && (
-              <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-0.5 w-fit">
+          {/* Persona selector row */}
+          {personas.length > 0 && (
+            <div className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground">回答角度：</span>
+              <div className="flex gap-1.5">
                 {personas.map((p) => (
                   <button
                     key={p.id}
                     onClick={() => setPersona(p.id)}
                     title={p.description}
-                    className={`cursor-pointer rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-all ${
+                    className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
                       persona === p.id
                         ? "bg-engenius-blue text-white shadow-sm"
-                        : "text-muted-foreground hover:text-foreground hover:bg-background"
+                        : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                     }`}
                   >
-                    {p.icon && <span className="mr-0.5">{p.icon}</span>}
+                    {p.icon && <span className="mr-1">{p.icon}</span>}
                     {p.name}
                   </button>
                 ))}
               </div>
-            )}
-          </div>
-
-          {messages.length > 0 && (
-            <button onClick={handleNewChat} className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 whitespace-nowrap" title="New conversation">
-              + New
-            </button>
+            </div>
           )}
         </div>
 
@@ -354,7 +362,7 @@ export function AskChat() {
                 <p className="text-sm text-muted-foreground mb-6 max-w-sm">
                   Compare specs, find models, or get technical details.
                 </p>
-                <div className="grid grid-cols-2 gap-2 max-w-md w-full">
+                <div className="grid grid-cols-2 gap-2 max-w-xl w-full">
                   {EXAMPLE_QUESTIONS.map((q) => (
                     <button key={q} onClick={() => handleSubmit(q)}
                       className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground hover:border-engenius-blue/40 hover:text-foreground hover:bg-muted/30 transition-all">
