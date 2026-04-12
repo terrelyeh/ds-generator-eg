@@ -135,6 +135,36 @@
   }
 }
 
+/* Ask SpecHub markdown rendering */
+.ask-markdown p { margin: 6px 0; }
+.ask-markdown p:first-child { margin-top: 0; }
+.ask-markdown p:last-child { margin-bottom: 0; }
+.ask-markdown strong { font-weight: 600; }
+.ask-markdown ul, .ask-markdown ol { margin: 6px 0; padding-left: 20px; }
+.ask-markdown li { margin: 2px 0; }
+.ask-markdown h1, .ask-markdown h2, .ask-markdown h3, .ask-markdown h4 {
+  font-weight: 600; margin: 12px 0 6px;
+}
+.ask-markdown h1 { font-size: 16px; }
+.ask-markdown h2 { font-size: 15px; }
+.ask-markdown h3 { font-size: 14px; }
+.ask-markdown code {
+  background: rgba(0,0,0,0.06); padding: 1px 4px; border-radius: 3px; font-size: 12px;
+}
+.ask-markdown pre { background: #1e293b; color: #e2e8f0; padding: 12px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+.ask-markdown pre code { background: none; padding: 0; color: inherit; }
+.ask-markdown table { width: 100%; border-collapse: collapse; margin: 8px 0; font-size: 13px; }
+.ask-markdown th {
+  background: rgba(0,0,0,0.04); text-align: left; padding: 6px 10px;
+  font-weight: 600; border: 1px solid rgba(0,0,0,0.1);
+}
+.ask-markdown td { padding: 5px 10px; border: 1px solid rgba(0,0,0,0.1); }
+.ask-markdown tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+.ask-markdown blockquote {
+  border-left: 3px solid rgba(0,0,0,0.15); padding-left: 12px; margin: 8px 0; color: #666;
+}
+.ask-markdown hr { border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 12px 0; }
+
 /* Prevent Tailwind h-full / min-h-full from creating extra print pages */
 @media print {
   html { height: auto !important; min-height: 0 !important; }

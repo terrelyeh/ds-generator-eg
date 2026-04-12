@@ -309,7 +309,7 @@ export function AskChat() {
                   }`}
                 >
                   {msg.role === "assistant" ? (
-                    <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-table:my-2 prose-th:px-3 prose-th:py-1.5 prose-th:bg-foreground/5 prose-td:px-3 prose-td:py-1.5 prose-td:border prose-th:border prose-th:text-left prose-strong:font-semibold">
+                    <div className="ask-markdown text-sm leading-relaxed">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     </div>
                   ) : (
