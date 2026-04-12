@@ -105,7 +105,7 @@ export function AskChat() {
           question: q,
           provider,
           persona,
-          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+          history: messages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
       const data = await res.json();

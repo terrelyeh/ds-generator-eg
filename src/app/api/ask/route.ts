@@ -64,7 +64,7 @@ export async function POST(request: Request) {
   try {
     // Step 1: Build search query — for follow-up questions, include context from history
     // so the embedding captures the full intent (e.g., "這幾台" → models from previous answer)
-    const recentHistory = history.slice(-4); // last 2 exchanges
+    const recentHistory = history.slice(-20); // last 10 exchanges
     const searchQuery = recentHistory.length > 0
       ? `${recentHistory.map((m) => m.content).join("\n")}\n${question}`
       : question;
