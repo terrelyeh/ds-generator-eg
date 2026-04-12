@@ -10,6 +10,7 @@ import {
   TYPOGRAPHY_FIELDS,
   WEIGHT_OPTIONS,
   TYPOGRAPHY_DEFAULTS,
+  FONT_OPTIONS,
 } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 
@@ -45,10 +46,11 @@ export function TypographyEditor() {
 
   function handleChange(key: keyof TypographySettings, value: string) {
     if (!settings) return;
+    const isStringField = key === "text_color" || key === "font_family";
     const numVal = parseFloat(value);
     setSettings({
       ...settings,
-      [key]: key === "text_color" ? value : (isNaN(numVal) ? 0 : numVal),
+      [key]: isStringField ? value : (isNaN(numVal) ? 0 : numVal),
     });
     setDirty(true);
   }
@@ -171,6 +173,42 @@ export function TypographyEditor() {
             </CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Font Family selector */}
+            <div className="mb-6 rounded-lg border p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h3 className="text-sm font-semibold">Font Family</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Default: {defaults?.font_family}
+                    {settings.font_family !== defaults?.font_family && (
+                      <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Modified</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(FONT_OPTIONS[locale] ?? []).map((font) => (
+                  <button
+                    key={font.value}
+                    onClick={() => { handleChange("font_family", font.value); }}
+                    className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
+                      settings.font_family === font.value
+                        ? "border-engenius-blue bg-engenius-blue/5 ring-1 ring-engenius-blue"
+                        : "border-border hover:border-engenius-blue/30"
+                    }`}
+                  >
+                    <span className="text-sm font-medium">{font.label}</span>
+                    <p
+                      className="mt-1 text-xs text-muted-foreground truncate"
+                      style={{ fontFamily: `'${font.value}', sans-serif` }}
+                    >
+                      {locale === "ja" ? "クラウド管理型 AI ドームカメラ 256GB" : "雲端管理型 AI 戶外半球攝影機"}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             <table className="w-full">
               <thead>
                 <tr className="border-b-2 border-foreground/10">

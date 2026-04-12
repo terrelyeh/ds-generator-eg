@@ -1,4 +1,5 @@
 export interface TypographySettings {
+  font_family: string;
   headline_size: number;
   headline_weight: number;
   subtitle_size: number;
@@ -15,8 +16,28 @@ export interface TypographySettings {
   text_color: string;
 }
 
+/** Google Fonts suitable for each locale */
+export const FONT_OPTIONS: Record<string, { value: string; label: string; import: string }[]> = {
+  ja: [
+    { value: "Zen Kaku Gothic New", label: "Zen Kaku Gothic New", import: "Zen+Kaku+Gothic+New" },
+    { value: "Noto Sans JP", label: "Noto Sans JP", import: "Noto+Sans+JP" },
+    { value: "M PLUS 1p", label: "M PLUS 1p", import: "M+PLUS+1p" },
+    { value: "M PLUS 2", label: "M PLUS 2", import: "M+PLUS+2" },
+    { value: "BIZ UDGothic", label: "BIZ UDGothic", import: "BIZ+UDGothic" },
+    { value: "IBM Plex Sans JP", label: "IBM Plex Sans JP", import: "IBM+Plex+Sans+JP" },
+    { value: "Murecho", label: "Murecho", import: "Murecho" },
+    { value: "Kiwi Maru", label: "Kiwi Maru (rounded)", import: "Kiwi+Maru" },
+  ],
+  "zh-TW": [
+    { value: "Noto Sans TC", label: "Noto Sans TC", import: "Noto+Sans+TC" },
+    { value: "Zen Old Mincho", label: "Zen Old Mincho", import: "Zen+Old+Mincho" },
+    { value: "LXGW WenKai TC", label: "LXGW WenKai TC", import: "LXGW+WenKai+TC" },
+  ],
+};
+
 export const TYPOGRAPHY_DEFAULTS: Record<string, TypographySettings> = {
   ja: {
+    font_family: "Zen Kaku Gothic New",
     headline_size: 24,
     headline_weight: 500,
     subtitle_size: 17,
@@ -33,6 +54,7 @@ export const TYPOGRAPHY_DEFAULTS: Record<string, TypographySettings> = {
     text_color: "#444444",
   },
   "zh-TW": {
+    font_family: "Noto Sans TC",
     headline_size: 24,
     headline_weight: 600,
     subtitle_size: 17,

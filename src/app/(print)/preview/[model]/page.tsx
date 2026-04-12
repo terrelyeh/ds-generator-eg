@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { splitIntoPages } from "@/lib/datasheet/pagination";
 import { getDict } from "@/lib/datasheet/locales";
-import { TYPOGRAPHY_DEFAULTS } from "@/lib/datasheet/typography";
+import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import type {
@@ -181,17 +181,6 @@ export default async function PreviewPage({
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   const totalPages = 1 + specPages.length + 1; // cover + specs + hardware
 
-  // Font: Zen Kaku Gothic New for JA, Noto Sans TC for ZH-TW
-  const fontImports = [
-    "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap",
-    ...(lang === "ja"
-      ? ["https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@300;400;500;700&display=swap"]
-      : []),
-    ...(lang === "zh-TW"
-      ? ["https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap"]
-      : []),
-  ];
-
   const isCJK = lang === "ja" || lang === "zh-TW";
 
   // Load typography settings from DB (with defaults fallback)
@@ -215,11 +204,23 @@ export default async function PreviewPage({
     }
   }
 
-  const fontFamily = lang === "ja"
-    ? "'Zen Kaku Gothic New', 'Roboto', sans-serif"
-    : lang === "zh-TW"
-      ? "'Noto Sans TC', 'Roboto', sans-serif"
-      : "'Roboto', sans-serif";
+  // Font: from typography settings or defaults
+  const chosenFont = typo?.font_family;
+  const fontImportSlug = chosenFont
+    ? (FONT_OPTIONS[lang] ?? []).find((f) => f.value === chosenFont)?.import
+      ?? chosenFont.replace(/\s+/g, "+")
+    : null;
+
+  const fontImports = [
+    "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap",
+    ...(fontImportSlug
+      ? [`https://fonts.googleapis.com/css2?family=${fontImportSlug}:wght@300;400;500;600;700&display=swap`]
+      : []),
+  ];
+
+  const fontFamily = chosenFont
+    ? `'${chosenFont}', 'Roboto', sans-serif`
+    : "'Roboto', sans-serif";
 
   return (
     <>
