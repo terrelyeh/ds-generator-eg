@@ -11,6 +11,76 @@ export interface Persona {
 }
 
 /**
+ * User Profiles — who is asking the question (Dimension 2).
+ * Appended to the persona prompt to adjust depth, terminology, and focus.
+ */
+export interface UserProfile {
+  id: string;
+  label: string;
+  description: string;
+  prompt: string;  // Appended to system prompt
+}
+
+export const USER_PROFILES: UserProfile[] = [
+  {
+    id: "default",
+    label: "一般同事",
+    description: "不加額外調整",
+    prompt: "",  // No additional prompt
+  },
+  {
+    id: "new-hire",
+    label: "新進同仁",
+    description: "對產品線還在學習中，需要更多背景說明",
+    prompt: `對話對象是剛加入公司的新人，對 EnGenius 的產品線還不熟悉。請注意：
+- 遇到產品型號時，簡短補充這是哪個產品線、什麼定位
+- 技術術語第一次出現時附上白話解釋
+- 如果有相關的基礎概念值得了解，可以簡短帶過
+- 不要讓對方覺得問題很蠢，耐心回答`,
+  },
+  {
+    id: "sales-rep",
+    label: "業務人員",
+    description: "熟產品但需要快速查規格和賣點",
+    prompt: `對話對象是業務人員，對產品有基本認識，但需要快速取得可以對客戶說的資訊。請注意：
+- 回答要實用，可以直接拿去跟客戶溝通
+- 強調賣點和使用場景，不只列規格
+- 如果有適合搭配的產品，主動建議
+- 語言偏向客戶導向，少用純技術用語`,
+  },
+  {
+    id: "channel-sales",
+    label: "Channel Sales",
+    description: "通路業務，關心推廣策略和客戶痛點",
+    prompt: `對話對象是 Channel Sales（通路業務），關心的是如何向終端客戶推廣 EnGenius 產品。請注意：
+- 強調產品在特定垂直市場的應用優勢（教育、飯店、醫療等）
+- 提供可以用在提案或簡報中的重點
+- 如果能指出跟競品的差異化優勢，請主動補充
+- 回答要能幫助 Channel 說服終端客戶`,
+  },
+  {
+    id: "pm",
+    label: "產品經理",
+    description: "需要詳細規格分析和跨產品比較",
+    prompt: `對話對象是產品經理，需要深度的規格分析。請注意：
+- 可以使用完整的技術術語，不需要白話解釋
+- 比較時盡量用表格，標出差異點
+- 主動指出 feature gap 或產品線缺口
+- 如果觀察到跨產品線的 pattern，主動歸納`,
+  },
+  {
+    id: "customer",
+    label: "終端客戶",
+    description: "可能不懂技術，需要簡單語言",
+    prompt: `對話對象是終端客戶，可能完全不懂網路技術。請注意：
+- 用最簡單的語言，避免所有技術術語
+- 如果一定要提到技術名詞，用日常比喻解釋（例如「PoE 就是一條網路線同時傳資料和供電」）
+- 強調使用體驗和解決的問題，不要堆規格數字
+- 回答像在跟鄰居解釋，不是在寫技術文件`,
+  },
+];
+
+/**
  * Built-in personas (used as defaults, can be overridden via DB).
  */
 export const DEFAULT_PERSONAS: Persona[] = [

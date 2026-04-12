@@ -30,6 +30,12 @@ interface PersonaOption {
   icon?: string;
 }
 
+interface ProfileOption {
+  id: string;
+  label: string;
+  description: string;
+}
+
 interface SessionSummary {
   id: string;
   title: string;
@@ -102,6 +108,8 @@ export function AskChat() {
   const [provider, setProvider] = useState("gemini-2.5-flash");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
+  const [profiles, setProfiles] = useState<ProfileOption[]>([]);
+  const [profile, setProfile] = useState("default");
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -117,7 +125,7 @@ export function AskChat() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetch("/api/ask").then((r) => r.json()).then((d) => { if (d.ok) setPersonas(d.personas); }).catch(() => {});
+    fetch("/api/ask").then((r) => r.json()).then((d) => { if (d.ok) { setPersonas(d.personas); setProfiles(d.profiles ?? []); } }).catch(() => {});
     fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
     // Auto-focus input on mount
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -157,7 +165,7 @@ export function AskChat() {
       const res = await fetch("/api/chat-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: sessionId || undefined, title, persona, provider, messages: msgs }),
+        body: JSON.stringify({ id: sessionId || undefined, title, persona, provider, profile, messages: msgs }),
       });
       const data = await res.json();
       if (data.ok && data.id && !sessionId) setSessionId(data.id);
@@ -182,7 +190,7 @@ export function AskChat() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          question: q, provider, persona,
+          question: q, provider, persona, profile,
           history: newMessages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
@@ -283,6 +291,7 @@ export function AskChat() {
   // Find current model label for display
   const currentModelLabel = PROVIDERS.flatMap((g) => g.models).find((m) => m.id === provider)?.label ?? provider;
   const currentPersonaLabel = personas.find((p) => p.id === persona);
+  const currentProfileLabel = profiles.find((p) => p.id === profile);
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.provider);
   const lastUsedModel = lastAssistantMsg?.provider;
 
@@ -385,29 +394,48 @@ export function AskChat() {
             )}
           </div>
 
-          {/* Persona selector row */}
-          {personas.length > 0 && (
-            <div className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground">回答角度：</span>
-              <div className="flex gap-1.5">
-                {personas.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => setPersona(p.id)}
-                    title={p.description}
-                    className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
-                      persona === p.id
-                        ? "bg-engenius-blue text-white shadow-sm"
-                        : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                    }`}
-                  >
-                    {p.icon && <span className="mr-1">{p.icon}</span>}
-                    {p.name}
-                  </button>
-                ))}
+          {/* Persona + Profile selector row */}
+          <div className="flex items-center gap-6">
+            {/* Dimension 1: 回答角度 */}
+            {personas.length > 0 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground flex-shrink-0">回答角度：</span>
+                <div className="flex gap-1.5">
+                  {personas.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setPersona(p.id)}
+                      title={p.description}
+                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+                        persona === p.id
+                          ? "bg-engenius-blue text-white shadow-sm"
+                          : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                      }`}
+                    >
+                      {p.icon && <span className="mr-1">{p.icon}</span>}
+                      {p.name}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Dimension 2: 對話對象 */}
+            {profiles.length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground flex-shrink-0">對話對象：</span>
+                <select
+                  value={profile}
+                  onChange={(e) => setProfile(e.target.value)}
+                  className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                >
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Chat card — fills remaining space */}
@@ -602,7 +630,8 @@ export function AskChat() {
             <div className="flex items-center justify-between text-xs text-muted-foreground/40 px-1">
               <span>
                 Model: {currentModelLabel}
-                {currentPersonaLabel ? ` · Persona: ${currentPersonaLabel.name}` : ""}
+                {currentPersonaLabel ? ` · ${currentPersonaLabel.name}` : ""}
+                {currentProfileLabel && currentProfileLabel.id !== "default" ? ` · ${currentProfileLabel.label}` : ""}
               </span>
               {lastUsedModel && (
                 <span>Last answer via {lastUsedModel}</span>

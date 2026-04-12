@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbedding } from "@/lib/rag/embeddings";
 import { getApiKey, API_KEY_MAP } from "@/lib/settings";
-import { getPersona, listPersonas } from "@/lib/rag/personas";
+import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
 export const maxDuration = 60;
@@ -18,6 +18,7 @@ interface AskRequest {
   product_line?: string; // Filter by product line
   provider?: string; // LLM provider: 'claude' | 'openai' | 'gemini'
   persona?: string;  // Persona slug: 'default' | 'sales' | 'support' | 'pm' | custom
+  profile?: string;  // User profile: 'default' | 'new-hire' | 'sales-rep' | 'channel-sales' | 'pm' | 'customer'
   history?: ChatMessage[]; // Previous messages for conversation context
 }
 
@@ -34,6 +35,11 @@ export async function GET() {
       name: p.name,
       description: p.description,
       icon: p.icon,
+    })),
+    profiles: USER_PROFILES.map((p) => ({
+      id: p.id,
+      label: p.label,
+      description: p.description,
     })),
   });
 }
@@ -55,7 +61,7 @@ interface MatchedDoc {
  */
 export async function POST(request: Request) {
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, provider = "gemini-flash", persona: personaId = "default", history = [] } = body;
+  const { question, source_type, product_line, provider = "gemini-2.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -118,9 +124,12 @@ export async function POST(request: Request) {
           .join("\n\n---\n\n")
       : "(No new documents found — answer based on conversation history)";
 
-    // Step 3.5: Load persona system prompt
+    // Step 3.5: Assemble system prompt (Persona + User Profile)
     const persona = await getPersona(personaId);
-    const systemPrompt = persona?.system_prompt ?? (await getPersona("default"))!.system_prompt;
+    const personaPrompt = persona?.system_prompt ?? (await getPersona("default"))!.system_prompt;
+    const userProfile = USER_PROFILES.find((p) => p.id === profileId);
+    const profilePrompt = userProfile?.prompt ? `\n\n---\n對話對象設定：\n${userProfile.prompt}` : "";
+    const systemPrompt = personaPrompt + profilePrompt;
 
     // Build conversation context for follow-up questions
     const historyText = recentHistory.length > 0
@@ -178,6 +187,7 @@ These should be natural extensions of the current topic, written in the same lan
       sources,
       follow_ups: followUps.slice(0, 3),
       persona: personaId,
+      profile: profileId,
       provider,
       match_count: docs.length,
     });
