@@ -93,6 +93,7 @@ export default async function PreviewPage({
   let translatedOverview: string | null = null;
   let translatedFeatures: string[] | null = null;
   let translatedHeadline: string | null = null;
+  let translatedSubtitle: string | null = null;
   let localeHardwareImage: string | null = null;
   let customQrLabel: string | null = null;
   let customQrUrl: string | null = null;
@@ -103,15 +104,16 @@ export default async function PreviewPage({
     // Per-product translation (overview + features)
     const { data: pt } = await supabase
       .from("product_translations" as "products")
-      .select("overview, features, translation_mode, headline, hardware_image, qr_label, qr_url")
+      .select("overview, features, translation_mode, headline, subtitle, hardware_image, qr_label, qr_url")
       .eq("product_id", model)
       .eq("locale", lang)
-      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null } | null };
+      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; subtitle: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null } | null };
 
     if (pt) {
       translatedOverview = pt.overview;
       translatedFeatures = pt.features;
       translatedHeadline = pt.headline;
+      translatedSubtitle = pt.subtitle;
       localeHardwareImage = pt.hardware_image;
       customQrLabel = pt.qr_label;
       customQrUrl = pt.qr_url;
@@ -157,6 +159,7 @@ export default async function PreviewPage({
   const overview = (isTranslated && translatedOverview) ? translatedOverview : product.overview;
   const features = (isTranslated && translatedFeatures) ? translatedFeatures : (product.features ?? []);
   const headline = (isTranslated && translatedHeadline) ? translatedHeadline : (product.headline || product.full_name);
+  const subtitle = (isTranslated && translatedSubtitle) ? translatedSubtitle : product.subtitle;
   const midpoint = Math.ceil(features.length / 2);
 
   const currentVersions = product.current_versions as Record<string, string> | null;
@@ -426,7 +429,7 @@ ${isCJK ? `
 .product-fullname-cloud,
 .product-fullname-standard {
   font-weight: 500;
-  font-size: 22pt;
+  font-size: 24pt;
   line-height: 1.25;
   word-break: keep-all;
   overflow-wrap: break-word;
@@ -530,14 +533,14 @@ ${isCJK ? `
               src="/logo/engenius_cloud_icon.png"
               alt=""
             />
-            <div className="product-subtitle-cloud">{product.subtitle}</div>
+            <div className="product-subtitle-cloud">{subtitle}</div>
             <div className="product-fullname-cloud">
               {parseHeadlineMarkup(headline)}
             </div>
           </>
         ) : (
           <>
-            <div className="product-subtitle-standard">{product.subtitle}</div>
+            <div className="product-subtitle-standard">{subtitle}</div>
             <div className="product-fullname-standard">
               {parseHeadlineMarkup(headline)}
             </div>

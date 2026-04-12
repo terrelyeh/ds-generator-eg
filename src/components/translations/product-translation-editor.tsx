@@ -79,6 +79,7 @@ interface TranslationData {
   overview: string | null;
   features: string[] | null;
   headline: string | null;
+  subtitle: string | null;
   hardware_image: string | null;
   qr_label: string | null;
   qr_url: string | null;
@@ -88,6 +89,7 @@ interface TranslationData {
 interface ProductTranslationEditorProps {
   modelName: string;
   englishHeadline: string;
+  englishSubtitle: string;
   productLineName: string;
   englishOverview: string;
   englishFeatures: string[];
@@ -97,6 +99,7 @@ interface ProductTranslationEditorProps {
 export function ProductTranslationEditor({
   modelName,
   englishHeadline,
+  englishSubtitle,
   productLineName,
   englishOverview,
   englishFeatures,
@@ -137,6 +140,7 @@ export function ProductTranslationEditor({
   const existing = existingTranslations.find((t) => t.locale === activeLocale);
   const [mode, setMode] = useState<"light" | "full">(existing?.translation_mode ?? "light");
   const [headlineTrans, setHeadlineTrans] = useState(existing?.headline ?? "");
+  const [subtitleTrans, setSubtitleTrans] = useState(existing?.subtitle ?? "");
   const [overview, setOverview] = useState(existing?.overview ?? "");
   const [features, setFeatures] = useState<string[]>(
     existing?.features ?? englishFeatures.map(() => "")
@@ -152,6 +156,7 @@ export function ProductTranslationEditor({
     const t = existingTranslations.find((t) => t.locale === locale);
     setMode(t?.translation_mode ?? "light");
     setHeadlineTrans(t?.headline ?? "");
+    setSubtitleTrans(t?.subtitle ?? "");
     setOverview(t?.overview ?? "");
     setFeatures(t?.features ?? englishFeatures.map(() => ""));
     setHwImage(t?.hardware_image ?? "");
@@ -304,6 +309,7 @@ export function ProductTranslationEditor({
           locale: activeLocale,
           translation_mode: mode,
           headline: headlineTrans || null,
+          subtitle: subtitleTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
           hardware_image: hwImage || null,
@@ -363,6 +369,7 @@ export function ProductTranslationEditor({
           locale: activeLocale,
           translation_mode: mode,
           headline: headlineTrans || null,
+          subtitle: subtitleTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
           hardware_image: hwImage || null,
@@ -649,6 +656,34 @@ export function ProductTranslationEditor({
             />
           </div>
           {headlineNotes && <TranslationNotes notes={headlineNotes} onDismiss={() => setHeadlineNotes("")} />}
+        </CardContent>
+      </Card>
+
+      {/* Subtitle */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Subtitle</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">English (source)</label>
+            <p className="mt-1 rounded-md bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+              {englishSubtitle || <span className="italic">No subtitle</span>}
+            </p>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground">
+              {currentLocaleInfo?.flag} {currentLocaleInfo?.label}
+              <span className="ml-2 text-muted-foreground/40">(leave empty to use English)</span>
+            </label>
+            <input
+              type="text"
+              value={subtitleTrans}
+              onChange={(e) => { setSubtitleTrans(e.target.value); setDirty(true); }}
+              placeholder={englishSubtitle}
+              className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+            />
+          </div>
         </CardContent>
       </Card>
 

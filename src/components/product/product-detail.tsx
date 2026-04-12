@@ -531,12 +531,14 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
           englishOverview={product.overview ?? ""}
           englishFeatures={product.features ?? []}
           englishHeadline={product.headline || product.full_name}
+          englishSubtitle={product.subtitle}
           existingTranslations={translations.map((t) => ({
             locale: t.locale,
             translation_mode: t.translation_mode,
             overview: t.overview,
             features: t.features,
             headline: t.headline,
+            subtitle: t.subtitle,
             hardware_image: t.hardware_image,
             qr_label: t.qr_label,
             qr_url: t.qr_url,
