@@ -104,6 +104,7 @@ export function AskChat() {
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -118,6 +119,8 @@ export function AskChat() {
   useEffect(() => {
     fetch("/api/ask").then((r) => r.json()).then((d) => { if (d.ok) setPersonas(d.personas); }).catch(() => {});
     fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
+    // Auto-focus input on mount
+    setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
   // Close dropdown on click outside
@@ -585,7 +588,7 @@ export function AskChat() {
               })}
             </div>
             <div className="flex items-end gap-2">
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
+              <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
                 placeholder="Ask about products, specs, or comparisons..."
                 rows={1}
                 className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
