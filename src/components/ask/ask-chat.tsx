@@ -118,7 +118,7 @@ export function AskChat() {
       } else {
         setMessages((prev) => [
           ...prev,
-          { role: "assistant", content: `Error: ${data.error}` },
+          { role: "assistant", content: `Error: ${data.error}${data.details ? `\n\n${data.details}` : ""}` },
         ]);
       }
     } catch (err) {
