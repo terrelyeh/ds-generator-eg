@@ -179,9 +179,9 @@ async function callLLM(
   // Model ID mapping
   const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string }> = {
     // Claude
-    "claude-opus": { fn: "claude", model: "claude-opus-4-5-20250415" },
-    "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-5-20241219" },
-    "claude-haiku": { fn: "claude", model: "claude-haiku-3-5-20241022" },
+    "claude-opus": { fn: "claude", model: "claude-opus-4-6-20250514" },
+    "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-6-20250514" },
+    "claude-haiku": { fn: "claude", model: "claude-haiku-4-5-20251001" },
     // OpenAI
     "gpt-4o": { fn: "openai", model: "gpt-4o" },
     "gpt-4o-mini": { fn: "openai", model: "gpt-4o-mini" },

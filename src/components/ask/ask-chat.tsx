@@ -76,8 +76,8 @@ const PROVIDERS: ProviderGroup[] = [
     label: "Claude",
     checkKeys: ["claude-sonnet", "claude-opus"],
     models: [
-      { id: "claude-opus", label: "Claude Opus 4", tier: "Strongest" },
-      { id: "claude-sonnet", label: "Claude Sonnet 4", tier: "Mainstream" },
+      { id: "claude-opus", label: "Claude Opus 4.6", tier: "Strongest" },
+      { id: "claude-sonnet", label: "Claude Sonnet 4.6", tier: "Mainstream" },
       { id: "claude-haiku", label: "Claude Haiku 3.5", tier: "Best CP" },
     ],
   },
@@ -96,7 +96,7 @@ export function AskChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState("gemini-flash");
+  const [provider, setProvider] = useState("gemini-2.5-flash");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
@@ -234,6 +234,12 @@ export function AskChat() {
   }
 
   const isEmpty = messages.length === 0;
+
+  // Find current model label for display
+  const currentModelLabel = PROVIDERS.flatMap((g) => g.models).find((m) => m.id === provider)?.label ?? provider;
+  const currentPersonaLabel = personas.find((p) => p.id === persona);
+  const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.provider);
+  const lastUsedModel = lastAssistantMsg?.provider;
 
   return (
     <div className="flex h-[calc(100vh-120px)] gap-0">
@@ -379,20 +385,7 @@ export function AskChat() {
                 </div>
               ))
             )}
-            {loading && (
-              <div className="flex justify-start">
-                <div className="bg-muted rounded-xl px-4 py-3">
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                    <div className="flex gap-1">
-                      <span className="h-2 w-2 rounded-full bg-engenius-blue/60 animate-bounce" style={{ animationDelay: "0ms" }} />
-                      <span className="h-2 w-2 rounded-full bg-engenius-blue/60 animate-bounce" style={{ animationDelay: "150ms" }} />
-                      <span className="h-2 w-2 rounded-full bg-engenius-blue/60 animate-bounce" style={{ animationDelay: "300ms" }} />
-                    </div>
-                    <span className="text-xs">Searching specs & generating answer...</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {loading && <ThinkingIndicator provider={currentModelLabel} />}
           </div>
 
           {/* Input area */}
@@ -426,7 +419,7 @@ export function AskChat() {
                             : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
                       }`}
                     >
-                      {isActiveGroup ? `${group.label}: ${activeModel.label}` : group.label}
+                      {isActiveGroup ? activeModel.label : group.label}
                       {isAvailable && (
                         <svg className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M3 5l3 3 3-3" />
@@ -478,8 +471,63 @@ export function AskChat() {
                 {loading ? "..." : "Ask"}
               </Button>
             </div>
+            {/* Current model info */}
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground/40 px-1">
+              <span>
+                Model: {currentModelLabel}
+                {currentPersonaLabel ? ` · Persona: ${currentPersonaLabel.name}` : ""}
+              </span>
+              {lastUsedModel && (
+                <span>Last answer via {lastUsedModel}</span>
+              )}
+            </div>
           </div>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+/** Animated thinking indicator with step progression */
+function ThinkingIndicator({ provider }: { provider: string }) {
+  const [step, setStep] = useState(0);
+  const steps = [
+    { icon: "🔍", text: "Searching product database..." },
+    { icon: "📊", text: "Analyzing matched specifications..." },
+    { icon: "🤖", text: `Generating answer with ${provider}...` },
+  ];
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStep(1), 1500);
+    const t2 = setTimeout(() => setStep(2), 3500);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  return (
+    <div className="flex justify-start">
+      <div className="bg-muted rounded-xl px-4 py-3 min-w-[280px]">
+        <div className="space-y-2">
+          {steps.map((s, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-2.5 text-xs transition-all duration-300 ${
+                i < step ? "text-muted-foreground/40" : i === step ? "text-foreground" : "text-muted-foreground/20"
+              }`}
+            >
+              <span className={`text-sm ${i === step ? "animate-pulse" : ""}`}>
+                {i < step ? "✓" : s.icon}
+              </span>
+              <span>{s.text}</span>
+              {i === step && (
+                <span className="flex gap-0.5 ml-1">
+                  <span className="h-1 w-1 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="h-1 w-1 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="h-1 w-1 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "300ms" }} />
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
