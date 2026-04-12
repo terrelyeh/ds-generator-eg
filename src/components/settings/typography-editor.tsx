@@ -415,13 +415,6 @@ export function TypographyEditor() {
                   >
                     +
                   </button>
-                  <span className="text-border mx-1">|</span>
-                  <button
-                    onClick={() => setPreviewKey((k) => k + 1)}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    ↻ Refresh
-                  </button>
                 </div>
               </div>
               <div className="rounded-lg border bg-white shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)" }}>
