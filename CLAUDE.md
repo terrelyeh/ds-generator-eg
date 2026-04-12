@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-04-12
+> Last updated: 2026-04-13
 
 ## Project Overview
 
@@ -26,6 +26,8 @@ Cloud Camera, Cloud AI-NVS, Cloud VPN Firewall, Switch Extender, Unmanaged Switc
 - **Data Source**: Google Sheets API + Google Drive API → synced to Supabase
 - **Notifications**: Telegram Bot API
 - **PDF**: Puppeteer (server-side) + browser print (client-side)
+- **RAG**: pgvector + OpenAI Embedding (`text-embedding-3-small`) + multi-LLM (Claude/GPT/Gemini)
+- **Markdown**: react-markdown + remark-gfm（Ask 頁面回答渲染）
 
 ## Next.js 16 Breaking Changes (IMPORTANT)
 
@@ -45,55 +47,51 @@ src/
       changelog/[line]/page.tsx
       product/[model]/page.tsx         # Product detail (sticky header, tabs: Detail/Translations)
       translations/[line]/page.tsx     # Per-product-line spec label translations
-      settings/page.tsx                # Settings navigation hub (3 cards)
-      settings/api-keys/page.tsx       # API key management
-      settings/glossary/page.tsx       # Translation glossary management
-      settings/typography/page.tsx     # Font + size/weight per locale (split layout with live preview)
+      ask/page.tsx                    # Ask SpecHub — RAG chat UI
+      knowledge/page.tsx              # Knowledge Base — index management dashboard
+      settings/page.tsx               # Settings navigation hub (4 cards)
+      settings/api-keys/page.tsx      # API key management
+      settings/glossary/page.tsx      # Translation glossary management
+      settings/typography/page.tsx    # Font + size/weight per locale (split layout with live preview)
+      settings/personas/page.tsx      # Ask Persona prompt management
     (print)/
-      preview/[model]/page.tsx         # Datasheet HTML preview (?lang=ja&mode=full)
+      preview/[model]/page.tsx        # Datasheet HTML preview (?lang=ja&mode=full&toolbar=false)
     api/
-      sync/route.ts                    # Google Sheets → Supabase sync
-      generate-pdf/route.ts            # Puppeteer PDF (?model=X&lang=ja&mode=regenerate)
-      upload-image/route.ts            # Upload to Supabase + Google Drive
-      translate/route.ts               # AI translation endpoint (multi-provider)
-      translations/product/route.ts    # CRUD product translations (POST/DELETE)
-      translations/spec-labels/route.ts # Save spec label translations
-      detect-locale-version/route.ts   # Detect locale PDF version from Drive
-      settings/route.ts                # API key CRUD
-      settings/providers/route.ts      # Which AI providers have keys configured
-      settings/typography/route.ts     # Typography settings per locale (GET/POST/DELETE)
-      settings/fonts/route.ts          # Custom Google Font management per locale
-      glossary/route.ts                # Translation glossary CRUD
+      sync/route.ts                   # Google Sheets → Supabase sync
+      generate-pdf/route.ts           # Puppeteer PDF + generation lock (GET: check lock, POST: generate)
+      upload-image/route.ts           # Upload to Supabase + Google Drive
+      translate/route.ts              # AI translation endpoint (multi-provider)
+      ask/route.ts                    # RAG query (GET: personas, POST: question + history → answer)
+      documents/route.ts              # RAG document index management (GET/POST/DELETE)
+      chat-sessions/route.ts          # Conversation persistence (GET/POST/DELETE)
+      personas/route.ts               # Persona CRUD
+      settings/route.ts               # API key CRUD (with optimistic locking)
+      settings/providers/route.ts     # Which AI providers have keys configured
+      settings/typography/route.ts    # Typography settings (with optimistic locking)
+      settings/fonts/route.ts         # Custom Google Font management per locale
+      glossary/route.ts               # Translation glossary CRUD (with optimistic locking)
   components/
-    layout/navbar.tsx, solution-sidebar.tsx
+    layout/navbar.tsx, solution-sidebar.tsx  # Navbar: Ask, Knowledge, Settings links
+    ask/ask-chat.tsx                    # Chat UI + sidebar history + persona + model dropdown
+    knowledge/knowledge-base.tsx        # Index dashboard + per-source management
     dashboard/dashboard-content.tsx     # Tabs + Lang column + Translations link
-    product/product-detail.tsx          # Detail/Translations tabs, 🌐 menu, version history by locale
-    preview/print-toolbar.tsx           # Locale badge
-    translations/
-      product-translation-editor.tsx    # Enable/disable lang, headline/overview/features/HW image/QR
-      spec-label-editor.tsx             # Per-product-line spec label + section header translations
+    product/product-detail.tsx          # Detail/Translations tabs, 🌐 menu, version history
+    preview/print-toolbar.tsx           # Locale badge (hidden via ?toolbar=false in typography preview)
     settings/
-      settings-page.tsx                 # Navigation hub (3 cards → api-keys/glossary/typography)
-      api-keys-editor.tsx               # API key cards with masked values
-      glossary-editor.tsx               # Glossary CRUD with scope/search
-      typography-editor.tsx             # Split layout: left settings + right live preview iframe
+      settings-page.tsx                 # Navigation hub (4 cards)
+      personas-editor.tsx               # Persona prompt CRUD
+      api-keys-editor.tsx, glossary-editor.tsx, typography-editor.tsx
     compare/compare-table.tsx
   lib/
-    google/drive-versions.ts           # detectLatestVersion() + detectLocaleVersion() + getLocaleSuffix()
-    translate/
-      index.ts                         # 5-layer prompt assembly + JSON response parsing
-      types.ts                         # Provider types, AVAILABLE_PROVIDERS
-      use-providers.ts                 # Client hook: fetch provider availability
+    rag/
+      embeddings.ts                    # OpenAI embedding wrapper + contentHash + estimateTokens
+      ingest-products.ts               # Products → 2 chunks (overview + specs) → embed → DB
+      personas.ts                      # 4 built-in personas + CRUD (stored in app_settings)
+    google/drive-versions.ts           # detectLatestVersion() + getLocaleSuffix()
+    translate/                         # 5-layer prompt + multi-provider translation
       providers/claude.ts, openai.ts, gemini.ts
-      prompts/
-        base.ts                        # Layer 1: base translate+improve instructions
-        locales/ja.ts, zh-TW.ts        # Layer 2: locale-specific rules
-        product-lines/cloud-camera.ts  # Layer 3: product line terminology
-        content-types.ts               # Layer 4: overview/features/spec_labels rules
-                                       # Layer 5: glossary (loaded from DB at runtime)
     datasheet/
-      locales/en.ts, ja.ts, zh-TW.ts   # Locale dictionaries for fixed UI strings
-      typography.ts                     # TypographySettings type, defaults per locale, FONT_OPTIONS, TYPOGRAPHY_GROUPS
+      typography.ts                    # TypographySettings, defaults, FONT_OPTIONS
     settings.ts                        # getApiKey(): DB first, env var fallback
   types/database.ts
 ```
@@ -205,7 +203,9 @@ Key tables:
 - `product_translations` — per-product per-locale: headline, **subtitle**, overview, features, hardware_image, qr_label, qr_url, translation_mode, **confirmed**
 - `spec_label_translations` — per-product-line per-locale: original_label → translated_label, label_type (spec/section)
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
-- `app_settings` — key-value store: API keys, `typography_${locale}` (JSON), `custom_fonts_${locale}` (JSON)
+- `app_settings` — key-value store: API keys, `typography_${locale}`, `custom_fonts_${locale}`, `persona_{id}`, `pdf_lock_{model}_{lang}`
+- `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash
+- `chat_sessions` — 對話持久化：user_id (default 'anonymous'), title, persona, provider, messages JSONB
 
 ## Conventions
 
@@ -225,27 +225,14 @@ Key tables:
 
 ## Ask SpecHub (RAG System)
 
-產品規格 AI 查詢助手。使用 pgvector + OpenAI Embedding + LLM 實現 RAG。
-完整說明請參考 [`docs/rag-system.md`](docs/rag-system.md)。
+完整架構、API、Persona、Chunking、圖片處理、Roadmap 請參考 [`docs/rag-system.md`](docs/rag-system.md)。
 
-**核心架構**：`documents` 表（pgvector）→ `match_documents()` RPC → LLM 回答
-
-**關鍵檔案**：
-- `src/lib/rag/embeddings.ts` — OpenAI embedding 封裝
-- `src/lib/rag/ingest-products.ts` — 產品規格 → chunks → embeddings
-- `src/lib/rag/personas.ts` — Persona 系統（4 內建 + 自訂）
-- `src/app/api/ask/route.ts` — RAG 查詢 endpoint（GET: personas, POST: query）
-- `src/app/api/documents/route.ts` — 文件索引管理
-- `src/app/api/personas/route.ts` — Persona CRUD
-- `src/components/ask/ask-chat.tsx` — 聊天 UI
-
-**Persona 系統**：每個 persona 有獨立的 system prompt，存在 `app_settings` 表（`persona_{id}`）。
-內建 4 個：default（Product Specialist）、sales、support、pm。可在 `/settings/personas` 管理。
-
-**Embedding**：固定用 OpenAI `text-embedding-3-small`（需要 `OPENAI_API_KEY`），每個產品 2 chunks（overview + specs）。
-
-**未來擴充**：支援 `gitbook`、`web`、`google_doc`、`file`（PDF/Word）、`text_snippet` 等來源。
-`documents` 表的 `source_type` + `metadata` JSONB 已預留擴展性，新增來源不需要改 schema。
+**核心流程**：問題 → OpenAI Embedding → pgvector 搜尋 → Persona prompt + context → LLM 回答
+**資料表**：`documents`（向量索引）、`chat_sessions`（對話持久化）
+**Persona**：4 內建（Product Specialist / Sales / Support / PM）+ 自訂，存 `app_settings` 表（`persona_{id}`）
+**Model 選擇**：3 家 provider × 3 tier（Strongest / Mainstream / Best CP），`callLLM()` 內 `MODEL_MAP` 統一映射
+**Concurrency**：PDF 生成有 DB lock（`pdf_lock_{model}_{lang}`，5 分鐘 auto-expire）；Settings 有 optimistic locking（`updated_at` 比對）
+**頁面寬度**：Dashboard/Compare/Translations/Typography/Ask = `1400px`，其餘 = `1100px`
 
 ## Current Status
 
@@ -253,12 +240,22 @@ Key tables:
 
 ### 🔜 Next Steps
 
-1. **多國語言擴展到其他產品線** — Camera 已完成，需為 AP/Switch/NVS/VPN FW 等建立 product-line prompt（`prompts/product-lines/`）
-2. **翻譯 feedback 偵測** — AI 翻譯後使用者修改了某些詞，Save 時自動偵測差異，建議加入詞庫
-3. **產品照片補齊** — Cloud VPN FW（4 models 全部缺圖）優先，AP 需 radio pattern
-4. **多張 Hardware 圖支援** — 部分型號需 front/rear/bottom 最多 3 張
-5. **NVS 命名不一致** — Drive 用 "NVS" prefix，系統 model 用 "EVS"，需解決
-6. **Extender/Unmgd SW 的 ds_prefix** — Unmanaged 實際 PDF 用 `DS_Unmanaged_Switch_ES105`（中間有 Switch），但 ds_prefix 設為 `DS_Unmanaged`
+**RAG 擴充**（詳見 [`docs/rag-system.md`](docs/rag-system.md) Roadmap）：
+1. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較），最快能產生價值的擴充
+2. **Auto re-index after Sync** — Sync 完成後自動觸發 re-embed 有變動的產品
+3. **Gitbook ingestion** — 技術文件索引
+4. **Streaming response (SSE)** — 回答即時顯示，改善等待體驗
+
+**Datasheet 系統**：
+5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
+6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
+7. **產品照片補齊** — Cloud VPN FW 優先（4 models 全缺圖）
+8. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
+
+**系統**：
+9. **Supabase Auth + email 白名單** — 控制存取權限，chat_sessions 綁定 user_id
+10. **NVS 命名不一致** — Drive "NVS" vs 系統 "EVS"
+11. **Extender/Unmgd SW 的 ds_prefix** — 實際 PDF 用 `DS_Unmanaged_Switch_`，但 ds_prefix 設為 `DS_Unmanaged`
 
 ## Deployment
 
@@ -286,5 +283,5 @@ npm run lint   # ESLint check
 9. **Supabase 不認得新建的 table** — `product_translations` 等新表的 query 會被 TypeScript 推斷為 `never`。解法：`supabase.from("product_translations" as "products")` + 手動 `as { data: T | null }` 型別斷言
 10. **AI 翻譯 JSON 解析** — prompt 要求回 JSON `{ translated, notes }`，但有些 model 會加 markdown code fence。`index.ts` 有 fallback：strip ``` 後 parse，失敗就當 plain text
 11. **zh-TW locale 在 Drive 用 zh** — `getLocaleSuffix("zh-TW")` 回傳 `"zh"`，資料夾命名和 PDF 檔名用 `_zh` 不用 `_zh-TW`
-12. **Gemini API 需要 `responseMimeType: "application/json"`** — 不加的話 Gemini 2.5 Pro 回傳格式不穩定，有時帶 markdown code fence。加了之後穩定回 JSON。Model 名稱用 `gemini-2.5-pro-latest`
+12. **Gemini API model 名稱** — 翻譯用 `gemini-2.5-pro`（加 `responseMimeType: "application/json"` 穩定 JSON 輸出）。Ask RAG 用 `gemini-2.5-flash`（預設）或 `gemini-2.5-pro`。注意：`-latest` suffix 已棄用
 13. **Preview CSS 動態化** — per-locale 的字級/字重/顏色不再 hardcode 在 CSS，而是從 `app_settings` 讀 `typography_${lang}` JSON，fallback 到 `TYPOGRAPHY_DEFAULTS[lang]`

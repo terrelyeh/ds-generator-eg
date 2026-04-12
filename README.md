@@ -50,14 +50,33 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Subtitle 可按語言覆寫
 - QR Code 標籤和連結可按語言自訂
 
+### Ask SpecHub (RAG)
+- **AI 產品規格查詢** — 用自然語言（中文/英文）詢問產品規格、比較、推薦
+- **向量搜尋** — pgvector + OpenAI Embedding，語意搜尋而非關鍵字匹配
+- **多 AI 模型** — Gemini（Pro/Flash/Lite）、GPT（4o/4o-mini/Nano）、Claude（Opus/Sonnet/Haiku），可即時切換比較
+- **Persona 系統** — 4 個內建角色（Product Specialist / Sales / Support / PM），可自訂
+- **對話持久化** — 對話自動存入 DB，側邊欄歷史列表，可恢復過往對話
+- **Markdown 渲染** — 表格、列表、粗體等格式化回答
+- **來源引用** — 回答附上匹配的產品連結和相似度分數
+
+### Knowledge Base
+- **索引管理**（`/knowledge`）— 查看已索引的內容、source 數量、chunk 數、token 數
+- **6 種來源類型** — Product Specs（已實作）、Text Snippets、Gitbook、Google Docs、Web、PDF/Word（規劃中）
+- **Re-index / Force Re-index / Delete** — 按來源類型管理
+- **Last Indexed 時間** — 每個來源類型顯示最後索引時間
+
 ### Settings
-- **Settings 導航頁** — 三個獨立管理區塊，各自獨立頁面
-- **API Key 管理**（`/settings/api-keys`）— 設定 AI 翻譯 API Key，存到 DB，優先於 Vercel env var
+- **Settings 導航頁** — 四個獨立管理區塊，各自獨立頁面
+- **API Key 管理**（`/settings/api-keys`）— 設定 AI API Key（Embedding + 翻譯 + RAG），存到 DB
 - **翻譯詞庫**（`/settings/glossary`）— 公司認可翻譯術語，分 Global 和產品線專屬
 - **Typography**（`/settings/typography`）— 每個語言獨立的字型、字級、字重設定
   - Google Font 選擇器（預設 + 自定義 URL 添加）
   - Split layout：左設定、右即時 Datasheet Preview（可縮放）
-  - 分組欄位：Headline / Overview / Features / Specifications / Footer
+- **Ask Personas**（`/settings/personas`）— 管理 AI 問答的 system prompt
+
+### Concurrency Protection
+- **PDF 生成鎖** — 同一 model + locale 同時只能一人生成，DB flag 自動 5 分鐘過期
+- **Settings 樂觀鎖** — Typography / API Keys / Glossary 儲存時比對 `updated_at`，衝突回 409
 
 ### Automated Sync
 - 每日 09:00（台灣時間）自動同步 Google Sheets → Supabase
@@ -69,6 +88,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ### Documentation
 - `/docs/sync` — 資料同步與通知機制說明頁
 - `/docs/drive-folder-and-naming-rules.html` — Drive 資料夾結構與命名規則（含 left panel TOC）
+- `/docs/rag-system.html` — Ask SpecHub RAG 系統完整說明（含 left panel TOC）
 
 ## Tech Stack
 
@@ -81,6 +101,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 | Data Source | Google Sheets API + Drive API |
 | PDF | Puppeteer + Browser Print |
 | AI Translation | Claude / GPT-4o / Gemini (multi-provider) |
+| RAG / Vector Search | pgvector + OpenAI Embedding + react-markdown |
 | Deployment | Vercel + Vercel Cron |
 | Notifications | Telegram Bot API |
 
