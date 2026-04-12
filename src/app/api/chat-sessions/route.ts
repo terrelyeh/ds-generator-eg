@@ -14,10 +14,22 @@ interface SessionRow {
   title: string;
   persona: string;
   provider: string;
-  messages: ChatMessage[];
+  messages: ChatMessage[] | string;
   message_count: number;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Parse messages — handles both proper JSONB arrays and double-encoded strings
+ */
+function parseMessages(raw: ChatMessage[] | string | unknown): ChatMessage[] {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === "string") {
+    try { const parsed = JSON.parse(raw); return Array.isArray(parsed) ? parsed : []; }
+    catch { return []; }
+  }
+  return [];
 }
 
 /**
@@ -31,7 +43,6 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
 
   if (id) {
-    // Get single session
     const { data, error } = await supabase
       .from("chat_sessions" as "products")
       .select("*")
@@ -41,10 +52,13 @@ export async function GET(request: Request) {
     if (error || !data) {
       return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
+
+    // Fix double-encoded messages
+    data.messages = parseMessages(data.messages);
+
     return NextResponse.json({ ok: true, session: data });
   }
 
-  // List sessions (without full messages for performance)
   const { data, error } = await supabase
     .from("chat_sessions" as "products")
     .select("id, title, persona, provider, message_count, created_at, updated_at")
@@ -76,13 +90,13 @@ export async function POST(request: Request) {
   const supabase = createAdminClient();
 
   if (id) {
-    // Update existing session
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (title !== undefined) updates.title = title;
     if (persona !== undefined) updates.persona = persona;
     if (provider !== undefined) updates.provider = provider;
     if (messages !== undefined) {
-      updates.messages = JSON.stringify(messages);
+      // Pass raw array — Supabase JSONB handles serialization
+      updates.messages = messages;
       updates.message_count = messages.length;
     }
 
@@ -104,8 +118,8 @@ export async function POST(request: Request) {
     .insert({
       title: title || "New conversation",
       persona: persona || "default",
-      provider: provider || "gemini-flash",
-      messages: JSON.stringify(messages || []),
+      provider: provider || "gemini-2.5-flash",
+      messages: messages || [],
       message_count: messages?.length || 0,
       user_id: "anonymous",
     })
@@ -121,17 +135,30 @@ export async function POST(request: Request) {
 
 /**
  * DELETE /api/chat-sessions
- * Body: { id: string }
+ * Body: { id: string } or { ids: string[] } for batch delete
  */
 export async function DELETE(request: Request) {
   const body = await request.json();
-  const { id } = body as { id: string };
-
-  if (!id) {
-    return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  }
+  const { id, ids } = body as { id?: string; ids?: string[] };
 
   const supabase = createAdminClient();
+
+  if (ids && ids.length > 0) {
+    // Batch delete
+    const { error } = await supabase
+      .from("chat_sessions" as "products")
+      .delete()
+      .in("id", ids);
+
+    if (error) {
+      return NextResponse.json({ error: "Batch delete failed" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, deleted: ids.length });
+  }
+
+  if (!id) {
+    return NextResponse.json({ error: "Missing id or ids" }, { status: 400 });
+  }
 
   const { error } = await supabase
     .from("chat_sessions" as "products")

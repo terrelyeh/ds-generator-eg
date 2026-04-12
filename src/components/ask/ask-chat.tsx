@@ -109,6 +109,8 @@ export function AskChat() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -237,6 +239,30 @@ export function AskChat() {
     } catch { /* ignore */ }
   }
 
+  async function handleBatchDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Delete ${selectedIds.size} conversations?`)) return;
+    try {
+      await fetch("/api/chat-sessions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ids: [...selectedIds] }),
+      });
+      if (sessionId && selectedIds.has(sessionId)) handleNewChat();
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      fetchSessions();
+    } catch { /* ignore */ }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
   function formatRelativeTime(dateStr: string) {
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
@@ -269,6 +295,15 @@ export function AskChat() {
           <div className="flex items-center justify-between px-3 py-2.5 border-b">
             <span className="text-xs font-semibold text-muted-foreground">History</span>
             <div className="flex items-center gap-1">
+              {sessions.length > 0 && (
+                <button
+                  onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
+                  className={`rounded px-1.5 py-0.5 text-xs transition-colors ${selectMode ? "bg-engenius-blue text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                  title="Select multiple"
+                >
+                  {selectMode ? "Cancel" : "Select"}
+                </button>
+              )}
               <button onClick={handleNewChat} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
                 <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10" /></svg>
               </button>
@@ -277,6 +312,17 @@ export function AskChat() {
               </button>
             </div>
           </div>
+
+          {/* Batch delete bar */}
+          {selectMode && selectedIds.size > 0 && (
+            <div className="flex items-center justify-between px-3 py-2 border-b bg-red-50">
+              <span className="text-xs text-red-700">{selectedIds.size} selected</span>
+              <button onClick={handleBatchDelete} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
+                Delete
+              </button>
+            </div>
+          )}
+
           <div className="flex-1 overflow-y-auto">
             {sessions.length === 0 ? (
               <div className="px-3 py-6 text-center text-xs text-muted-foreground/50">No conversations yet</div>
@@ -284,10 +330,21 @@ export function AskChat() {
               sessions.map((s) => (
                 <button
                   key={s.id}
-                  onClick={() => handleLoadSession(s.id)}
-                  className={`w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors group ${sessionId === s.id ? "bg-muted" : ""}`}
+                  onClick={() => selectMode ? toggleSelect(s.id) : handleLoadSession(s.id)}
+                  className={`w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors group ${
+                    sessionId === s.id && !selectMode ? "bg-muted" : ""
+                  } ${selectedIds.has(s.id) ? "bg-engenius-blue/5" : ""}`}
                 >
                   <div className="flex items-start justify-between gap-2">
+                    {selectMode && (
+                      <div className={`flex-shrink-0 mt-0.5 h-4 w-4 rounded border-2 transition-colors ${
+                        selectedIds.has(s.id) ? "bg-engenius-blue border-engenius-blue" : "border-muted-foreground/30"
+                      }`}>
+                        {selectedIds.has(s.id) && (
+                          <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5" /></svg>
+                        )}
+                      </div>
+                    )}
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium truncate">{s.title}</div>
                       <div className="flex items-center gap-2 mt-0.5">
