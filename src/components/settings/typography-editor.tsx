@@ -162,6 +162,23 @@ export function TypographyEditor() {
   const allFonts = [...(FONT_OPTIONS[locale] ?? []), ...customFonts];
   const localeInfo = SUPPORTED_LOCALES.find((l) => l.value === locale);
 
+  // Load all candidate fonts so previews render correctly
+  useEffect(() => {
+    const fonts = [...(FONT_OPTIONS[locale] ?? []), ...customFonts];
+    if (fonts.length === 0) return;
+    const families = fonts.map((f) => `family=${f.import}:wght@400;500;700`).join("&");
+    const linkId = `typography-font-preview-${locale}`;
+    let link = document.getElementById(linkId) as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.id = linkId;
+      link.rel = "stylesheet";
+      document.head.appendChild(link);
+    }
+    link.href = `https://fonts.googleapis.com/css2?${families}&display=swap`;
+    return () => { link?.remove(); };
+  }, [locale, customFonts]);
+
   return (
     <div className="space-y-6">
       <div>
@@ -243,15 +260,18 @@ export function TypographyEditor() {
                       <div key={font.value} className="relative group">
                         <button
                           onClick={() => handleChange("font_family", font.value)}
-                          className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
+                          className={`w-full rounded-lg border px-3 py-2.5 text-left transition-all ${
                             settings.font_family === font.value
                               ? "border-engenius-blue bg-engenius-blue/5 ring-1 ring-engenius-blue"
                               : "border-border hover:border-engenius-blue/30"
                           }`}
                         >
-                          <span className="text-xs font-medium">{font.label}</span>
-                          <p className="mt-0.5 text-[10px] text-muted-foreground truncate" style={{ fontFamily: `'${font.value}', sans-serif` }}>
-                            {locale === "ja" ? "クラウド管理型 AI カメラ" : "雲端管理型 AI 攝影機"}
+                          <span className="text-[10px] font-medium text-muted-foreground">{font.label}</span>
+                          <p className="mt-1 text-sm leading-snug" style={{ fontFamily: `'${font.value}', sans-serif`, fontWeight: 500 }}>
+                            {locale === "ja" ? "クラウド管理型 AI ドームカメラ" : "雲端管理型 AI 戶外半球攝影機"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground" style={{ fontFamily: `'${font.value}', sans-serif` }}>
+                            {locale === "ja" ? "256GB 内蔵ストレージ搭載" : "內建 256GB 儲存空間"}
                           </p>
                         </button>
                         {isCustom && (
