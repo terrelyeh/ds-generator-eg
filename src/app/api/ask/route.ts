@@ -222,7 +222,7 @@ async function callClaude(
     },
     body: JSON.stringify({
       model,
-      max_tokens: 8192,
+      max_tokens: 16384,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     }),
@@ -252,7 +252,6 @@ async function callOpenAI(
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
     ],
-    max_tokens: 8192,
   });
 
   return response.choices[0]?.message?.content ?? "";
@@ -274,7 +273,6 @@ async function callGemini(
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        generationConfig: { maxOutputTokens: 8192 },
       }),
     }
   );
