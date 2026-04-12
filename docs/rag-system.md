@@ -162,6 +162,7 @@ After Google Sheets sync updates product data, click **Re-index** on the `/ask` 
   "question": "哪些 AP 支援 WiFi 7？",
   "persona": "sales",
   "provider": "claude",
+  "history": [{"role":"user","content":"..."},{"role":"assistant","content":"..."}],
   "source_type": "product_spec",
   "product_line": "Cloud AP"
 }
@@ -223,20 +224,59 @@ Not needed for `product_spec` (current). Implement when adding Gitbook/Google Do
 - **No Auth** — /api/ask is currently unprotected. Add Supabase Auth before wider rollout
 - **pgvector is free** — included in all Supabase plans including Free
 
-## 12. Roadmap
+## 12. Conversation History
+
+The system supports follow-up questions by sending recent conversation history (last 3 exchanges) with each API call.
+
+**How it works:**
+1. Frontend sends `history[]` (last 6 messages) with each question
+2. Backend enriches the embedding query with history context — so "這幾台" resolves to the models mentioned in the previous answer
+3. Previous conversation is included in the LLM prompt as "Previous conversation" section
+4. If vector search returns no results but history exists, the LLM can still answer based on conversation context
+
+**Limitations:**
+- History is client-side only (browser memory) — refreshing the page clears it
+- No persistent conversation storage (yet)
+- Very long conversations may hit token limits
+
+## 13. Intent Detection (Future)
+
+### When is it needed?
+Not now (105 chunks, single source_type). Needed when documents grow to 1000+ chunks across multiple source types.
+
+### What it does
+Classifies the user's question intent before searching, to pick the right source types and search strategy.
+
+| Intent | Example | Search Strategy |
+|---|---|---|
+| Spec query | "ECC100 解析度多少？" | product_spec only |
+| Product comparison | "ECC100 vs ECC500" | product_spec, top_k: 12 |
+| Installation/setup | "怎麼設定 cloud AP？" | gitbook + text_snippet |
+| Troubleshooting | "PoE 不供電怎麼辦？" | gitbook + text_snippet |
+| Recommendation | "適合倉庫的 AP？" | product_spec + text_snippet |
+| Policy/process | "RMA 流程？" | google_doc + text_snippet |
+
+### Implementation approaches (simple → complex)
+1. **Persona + source_types binding** — each persona limits search scope (already supported in schema)
+2. **Keyword rules** — question contains "怎麼裝/設定" → prioritize gitbook (500+ chunks)
+3. **LLM Router** — cheap LLM classifies intent first, then routes (1000+ chunks)
+4. **Multi-query** — break complex questions into sub-queries (advanced)
+
+## 14. Roadmap
 
 | Phase | Item | Complexity |
 |---|---|---|
-| 1 (Done) | product_spec + Ask UI + Persona | Low |
+| 1 (Done) | product_spec + Ask UI + Persona + Conversation history | Low |
 | 2 | text_snippet CRUD | Low |
 | 3 | Auto re-index after Sync | Low |
 | 4 | Gitbook ingestion | Medium |
 | 5 | Google Docs ingestion | Medium |
-| 6 | Streaming + conversation history | Medium |
+| 6 | Streaming response | Medium |
 | 7 | Image handling (Claude Vision) | Medium |
-| 8 | Web link ingestion | Medium-High |
-| 9 | Word/PDF upload + ingestion | High |
-| 10 | Supabase Auth + usage tracking | Medium |
+| 8 | Intent detection / query routing | Medium |
+| 9 | Web link ingestion | Medium-High |
+| 10 | Word/PDF upload + ingestion | High |
+| 11 | Supabase Auth + usage tracking + persistent conversations | Medium |
 
 ### Other improvements
 - Hybrid search (vector + tsvector keyword match)
@@ -245,3 +285,4 @@ Not needed for `product_spec` (current). Implement when adding Gitbook/Google Do
 - Answer quality feedback (thumbs up/down)
 - Multi-language embeddings
 - Query caching for common questions
+- Persistent conversation storage (DB-backed chat sessions)

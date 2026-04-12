@@ -7,12 +7,18 @@ import { getPersona, listPersonas } from "@/lib/rag/personas";
 // Allow up to 30s for RAG queries
 export const maxDuration = 30;
 
+interface ChatMessage {
+  role: "user" | "assistant";
+  content: string;
+}
+
 interface AskRequest {
   question: string;
   source_type?: string; // Filter by source type
   product_line?: string; // Filter by product line
   provider?: string; // LLM provider: 'claude' | 'openai' | 'gemini'
   persona?: string;  // Persona slug: 'default' | 'sales' | 'support' | 'pm' | custom
+  history?: ChatMessage[]; // Previous messages for conversation context
 }
 
 /**
@@ -49,15 +55,24 @@ interface MatchedDoc {
  */
 export async function POST(request: Request) {
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, provider = "gemini", persona: personaId = "default" } = body;
+  const { question, source_type, product_line, provider = "gemini", persona: personaId = "default", history = [] } = body;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
   }
 
   try {
-    // Step 1: Embed the question
-    const queryEmbedding = await generateEmbedding(question);
+    // Step 1: Build search query — for follow-up questions, include context from history
+    // so the embedding captures the full intent (e.g., "這幾台" → models from previous answer)
+    const recentHistory = history.slice(-4); // last 2 exchanges
+    const searchQuery = recentHistory.length > 0
+      ? `${recentHistory.map((m) => m.content).join("\n")}\n${question}`
+      : question;
+
+    // Embed using enriched query for better search results
+    const queryEmbedding = await generateEmbedding(
+      searchQuery.length > 8000 ? searchQuery.slice(-8000) : searchQuery
+    );
 
     // Step 2: Vector search in Supabase
     const supabase = createAdminClient();
@@ -87,7 +102,7 @@ export async function POST(request: Request) {
 
     const docs = matches ?? [];
 
-    if (docs.length === 0) {
+    if (docs.length === 0 && recentHistory.length === 0) {
       return NextResponse.json({
         ok: true,
         answer: "I couldn't find relevant product information to answer your question. Try rephrasing or asking about a specific product model.",
@@ -97,24 +112,28 @@ export async function POST(request: Request) {
     }
 
     // Step 3: Build context from matched documents
-    const context = docs
-      .map(
-        (d, i) =>
-          `[Source ${i + 1}: ${d.title}]\n${d.content}`
-      )
-      .join("\n\n---\n\n");
+    const context = docs.length > 0
+      ? docs
+          .map((d, i) => `[Source ${i + 1}: ${d.title}]\n${d.content}`)
+          .join("\n\n---\n\n")
+      : "(No new documents found — answer based on conversation history)";
 
     // Step 3.5: Load persona system prompt
     const persona = await getPersona(personaId);
     const systemPrompt = persona?.system_prompt ?? (await getPersona("default"))!.system_prompt;
 
-    const userMessage = `Context documents:
+    // Build conversation context for follow-up questions
+    const historyText = recentHistory.length > 0
+      ? `Previous conversation:\n${recentHistory.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n")}\n\n---\n\n`
+      : "";
+
+    const userMessage = `${historyText}Context documents:
 
 ${context}
 
 ---
 
-Question: ${question}`;
+Current question: ${question}`;
 
     // Step 4: Call LLM
     const answer = await callLLM(provider, systemPrompt, userMessage);

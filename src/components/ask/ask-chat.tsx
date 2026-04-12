@@ -101,7 +101,12 @@ export function AskChat() {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: q, provider, persona }),
+        body: JSON.stringify({
+          question: q,
+          provider,
+          persona,
+          history: messages.slice(-6).map((m) => ({ role: m.role, content: m.content })),
+        }),
       });
       const data = await res.json();
 
