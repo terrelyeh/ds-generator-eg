@@ -355,37 +355,48 @@ export function AskChat() {
               </div>
             ) : (
               messages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
-                  <div className={`max-w-[85%] rounded-xl px-4 py-3 ${msg.role === "user" ? "bg-engenius-blue text-white" : "bg-muted"}`}>
-                    {msg.role === "assistant" ? (
-                      <div className="ask-markdown text-sm leading-relaxed">
+                <div key={i} className={msg.role === "user" ? "flex justify-end" : ""}>
+                  {msg.role === "user" ? (
+                    <div className="max-w-[80%] rounded-xl px-4 py-2.5 bg-engenius-blue text-white text-sm leading-relaxed">
+                      {msg.content}
+                    </div>
+                  ) : (
+                    <div className="text-sm leading-relaxed">
+                      <div className="ask-markdown">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
-                    ) : (
-                      <div className="text-sm leading-relaxed">{msg.content}</div>
-                    )}
-                    {msg.sources && msg.sources.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-foreground/10">
-                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">Sources</span>
-                        <div className="mt-1 flex flex-wrap gap-1.5">
+                      {msg.sources && msg.sources.length > 0 && (
+                        <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-1.5">
+                          <span className="text-xs text-muted-foreground/50 mr-1">Sources:</span>
                           {[...new Map(msg.sources.map((s) => [s.source_id, s])).values()].map((s) => (
                             <Link key={s.source_id} href={s.source_url || "#"}
-                              className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-0.5 text-xs font-medium text-engenius-blue hover:underline">
+                              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-engenius-blue hover:underline">
                               {s.source_id}
                               <span className="text-muted-foreground/40">{Math.round(s.similarity * 100)}%</span>
                             </Link>
                           ))}
+                          {msg.provider && (
+                            <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
+                          )}
                         </div>
-                      </div>
-                    )}
-                    {msg.provider && (
-                      <div className="mt-1 text-xs text-muted-foreground/40 text-right">via {msg.provider}</div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))
             )}
-            {loading && <ThinkingIndicator provider={currentModelLabel} />}
+
+            {/* Loading animation */}
+            {loading && (
+              <div className="flex items-center gap-3 py-2">
+                <div className="flex gap-1.5">
+                  <span className="h-3 w-3 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "0ms", animationDuration: "0.8s" }} />
+                  <span className="h-3 w-3 rounded-full bg-engenius-blue/70 animate-bounce" style={{ animationDelay: "200ms", animationDuration: "0.8s" }} />
+                  <span className="h-3 w-3 rounded-full bg-engenius-blue/40 animate-bounce" style={{ animationDelay: "400ms", animationDuration: "0.8s" }} />
+                </div>
+                <span className="text-sm text-muted-foreground animate-pulse">AI 思考中...</span>
+              </div>
+            )}
           </div>
 
           {/* Input area */}
@@ -488,47 +499,3 @@ export function AskChat() {
   );
 }
 
-/** Animated thinking indicator with step progression */
-function ThinkingIndicator({ provider }: { provider: string }) {
-  const [step, setStep] = useState(0);
-  const steps = [
-    { icon: "🔍", text: "Searching product database..." },
-    { icon: "📊", text: "Analyzing matched specifications..." },
-    { icon: "🤖", text: `Generating answer with ${provider}...` },
-  ];
-
-  useEffect(() => {
-    const t1 = setTimeout(() => setStep(1), 1500);
-    const t2 = setTimeout(() => setStep(2), 3500);
-    return () => { clearTimeout(t1); clearTimeout(t2); };
-  }, []);
-
-  return (
-    <div className="flex justify-start">
-      <div className="bg-muted rounded-xl px-4 py-3 min-w-[280px]">
-        <div className="space-y-2">
-          {steps.map((s, i) => (
-            <div
-              key={i}
-              className={`flex items-center gap-2.5 text-xs transition-all duration-300 ${
-                i < step ? "text-muted-foreground/40" : i === step ? "text-foreground" : "text-muted-foreground/20"
-              }`}
-            >
-              <span className={`text-sm ${i === step ? "animate-pulse" : ""}`}>
-                {i < step ? "✓" : s.icon}
-              </span>
-              <span>{s.text}</span>
-              {i === step && (
-                <span className="flex gap-0.5 ml-1">
-                  <span className="h-1 w-1 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="h-1 w-1 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="h-1 w-1 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "300ms" }} />
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
