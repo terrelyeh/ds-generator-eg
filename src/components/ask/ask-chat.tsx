@@ -20,6 +20,7 @@ interface Message {
   content: string;
   sources?: Source[];
   provider?: string;
+  followUps?: string[];
 }
 
 interface PersonaOption {
@@ -180,7 +181,7 @@ export function AskChat() {
       });
       const data = await res.json();
       const updatedMessages = data.ok
-        ? [...newMessages, { role: "assistant" as const, content: data.answer, sources: data.sources, provider: data.provider }]
+        ? [...newMessages, { role: "assistant" as const, content: data.answer, sources: data.sources, provider: data.provider, followUps: data.follow_ups }]
         : [...newMessages, { role: "assistant" as const, content: `Error: ${data.error}${data.details ? `\n\n${data.details}` : ""}` }];
       setMessages(updatedMessages);
       scheduleSave(updatedMessages);
@@ -361,23 +362,54 @@ export function AskChat() {
                       {msg.content}
                     </div>
                   ) : (
-                    <div className="text-sm leading-relaxed">
+                    <div className="text-sm leading-relaxed group/msg">
                       <div className="ask-markdown">
                         <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                       </div>
-                      {msg.sources && msg.sources.length > 0 && (
-                        <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-1.5">
-                          <span className="text-xs text-muted-foreground/50 mr-1">Sources:</span>
-                          {[...new Map(msg.sources.map((s) => [s.source_id, s])).values()].map((s) => (
-                            <Link key={s.source_id} href={s.source_url || "#"}
-                              className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-engenius-blue hover:underline">
-                              {s.source_id}
-                              <span className="text-muted-foreground/40">{Math.round(s.similarity * 100)}%</span>
-                            </Link>
+
+                      {/* Action bar: copy + sources + provider */}
+                      <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-1.5">
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content);
+                            const btn = document.getElementById(`copy-${i}`);
+                            if (btn) { btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = "Copy"; }, 1500); }
+                          }}
+                          id={`copy-${i}`}
+                          className="text-xs text-muted-foreground/50 hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+                        >
+                          Copy
+                        </button>
+                        {msg.sources && msg.sources.length > 0 && (
+                          <>
+                            <span className="text-border">|</span>
+                            <span className="text-xs text-muted-foreground/50">Sources:</span>
+                            {[...new Map(msg.sources.map((s) => [s.source_id, s])).values()].map((s) => (
+                              <Link key={s.source_id} href={s.source_url || "#"}
+                                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-engenius-blue hover:underline">
+                                {s.source_id}
+                                <span className="text-muted-foreground/40">{Math.round(s.similarity * 100)}%</span>
+                              </Link>
+                            ))}
+                          </>
+                        )}
+                        {msg.provider && (
+                          <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
+                        )}
+                      </div>
+
+                      {/* Follow-up questions */}
+                      {msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {msg.followUps.map((q, qi) => (
+                            <button
+                              key={qi}
+                              onClick={() => handleSubmit(q)}
+                              className="rounded-lg border border-engenius-blue/20 px-3 py-1.5 text-xs text-engenius-blue hover:bg-engenius-blue/5 hover:border-engenius-blue/40 transition-all"
+                            >
+                              {q}
+                            </button>
                           ))}
-                          {msg.provider && (
-                            <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
-                          )}
                         </div>
                       )}
                     </div>

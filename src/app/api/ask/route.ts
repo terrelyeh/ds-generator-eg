@@ -133,12 +133,37 @@ ${context}
 
 ---
 
-Current question: ${question}`;
+Current question: ${question}
+
+---
+
+IMPORTANT: After your answer, on a new line, add exactly 3 follow-up questions the user might want to ask next, formatted as:
+FOLLOW_UP: question 1
+FOLLOW_UP: question 2
+FOLLOW_UP: question 3
+These should be natural extensions of the current topic, written in the same language as the question.`;
 
     // Step 4: Call LLM
-    const answer = await callLLM(provider, systemPrompt, userMessage);
+    const rawAnswer = await callLLM(provider, systemPrompt, userMessage);
 
-    // Step 5: Return answer with sources
+    // Step 5: Parse follow-up questions from the response
+    const lines = rawAnswer.split("\n");
+    const followUps: string[] = [];
+    const answerLines: string[] = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("FOLLOW_UP:")) {
+        followUps.push(trimmed.replace("FOLLOW_UP:", "").trim());
+      } else {
+        answerLines.push(line);
+      }
+    }
+
+    // Clean trailing empty lines from answer
+    const answer = answerLines.join("\n").replace(/\n+$/, "");
+
+    // Step 6: Return answer with sources
     const sources = docs.map((d) => ({
       title: d.title,
       source_id: d.source_id,
@@ -151,6 +176,7 @@ Current question: ${question}`;
       ok: true,
       answer,
       sources,
+      follow_ups: followUps.slice(0, 3),
       persona: personaId,
       provider,
       match_count: docs.length,
