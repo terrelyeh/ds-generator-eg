@@ -18,7 +18,7 @@ export async function GET(request: Request) {
   // Get stats per source_type
   let query = supabase
     .from("documents" as "products")
-    .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash");
+    .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash, metadata");
 
   if (sourceType) {
     query = query.eq("source_type", sourceType);
@@ -33,6 +33,7 @@ export async function GET(request: Request) {
       token_count: number | null;
       updated_at: string;
       content_hash: string;
+      metadata: Record<string, unknown> | null;
     }[] | null;
     error: unknown;
   };
@@ -70,6 +71,7 @@ export async function GET(request: Request) {
   const sources = [...new Set(docs.map((d) => `${d.source_type}:${d.source_id}`))].map((key) => {
     const [type, id] = key.split(":", 2);
     const chunks = docs.filter((d) => d.source_type === type && d.source_id === id);
+    const meta = chunks[0]?.metadata as Record<string, unknown> | null;
     return {
       source_type: type,
       source_id: id,
@@ -78,6 +80,7 @@ export async function GET(request: Request) {
       total_tokens: chunks.reduce((s, c) => s + (c.token_count ?? 0), 0),
       last_updated: chunks.reduce((latest, c) =>
         !latest || c.updated_at > latest ? c.updated_at : latest, "" as string),
+      product_line: (meta?.product_line_label as string) ?? (meta?.product_line as string) ?? null,
     };
   });
 

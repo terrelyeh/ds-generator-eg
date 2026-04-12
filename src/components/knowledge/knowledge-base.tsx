@@ -12,6 +12,7 @@ interface SourceItem {
   chunks: number;
   total_tokens: number;
   last_updated: string;
+  product_line?: string | null;
 }
 
 interface SourceTypeStats {
@@ -31,65 +32,24 @@ interface SourceTypeConfig {
 }
 
 const SOURCE_TYPES: SourceTypeConfig[] = [
-  {
-    id: "product_spec",
-    label: "Product Specs",
-    icon: "📦",
-    description: "Product overview, features, and technical specifications from the database",
-    status: "active",
-    canIngest: true,
-  },
-  {
-    id: "text_snippet",
-    label: "Text Snippets",
-    icon: "📝",
-    description: "Manual text entries — FAQ, competitive analysis, standard answers",
-    status: "planned",
-    canIngest: false,
-  },
-  {
-    id: "gitbook",
-    label: "Gitbook Docs",
-    icon: "📖",
-    description: "Technical documentation from Gitbook pages",
-    status: "planned",
-    canIngest: false,
-  },
-  {
-    id: "google_doc",
-    label: "Google Docs",
-    icon: "📄",
-    description: "Product briefs, marketing docs, internal documents from Google Drive",
-    status: "planned",
-    canIngest: false,
-  },
-  {
-    id: "web",
-    label: "Web Pages",
-    icon: "🌐",
-    description: "Website content, product pages, landing pages",
-    status: "planned",
-    canIngest: false,
-  },
-  {
-    id: "file",
-    label: "Files (PDF/Word)",
-    icon: "📎",
-    description: "Uploaded PDF and Word documents",
-    status: "planned",
-    canIngest: false,
-  },
+  { id: "product_spec", label: "Product Specs", icon: "📦", description: "Product overview, features, and technical specifications from the database", status: "active", canIngest: true },
+  { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
+  { id: "gitbook", label: "Gitbook Docs", icon: "📖", description: "Technical documentation from Gitbook pages", status: "planned", canIngest: false },
+  { id: "google_doc", label: "Google Docs", icon: "📄", description: "Product briefs, marketing docs, internal documents from Google Drive", status: "planned", canIngest: false },
+  { id: "web", label: "Web Pages", icon: "🌐", description: "Website content, product pages, landing pages", status: "planned", canIngest: false },
+  { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word documents", status: "planned", canIngest: false },
+];
+
+const SUMMARY_CARDS = [
+  { key: "types", label: "Source Types", icon: "📁", tip: "Number of active content source categories" },
+  { key: "sources", label: "Sources", icon: "📄", tip: "Total number of individual documents indexed" },
+  { key: "chunks", label: "Chunks", icon: "🧩", tip: "Each source is split into chunks for precise search" },
+  { key: "tokens", label: "Tokens", icon: "🔤", tip: "Total text volume — more tokens = richer search results" },
 ];
 
 function formatDate(dateStr: string | null) {
   if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
 }
 
 function formatTokens(tokens: number) {
@@ -104,6 +64,7 @@ export function KnowledgeBase() {
   const [loading, setLoading] = useState(true);
   const [ingesting, setIngesting] = useState<string | null>(null);
   const [expandedType, setExpandedType] = useState<string | null>(null);
+  const [showInfo, setShowInfo] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -115,11 +76,8 @@ export function KnowledgeBase() {
         setSources(data.sources ?? []);
         setTotal(data.total ?? 0);
       }
-    } catch {
-      // ignore
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* ignore */ }
+    finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
@@ -136,9 +94,6 @@ export function KnowledgeBase() {
       if (data.ok) {
         const errors = data.errors?.length ? ` (${data.errors.length} errors)` : "";
         toast.success(`Indexed ${data.processed} chunks, ${data.skipped} unchanged${errors}`);
-        if (data.errors?.length) {
-          console.warn("Ingestion errors:", data.errors);
-        }
         fetchData();
       } else {
         toast.error(`Ingestion failed: ${data.error}`);
@@ -153,7 +108,6 @@ export function KnowledgeBase() {
   async function handleDelete(sourceType: string, sourceId?: string) {
     const target = sourceId ? `"${sourceId}"` : `all ${sourceType} documents`;
     if (!confirm(`Delete ${target}? This will remove the indexed data from the vector database.`)) return;
-
     try {
       const res = await fetch("/api/documents", {
         method: "DELETE",
@@ -161,56 +115,79 @@ export function KnowledgeBase() {
         body: JSON.stringify({ source_type: sourceType, source_id: sourceId }),
       });
       const data = await res.json();
-      if (data.ok) {
-        toast.success("Deleted successfully");
-        fetchData();
-      }
-    } catch {
-      toast.error("Delete failed");
-    }
+      if (data.ok) { toast.success("Deleted"); fetchData(); }
+    } catch { toast.error("Delete failed"); }
   }
 
-  // Summary stats
   const totalSources = Object.values(stats).reduce((s, v) => s + v.sources, 0);
   const totalTokens = Object.values(stats).reduce((s, v) => s + v.total_tokens, 0);
   const activeTypes = Object.keys(stats).length;
 
+  const summaryValues: Record<string, string> = {
+    types: `${activeTypes}`,
+    sources: `${totalSources}`,
+    chunks: `${total}`,
+    tokens: formatTokens(totalTokens),
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Knowledge Base</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Manage indexed content for Ask SpecHub. All content here is searchable via AI-powered vector search.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Knowledge Base</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage indexed content for Ask SpecHub.
+          </p>
+        </div>
+        <button
+          onClick={() => setShowInfo(true)}
+          className="rounded-full p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="How it works"
+        >
+          <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+          </svg>
+        </button>
       </div>
 
-      {/* Summary cards */}
+      {/* Info modal */}
+      {showInfo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowInfo(false)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">How Knowledge Base Works</h2>
+              <button onClick={() => setShowInfo(false)} className="rounded-md p-1 hover:bg-muted transition-colors">
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+            <div className="space-y-3 text-sm text-muted-foreground">
+              <p><strong className="text-foreground">1. Indexing</strong> — Content is split into small chunks and converted to mathematical vectors (embeddings) via OpenAI API.</p>
+              <p><strong className="text-foreground">2. Storage</strong> — Vectors are stored in Supabase pgvector, enabling semantic similarity search.</p>
+              <p><strong className="text-foreground">3. Search</strong> — When someone asks a question on the Ask page, the question is also converted to a vector, and the most similar chunks are retrieved.</p>
+              <p><strong className="text-foreground">4. Answer</strong> — Retrieved chunks are sent to the AI model as context, which generates an accurate answer based only on your data.</p>
+            </div>
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-xs text-muted-foreground">Currently supports Product Specs. More source types (Gitbook, Google Docs, PDF, etc.) coming soon.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Summary cards — reordered: types first */}
       <div className="grid grid-cols-4 gap-4">
-        <Card className="shadow-sm">
-          <CardContent className="pt-5 pb-4 px-5">
-            <div className="text-2xl font-bold tabular-nums">{totalSources}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Sources</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="pt-5 pb-4 px-5">
-            <div className="text-2xl font-bold tabular-nums">{total}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Chunks</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="pt-5 pb-4 px-5">
-            <div className="text-2xl font-bold tabular-nums">{formatTokens(totalTokens)}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Tokens</div>
-          </CardContent>
-        </Card>
-        <Card className="shadow-sm">
-          <CardContent className="pt-5 pb-4 px-5">
-            <div className="text-2xl font-bold tabular-nums">{activeTypes}</div>
-            <div className="text-xs text-muted-foreground mt-0.5">Source Types</div>
-          </CardContent>
-        </Card>
+        {SUMMARY_CARDS.map((card) => (
+          <Card key={card.key} className="shadow-sm">
+            <CardContent className="pt-5 pb-4 px-5">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-lg">{card.icon}</span>
+                <span className="text-xs text-muted-foreground/50" title={card.tip}>?</span>
+              </div>
+              <div className="text-2xl font-bold tabular-nums">{summaryValues[card.key]}</div>
+              <div className="text-xs text-muted-foreground mt-0.5">{card.label}</div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {loading ? (
@@ -258,23 +235,13 @@ export function KnowledgeBase() {
                           <span className="text-xs text-muted-foreground/50 tabular-nums">
                             {formatTokens(typeStat.total_tokens)} tokens
                           </span>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setExpandedType(isExpanded ? null : config.id)}
-                            className="text-xs"
-                          >
+                          <Button variant="outline" size="sm" onClick={() => setExpandedType(isExpanded ? null : config.id)} className="text-xs">
                             {isExpanded ? "Hide" : "Details"}
                           </Button>
                         </>
                       )}
                       {config.canIngest && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleIngest(config.id)}
-                          disabled={isIngesting}
-                          className="text-xs"
-                        >
+                        <Button size="sm" onClick={() => handleIngest(config.id)} disabled={isIngesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
                       )}
@@ -290,17 +257,23 @@ export function KnowledgeBase() {
                         <thead>
                           <tr className="bg-muted/50">
                             <th className="text-left px-3 py-2 font-medium">Source</th>
+                            {config.id === "product_spec" && (
+                              <th className="text-left px-3 py-2 font-medium">Product Line</th>
+                            )}
                             <th className="text-left px-3 py-2 font-medium">Title</th>
                             <th className="text-center px-3 py-2 font-medium">Chunks</th>
                             <th className="text-center px-3 py-2 font-medium">Tokens</th>
                             <th className="text-left px-3 py-2 font-medium">Last Updated</th>
-                            <th className="text-right px-3 py-2 font-medium"></th>
+                            <th className="text-right px-3 py-2 font-medium">Action</th>
                           </tr>
                         </thead>
                         <tbody>
                           {typeSources.map((s) => (
                             <tr key={`${s.source_type}:${s.source_id}`} className="border-t hover:bg-muted/30 transition-colors">
                               <td className="px-3 py-2 font-mono font-medium text-engenius-blue">{s.source_id}</td>
+                              {config.id === "product_spec" && (
+                                <td className="px-3 py-2 text-muted-foreground">{s.product_line || "—"}</td>
+                              )}
                               <td className="px-3 py-2 text-muted-foreground truncate max-w-[200px]">{s.title}</td>
                               <td className="px-3 py-2 text-center tabular-nums">{s.chunks}</td>
                               <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{formatTokens(s.total_tokens)}</td>
@@ -308,12 +281,10 @@ export function KnowledgeBase() {
                               <td className="px-3 py-2 text-right">
                                 <button
                                   onClick={() => handleDelete(s.source_type, s.source_id)}
-                                  className="text-red-400 hover:text-red-600 transition-colors"
-                                  title="Delete"
+                                  className="text-xs text-muted-foreground/50 hover:text-red-500 transition-colors"
+                                  title={`Delete ${s.source_id} from index`}
                                 >
-                                  <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                    <path d="M5 3V2a1 1 0 011-1h4a1 1 0 011 1v1M2.5 3.5h11M6 6.5v5M10 6.5v5M3.5 3.5l.5 9a1 1 0 001 1h6a1 1 0 001-1l.5-9" />
-                                  </svg>
+                                  Delete
                                 </button>
                               </td>
                             </tr>
@@ -324,24 +295,13 @@ export function KnowledgeBase() {
 
                     <div className="mt-3 flex items-center justify-between">
                       <p className="text-xs text-muted-foreground/50">
-                        Last indexed: {formatDate(typeStat?.last_updated ?? null)}
+                        {typeSources.length} sources indexed
                       </p>
                       <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleIngest(config.id, true)}
-                          disabled={isIngesting}
-                          className="text-xs"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleIngest(config.id, true)} disabled={isIngesting} className="text-xs">
                           {isIngesting ? "Indexing..." : "Force Re-index All"}
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDelete(config.id)}
-                          className="text-xs text-red-500 hover:text-red-700"
-                        >
+                        <Button variant="outline" size="sm" onClick={() => handleDelete(config.id)} className="text-xs text-red-500 hover:text-red-700">
                           Delete All
                         </Button>
                       </div>
@@ -353,12 +313,6 @@ export function KnowledgeBase() {
           })}
         </div>
       )}
-
-      {/* Info callout */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <strong>How it works:</strong> Content is split into chunks, converted to vectors via OpenAI Embedding, and stored in pgvector for semantic search.
-        When someone asks a question on the Ask page, the most relevant chunks are retrieved and sent to the AI for answering.
-      </div>
     </div>
   );
 }
