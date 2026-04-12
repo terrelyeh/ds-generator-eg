@@ -411,7 +411,7 @@ body {
 .footer-qr-label { font-weight: 400; font-size: 7pt; color: #6b7580; margin-top: 2pt; }
 
 ${isCJK ? `
-/* CJK Typography — 禁則處理 + proper line breaking */
+/* ===== CJK Shared — 禁則處理 + line breaking ===== */
 .overview-text,
 .feature-text,
 .spec-label,
@@ -425,48 +425,16 @@ ${isCJK ? `
   text-justify: inter-ideograph;
 }
 
-/* Headline: prevent ugly mid-word breaks like 内|蔵 */
 .product-fullname-cloud,
 .product-fullname-standard {
-  font-weight: 500;
-  font-size: 24pt;
-  line-height: 1.25;
   word-break: keep-all;
   overflow-wrap: break-word;
 }
-/* Bold parts within headline (via **text** markup) */
 .product-fullname-cloud strong,
 .product-fullname-standard strong {
   font-weight: 700;
 }
 
-/* Subtitle: slightly smaller for CJK balance */
-.product-subtitle-cloud,
-.product-subtitle-standard {
-  font-size: 17pt;
-}
-
-/* Overview */
-.overview-text {
-  font-weight: 500;
-  font-size: 12pt;
-  line-height: 1.5;
-  color: #444444;
-}
-
-/* Section titles */
-.section-title,
-.features-title {
-  font-size: 13pt;
-}
-
-/* Features: slightly smaller than overview */
-.feature-item {
-  font-weight: 500;
-  font-size: 11pt;
-  line-height: 1.4;
-  color: #444444;
-}
 .feature-text {
   line-break: strict;
   word-break: normal;
@@ -474,34 +442,77 @@ ${isCJK ? `
   text-align: justify;
   text-justify: inter-ideograph;
 }
+` : ""}
 
-/* Spec: bump weight for Zen Kaku Gothic New Latin glyphs */
+${lang === "ja" ? `
+/* ===== Japanese (Zen Kaku Gothic New) ===== */
+.product-fullname-cloud,
+.product-fullname-standard {
+  font-weight: 500; font-size: 24pt; line-height: 1.25;
+}
+.product-subtitle-cloud,
+.product-subtitle-standard {
+  font-size: 17pt;
+}
+.overview-text {
+  font-weight: 500; font-size: 11.5pt; line-height: 1.5; color: #444444;
+}
+.section-title, .features-title {
+  font-size: 13pt;
+}
+.feature-item {
+  font-weight: 500; font-size: 10.5pt; line-height: 1.4; color: #444444;
+}
 .spec-label {
-  font-size: 7pt;
-  font-weight: 600;
-  line-height: 1.5;
+  font-size: 7pt; font-weight: 600; line-height: 1.5;
 }
 .spec-value {
-  font-weight: 400;
-  line-height: 1.5;
+  font-weight: 400; line-height: 1.5;
 }
-
-/* Section headers */
 .spec-category-header {
   letter-spacing: 0.5pt;
 }
-
-/* Footer */
 .footer-disclaimer {
-  font-size: 6pt;
-  font-weight: 400;
-  color: #555555;
-  line-height: 1.5;
+  font-size: 6pt; font-weight: 400; color: #555555; line-height: 1.5;
 }
 .footer-version {
-  font-size: 6pt;
-  font-weight: 400;
-  color: #555555;
+  font-size: 6pt; font-weight: 400; color: #555555;
+}
+` : ""}
+
+${lang === "zh-TW" ? `
+/* ===== Traditional Chinese (Noto Sans TC) ===== */
+.product-fullname-cloud,
+.product-fullname-standard {
+  font-weight: 600; font-size: 24pt; line-height: 1.25;
+}
+.product-subtitle-cloud,
+.product-subtitle-standard {
+  font-size: 17pt;
+}
+.overview-text {
+  font-weight: 500; font-size: 12pt; line-height: 1.5; color: #444444;
+}
+.section-title, .features-title {
+  font-size: 13pt;
+}
+.feature-item {
+  font-weight: 500; font-size: 11pt; line-height: 1.4; color: #444444;
+}
+.spec-label {
+  font-size: 7pt; font-weight: 600; line-height: 1.5;
+}
+.spec-value {
+  font-weight: 400; line-height: 1.5;
+}
+.spec-category-header {
+  letter-spacing: 0.3pt;
+}
+.footer-disclaimer {
+  font-size: 6pt; font-weight: 400; color: #555555; line-height: 1.5;
+}
+.footer-version {
+  font-size: 6pt; font-weight: 400; color: #555555;
 }
 ` : ""}
 `,
