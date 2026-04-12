@@ -281,6 +281,23 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Typography link */}
+      <Card className="shadow-sm">
+        <CardContent className="flex items-center justify-between py-5">
+          <div>
+            <h3 className="text-sm font-semibold">Typography</h3>
+            <p className="text-xs text-muted-foreground">
+              Adjust font sizes and weights per language for Datasheet PDF generation.
+            </p>
+          </div>
+          <Link href="/settings/typography">
+            <Button variant="outline" size="sm">
+              Manage Typography
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+
       <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
         <strong>Note:</strong> API keys stored here take priority over Vercel environment variables.
         If both exist, the key saved here will be used.

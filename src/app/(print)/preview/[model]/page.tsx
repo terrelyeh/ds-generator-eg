@@ -2,6 +2,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { splitIntoPages } from "@/lib/datasheet/pagination";
 import { getDict } from "@/lib/datasheet/locales";
+import { TYPOGRAPHY_DEFAULTS } from "@/lib/datasheet/typography";
+import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import type {
   Product,
@@ -191,6 +193,27 @@ export default async function PreviewPage({
   ];
 
   const isCJK = lang === "ja" || lang === "zh-TW";
+
+  // Load typography settings from DB (with defaults fallback)
+  let typo: TypographySettings | null = null;
+  if (isCJK) {
+    const defaults = TYPOGRAPHY_DEFAULTS[lang] ?? TYPOGRAPHY_DEFAULTS["ja"];
+    try {
+      const { data: typoData } = await supabase
+        .from("app_settings" as "products")
+        .select("value")
+        .eq("key", `typography_${lang}`)
+        .single() as { data: { value: string } | null };
+
+      if (typoData?.value) {
+        typo = { ...defaults, ...JSON.parse(typoData.value) };
+      } else {
+        typo = defaults;
+      }
+    } catch {
+      typo = defaults;
+    }
+  }
 
   const fontFamily = lang === "ja"
     ? "'Zen Kaku Gothic New', 'Roboto', sans-serif"
@@ -444,75 +467,39 @@ ${isCJK ? `
 }
 ` : ""}
 
-${lang === "ja" ? `
-/* ===== Japanese (Zen Kaku Gothic New) ===== */
+${typo ? `
+/* ===== Per-locale typography (from DB settings) ===== */
 .product-fullname-cloud,
 .product-fullname-standard {
-  font-weight: 500; font-size: 24pt; line-height: 1.25;
+  font-weight: ${typo.headline_weight}; font-size: ${typo.headline_size}pt; line-height: 1.25;
 }
 .product-subtitle-cloud,
 .product-subtitle-standard {
-  font-size: 17pt;
+  font-size: ${typo.subtitle_size}pt;
 }
 .overview-text {
-  font-weight: 500; font-size: 11.5pt; line-height: 1.5; color: #444444;
+  font-weight: ${typo.overview_weight}; font-size: ${typo.overview_size}pt; line-height: 1.5; color: ${typo.text_color};
 }
 .section-title, .features-title {
-  font-size: 13pt;
+  font-size: ${typo.section_title_size}pt;
 }
 .feature-item {
-  font-weight: 500; font-size: 10.5pt; line-height: 1.4; color: #444444;
+  font-weight: ${typo.features_weight}; font-size: ${typo.features_size}pt; line-height: 1.4; color: ${typo.text_color};
 }
 .spec-label {
-  font-size: 7pt; font-weight: 600; line-height: 1.5;
+  font-size: ${typo.spec_label_size}pt; font-weight: ${typo.spec_label_weight}; line-height: 1.5;
 }
 .spec-value {
-  font-weight: 400; line-height: 1.5;
+  font-weight: ${typo.spec_value_weight}; line-height: 1.5;
 }
 .spec-category-header {
-  letter-spacing: 0.5pt;
+  letter-spacing: ${typo.letter_spacing}pt;
 }
 .footer-disclaimer {
-  font-size: 6pt; font-weight: 400; color: #555555; line-height: 1.5;
+  font-size: ${typo.footer_size}pt; font-weight: 400; color: #555555; line-height: 1.5;
 }
 .footer-version {
-  font-size: 6pt; font-weight: 400; color: #555555;
-}
-` : ""}
-
-${lang === "zh-TW" ? `
-/* ===== Traditional Chinese (Noto Sans TC) ===== */
-.product-fullname-cloud,
-.product-fullname-standard {
-  font-weight: 600; font-size: 24pt; line-height: 1.25;
-}
-.product-subtitle-cloud,
-.product-subtitle-standard {
-  font-size: 17pt;
-}
-.overview-text {
-  font-weight: 500; font-size: 12pt; line-height: 1.5; color: #444444;
-}
-.section-title, .features-title {
-  font-size: 13pt;
-}
-.feature-item {
-  font-weight: 500; font-size: 11pt; line-height: 1.4; color: #444444;
-}
-.spec-label {
-  font-size: 7pt; font-weight: 600; line-height: 1.5;
-}
-.spec-value {
-  font-weight: 400; line-height: 1.5;
-}
-.spec-category-header {
-  letter-spacing: 0.3pt;
-}
-.footer-disclaimer {
-  font-size: 6pt; font-weight: 400; color: #555555; line-height: 1.5;
-}
-.footer-version {
-  font-size: 6pt; font-weight: 400; color: #555555;
+  font-size: ${typo.footer_size}pt; font-weight: 400; color: #555555;
 }
 ` : ""}
 `,
