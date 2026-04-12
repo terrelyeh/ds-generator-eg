@@ -156,10 +156,10 @@ Target: 300-800 tokens/chunk. Product specs are naturally small, no complex spli
 src/lib/rag/
   embeddings.ts         — OpenAI embedding wrapper + hash + token estimation
   ingest-products.ts    — Products → chunks → embeddings → DB
-  personas.ts           — Persona definitions, CRUD, 4 built-in defaults
+  personas.ts           — Persona (Dim 1) + User Profile (Dim 2) definitions, CRUD
 
 src/app/api/
-  ask/route.ts          — GET (list personas) + POST (RAG query with history)
+  ask/route.ts          — GET (personas + profiles) + POST (RAG query with 3 dimensions)
   documents/route.ts    — GET/POST/DELETE document management + trigger ingestion
   personas/route.ts     — GET/POST/DELETE persona management
   chat-sessions/route.ts — GET/POST/DELETE conversation persistence
@@ -170,7 +170,7 @@ src/app/(main)/
   settings/personas/page.tsx    — Persona prompt management (max-w-[1100px])
 
 src/components/
-  ask/ask-chat.tsx              — Chat UI + sidebar history + persona + model selector
+  ask/ask-chat.tsx              — Chat UI + sidebar + persona + profile + model selector
   knowledge/knowledge-base.tsx  — Knowledge index dashboard + per-source management
   settings/personas-editor.tsx  — Persona CRUD editor
 
@@ -188,11 +188,12 @@ supabase/migrations/
 
 ### Daily Usage
 1. Click **Ask** in navbar
-2. Select persona (Product Specialist / Sales / Support / PM)
-3. Select AI model (Gemini / GPT / Claude → pick specific model from dropdown)
-4. Type question or click example
-5. Follow up with additional questions (system remembers context)
-6. Past conversations auto-save and appear in the sidebar (hamburger icon)
+2. **回答角度** — Select persona (Product Specialist / Sales / Support / PM)
+3. **對話對象** — Select user profile (一般同事 / 新進同仁 / 業務 / Channel Sales / PM / 客戶)
+4. Select AI model (Gemini / GPT / Claude → pick specific model from dropdown)
+5. Type question or click example
+6. Follow up with additional questions (system remembers context)
+7. Past conversations auto-save and appear in the sidebar (hamburger icon)
 
 ### Knowledge Base Management
 - Go to `/knowledge` to see all indexed content
@@ -210,6 +211,7 @@ After Google Sheets sync updates product data, go to `/knowledge` and click **Re
 {
   "question": "哪些 AP 支援 WiFi 7？",
   "persona": "sales",
+  "profile": "channel-sales",
   "provider": "gemini-2.5-flash",
   "history": [{"role":"user","content":"..."},{"role":"assistant","content":"..."}],
   "source_type": "product_spec",
@@ -217,12 +219,24 @@ After Google Sheets sync updates product data, go to `/knowledge` and click **Re
 }
 ```
 
-Response includes `answer`, `sources[]` (with similarity scores), `persona`, `provider`.
+| Parameter | Required | Description |
+|---|---|---|
+| `question` | Yes | The question to ask |
+| `persona` | No | Dimension 1: answering angle (default: `default`) |
+| `profile` | No | Dimension 2: who is asking (default: `default`) |
+| `provider` | No | AI model ID (default: `gemini-2.5-flash`) |
+| `history` | No | Previous messages for conversation context |
+| `source_type` | No | Filter search to specific source type |
+| `product_line` | No | Filter search to specific product line |
 
-Provider values: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.0-flash-lite`, `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-nano`, `claude-opus`, `claude-sonnet`, `claude-haiku`
+Response includes `answer`, `sources[]`, `follow_ups[]`, `persona`, `profile`, `provider`.
+
+**Provider values**: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gpt-4o`, `gpt-4o-mini`, `gpt-4.1-nano`, `claude-opus`, `claude-sonnet`, `claude-haiku`
+
+**Profile values**: `default`, `new-hire`, `sales-rep`, `channel-sales`, `pm`, `customer`
 
 ### GET /api/ask
-Returns list of available personas.
+Returns list of available personas and user profiles.
 
 ### /api/documents (GET/POST/DELETE)
 - GET: index stats (source count, chunk count, last updated)
@@ -237,42 +251,106 @@ Returns list of available personas.
 ### /api/personas (GET/POST/DELETE)
 CRUD for persona management.
 
-## 9. Persona System
+## 9. Three-Dimension Prompt Architecture
 
-### Built-in Personas (4)
+The system uses a 3-layer prompt assembly that determines how AI responds. Each dimension is independent and combinable — creating a matrix of response styles.
 
-| Persona | Target | Style |
+```
+Prompt Assembly:
+  Layer 1: Persona        (回答角度 — what angle to answer from)
+  Layer 2: User Profile   (對話對象 — who is asking)
+  Layer 3: Output Format  (產出格式 — what to generate)  [Future]
+  Layer 4: RAG Context    (retrieved product data)
+  Layer 5: User Question  (the actual question)
+```
+
+### Dimension 1: 回答角度 (Persona) — Done
+
+Controls **what content to emphasize and how to structure the answer**, not just tone.
+
+| Persona | Emphasizes | Example difference for "ECC100 PoE?" |
 |---|---|---|
-| **Product Specialist** (default) | General / MKT | Precise specs, comparisons, multilingual |
-| **Sales Assistant** | Sales team | Benefits, selling points, customer language |
-| **Technical Support** | Support / Help desk | Simple explanations, troubleshooting steps |
-| **Product Manager** | Internal PM | Detailed comparison tables, feature gap analysis |
+| **Product Specialist** | Precise specs, related models | 「802.3af，最大 15.4W」 |
+| **Sales Assistant** | Customer value, pairings | 「支援標準 PoE，一般企業 Switch 就能供電」 |
+| **Technical Support** | Practical checks, troubleshooting | 「802.3af（15.4W）。確認 Switch 有開 PoE」 |
+| **Product Manager** | Cross-model patterns, gaps | 「802.3af。ECC500 系列用 802.3at，這是分水嶺」 |
 
-### Prompt Rules (all personas include)
+- 4 built-in personas + custom via `/settings/personas`
+- Stored in `app_settings` as `persona_{id}`
+- Each includes clarification rules (ask before guessing) and honesty rules (never fabricate)
 
-**Clarification** — AI asks follow-up questions when the user's question is vague:
-- "您是想比較規格還是價格？"
-- "請問使用場景是室內還是室外？"
-- If a reasonable guess can be made, answer with stated assumption
+### Dimension 2: 對話對象 (User Profile) — Done
 
-**Honesty** — AI never fabricates information:
-- NEVER guess specs not in the context
-- Explicitly say when data is unavailable: "根據目前資料庫中的資料，我無法找到這個資訊"
-- Share partial info and note what's missing
-- Do NOT extrapolate from similar models
+Controls **depth of explanation and terminology** based on who is asking.
+
+| Profile | Behavior adjustment |
+|---|---|
+| **一般同事** (default) | No adjustment — baseline response |
+| **新進同仁** | Explain terms, add product line context, patient with basics |
+| **業務人員** | Practical answers they can use with customers, suggest pairings |
+| **Channel Sales** | Market positioning, sell-through strategy, competitive advantages |
+| **產品經理** | Full technical depth, tables, feature gap analysis |
+| **終端客戶** | Simplest language, no jargon, focus on benefits not specs |
+
+- Default "一般同事" adds no extra prompt (zero friction)
+- Profile prompt appended to persona prompt as a separate section
+- Saved per session — no need to re-select within a conversation
+
+### Dimension 3: 產出格式 (Output Format) — Future
+
+Will control **what format of content to generate**, beyond Q&A.
+
+| Template | Use case |
+|---|---|
+| Q&A (current) | Ask questions, get answers |
+| 業務簡報 | Generate pitch deck outline for specific market + products |
+| 產品比較表 | Structured comparison sheet |
+| Email 草稿 | Product recommendation email to customer |
+| 提案文件 | Proposal document with pain points + solution |
+
+### Dimension Multiplication
+
+The three dimensions multiply to create highly targeted responses:
+
+```
+Example: Channel Sales wants a pitch for education market
+
+  Dimension 1: Sales Assistant (emphasize value, suggest pairings)
+  Dimension 2: Channel Sales (market positioning, sell-through)
+  Dimension 3: 業務簡報 (structured pitch format)  [Future]
+  
+  + RAG: ECW536, ECW526, ECS5512FP specs
+  + Question: "幫我準備教育市場的推薦方案"
+
+  → AI generates a structured pitch with market pain points,
+    product recommendations with reasons, and competitive positioning
+```
 
 ### Custom Personas
 - Manage at `/settings/personas`
 - Edit built-in prompts or create new ones (Reset to restore defaults)
 - Stored in `app_settings` table as `persona_{id}`
 
-### API Integration
-Different departments can build their own frontends calling `/api/ask` with different `persona` values:
+### External API Integration
+
+The `/api/ask` endpoint is a standalone REST API that external systems can call directly:
+
 ```
-POST /api/ask { "persona": "sales", ... }     → 業務團隊前端
-POST /api/ask { "persona": "support", ... }   → 客服系統 chatbot
-POST /api/ask { "persona": "partner", ... }   → 合作夥伴入口 (自訂)
+# Internal: 業務團隊前端
+POST /api/ask { "persona": "sales", "profile": "sales-rep", ... }
+
+# Internal: 客服系統 chatbot
+POST /api/ask { "persona": "support", "profile": "customer", ... }
+
+# External: 合作夥伴入口
+POST /api/ask { "persona": "partner", "profile": "channel-sales", ... }
 ```
+
+**Future: API Key access control** (after Supabase Auth):
+- Each partner/department gets a unique API key
+- Keys can restrict `source_type` scope (e.g., partners can only search `product_spec`, not `google_doc`)
+- Usage tracking per key (call count, token consumption)
+- Rate limiting per key tier
 
 ## 10. Conversation History & Persistence
 
@@ -344,31 +422,34 @@ Classifies the user's question intent before searching, to pick the right source
 
 | Phase | Item | Complexity | Status |
 |---|---|---|---|
-| 1 | product_spec + Ask UI + Persona | Low | Done |
+| 1 | product_spec + Ask UI + Persona (Dim 1) | Low | Done |
 | 2 | Conversation history + DB persistence | Low | Done |
 | 3 | Multi-model selector (3 tiers per provider) | Low | Done |
 | 4 | Knowledge Base management page | Low | Done |
-| 5 | Markdown rendering + loading animation | Low | Done |
+| 5 | Markdown rendering + copy button + follow-up questions | Low | Done |
 | 6 | Clarification + honesty prompt rules | Low | Done |
-| 7 | text_snippet CRUD | Low | Next |
-| 8 | Auto re-index after Sync | Low | Planned |
-| 9 | Gitbook ingestion | Medium | Planned |
-| 10 | Google Docs ingestion | Medium | Planned |
-| 11 | Streaming response (SSE) | Medium | Planned |
-| 12 | Image handling (Claude Vision) | Medium | Planned |
-| 13 | Intent detection / query routing | Medium | Planned |
-| 14 | Web link ingestion | Medium-High | Planned |
-| 15 | Word/PDF upload + ingestion | High | Planned |
-| 16 | Supabase Auth + usage tracking | Medium | Planned |
+| 7 | User Profile (Dim 2: 對話對象) | Low | Done |
+| 8 | text_snippet CRUD | Low | Next |
+| 9 | Auto re-index after Sync | Low | Planned |
+| 10 | Gitbook ingestion | Medium | Planned |
+| 11 | Google Docs ingestion | Medium | Planned |
+| 12 | Streaming response (SSE) | Medium | Planned |
+| 13 | Output Templates (Dim 3: 產出格式) | Medium | Planned |
+| 14 | Image handling (Claude Vision) | Medium | Planned |
+| 15 | Intent detection / query routing | Medium | Planned |
+| 16 | Web link ingestion | Medium-High | Planned |
+| 17 | Word/PDF upload + ingestion | High | Planned |
+| 18 | Supabase Auth + API keys + usage tracking | Medium | Planned |
+| 19 | External partner API access | Medium | Planned |
 
 ### Other improvements
 - Hybrid search (vector + tsvector keyword match)
-- Document management UI enhancements
 - Persona + source_type binding (limit search scope per persona)
 - Answer quality feedback (thumbs up/down)
 - Multi-language embeddings (embed translated content too)
 - Query caching for common questions
 - Conversation export (share/download chat history)
+- Content generation export (PPTX, PDF, Word) for Dimension 3
 
 ## 15. Page Layout
 
