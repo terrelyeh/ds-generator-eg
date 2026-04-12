@@ -103,7 +103,7 @@ export function CompareTable({ models, categories }: CompareTableProps) {
         cell: ({ getValue }) => (
           <Badge
             variant="outline"
-            className="text-[10px] px-1.5 py-0 font-semibold uppercase tracking-wider border-engenius-blue/30 text-engenius-blue bg-engenius-blue/5 whitespace-nowrap"
+            className="text-[11px] px-1.5 py-0 font-semibold uppercase tracking-wider border-engenius-blue/30 text-engenius-blue bg-engenius-blue/5 whitespace-nowrap"
           >
             {getValue<string>()}
           </Badge>
@@ -236,7 +236,7 @@ export function CompareTable({ models, categories }: CompareTableProps) {
           </Button>
           {showColumnPicker && (
             <div className="absolute right-0 top-full mt-1 z-50 w-56 max-h-[320px] overflow-y-auto rounded-lg border bg-card p-2 shadow-lg">
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
+              <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
                 Toggle Models
               </p>
               <button
@@ -336,7 +336,7 @@ export function CompareTable({ models, categories }: CompareTableProps) {
                             header.getContext()
                           )}
                           {header.column.getCanSort() && (
-                            <span className="text-[10px] ml-0.5">
+                            <span className="text-[11px] ml-0.5">
                               {isSorted === "asc"
                                 ? "↑"
                                 : isSorted === "desc"

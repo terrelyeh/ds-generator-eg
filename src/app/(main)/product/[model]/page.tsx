@@ -78,7 +78,7 @@ export default async function ProductPage({
     .eq("product_id", model)) as { data: ProductTranslation[] | null };
 
   return (
-    <div className="mx-auto max-w-[1100px] px-6 py-8">
+    <div className="mx-auto max-w-[1400px] px-6 py-8">
       <ProductDetail
         product={productWithSpecs}
         versions={versionData ?? []}

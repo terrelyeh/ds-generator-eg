@@ -169,10 +169,10 @@ export function PersonasEditor() {
                       <CardTitle className="text-sm flex items-center gap-2">
                         {p.name}
                         {p.is_default && (
-                          <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Built-in</span>
+                          <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Built-in</span>
                         )}
                         {p.updated_at && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Customized</span>
+                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">Customized</span>
                         )}
                       </CardTitle>
                       <p className="text-xs text-muted-foreground mt-0.5">{p.description}</p>

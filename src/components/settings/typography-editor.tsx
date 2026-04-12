@@ -257,7 +257,7 @@ export function TypographyEditor() {
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-sm">Font Family</CardTitle>
                   {settings.font_family !== defaults?.font_family && (
-                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Modified</span>
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">Modified</span>
                   )}
                 </div>
               </CardHeader>
@@ -275,7 +275,7 @@ export function TypographyEditor() {
                               : "border-border hover:border-engenius-blue/30"
                           }`}
                         >
-                          <span className="text-[10px] font-medium text-muted-foreground">{font.label}</span>
+                          <span className="text-[11px] font-medium text-muted-foreground">{font.label}</span>
                           <p className="mt-1 text-sm leading-snug" style={{ fontFamily: `'${font.value}', sans-serif`, fontWeight: 500 }}>
                             {locale === "ja" ? "クラウド管理型 AI ドームカメラ" : "雲端管理型 AI 戶外半球攝影機"}
                           </p>
@@ -286,7 +286,7 @@ export function TypographyEditor() {
                         {isCustom && (
                           <button
                             onClick={() => handleRemoveFont(font.value)}
-                            className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] shadow-sm"
+                            className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[11px] shadow-sm"
                             title="Remove"
                           >
                             ✕
@@ -308,7 +308,7 @@ export function TypographyEditor() {
                       className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
                       autoFocus
                     />
-                    <p className="text-[10px] text-muted-foreground/60">
+                    <p className="text-[11px] text-muted-foreground/60">
                       e.g. https://fonts.google.com/specimen/Noto+Sans+JP
                     </p>
                     <div className="flex gap-2">
@@ -344,7 +344,7 @@ export function TypographyEditor() {
                   <div key={group.label}>
                     {gi > 0 && <div className="border-t-2 border-foreground/8" />}
                     <div className="px-5 pt-3 pb-1">
-                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">{group.label}</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/50">{group.label}</span>
                     </div>
                     {group.fields.map((fieldKey) => {
                       const field = TYPOGRAPHY_FIELDS.find((f) => f.key === fieldKey);
@@ -382,10 +382,10 @@ export function TypographyEditor() {
                                   min={0}
                                   className="rounded border border-input bg-background px-1.5 py-1 text-xs w-16 tabular-nums"
                                 />
-                                {field.unit && <span className="text-[10px] text-muted-foreground">{field.unit}</span>}
+                                {field.unit && <span className="text-[11px] text-muted-foreground">{field.unit}</span>}
                               </div>
                             )}
-                            <span className="text-[10px] tabular-nums text-muted-foreground/40 w-12 text-right">
+                            <span className="text-[11px] tabular-nums text-muted-foreground/40 w-12 text-right">
                               {typeof defaultVal === "number" ? `${defaultVal}${field.unit}` : ""}
                             </span>
                             {modified && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="Modified" />}

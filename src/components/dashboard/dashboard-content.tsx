@@ -77,7 +77,7 @@ function RadioPatternCell({
           <Badge
             key={p.band}
             variant="outline"
-            className={`text-[10px] px-1.5 py-0 ${
+            className={`text-[11px] px-1.5 py-0 ${
               complete
                 ? "border-green-300 text-green-700 bg-green-50"
                 : partial
@@ -170,11 +170,11 @@ function ProductTable({
             </TableCell>
             <TableCell>
               <div className="flex gap-1">
-                <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">EN</span>
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">EN</span>
                 {product.translation_locales.map((loc) => (
                   <span
                     key={loc}
-                    className="rounded bg-engenius-blue/10 px-1.5 py-0.5 text-[10px] font-medium text-engenius-blue"
+                    className="rounded bg-engenius-blue/10 px-1.5 py-0.5 text-[11px] font-medium text-engenius-blue"
                   >
                     {loc.toUpperCase()}
                   </span>
@@ -232,7 +232,7 @@ function StatusBadge({ status }: { status: string }) {
   }[status] ?? { label: status, className: "border-gray-300 text-gray-600 bg-gray-50" };
 
   return (
-    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${config.className}`}>
+    <Badge variant="outline" className={`text-[11px] px-1.5 py-0 ${config.className}`}>
       {config.label}
     </Badge>
   );

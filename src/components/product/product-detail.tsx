@@ -176,7 +176,7 @@ function RadioPatternSlot({
         {band} {plane}
       </span>
       <label>
-        <span className="inline-flex h-6 cursor-pointer items-center rounded border border-input bg-background px-2 text-[10px] font-medium shadow-xs hover:bg-accent transition-colors">
+        <span className="inline-flex h-6 cursor-pointer items-center rounded border border-input bg-background px-2 text-[11px] font-medium shadow-xs hover:bg-accent transition-colors">
           {uploading ? "..." : hasImage ? "Replace" : "Upload"}
         </span>
         <input
@@ -472,7 +472,7 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
                               </div>
                             ) : (
                               <div className="flex items-center gap-2">
-                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Draft</span>
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">Draft</span>
                                 <span className="text-xs text-muted-foreground/60">Save translation to enable PDF generation</span>
                               </div>
                             )}

@@ -233,12 +233,12 @@ export function KnowledgeBase() {
                         <CardTitle className="text-sm flex items-center gap-2">
                           {config.label}
                           {typeStat ? (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               {typeStat.sources} sources, {typeStat.count} chunks
                             </span>
                           ) : config.status === "planned" ? (
-                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">Coming Soon</span>
+                            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Coming Soon</span>
                           ) : null}
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -323,7 +323,7 @@ export function KnowledgeBase() {
                     </div>
 
                     <div className="mt-3 flex items-center justify-between">
-                      <p className="text-[11px] text-muted-foreground/50">
+                      <p className="text-xs text-muted-foreground/50">
                         Last indexed: {formatDate(typeStat?.last_updated ?? null)}
                       </p>
                       <div className="flex items-center gap-2">

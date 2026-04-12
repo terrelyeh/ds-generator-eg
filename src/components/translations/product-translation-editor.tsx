@@ -540,11 +540,11 @@ export function ProductTranslationEditor({
         <div className="flex items-center gap-3">
           {/* Draft / Confirmed badge */}
           {confirmedLocales.has(activeLocale) ? (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-medium text-emerald-700 border border-emerald-200">
+            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-200">
               Confirmed
             </span>
           ) : (
-            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-medium text-amber-700 border border-amber-200">
+            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-200">
               Draft
             </span>
           )}
@@ -633,7 +633,7 @@ export function ProductTranslationEditor({
           </Button>
           </div>
           <p className="text-[11px] text-muted-foreground/60">
-            用 <code className="rounded bg-muted px-1 text-[10px]">**粗體文字**</code> 標記粗體部分。按 Enter 手動斷行，或寫成一行讓系統自動斷行。
+            用 <code className="rounded bg-muted px-1 text-[11px]">**粗體文字**</code> 標記粗體部分。按 Enter 手動斷行，或寫成一行讓系統自動斷行。
           </p>
         </CardHeader>
         <CardContent className="space-y-3">

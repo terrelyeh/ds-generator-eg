@@ -275,8 +275,8 @@ export function AskChat() {
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-medium truncate">{s.title}</div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-[10px] text-muted-foreground/50">{s.message_count} msgs</span>
-                        <span className="text-[10px] text-muted-foreground/50">{formatRelativeTime(s.updated_at)}</span>
+                        <span className="text-xs text-muted-foreground/50">{s.message_count} msgs</span>
+                        <span className="text-xs text-muted-foreground/50">{formatRelativeTime(s.updated_at)}</span>
                       </div>
                     </div>
                     <button onClick={(e) => handleDeleteSession(s.id, e)} className="hidden group-hover:block flex-shrink-0 mt-0.5 text-muted-foreground/30 hover:text-red-500 transition-colors">
@@ -299,7 +299,7 @@ export function AskChat() {
           </button>
           <div className="flex-shrink-0">
             <h1 className="text-lg font-bold tracking-tight leading-tight">Ask SpecHub</h1>
-            <p className="text-[11px] text-muted-foreground">AI-powered product query</p>
+            <p className="text-xs text-muted-foreground">AI-powered product query</p>
           </div>
 
           {/* Persona pills */}
@@ -311,7 +311,7 @@ export function AskChat() {
                     key={p.id}
                     onClick={() => setPersona(p.id)}
                     title={p.description}
-                    className={`cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap transition-all ${
+                    className={`cursor-pointer rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-all ${
                       persona === p.id
                         ? "bg-engenius-blue text-white shadow-sm"
                         : "text-muted-foreground hover:text-foreground hover:bg-background"
@@ -326,7 +326,7 @@ export function AskChat() {
           </div>
 
           {messages.length > 0 && (
-            <button onClick={handleNewChat} className="rounded-md px-2 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 whitespace-nowrap" title="New conversation">
+            <button onClick={handleNewChat} className="rounded-md px-2 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors flex-shrink-0 whitespace-nowrap" title="New conversation">
               + New
             </button>
           )}
@@ -366,11 +366,11 @@ export function AskChat() {
                     )}
                     {msg.sources && msg.sources.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-foreground/10">
-                        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">Sources</span>
+                        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground/60">Sources</span>
                         <div className="mt-1 flex flex-wrap gap-1.5">
                           {[...new Map(msg.sources.map((s) => [s.source_id, s])).values()].map((s) => (
                             <Link key={s.source_id} href={s.source_url || "#"}
-                              className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-0.5 text-[11px] font-medium text-engenius-blue hover:underline">
+                              className="inline-flex items-center gap-1 rounded-md bg-background px-2 py-0.5 text-xs font-medium text-engenius-blue hover:underline">
                               {s.source_id}
                               <span className="text-muted-foreground/40">{Math.round(s.similarity * 100)}%</span>
                             </Link>
@@ -379,7 +379,7 @@ export function AskChat() {
                       </div>
                     )}
                     {msg.provider && (
-                      <div className="mt-1 text-[10px] text-muted-foreground/40 text-right">via {msg.provider}</div>
+                      <div className="mt-1 text-xs text-muted-foreground/40 text-right">via {msg.provider}</div>
                     )}
                   </div>
                 </div>
@@ -392,7 +392,7 @@ export function AskChat() {
           <div className="border-t px-4 py-3 space-y-2 flex-shrink-0">
             {/* Model selector — provider tabs + dropdown */}
             <div className="flex items-center gap-1.5" ref={dropdownRef}>
-              <span className="text-[11px] text-muted-foreground/50 flex-shrink-0">AI:</span>
+              <span className="text-xs text-muted-foreground/50 flex-shrink-0">AI:</span>
               {PROVIDERS.map((group) => {
                 const isAvailable = group.checkKeys.some((k) => availableProviders[k]);
                 const activeModel = group.models.find((m) => m.id === provider);
@@ -411,7 +411,7 @@ export function AskChat() {
                         }
                       }}
                       disabled={!isAvailable}
-                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-all ${
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${
                         isActiveGroup
                           ? "bg-engenius-blue text-white shadow-sm"
                           : isAvailable
@@ -430,7 +430,7 @@ export function AskChat() {
                     {/* Dropdown */}
                     {isOpen && (
                       <div className="absolute bottom-full left-0 mb-1 w-52 rounded-lg border bg-background shadow-lg py-1 z-50">
-                        <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                        <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground/50 uppercase tracking-wider">
                           {group.label} Models
                         </div>
                         {group.models.map((model) => (
@@ -445,7 +445,7 @@ export function AskChat() {
                             }`}
                           >
                             <span>{model.label}</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                            <span className={`text-xs px-1.5 py-0.5 rounded ${
                               model.tier === "Strongest" ? "bg-amber-50 text-amber-700" :
                               model.tier === "Mainstream" ? "bg-blue-50 text-blue-700" :
                               "bg-emerald-50 text-emerald-700"
@@ -472,7 +472,7 @@ export function AskChat() {
               </Button>
             </div>
             {/* Current model info */}
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground/40 px-1">
+            <div className="flex items-center justify-between text-xs text-muted-foreground/40 px-1">
               <span>
                 Model: {currentModelLabel}
                 {currentPersonaLabel ? ` · Persona: ${currentPersonaLabel.name}` : ""}
