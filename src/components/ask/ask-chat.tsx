@@ -179,7 +179,16 @@ export function AskChat() {
           history: newMessages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
-      const data = await res.json();
+
+      // Handle non-JSON responses (Vercel timeout, 502, etc.)
+      const rawText = await res.text();
+      let data;
+      try {
+        data = JSON.parse(rawText);
+      } catch {
+        data = { ok: false, error: `Server error (${res.status})`, details: rawText.slice(0, 200) };
+      }
+
       const updatedMessages = data.ok
         ? [...newMessages, { role: "assistant" as const, content: data.answer, sources: data.sources, provider: data.provider, followUps: data.follow_ups }]
         : [...newMessages, { role: "assistant" as const, content: `Error: ${data.error}${data.details ? `\n\n${data.details}` : ""}` }];

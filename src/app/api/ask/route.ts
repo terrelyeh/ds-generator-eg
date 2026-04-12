@@ -4,8 +4,8 @@ import { generateEmbedding } from "@/lib/rag/embeddings";
 import { getApiKey, API_KEY_MAP } from "@/lib/settings";
 import { getPersona, listPersonas } from "@/lib/rag/personas";
 
-// Allow up to 30s for RAG queries
-export const maxDuration = 30;
+// Allow up to 60s for RAG queries (embedding + vector search + LLM)
+export const maxDuration = 60;
 
 interface ChatMessage {
   role: "user" | "assistant";
