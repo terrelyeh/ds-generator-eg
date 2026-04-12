@@ -176,22 +176,32 @@ async function callLLM(
   systemPrompt: string,
   userMessage: string
 ): Promise<string> {
-  switch (provider) {
-    case "claude-sonnet":
-      return callClaude(systemPrompt, userMessage, "claude-sonnet-4-5-20241219");
-    case "claude-opus":
-      return callClaude(systemPrompt, userMessage, "claude-opus-4-5-20250415");
+  // Model ID mapping
+  const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string }> = {
+    // Claude
+    "claude-opus": { fn: "claude", model: "claude-opus-4-5-20250415" },
+    "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-5-20241219" },
+    "claude-haiku": { fn: "claude", model: "claude-haiku-3-5-20241022" },
+    // OpenAI
+    "gpt-4o": { fn: "openai", model: "gpt-4o" },
+    "gpt-4o-mini": { fn: "openai", model: "gpt-4o-mini" },
+    "gpt-4.1-nano": { fn: "openai", model: "gpt-4.1-nano" },
+    // Gemini
+    "gemini-2.5-pro": { fn: "gemini", model: "gemini-2.5-pro" },
+    "gemini-2.5-flash": { fn: "gemini", model: "gemini-2.5-flash" },
+    "gemini-2.0-flash-lite": { fn: "gemini", model: "gemini-2.0-flash-lite" },
+  };
+
+  const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-2.5-flash" };
+
+  switch (mapped.fn) {
     case "claude":
-      return callClaude(systemPrompt, userMessage, "claude-sonnet-4-5-20241219");
-    case "gpt-4o":
+      return callClaude(systemPrompt, userMessage, mapped.model);
     case "openai":
-      return callOpenAI(systemPrompt, userMessage);
-    case "gemini-pro":
-      return callGemini(systemPrompt, userMessage, "gemini-2.5-pro");
-    case "gemini-flash":
+      return callOpenAI(systemPrompt, userMessage, mapped.model);
     case "gemini":
     default:
-      return callGemini(systemPrompt, userMessage, "gemini-2.5-flash");
+      return callGemini(systemPrompt, userMessage, mapped.model);
   }
 }
 
@@ -227,7 +237,8 @@ async function callClaude(
 
 async function callOpenAI(
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  model = "gpt-4o"
 ): Promise<string> {
   const apiKey = await getApiKey("openai_api_key", API_KEY_MAP.openai_api_key);
   if (!apiKey) throw new Error("OpenAI API key not configured");
@@ -236,7 +247,7 @@ async function callOpenAI(
   const client = new OpenAI({ apiKey });
 
   const response = await client.chat.completions.create({
-    model: "gpt-4o",
+    model,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },

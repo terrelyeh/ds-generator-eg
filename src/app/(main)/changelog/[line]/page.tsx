@@ -123,7 +123,7 @@ export default async function ChangeLogPage({
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] px-6 py-8">
+    <div className="mx-auto max-w-[1100px] px-6 py-8">
       <div className="mb-6">
         <nav className="flex items-center gap-1.5 text-sm">
           <Link

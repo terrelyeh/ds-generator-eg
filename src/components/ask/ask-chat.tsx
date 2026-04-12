@@ -37,12 +37,50 @@ interface SessionSummary {
   updated_at: string;
 }
 
-const PROVIDER_OPTIONS = [
-  { id: "claude-sonnet", label: "Claude Sonnet", checkKeys: ["claude-sonnet"] },
-  { id: "claude-opus", label: "Claude Opus", checkKeys: ["claude-opus"] },
-  { id: "gpt-4o", label: "GPT-4o", checkKeys: ["gpt-4o"] },
-  { id: "gemini-pro", label: "Gemini Pro", checkKeys: ["gemini-2.5-pro"] },
-  { id: "gemini-flash", label: "Gemini Flash", checkKeys: ["gemini-2.5-pro"] },
+interface ModelOption {
+  id: string;
+  label: string;
+  tier: string; // "strongest" | "mainstream" | "cp-value"
+}
+
+interface ProviderGroup {
+  id: string;
+  label: string;
+  checkKeys: string[];
+  models: ModelOption[];
+}
+
+const PROVIDERS: ProviderGroup[] = [
+  {
+    id: "gemini",
+    label: "Gemini",
+    checkKeys: ["gemini-2.5-pro"],
+    models: [
+      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tier: "Strongest" },
+      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tier: "Mainstream" },
+      { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite", tier: "Best CP" },
+    ],
+  },
+  {
+    id: "openai",
+    label: "GPT",
+    checkKeys: ["gpt-4o"],
+    models: [
+      { id: "gpt-4o", label: "GPT-4o", tier: "Strongest" },
+      { id: "gpt-4o-mini", label: "GPT-4o Mini", tier: "Mainstream" },
+      { id: "gpt-4.1-nano", label: "GPT-4.1 Nano", tier: "Best CP" },
+    ],
+  },
+  {
+    id: "claude",
+    label: "Claude",
+    checkKeys: ["claude-sonnet", "claude-opus"],
+    models: [
+      { id: "claude-opus", label: "Claude Opus 4", tier: "Strongest" },
+      { id: "claude-sonnet", label: "Claude Sonnet 4", tier: "Mainstream" },
+      { id: "claude-haiku", label: "Claude Haiku 3.5", tier: "Best CP" },
+    ],
+  },
 ];
 
 const EXAMPLE_QUESTIONS = [
@@ -68,12 +106,24 @@ export function AskChat() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetch("/api/ask").then((r) => r.json()).then((d) => { if (d.ok) setPersonas(d.personas); }).catch(() => {});
     fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
   }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!openDropdown) return;
+    const handler = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) setOpenDropdown(null);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [openDropdown]);
 
   const fetchSessions = useCallback(async () => {
     try {
@@ -246,10 +296,10 @@ export function AskChat() {
             <p className="text-[11px] text-muted-foreground">AI-powered product query</p>
           </div>
 
-          {/* Persona pills — scrollable on small screens */}
-          <div className="flex-1 min-w-0 overflow-x-auto">
+          {/* Persona pills */}
+          <div className="flex-1 min-w-0">
             {personas.length > 0 && (
-              <div className="flex gap-1 rounded-lg bg-muted p-0.5 w-fit">
+              <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-0.5 w-fit">
                 {personas.map((p) => (
                   <button
                     key={p.id}
@@ -347,20 +397,73 @@ export function AskChat() {
 
           {/* Input area */}
           <div className="border-t px-4 py-3 space-y-2 flex-shrink-0">
-            <div className="flex items-center gap-1.5 overflow-x-auto">
+            {/* Model selector — provider tabs + dropdown */}
+            <div className="flex items-center gap-1.5" ref={dropdownRef}>
               <span className="text-[11px] text-muted-foreground/50 flex-shrink-0">AI:</span>
-              {PROVIDER_OPTIONS.map((p) => {
-                const isAvailable = p.checkKeys.some((k) => availableProviders[k]);
+              {PROVIDERS.map((group) => {
+                const isAvailable = group.checkKeys.some((k) => availableProviders[k]);
+                const activeModel = group.models.find((m) => m.id === provider);
+                const isActiveGroup = !!activeModel;
+                const isOpen = openDropdown === group.id;
+
                 return (
-                  <button key={p.id} onClick={() => isAvailable && setProvider(p.id)} disabled={!isAvailable}
-                    title={isAvailable ? p.label : `${p.label} — API key not configured`}
-                    className={`rounded-md px-2 py-0.5 text-[11px] font-medium whitespace-nowrap transition-all flex-shrink-0 ${
-                      provider === p.id ? "bg-engenius-blue text-white shadow-sm"
-                        : isAvailable ? "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
-                        : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
-                    }`}>
-                    {p.label}
-                  </button>
+                  <div key={group.id} className="relative">
+                    <button
+                      onClick={() => {
+                        if (!isAvailable) return;
+                        if (isOpen) {
+                          setOpenDropdown(null);
+                        } else {
+                          setOpenDropdown(group.id);
+                        }
+                      }}
+                      disabled={!isAvailable}
+                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[11px] font-medium whitespace-nowrap transition-all ${
+                        isActiveGroup
+                          ? "bg-engenius-blue text-white shadow-sm"
+                          : isAvailable
+                            ? "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
+                            : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
+                      }`}
+                    >
+                      {isActiveGroup ? `${group.label}: ${activeModel.label}` : group.label}
+                      {isAvailable && (
+                        <svg className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M3 5l3 3 3-3" />
+                        </svg>
+                      )}
+                    </button>
+
+                    {/* Dropdown */}
+                    {isOpen && (
+                      <div className="absolute bottom-full left-0 mb-1 w-52 rounded-lg border bg-background shadow-lg py-1 z-50">
+                        <div className="px-3 py-1.5 text-[10px] font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                          {group.label} Models
+                        </div>
+                        {group.models.map((model) => (
+                          <button
+                            key={model.id}
+                            onClick={() => {
+                              setProvider(model.id);
+                              setOpenDropdown(null);
+                            }}
+                            className={`w-full text-left px-3 py-2 text-xs hover:bg-muted/50 transition-colors flex items-center justify-between ${
+                              provider === model.id ? "bg-engenius-blue/5 text-engenius-blue font-medium" : ""
+                            }`}
+                          >
+                            <span>{model.label}</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                              model.tier === "Strongest" ? "bg-amber-50 text-amber-700" :
+                              model.tier === "Mainstream" ? "bg-blue-50 text-blue-700" :
+                              "bg-emerald-50 text-emerald-700"
+                            }`}>
+                              {model.tier}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </div>
