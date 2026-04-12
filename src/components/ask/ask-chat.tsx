@@ -32,9 +32,9 @@ interface PersonaOption {
 }
 
 const PROVIDER_OPTIONS = [
-  { id: "claude", label: "Claude" },
-  { id: "openai", label: "GPT-4o" },
-  { id: "gemini", label: "Gemini" },
+  { id: "claude", label: "Claude", checkKeys: ["claude-sonnet", "claude-opus"] },
+  { id: "openai", label: "GPT-4o", checkKeys: ["gpt-4o"] },
+  { id: "gemini", label: "Gemini", checkKeys: ["gemini-2.5-pro"] },
 ];
 
 const EXAMPLE_QUESTIONS = [
@@ -53,11 +53,12 @@ export function AskChat() {
   const [provider, setProvider] = useState("gemini");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
   const [stats, setStats] = useState<IndexStats | null>(null);
   const [indexing, setIndexing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load index stats and personas
+  // Load index stats, personas, and available providers
   useEffect(() => {
     fetch("/api/documents?source_type=product_spec")
       .then((r) => r.json())
@@ -66,6 +67,10 @@ export function AskChat() {
     fetch("/api/ask")
       .then((r) => r.json())
       .then((d) => { if (d.ok) setPersonas(d.personas); })
+      .catch(() => {});
+    fetch("/api/settings/providers")
+      .then((r) => r.json())
+      .then((d) => setAvailableProviders(d))
       .catch(() => {});
   }, []);
 
@@ -308,29 +313,43 @@ export function AskChat() {
         </div>
 
         {/* Input area */}
-        <div className="border-t p-4">
-          <div className="flex items-end gap-3">
-            <div className="flex-1 relative">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask about products, specs, or comparisons..."
-                rows={1}
-                className="w-full resize-none rounded-lg border border-input bg-background px-4 py-3 pr-20 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
-                style={{ minHeight: 44, maxHeight: 120 }}
-              />
-              {/* Provider selector */}
-              <select
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded border border-input bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground"
-              >
-                {PROVIDER_OPTIONS.map((p) => (
-                  <option key={p.id} value={p.id}>{p.label}</option>
-                ))}
-              </select>
+        <div className="border-t p-4 space-y-2.5">
+          {/* Provider selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground/60">AI:</span>
+            <div className="flex gap-1">
+              {PROVIDER_OPTIONS.map((p) => {
+                const isAvailable = p.checkKeys.some((k) => availableProviders[k]);
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => isAvailable && setProvider(p.id)}
+                    disabled={!isAvailable}
+                    title={isAvailable ? p.label : `${p.label} — API key not configured`}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-medium transition-all ${
+                      provider === p.id
+                        ? "bg-engenius-blue text-white shadow-sm"
+                        : isAvailable
+                          ? "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
+                          : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
             </div>
+          </div>
+          <div className="flex items-end gap-3">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Ask about products, specs, or comparisons..."
+              rows={1}
+              className="flex-1 resize-none rounded-lg border border-input bg-background px-4 py-3 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+              style={{ minHeight: 44, maxHeight: 120 }}
+            />
             <Button
               onClick={() => handleSubmit()}
               disabled={loading || !input.trim()}
