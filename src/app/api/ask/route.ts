@@ -189,7 +189,7 @@ async function callLLM(
     // Gemini
     "gemini-2.5-pro": { fn: "gemini", model: "gemini-2.5-pro" },
     "gemini-2.5-flash": { fn: "gemini", model: "gemini-2.5-flash" },
-    "gemini-2.0-flash-lite": { fn: "gemini", model: "gemini-2.0-flash-lite" },
+    "gemini-2.5-flash-lite": { fn: "gemini", model: "gemini-2.5-flash-lite" },
   };
 
   const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-2.5-flash" };
@@ -279,9 +279,38 @@ async function callGemini(
     }
   );
 
-  const data = await res.json();
+  const rawText = await res.text();
+
   if (!res.ok) {
-    throw new Error(`Gemini API error: ${JSON.stringify(data)}`);
+    // Try to extract useful error message
+    try {
+      const errData = JSON.parse(rawText);
+      throw new Error(`Gemini API error: ${errData.error?.message || rawText.slice(0, 300)}`);
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("Gemini")) throw e;
+      throw new Error(`Gemini API error (${res.status}): ${rawText.slice(0, 300)}`);
+    }
   }
-  return data.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+
+  let data;
+  try {
+    data = JSON.parse(rawText);
+  } catch {
+    throw new Error(`Gemini returned invalid JSON: ${rawText.slice(0, 200)}`);
+  }
+
+  // Handle safety blocks
+  if (data.promptFeedback?.blockReason) {
+    throw new Error(`Gemini blocked request: ${data.promptFeedback.blockReason}`);
+  }
+
+  // Gemini 2.5 Pro may return multiple parts (thinking + answer) — get the last text part
+  const parts = data.candidates?.[0]?.content?.parts;
+  if (!parts || parts.length === 0) {
+    throw new Error("Gemini returned empty response");
+  }
+
+  // Filter to text parts only (skip thinking parts), take the last one
+  const textParts = parts.filter((p: { text?: string }) => p.text !== undefined);
+  return textParts[textParts.length - 1]?.text ?? textParts[0]?.text ?? "";
 }

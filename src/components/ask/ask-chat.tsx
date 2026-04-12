@@ -58,7 +58,7 @@ const PROVIDERS: ProviderGroup[] = [
     models: [
       { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tier: "Strongest" },
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tier: "Mainstream" },
-      { id: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite", tier: "Best CP" },
+      { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", tier: "Best CP" },
     ],
   },
   {
