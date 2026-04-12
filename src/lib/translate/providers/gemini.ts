@@ -9,7 +9,7 @@ export const gemini25Pro: TranslateProvider = {
     if (!apiKey) throw new Error("Google AI API Key 尚未設定。請到 Settings 頁面輸入。");
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro-latest:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
