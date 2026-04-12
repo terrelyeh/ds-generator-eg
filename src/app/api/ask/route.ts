@@ -49,7 +49,7 @@ interface MatchedDoc {
  */
 export async function POST(request: Request) {
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, provider = "claude", persona: personaId = "default" } = body;
+  const { question, source_type, product_line, provider = "gemini", persona: personaId = "default" } = body;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });

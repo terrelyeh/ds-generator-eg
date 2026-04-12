@@ -50,7 +50,7 @@ export function AskChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState("claude");
+  const [provider, setProvider] = useState("gemini");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [stats, setStats] = useState<IndexStats | null>(null);
