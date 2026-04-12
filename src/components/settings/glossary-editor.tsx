@@ -15,6 +15,7 @@ interface GlossaryEntry {
   scope: string;
   source: string;
   notes: string | null;
+  updated_at: string;
 }
 
 const SCOPE_OPTIONS = [
@@ -112,9 +113,16 @@ export function GlossaryEditor() {
           translated_term: editTranslated,
           scope: entry.scope,
           notes: editNotes || null,
+          expected_updated_at: entry.updated_at,
         }),
       });
       const data = await res.json();
+      if (res.status === 409) {
+        toast.error(data.error || "This term was modified by another user. Reloading...");
+        fetchGlossary();
+        setEditingId(null);
+        return;
+      }
       if (data.ok) {
         toast.success("Term updated");
         setEditingId(null);

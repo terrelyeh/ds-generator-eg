@@ -66,10 +66,11 @@ export default async function PreviewPage({
   searchParams,
 }: {
   params: Promise<{ model: string }>;
-  searchParams: Promise<{ lang?: string; mode?: string }>;
+  searchParams: Promise<{ lang?: string; mode?: string; toolbar?: string }>;
 }) {
   const { model } = await params;
-  const { lang = "en", mode = "light" } = await searchParams;
+  const { lang = "en", mode = "light", toolbar } = await searchParams;
+  const showToolbar = toolbar !== "false";
 
   const dict = getDict(lang);
   const isTranslated = lang !== "en";
@@ -224,17 +225,19 @@ export default async function PreviewPage({
 
   return (
     <>
-      <PrintToolbar
-        model={product.model_name}
-        currentVersion={product.current_version || "0.0"}
-        canGenerate={
-          !!product.product_image && !product.product_image.startsWith("cache/") &&
-          !!product.hardware_image && !product.hardware_image.startsWith("cache/") &&
-          !!product.overview && product.overview.trim().length > 0 &&
-          Array.isArray(product.features) && product.features.length > 0
-        }
-        locale={lang}
-      />
+      {showToolbar && (
+        <PrintToolbar
+          model={product.model_name}
+          currentVersion={product.current_version || "0.0"}
+          canGenerate={
+            !!product.product_image && !product.product_image.startsWith("cache/") &&
+            !!product.hardware_image && !product.hardware_image.startsWith("cache/") &&
+            !!product.overview && product.overview.trim().length > 0 &&
+            Array.isArray(product.features) && product.features.length > 0
+          }
+          locale={lang}
+        />
+      )}
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -256,7 +259,7 @@ body {
   font-size: 7pt;
   line-height: 1.4;
   background: #e0e0e0;
-  padding-top: 48px;
+  padding-top: ${showToolbar ? "48px" : "0"};
 }
 
 @media print {

@@ -16,14 +16,64 @@ const CHROMIUM_URL =
 // Allow up to 60s for PDF generation
 export const maxDuration = 60;
 
+// PDF generation lock: auto-expires after 5 minutes
+const LOCK_TTL_MS = 5 * 60 * 1000;
+
+interface PdfLock {
+  locked_at: string;
+  model: string;
+  lang: string;
+}
+
+function getLockKey(model: string, lang: string) {
+  return `pdf_lock_${model}_${lang}`;
+}
+
+/**
+ * GET /api/generate-pdf?model=ECC100&lang=en
+ * Check if a PDF generation lock is active for a model+locale.
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const model = searchParams.get("model");
+  const lang = searchParams.get("lang") ?? "en";
+
+  if (!model) {
+    return NextResponse.json({ error: "Missing ?model=" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const lockKey = getLockKey(model, lang);
+
+  const { data } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", lockKey)
+    .single() as { data: { value: string } | null };
+
+  if (data?.value) {
+    try {
+      const lock: PdfLock = JSON.parse(data.value);
+      const elapsed = Date.now() - new Date(lock.locked_at).getTime();
+      if (elapsed < LOCK_TTL_MS) {
+        return NextResponse.json({ ok: true, locked: true, lock });
+      }
+    } catch { /* expired or bad data */ }
+  }
+
+  return NextResponse.json({ ok: true, locked: false });
+}
+
 /**
  * POST /api/generate-pdf?model=ECC100&mode=regenerate&lang=en
  *
- * 1. Detects latest version from Google Drive (locale-aware)
- * 2. Generates PDF from the preview page using headless Chromium
- * 3. Uploads to Supabase Storage
- * 4. Uploads to Google Drive (locale-specific folder)
- * 5. Bumps version in Supabase
+ * 1. Acquires generation lock (prevents concurrent generation for same model+locale)
+ * 2. Detects latest version from Google Drive (locale-aware)
+ * 3. Generates PDF from the preview page using headless Chromium
+ * 4. Uploads to Supabase Storage
+ * 5. Uploads to Google Drive (locale-specific folder)
+ * 6. Bumps version in Supabase (with optimistic locking)
+ * 7. Releases lock
  */
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -40,6 +90,35 @@ export async function POST(request: Request) {
 
   const isLocalized = lang !== "en";
   const supabase = createAdminClient();
+  const lockKey = getLockKey(model, lang);
+
+  // --- Acquire lock ---
+  const { data: existingLock } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", lockKey)
+    .single() as { data: { value: string } | null };
+
+  if (existingLock?.value) {
+    try {
+      const lock: PdfLock = JSON.parse(existingLock.value);
+      const elapsed = Date.now() - new Date(lock.locked_at).getTime();
+      if (elapsed < LOCK_TTL_MS) {
+        return NextResponse.json(
+          { error: `PDF is already being generated for ${model} (${lang}). Please wait and try again.` },
+          { status: 409 }
+        );
+      }
+    } catch { /* stale lock, proceed to overwrite */ }
+  }
+
+  const lockValue: PdfLock = { locked_at: new Date().toISOString(), model, lang };
+  await supabase
+    .from("app_settings" as "products")
+    .upsert(
+      { key: lockKey, value: JSON.stringify(lockValue), updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
 
   // Get the product + product line info
   const { data: product, error: productError } = await supabase
@@ -66,6 +145,14 @@ export async function POST(request: Request) {
       { error: "Product line not found" },
       { status: 404 }
     );
+  }
+
+  // Helper to release the lock
+  async function releaseLock() {
+    await supabase
+      .from("app_settings" as "products")
+      .delete()
+      .eq("key", lockKey);
   }
 
   try {
@@ -284,15 +371,24 @@ export async function POST(request: Request) {
       });
     }
 
-    // Update current_version(s)
+    // Update current_version(s) with optimistic locking
+    // Re-read current_versions to merge safely (prevents overwriting concurrent changes to other locales)
+    const { data: freshProduct } = await supabase
+      .from("products")
+      .select("current_versions")
+      .eq("id", product.id)
+      .single();
+
+    const freshVersions = (freshProduct?.current_versions ?? {}) as Record<string, string>;
+
     if (isLocalized) {
-      const updatedVersions = { ...currentVersions, [lang]: newVersion };
+      const updatedVersions = { ...freshVersions, [lang]: newVersion };
       await supabase
         .from("products")
         .update({ current_versions: updatedVersions })
         .eq("id", product.id);
     } else {
-      const updatedVersions = { ...currentVersions, en: newVersion };
+      const updatedVersions = { ...freshVersions, en: newVersion };
       await supabase
         .from("products")
         .update({
@@ -310,6 +406,9 @@ export async function POST(request: Request) {
         : `Generated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`,
     });
 
+    // --- Release lock ---
+    await releaseLock();
+
     return NextResponse.json({
       ok: true,
       model,
@@ -321,6 +420,9 @@ export async function POST(request: Request) {
       driveLink: driveResult?.webViewLink ?? null,
     });
   } catch (err) {
+    // --- Release lock on failure ---
+    await releaseLock();
+
     console.error("PDF generation error:", err);
     return NextResponse.json(
       {

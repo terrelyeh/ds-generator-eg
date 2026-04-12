@@ -223,6 +223,30 @@ Key tables:
 - **Solution sidebar**: 預設收合（`collapsed: true`），只顯示 icon
 - **Datasheet 佈景**: Cloud = 藍色 `#03a9f4`，Unmanaged = 灰色 `#58595B`（由 `product_lines.category` 判斷）
 
+## Ask SpecHub (RAG System)
+
+產品規格 AI 查詢助手。使用 pgvector + OpenAI Embedding + LLM 實現 RAG。
+完整說明請參考 [`docs/rag-system.md`](docs/rag-system.md)。
+
+**核心架構**：`documents` 表（pgvector）→ `match_documents()` RPC → LLM 回答
+
+**關鍵檔案**：
+- `src/lib/rag/embeddings.ts` — OpenAI embedding 封裝
+- `src/lib/rag/ingest-products.ts` — 產品規格 → chunks → embeddings
+- `src/lib/rag/personas.ts` — Persona 系統（4 內建 + 自訂）
+- `src/app/api/ask/route.ts` — RAG 查詢 endpoint（GET: personas, POST: query）
+- `src/app/api/documents/route.ts` — 文件索引管理
+- `src/app/api/personas/route.ts` — Persona CRUD
+- `src/components/ask/ask-chat.tsx` — 聊天 UI
+
+**Persona 系統**：每個 persona 有獨立的 system prompt，存在 `app_settings` 表（`persona_{id}`）。
+內建 4 個：default（Product Specialist）、sales、support、pm。可在 `/settings/personas` 管理。
+
+**Embedding**：固定用 OpenAI `text-embedding-3-small`（需要 `OPENAI_API_KEY`），每個產品 2 chunks（overview + specs）。
+
+**未來擴充**：支援 `gitbook`、`web`、`google_doc`、`file`（PDF/Word）、`text_snippet` 等來源。
+`documents` 表的 `source_type` + `metadata` JSONB 已預留擴展性，新增來源不需要改 schema。
+
 ## Current Status
 
 功能清單詳見 [README.md](README.md)。

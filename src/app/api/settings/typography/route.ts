@@ -20,9 +20,9 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("app_settings" as "products")
-    .select("value")
+    .select("value, updated_at")
     .eq("key", `typography_${locale}`)
-    .single() as { data: { value: string } | null };
+    .single() as { data: { value: string; updated_at: string } | null };
 
   let settings: TypographySettings = { ...defaults };
   if (data?.value) {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, settings, defaults });
+  return NextResponse.json({ ok: true, settings, defaults, updated_at: data?.updated_at ?? null });
 }
 
 /**
@@ -44,9 +44,10 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { locale, settings } = body as {
+  const { locale, settings, expected_updated_at } = body as {
     locale: string;
     settings: Partial<TypographySettings>;
+    expected_updated_at?: string | null;
   };
 
   if (!locale || !settings) {
@@ -55,13 +56,30 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  // Optimistic locking: check if someone else saved since we loaded
+  if (expected_updated_at) {
+    const { data: current } = await supabase
+      .from("app_settings" as "products")
+      .select("updated_at")
+      .eq("key", `typography_${locale}`)
+      .single() as { data: { updated_at: string } | null };
+
+    if (current?.updated_at && current.updated_at > expected_updated_at) {
+      return NextResponse.json(
+        { error: "Settings were modified by another user. Please reload and try again." },
+        { status: 409 }
+      );
+    }
+  }
+
+  const now = new Date().toISOString();
   const { error } = await supabase
     .from("app_settings" as "products")
     .upsert(
       {
         key: `typography_${locale}`,
         value: JSON.stringify(settings),
-        updated_at: new Date().toISOString(),
+        updated_at: now,
       },
       { onConflict: "key" }
     );
@@ -70,7 +88,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Save failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, updated_at: now });
 }
 
 /**

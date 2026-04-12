@@ -51,13 +51,14 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { english_term, locale, translated_term, scope = "global", source = "manual", notes } = body as {
+  const { english_term, locale, translated_term, scope = "global", source = "manual", notes, expected_updated_at } = body as {
     english_term: string;
     locale: string;
     translated_term: string;
     scope?: string;
     source?: string;
     notes?: string;
+    expected_updated_at?: string | null;
   };
 
   if (!english_term || !locale || !translated_term) {
@@ -65,6 +66,24 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // Optimistic locking: check if this term was modified since we loaded
+  if (expected_updated_at) {
+    const { data: current } = await supabase
+      .from("translation_glossary" as "products")
+      .select("updated_at")
+      .eq("english_term", english_term.trim())
+      .eq("locale", locale)
+      .eq("scope", scope)
+      .single() as { data: { updated_at: string } | null };
+
+    if (current?.updated_at && current.updated_at > expected_updated_at) {
+      return NextResponse.json(
+        { error: "This glossary term was modified by another user. Please reload and try again." },
+        { status: 409 }
+      );
+    }
+  }
 
   const { error } = await supabase
     .from("translation_glossary" as "products")

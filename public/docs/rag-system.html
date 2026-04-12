@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product SpecHub — Ask SpecHub RAG 系統說明</title>
+  <style>
+    :root {
+      --blue: #03a9f4;
+      --blue-dark: #0288d1;
+      --gray-dark: #2C3345;
+      --gray: #58595B;
+      --gray-light: #6f6f6f;
+      --gray-bg: #f8f9fa;
+      --border: #e2e5e9;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --green: #059669;
+      --green-bg: #ecfdf5;
+      --purple: #7c3aed;
+      --purple-bg: #f5f3ff;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--gray-dark);
+      line-height: 1.7;
+      background: #fff;
+      display: flex;
+    }
+
+    /* Left TOC panel */
+    .toc-panel {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 260px;
+      height: 100vh;
+      background: var(--gray-bg);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 24px 16px;
+      z-index: 100;
+    }
+
+    .toc-panel h3 {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--gray-light);
+      margin-bottom: 12px;
+    }
+
+    .toc-panel a {
+      display: block;
+      padding: 4px 8px;
+      margin: 2px 0;
+      font-size: 13px;
+      color: var(--gray);
+      text-decoration: none;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+
+    .toc-panel a:hover {
+      background: var(--blue);
+      color: #fff;
+    }
+
+    .toc-panel a.sub {
+      padding-left: 20px;
+      font-size: 12px;
+      color: var(--gray-light);
+    }
+
+    .toc-panel a .num {
+      display: inline-block;
+      background: var(--blue);
+      color: #fff;
+      width: 20px;
+      height: 20px;
+      border-radius: 4px;
+      text-align: center;
+      line-height: 20px;
+      font-size: 11px;
+      margin-right: 6px;
+    }
+
+    .toc-panel a:hover .num {
+      background: #fff;
+      color: var(--blue);
+    }
+
+    /* Main content */
+    .content {
+      margin-left: 260px;
+      max-width: 780px;
+      padding: 40px 40px 100px;
+    }
+
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--blue-dark);
+      margin-bottom: 4px;
+      border-bottom: 3px solid var(--blue);
+      padding-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 14px;
+      color: var(--gray-light);
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--gray-dark);
+      margin: 48px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h2 .num {
+      display: inline-block;
+      background: var(--blue);
+      color: #fff;
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      text-align: center;
+      line-height: 28px;
+      font-size: 14px;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gray);
+      margin: 28px 0 8px;
+    }
+
+    h4 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--gray-dark);
+      margin: 20px 0 6px;
+    }
+
+    p { margin: 8px 0; font-size: 14px; }
+    ul, ol { margin: 8px 0 8px 24px; font-size: 14px; }
+    li { margin: 4px 0; }
+
+    code {
+      background: #f0f1f3;
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-size: 13px;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 16px 20px;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-size: 13px;
+      line-height: 1.5;
+      margin: 12px 0;
+      font-family: "SF Mono", "Fira Code", monospace;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    .comment { color: #64748b; }
+    .keyword { color: #93c5fd; }
+    .string { color: #86efac; }
+    .type { color: #c4b5fd; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 13px;
+    }
+
+    th {
+      background: var(--gray-bg);
+      text-align: left;
+      padding: 8px 12px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    td {
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    .callout {
+      padding: 14px 18px;
+      border-radius: 8px;
+      margin: 16px 0;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .callout-blue { background: #ebf8fe; border-left: 4px solid var(--blue); }
+    .callout-amber { background: var(--amber-bg); border-left: 4px solid var(--amber); }
+    .callout-green { background: var(--green-bg); border-left: 4px solid var(--green); }
+    .callout-red { background: var(--red-bg); border-left: 4px solid var(--red); }
+    .callout-purple { background: var(--purple-bg); border-left: 4px solid var(--purple); }
+
+    .callout strong { display: block; margin-bottom: 4px; }
+
+    .flow-diagram {
+      background: var(--gray-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px;
+      margin: 16px 0;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13px;
+      line-height: 1.8;
+      overflow-x: auto;
+      white-space: pre;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-blue { background: #dbeafe; color: #1d4ed8; }
+    .badge-green { background: #dcfce7; color: #15803d; }
+    .badge-amber { background: #fef3c7; color: #92400e; }
+    .badge-gray { background: #f1f5f9; color: #475569; }
+    .badge-purple { background: #ede9fe; color: #6d28d9; }
+
+    .file-tree {
+      background: var(--gray-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+      font-family: "SF Mono", "Fira Code", monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      margin: 12px 0;
+    }
+
+    .file-tree .dir { color: var(--blue); font-weight: 600; }
+    .file-tree .file { color: var(--gray); }
+    .file-tree .new { color: var(--green); font-weight: 600; }
+    .file-tree .desc { color: var(--gray-light); font-size: 11px; }
+
+    @media (max-width: 900px) {
+      .toc-panel { display: none; }
+      .content { margin-left: 0; padding: 24px 16px 60px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Left TOC -->
+<nav class="toc-panel">
+  <h3>Ask SpecHub RAG</h3>
+  <a href="#s1"><span class="num">1</span> 功能概述</a>
+  <a href="#s2"><span class="num">2</span> 系統架構</a>
+  <a href="#s2-flow" class="sub">Query Workflow</a>
+  <a href="#s2-index" class="sub">Indexing Workflow</a>
+  <a href="#s3"><span class="num">3</span> 資料庫設計</a>
+  <a href="#s3-schema" class="sub">documents 表 Schema</a>
+  <a href="#s3-source" class="sub">source_type 規劃</a>
+  <a href="#s3-func" class="sub">match_documents 函數</a>
+  <a href="#s4"><span class="num">4</span> AI 如何參與</a>
+  <a href="#s4-embed" class="sub">Embedding</a>
+  <a href="#s4-search" class="sub">向量搜尋</a>
+  <a href="#s4-llm" class="sub">LLM 回答</a>
+  <a href="#s5"><span class="num">5</span> Chunking 策略</a>
+  <a href="#s6"><span class="num">6</span> 檔案結構</a>
+  <a href="#s7"><span class="num">7</span> 設定與使用</a>
+  <a href="#s7-setup" class="sub">首次設定</a>
+  <a href="#s7-use" class="sub">日常使用</a>
+  <a href="#s7-reindex" class="sub">重新索引</a>
+  <a href="#s8"><span class="num">8</span> API 文件</a>
+  <a href="#s8-ask" class="sub">POST /api/ask</a>
+  <a href="#s8-docs" class="sub">/api/documents</a>
+  <a href="#s9"><span class="num">9</span> Persona 系統</a>
+  <a href="#s9-builtin" class="sub">內建 Personas</a>
+  <a href="#s9-custom" class="sub">自訂 Persona</a>
+  <a href="#s9-api" class="sub">API 整合</a>
+  <a href="#s10"><span class="num">10</span> 各來源 Chunking 策略</a>
+  <a href="#s11"><span class="num">11</span> 圖片處理策略</a>
+  <a href="#s11-desc" class="sub">圖片描述化</a>
+  <a href="#s11-store" class="sub">儲存架構</a>
+  <a href="#s11-when" class="sub">實作時機</a>
+  <a href="#s12"><span class="num">12</span> 注意事項</a>
+  <a href="#s13"><span class="num">13</span> 未來擴充</a>
+  <a href="#s13-gitbook" class="sub">Gitbook</a>
+  <a href="#s13-web" class="sub">Web Link</a>
+  <a href="#s13-gdoc" class="sub">Google Docs</a>
+  <a href="#s13-file" class="sub">Word / PDF</a>
+  <a href="#s13-text" class="sub">Text Snippets</a>
+  <a href="#s13-roadmap" class="sub">Roadmap</a>
+</nav>
+
+<!-- Main content -->
+<div class="content">
+
+<h1>Ask SpecHub — RAG 系統說明</h1>
+<p class="subtitle">Retrieval-Augmented Generation for EnGenius Product Specifications &nbsp;|&nbsp; Last updated: 2026-04-12</p>
+
+<!-- ==================== Section 1 ==================== -->
+<h2 id="s1"><span class="num">1</span> 功能概述</h2>
+
+<p><strong>Ask SpecHub</strong> 是 Product SpecHub 內建的 AI 產品查詢助手。同事可以用自然語言（中文或英文）詢問任何 EnGenius 產品規格相關的問題，系統會從已索引的產品資料中找到最相關的內容，交由 AI 產生精準回答並附上來源。</p>
+
+<h3>核心能力</h3>
+<ul>
+  <li><strong>規格查詢</strong> — 「ESG510 的 VPN throughput 是多少？」</li>
+  <li><strong>產品比較</strong> — 「ECC100 和 ECC500 差在哪裡？」</li>
+  <li><strong>條件篩選</strong> — 「哪些 AP 支援 WiFi 7？」「Which switches support PoE++?」</li>
+  <li><strong>推薦建議</strong> — 「推薦一台適合戶外的攝影機」</li>
+  <li><strong>多語言</strong> — 支援中文和英文提問，AI 會用同語言回答</li>
+</ul>
+
+<h3>技術名詞</h3>
+<table>
+  <tr><th>名詞</th><th>說明</th></tr>
+  <tr><td><strong>RAG</strong></td><td>Retrieval-Augmented Generation — 先搜尋相關資料，再交由 AI 生成回答。避免 AI 「幻覺」（憑空編造）</td></tr>
+  <tr><td><strong>Embedding</strong></td><td>將文字轉換成數學向量（1536 維數字陣列），語意相近的文字在向量空間中距離也近</td></tr>
+  <tr><td><strong>向量搜尋</strong></td><td>用 cosine similarity 計算問題向量和文件向量的相似度，找出最相關的文件</td></tr>
+  <tr><td><strong>Chunk</strong></td><td>將文件拆成小片段。每個 chunk 獨立做 embedding，搜尋時回傳最相關的 chunks</td></tr>
+  <tr><td><strong>pgvector</strong></td><td>PostgreSQL 的向量搜尋擴充，直接在 Supabase 內執行，不需額外的向量資料庫</td></tr>
+</table>
+
+<!-- ==================== Section 2 ==================== -->
+<h2 id="s2"><span class="num">2</span> 系統架構</h2>
+
+<h3 id="s2-flow">Query Workflow（使用者提問）</h3>
+
+<div class="flow-diagram">同事在 /ask 頁面輸入問題
+        |
+        v
+  ┌─────────────────────┐
+  │  1. Embed Question   │  OpenAI text-embedding-3-small
+  │     文字 → 向量       │  問題轉成 1536 維向量
+  └──────────┬──────────┘
+             v
+  ┌─────────────────────┐
+  │  2. Vector Search    │  Supabase pgvector
+  │     向量相似度搜尋    │  cosine distance, top 8 matches
+  └──────────┬──────────┘
+             v
+  ┌─────────────────────┐
+  │  3. Build Context    │  將搜尋到的文件組合成 context
+  │     附上來源標記      │  [Source 1: ECC100 — Overview]
+  └──────────┬──────────┘
+             v
+  ┌─────────────────────┐
+  │  4. LLM Answer       │  Claude / GPT-4o / Gemini
+  │     System + Context  │  基於 context 回答，不會幻覺
+  │     + Question → 回答 │  自動偵測語言
+  └──────────┬──────────┘
+             v
+     回傳答案 + 來源引用</div>
+
+<h3 id="s2-index">Indexing Workflow（建立索引）</h3>
+
+<div class="flow-diagram">點擊 "Index Products" 按鈕
+        |
+        v
+  ┌──────────────────────────┐
+  │  1. 讀取所有 products      │  從 Supabase 讀取
+  │     + spec_sections       │  model_name, overview,
+  │     + spec_items          │  features, 完整規格表
+  └───────────┬──────────────┘
+              v
+  ┌──────────────────────────┐
+  │  2. 產生 Chunks           │  每個產品 2 chunks:
+  │     Chunk 0: Overview     │  名稱 + 描述 + 功能特色
+  │     Chunk 1: Specs        │  完整規格表（分類+項目）
+  └───────────┬──────────────┘
+              v
+  ┌──────────────────────────┐
+  │  3. Content Hash 比對     │  SHA-256 hash
+  │     跳過未變更的 chunks    │  避免重複呼叫 API
+  └───────────┬──────────────┘
+              v
+  ┌──────────────────────────┐
+  │  4. Batch Embedding       │  OpenAI API
+  │     50 chunks / batch     │  text-embedding-3-small
+  └───────────┬──────────────┘
+              v
+  ┌──────────────────────────┐
+  │  5. Upsert to documents   │  寫入 Supabase
+  │     含 embedding 向量      │  unique key 防重複
+  └──────────────────────────┘</div>
+
+<!-- ==================== Section 3 ==================== -->
+<h2 id="s3"><span class="num">3</span> 資料庫設計</h2>
+
+<h3 id="s3-schema">documents 表 Schema</h3>
+
+<p>使用單一 <code>documents</code> 表儲存所有來源的文件 chunks 和向量，透過 <code>source_type</code> 區分不同來源。</p>
+
+<pre><code><span class="keyword">CREATE TABLE</span> public.documents (
+  id              <span class="type">UUID</span> PRIMARY KEY DEFAULT gen_random_uuid(),
+
+  <span class="comment">-- 來源識別</span>
+  source_type     <span class="type">TEXT</span> NOT NULL,     <span class="comment">-- 'product_spec' | 'gitbook' | 'web' | ...</span>
+  source_id       <span class="type">TEXT</span> NOT NULL,     <span class="comment">-- 產品 model_name / URL / Doc ID</span>
+  source_url      <span class="type">TEXT</span>,              <span class="comment">-- 原始連結（回答附引用用）</span>
+
+  <span class="comment">-- 內容</span>
+  title           <span class="type">TEXT</span> NOT NULL,     <span class="comment">-- 顯示用標題</span>
+  chunk_index     <span class="type">INT</span> NOT NULL DEFAULT 0,  <span class="comment">-- 同文件第幾段</span>
+  content         <span class="type">TEXT</span> NOT NULL,     <span class="comment">-- 純文字內容</span>
+  token_count     <span class="type">INT</span>,               <span class="comment">-- 估算 token 數</span>
+
+  <span class="comment">-- 彈性 metadata</span>
+  metadata        <span class="type">JSONB</span> NOT NULL DEFAULT '{}',
+  <span class="comment">-- 例如: {"product_line": "Cloud Camera", "status": "active", "chunk_type": "overview"}</span>
+
+  <span class="comment">-- 向量</span>
+  embedding       <span class="type">VECTOR(1536)</span>,      <span class="comment">-- OpenAI text-embedding-3-small</span>
+
+  <span class="comment">-- 變更偵測</span>
+  content_hash    <span class="type">TEXT</span>,              <span class="comment">-- SHA-256，內容不變就不重新 embed</span>
+  created_at      <span class="type">TIMESTAMPTZ</span> NOT NULL DEFAULT now(),
+  updated_at      <span class="type">TIMESTAMPTZ</span> NOT NULL DEFAULT now()
+);</code></pre>
+
+<h4>索引</h4>
+<table>
+  <tr><th>索引名稱</th><th>欄位</th><th>用途</th></tr>
+  <tr><td><code>documents_embedding_idx</code></td><td>embedding (IVFFlat, cosine)</td><td>向量相似度搜尋加速</td></tr>
+  <tr><td><code>documents_source_type_idx</code></td><td>source_type</td><td>按來源類型篩選</td></tr>
+  <tr><td><code>documents_source_id_idx</code></td><td>(source_type, source_id)</td><td>找特定來源的所有 chunks</td></tr>
+  <tr><td><code>documents_source_chunk_unique</code></td><td>(source_type, source_id, chunk_index)</td><td>防止重複（upsert 用）</td></tr>
+</table>
+
+<h3 id="s3-source">source_type 規劃</h3>
+
+<table>
+  <tr><th>source_type</th><th>用途</th><th>source_id 格式</th><th>source_url 格式</th><th>狀態</th></tr>
+  <tr>
+    <td><code>product_spec</code></td>
+    <td>產品規格（overview + specs）</td>
+    <td>Model name, e.g. <code>ECC100</code></td>
+    <td><code>/product/ECC100</code></td>
+    <td><span class="badge badge-green">已實作</span></td>
+  </tr>
+  <tr>
+    <td><code>gitbook</code></td>
+    <td>Gitbook 技術文件</td>
+    <td>Page slug, e.g. <code>quick-start/ecc100</code></td>
+    <td>Gitbook page URL</td>
+    <td><span class="badge badge-gray">規劃中</span></td>
+  </tr>
+  <tr>
+    <td><code>web</code></td>
+    <td>網頁內容</td>
+    <td>URL hash or slug</td>
+    <td>原始 URL</td>
+    <td><span class="badge badge-gray">規劃中</span></td>
+  </tr>
+  <tr>
+    <td><code>google_doc</code></td>
+    <td>Google Docs 文件</td>
+    <td>Google Doc ID</td>
+    <td>Google Docs URL</td>
+    <td><span class="badge badge-gray">規劃中</span></td>
+  </tr>
+  <tr>
+    <td><code>file</code></td>
+    <td>Word / PDF 上傳</td>
+    <td>File hash or name</td>
+    <td>Supabase Storage URL</td>
+    <td><span class="badge badge-gray">規劃中</span></td>
+  </tr>
+  <tr>
+    <td><code>text_snippet</code></td>
+    <td>手動貼入的文字片段</td>
+    <td>自定義 slug</td>
+    <td>—</td>
+    <td><span class="badge badge-gray">規劃中</span></td>
+  </tr>
+</table>
+
+<h3 id="s3-func">match_documents 函數</h3>
+
+<p>Supabase RPC 函數，執行向量相似度搜尋並支援篩選：</p>
+
+<pre><code><span class="keyword">SELECT</span> * <span class="keyword">FROM</span> match_documents(
+  query_embedding  := <span class="string">'[0.012, -0.034, ...]'</span>,  <span class="comment">-- 問題的向量</span>
+  match_count      := 8,                         <span class="comment">-- 回傳前 8 筆</span>
+  match_threshold  := 0.3,                       <span class="comment">-- 相似度門檻</span>
+  filter_source_type := <span class="string">'product_spec'</span>,         <span class="comment">-- 只搜產品規格</span>
+  filter_metadata  := <span class="string">'{"product_line":"Cloud Camera"}'</span>  <span class="comment">-- 只搜特定產品線</span>
+);</code></pre>
+
+<!-- ==================== Section 4 ==================== -->
+<h2 id="s4"><span class="num">4</span> AI 如何參與</h2>
+
+<p>整個 RAG 系統中有 <strong>兩次 AI 呼叫</strong>，各司其職：</p>
+
+<h3 id="s4-embed">Step 1: Embedding（文字 → 向量）</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>用途</td><td>將文字轉成 1536 維向量，捕捉語意（而非關鍵字）</td></tr>
+  <tr><td>模型</td><td>OpenAI <code>text-embedding-3-small</code></td></tr>
+  <tr><td>費用</td><td>$0.02 / 1M tokens（極便宜，66 個產品 ≈ $0.001）</td></tr>
+  <tr><td>何時呼叫</td><td>1) 建立/更新索引時（每個 chunk 一次）<br>2) 使用者提問時（每次提問一次）</td></tr>
+  <tr><td>為什麼不用關鍵字搜尋</td><td>向量搜尋理解語意：「戶外攝影機」能匹配到 "IP67 outdoor dome camera"</td></tr>
+</table>
+
+<h3 id="s4-search">Step 2: 向量搜尋（找相關文件）</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>引擎</td><td>Supabase pgvector（PostgreSQL 內建）</td></tr>
+  <tr><td>演算法</td><td>IVFFlat index + cosine distance</td></tr>
+  <tr><td>回傳數量</td><td>Top 8 最相關的 chunks</td></tr>
+  <tr><td>相似度門檻</td><td>0.3（低於此值的結果不回傳）</td></tr>
+  <tr><td>費用</td><td>零（SQL 查詢，不呼叫外部 API）</td></tr>
+</table>
+
+<h3 id="s4-llm">Step 3: LLM 回答（生成回答）</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>用途</td><td>基於搜尋到的文件，用自然語言回答問題</td></tr>
+  <tr><td>可選模型</td><td>Claude Sonnet（預設）、GPT-4o、Gemini 2.5 Flash</td></tr>
+  <tr><td>System Prompt</td><td>指定為 EnGenius 產品專家，只基於提供的 context 回答</td></tr>
+  <tr><td>語言偵測</td><td>Prompt 指示 AI 用提問的語言回答（中文問中文答）</td></tr>
+  <tr><td>防幻覺</td><td>明確要求「If the context doesn't contain enough information, say so」</td></tr>
+</table>
+
+<div class="callout callout-blue">
+  <strong>為什麼需要兩步（搜尋 + LLM）而不是直接問 AI？</strong>
+  直接問 ChatGPT「ECC100 的解析度是多少？」它可能會編一個答案（幻覺）。RAG 的做法是先從你自己的資料庫找到真實資料，再讓 AI 基於這些資料回答。AI 看到的是你提供的 context，不是它的訓練資料。
+</div>
+
+<!-- ==================== Section 5 ==================== -->
+<h2 id="s5"><span class="num">5</span> Chunking 策略</h2>
+
+<p>每個產品生成 <strong>2 個 chunks</strong>：</p>
+
+<h3>Chunk 0: Overview（產品概述）</h3>
+
+<div class="callout callout-green">
+<strong>捕捉「這個產品是什麼、能做什麼」</strong>
+<pre style="background:none;color:inherit;padding:8px 0;margin:0;">
+ECC100 — Cloud-Managed AI Outdoor Dome Camera
+Product Line: Cloud Camera (Cloud)
+Status: active
+Subtitle: Cloud-Managed AI Outdoor Dome Camera
+
+Overview:
+The ECC100 is a cloud-managed 2MP outdoor dome camera
+with AI-powered detection and 256GB built-in storage...
+
+Key Features:
+• AI-powered people and vehicle detection
+• 256GB built-in storage
+• IP67 weatherproof rating
+• ...</pre>
+</div>
+
+<h3>Chunk 1: Specifications（技術規格）</h3>
+
+<div class="callout callout-green">
+<strong>捕捉「具體的技術數值」</strong>
+<pre style="background:none;color:inherit;padding:8px 0;margin:0;">
+ECC100 — Technical Specifications
+
+[Camera]
+  Image Sensor: 1/2.8" 2MP Progressive Scan CMOS
+  Resolution: 1920 x 1080 (1080p)
+  Lens: 2.8mm fixed
+
+[Network]
+  Protocols: TCP/IP, HTTPS, DHCP, DNS
+  PoE: IEEE 802.3af
+
+[Physical]
+  Dimensions: 122 x 122 x 97 mm
+  Weight: 420g
+  ...</pre>
+</div>
+
+<div class="callout callout-blue">
+  <strong>為什麼拆成兩個 chunk？</strong>
+  Overview 和 Specs 的語意差異很大。「推薦一台戶外攝影機」應該匹配 overview（因為 overview 提到了使用場景）；「ECC100 的 PoE 標準是什麼？」應該匹配 specs。拆開後搜尋更精準。
+</div>
+
+<h3>為什麼不需要更複雜的 chunking？</h3>
+<p>常見的 RAG 系統要處理長文件（PDF 報告、法律合約），需要複雜的 chunking（overlapping windows、recursive splitting）。但 EnGenius 產品規格有兩個特性：</p>
+<ul>
+  <li><strong>資料量小</strong> — 每個產品 overview 約 200 tokens，specs 約 500-1000 tokens，遠小於 embedding 模型的 8191 token 上限</li>
+  <li><strong>結構清晰</strong> — 每個產品就是一個獨立單位，不需要跨產品的 chunk</li>
+</ul>
+
+<!-- ==================== Section 6 ==================== -->
+<h2 id="s6"><span class="num">6</span> 檔案結構</h2>
+
+<div class="file-tree">
+<span class="dir">src/</span>
+  <span class="dir">lib/rag/</span>                           <span class="desc">← RAG 核心邏輯</span>
+    <span class="new">embeddings.ts</span>                     <span class="desc">← OpenAI embedding 封裝 + hash + token 估算</span>
+    <span class="new">ingest-products.ts</span>                <span class="desc">← 產品 → chunks → embeddings → DB</span>
+    <span class="new">personas.ts</span>                       <span class="desc">← Persona 定義、CRUD、內建預設 prompts</span>
+  <span class="dir">app/api/</span>
+    <span class="new">ask/route.ts</span>                      <span class="desc">← GET（列出 personas）+ POST（RAG 查詢）</span>
+    <span class="new">documents/route.ts</span>                <span class="desc">← GET/POST/DELETE — 文件管理 + 觸發 ingestion</span>
+    <span class="new">personas/route.ts</span>                 <span class="desc">← GET/POST/DELETE — Persona 管理 API</span>
+  <span class="dir">app/(main)/</span>
+    <span class="new">ask/page.tsx</span>                      <span class="desc">← Ask SpecHub 頁面（server component wrapper）</span>
+    <span class="new">settings/personas/page.tsx</span>        <span class="desc">← Persona 管理設定頁</span>
+  <span class="dir">components/</span>
+    <span class="new">ask/ask-chat.tsx</span>                  <span class="desc">← 聊天 UI + persona 選擇器</span>
+    <span class="new">settings/personas-editor.tsx</span>      <span class="desc">← Persona CRUD 管理介面</span>
+  <span class="dir">components/layout/</span>
+    <span class="file">navbar.tsx</span>                        <span class="desc">← 新增 "Ask" 導覽連結</span>
+<span class="dir">supabase/migrations/</span>
+  <span class="new">00009_add_rag_documents.sql</span>        <span class="desc">← pgvector + documents 表 + match_documents 函數</span>
+<span class="dir">docs/</span>
+  <span class="new">rag-system.html</span>                     <span class="desc">← 本文件</span>
+</div>
+
+<!-- ==================== Section 7 ==================== -->
+<h2 id="s7"><span class="num">7</span> 設定與使用</h2>
+
+<h3 id="s7-setup">首次設定</h3>
+
+<h4>1. 確認 API Key</h4>
+<p>RAG 系統需要兩組 API Key：</p>
+<table>
+  <tr><th>Key</th><th>用途</th><th>必要性</th></tr>
+  <tr><td>OpenAI API Key</td><td>Embedding（<code>text-embedding-3-small</code>）</td><td><span class="badge badge-red" style="background:#fee2e2;color:#991b1b;">必要</span> — 沒有就無法建索引和搜尋</td></tr>
+  <tr><td>Claude / GPT-4o / Gemini Key</td><td>LLM 回答生成</td><td><span class="badge badge-amber">至少一個</span> — 用於生成回答</td></tr>
+</table>
+
+<p>到 <code>/settings/api-keys</code> 設定，或在 Vercel 環境變數中設定 <code>OPENAI_API_KEY</code>。</p>
+
+<h4>2. 執行 Migration</h4>
+<p>如果使用 Supabase MCP 或 CLI，migration <code>00009_add_rag_documents.sql</code> 已經準備好。確認 <code>pgvector</code> extension 已啟用且 <code>documents</code> 表已建立。</p>
+
+<h4>3. 建立索引</h4>
+<ol>
+  <li>進入 <code>/ask</code> 頁面</li>
+  <li>點擊 <strong>Index Products</strong> 按鈕</li>
+  <li>等待完成（66 個產品約 10-20 秒）</li>
+  <li>狀態列會顯示「X products indexed (Y chunks)」</li>
+</ol>
+
+<h3 id="s7-use">日常使用</h3>
+<ol>
+  <li>從 Navbar 點 <strong>Ask</strong> 進入</li>
+  <li>在輸入框打字或點擊範例問題</li>
+  <li>右下角可切換 AI provider（Claude / GPT-4o / Gemini）</li>
+  <li>回答會附上來源產品連結和相似度分數</li>
+</ol>
+
+<h3 id="s7-reindex">何時需要重新索引？</h3>
+
+<div class="callout callout-amber">
+  <strong>目前需要手動 Re-index</strong>
+  當 Google Sheets 同步了新的產品資料（overview、features、specs 有變動）後，需要到 <code>/ask</code> 頁面點 <strong>Re-index</strong> 讓向量資料庫更新。
+  <br><br>
+  系統會自動比對 content hash，只重新 embed 有變動的 chunks，所以 re-index 很快且不浪費 API 費用。
+  <br><br>
+  未來可以整合到 Sync 流程中自動觸發。
+</div>
+
+<!-- ==================== Section 8 ==================== -->
+<h2 id="s8"><span class="num">8</span> API 文件</h2>
+
+<h3 id="s8-ask">POST /api/ask</h3>
+<p>RAG 查詢。接收自然語言問題，回傳 AI 生成的回答和來源。</p>
+
+<h4>Request</h4>
+<pre><code>{
+  <span class="string">"question"</span>: <span class="string">"哪些 AP 支援 WiFi 7？"</span>,
+  <span class="string">"provider"</span>: <span class="string">"claude"</span>,          <span class="comment">// 可選: "claude" | "openai" | "gemini"</span>
+  <span class="string">"source_type"</span>: <span class="string">"product_spec"</span>, <span class="comment">// 可選: 限定搜尋範圍</span>
+  <span class="string">"product_line"</span>: <span class="string">"Cloud AP"</span>      <span class="comment">// 可選: 限定產品線</span>
+}</code></pre>
+
+<h4>Response</h4>
+<pre><code>{
+  <span class="string">"ok"</span>: <span class="keyword">true</span>,
+  <span class="string">"answer"</span>: <span class="string">"支援 WiFi 7 的 AP 有以下型號..."</span>,
+  <span class="string">"sources"</span>: [
+    {
+      <span class="string">"title"</span>: <span class="string">"ECW536 — Cloud-Managed Wi-Fi 7 AP"</span>,
+      <span class="string">"source_id"</span>: <span class="string">"ECW536"</span>,
+      <span class="string">"source_url"</span>: <span class="string">"/product/ECW536"</span>,
+      <span class="string">"similarity"</span>: 0.82
+    }
+  ],
+  <span class="string">"provider"</span>: <span class="string">"claude"</span>,
+  <span class="string">"match_count"</span>: 6
+}</code></pre>
+
+<h3 id="s8-docs">/api/documents</h3>
+
+<h4>GET /api/documents?source_type=product_spec</h4>
+<p>查看索引狀態：幾個 sources、幾個 chunks、總 token 數、最後更新時間。</p>
+
+<h4>POST /api/documents</h4>
+<p>觸發 ingestion。</p>
+<pre><code>{
+  <span class="string">"action"</span>: <span class="string">"ingest"</span>,
+  <span class="string">"source_type"</span>: <span class="string">"product_spec"</span>,
+  <span class="string">"model"</span>: <span class="string">"ECC100"</span>,   <span class="comment">// 可選: 只索引特定 model</span>
+  <span class="string">"force"</span>: <span class="keyword">false</span>         <span class="comment">// 可選: true = 忽略 hash，強制重新 embed</span>
+}</code></pre>
+
+<h4>DELETE /api/documents</h4>
+<p>刪除索引。</p>
+<pre><code>{
+  <span class="string">"source_type"</span>: <span class="string">"product_spec"</span>,
+  <span class="string">"source_id"</span>: <span class="string">"ECC100"</span>   <span class="comment">// 可選: 不填則刪除整個 source_type</span>
+}</code></pre>
+
+<!-- ==================== Section 9 ==================== -->
+<h2 id="s9"><span class="num">9</span> Persona 系統</h2>
+
+<p>不同部門的同事對同一個問題需要不同角度的回答。<strong>Persona</strong> 機制讓你為每個使用情境定義獨立的 AI system prompt。</p>
+
+<h3 id="s9-builtin">內建 Personas（4 個）</h3>
+
+<table>
+  <tr><th>Persona</th><th>適用對象</th><th>回答風格</th></tr>
+  <tr>
+    <td><strong>Product Specialist</strong> <span class="badge badge-blue">預設</span></td>
+    <td>一般查詢、MKT</td>
+    <td>精確規格、型號比較、技術細節，中英文自動偵測</td>
+  </tr>
+  <tr>
+    <td><strong>Sales Assistant</strong></td>
+    <td>業務團隊</td>
+    <td>強調賣點、競爭優勢、使用場景、客戶導向語言</td>
+  </tr>
+  <tr>
+    <td><strong>Technical Support</strong></td>
+    <td>客服 / 技術支援</td>
+    <td>簡單語言、步驟式說明、相容性確認、troubleshooting</td>
+  </tr>
+  <tr>
+    <td><strong>Product Manager</strong></td>
+    <td>PM 內部分析</td>
+    <td>詳細規格比較表、功能差距分析、跨產品線觀察</td>
+  </tr>
+</table>
+
+<h3 id="s9-custom">自訂 Persona</h3>
+
+<p>到 <code>/settings/personas</code> 可以：</p>
+<ul>
+  <li><strong>編輯內建 Persona</strong> — 修改 system prompt（可隨時 Reset 回預設值）</li>
+  <li><strong>新增自訂 Persona</strong> — 例如為合作夥伴、經銷商、特定市場建立專屬角色</li>
+  <li>每個 Persona 有：ID（slug）、名稱、圖示、描述、System Prompt</li>
+</ul>
+
+<div class="callout callout-blue">
+  <strong>自訂 Persona 範例</strong>
+  <p style="margin-top:8px"><strong>Partner Portal</strong> — 為合作夥伴設計：用英文回答、附上型號和訂購資訊、強調 partner program 相關內容。</p>
+  <p><strong>Japan Market</strong> — 為日本市場設計：固定用日文回答、使用日本市場的產品命名、參考日文翻譯版本的內容。</p>
+</div>
+
+<h3 id="s9-api">API 整合（給不同部門做前端）</h3>
+
+<p><code>/api/ask</code> 是獨立的 REST endpoint，任何前端都能呼叫。不同部門可以各自建介面，只要帶上不同的 <code>persona</code> 參數：</p>
+
+<pre><code><span class="comment">// 業務團隊的前端</span>
+POST /api/ask
+{
+  <span class="string">"question"</span>: <span class="string">"ECC100 跟海康威視比有什麼優勢？"</span>,
+  <span class="string">"persona"</span>: <span class="string">"sales"</span>,
+  <span class="string">"provider"</span>: <span class="string">"claude"</span>
+}
+
+<span class="comment">// 客服系統的 chatbot</span>
+POST /api/ask
+{
+  <span class="string">"question"</span>: <span class="string">"ECC100 支援哪些 PoE 標準？"</span>,
+  <span class="string">"persona"</span>: <span class="string">"support"</span>,
+  <span class="string">"provider"</span>: <span class="string">"gemini"</span>
+}
+
+<span class="comment">// 合作夥伴入口（自訂 persona）</span>
+POST /api/ask
+{
+  <span class="string">"question"</span>: <span class="string">"Which outdoor APs support WiFi 7?"</span>,
+  <span class="string">"persona"</span>: <span class="string">"partner"</span>,
+  <span class="string">"provider"</span>: <span class="string">"claude"</span>
+}</code></pre>
+
+<h4>資料儲存</h4>
+<p>Persona 的 system prompt 存在 <code>app_settings</code> 表，key 格式為 <code>persona_{id}</code>。內建的 4 個 Persona 有 hardcoded 的預設值（在 <code>personas.ts</code>），DB 中的設定會覆蓋預設值。</p>
+
+<!-- ==================== Section 10 ==================== -->
+<h2 id="s10"><span class="num">10</span> 各來源 Chunking 策略</h2>
+
+<p>Embedding 模型不變（都是 <code>text-embedding-3-small</code>），但不同來源需要不同的分割方式：</p>
+
+<table>
+  <tr><th>來源</th><th>Chunking 策略</th><th>每 Chunk 目標</th><th>原因</th></tr>
+  <tr>
+    <td><code>product_spec</code></td>
+    <td>固定 2 chunks/product<br>(overview + specifications)</td>
+    <td>200-1000 tokens</td>
+    <td>結構固定、資料量小，不需要複雜切割</td>
+  </tr>
+  <tr>
+    <td><code>gitbook</code></td>
+    <td>按 Markdown heading（h1/h2/h3）分割<br>長 section 用 recursive split</td>
+    <td>300-800 tokens</td>
+    <td>Markdown 結構清晰，heading 就是天然分割點</td>
+  </tr>
+  <tr>
+    <td><code>google_doc</code></td>
+    <td>按 heading 分割<br>無 heading 時用 recursive split</td>
+    <td>300-800 tokens</td>
+    <td>格式不一致，需要同時支援有/無 heading 的文件</td>
+  </tr>
+  <tr>
+    <td><code>web</code></td>
+    <td>先用 Readability 提取正文<br>再按 <code>&lt;section&gt;</code> 或段落分割</td>
+    <td>300-800 tokens</td>
+    <td>HTML 結構雜，需要先去除 nav/footer/ads</td>
+  </tr>
+  <tr>
+    <td><code>file</code> (PDF)</td>
+    <td>按頁面分割 + overlapping window<br>（50 tokens overlap）</td>
+    <td>300-800 tokens</td>
+    <td>頁面跨段落是常見問題，overlap 確保不漏前後文</td>
+  </tr>
+  <tr>
+    <td><code>file</code> (Word)</td>
+    <td>按 heading 或段落分割</td>
+    <td>300-800 tokens</td>
+    <td>Word 的結構比 PDF 乾淨，可直接用段落</td>
+  </tr>
+  <tr>
+    <td><code>text_snippet</code></td>
+    <td>不切割，整段就是一個 chunk</td>
+    <td>自由</td>
+    <td>手動輸入的內容通常短小</td>
+  </tr>
+</table>
+
+<div class="callout callout-blue">
+  <strong>Chunking 核心原則</strong>
+  <p>每個 chunk 應該是「自含」的 — 單獨讀也能理解意思。</p>
+  <ul style="margin-top:6px">
+    <li><strong>切太小</strong>（一句話）→ 失去上下文，搜尋結果碎片化</li>
+    <li><strong>切太大</strong>（整份文件）→ 語意被稀釋，搜尋精準度降低</li>
+    <li><strong>目標</strong>：300-800 tokens / chunk，除非資料天然更小（如 text_snippet）</li>
+  </ul>
+</div>
+
+<h3>Recursive Splitting 策略</h3>
+<p>當一個 section 超過 800 tokens 時，需要進一步切割：</p>
+<ol>
+  <li>先按 <code>\n\n</code>（段落）分割</li>
+  <li>如果單段仍超過上限，按 <code>\n</code>（換行）分割</li>
+  <li>如果單行仍超過上限，按句號分割</li>
+  <li>相鄰 chunks 保留 50 tokens 的 overlap（確保前後文不斷裂）</li>
+</ol>
+
+<h3>不同來源的 metadata 建議</h3>
+<table>
+  <tr><th>來源</th><th>metadata 範例</th></tr>
+  <tr><td>product_spec</td><td><code>{"product_line": "Cloud Camera", "status": "active", "chunk_type": "overview"}</code></td></tr>
+  <tr><td>gitbook</td><td><code>{"collection": "Cloud Camera", "path": "setup/quick-start", "section": "Installation"}</code></td></tr>
+  <tr><td>web</td><td><code>{"url": "https://...", "domain": "engenius.com", "page_title": "ECC100 Product Page"}</code></td></tr>
+  <tr><td>google_doc</td><td><code>{"title": "Product Brief", "folder": "Marketing/Camera", "owner": "terrel@..."}</code></td></tr>
+  <tr><td>file</td><td><code>{"filename": "ECC100_Datasheet.pdf", "file_type": "pdf", "pages": 3, "page_number": 2}</code></td></tr>
+  <tr><td>text_snippet</td><td><code>{"author": "Terrel", "tags": ["FAQ", "ECC100"], "category": "competitive"}</code></td></tr>
+</table>
+
+<!-- ==================== Section 11 ==================== -->
+<h2 id="s11"><span class="num">11</span> 圖片處理策略</h2>
+
+<p>未來的文件來源（Gitbook、Google Docs、PDF、網頁）都可能包含圖片。向量資料庫只能搜尋文字，因此需要將圖片「文字化」。</p>
+
+<h3 id="s11-desc">圖片描述化（Image-to-Text）</h3>
+
+<div class="flow-diagram">文件中的圖片
+      |
+      v
+┌─────────────────────────┐
+│  Claude Vision API       │  多模態 LLM
+│  圖片 → 結構化文字描述    │  理解圖片內容
+└────────────┬────────────┘
+             v
+┌─────────────────────────┐
+│  描述文字嵌入 Chunk       │  [Image: Front panel showing
+│  成為可搜尋的內容         │   LED indicator and reset button]
+└────────────┬────────────┘
+             v
+┌─────────────────────────┐
+│  Embedding + 向量搜尋    │  正常搜尋流程
+│  圖片描述也能被匹配到     │  "reset button 在哪裡？"
+└─────────────────────────┘</div>
+
+<h4>為什麼用 Claude Vision？</h4>
+<ul>
+  <li>專案已有 Anthropic API Key，不需額外設定</li>
+  <li>Claude Vision 對技術圖片（hardware diagram、network topology）描述品質好</li>
+  <li>可以指定描述重點（例如：「描述這張硬體圖中的每個介面和按鈕」）</li>
+</ul>
+
+<h4>描述 Prompt 範例</h4>
+<pre><code><span class="comment">// 給 Claude Vision 的指示</span>
+<span class="string">"Describe this image in detail for a product database.
+Focus on:
+- Hardware interfaces, ports, and buttons visible
+- LED indicators and their labels
+- Physical dimensions or mounting details if shown
+- Network topology or connection diagram details
+Write in plain text, suitable for text search."</span></code></pre>
+
+<h3>圖文關聯（Image-Context Binding）</h3>
+
+<p>圖片描述不應該獨立存在，而是和它前後的段落文字綁在同一個 chunk 裡：</p>
+
+<pre><code><span class="comment">// chunk.content 範例</span>
+<span class="string">"Hardware Overview
+The ECC100 features a compact dome design suitable for
+outdoor installation with IP67 weatherproof rating.
+
+[Image: Front panel showing LED indicator (power/status),
+reset pinhole button, and mounting bracket. Rear panel
+with RJ45 PoE port (802.3af) and microSD card slot
+(supports up to 256GB).]
+
+The device supports wall and ceiling mounting via the
+included bracket."</span>
+
+<span class="comment">// chunk.metadata 中存圖片 URL</span>
+{
+  <span class="string">"images"</span>: [
+    {
+      <span class="string">"url"</span>: <span class="string">"https://xxx.supabase.co/storage/v1/.../ecc100_hw.png"</span>,
+      <span class="string">"alt"</span>: <span class="string">"ECC100 hardware diagram"</span>,
+      <span class="string">"position"</span>: <span class="string">"inline"</span>
+    }
+  ]
+}</code></pre>
+
+<div class="callout callout-green">
+  <strong>優點：搜尋到段落時，圖片也跟著出來</strong>
+  <p>當有人問「ECC100 的 microSD 插槽在哪裡？」，向量搜尋會匹配到這個 chunk（因為描述文字包含 "microSD card slot"），前端可以從 metadata 中取出圖片 URL 一起顯示。</p>
+</div>
+
+<h3 id="s11-store">圖片儲存架構</h3>
+
+<table>
+  <tr><th>層級</th><th>儲存位置</th><th>用途</th></tr>
+  <tr><td>原始圖片</td><td>Supabase Storage <code>documents</code> bucket</td><td>保留原圖，前端可直接渲染</td></tr>
+  <tr><td>圖片描述文字</td><td><code>documents.content</code>（嵌入 chunk 中）</td><td>向量搜尋用</td></tr>
+  <tr><td>圖片 URL 引用</td><td><code>documents.metadata.images[]</code></td><td>前端取用、渲染圖片</td></tr>
+</table>
+
+<h3 id="s11-when">實作時機與注意事項</h3>
+
+<div class="callout callout-amber">
+  <strong>目前不需要做</strong>
+  <p>圖片處理只有在處理 Gitbook / Google Docs / PDF / 網頁 時才需要。目前 <code>product_spec</code> 的圖片（產品照、hardware 圖）不需要 embed — 它們是用來生成 PDF 的，不是用來回答問題的。</p>
+  <p>等到實作其他來源的 ingestion 時再加入圖片處理即可。<code>documents</code> 表的 <code>metadata</code> JSONB 欄位已經預留了存圖片資訊的空間，不需要改 schema。</p>
+</div>
+
+<table>
+  <tr><th>注意事項</th><th>說明</th></tr>
+  <tr>
+    <td><strong>Vision API 費用</strong></td>
+    <td>Claude Vision 每張圖約 $0.01-0.05（依解析度）。批量處理大量圖片前要估算費用</td>
+  </tr>
+  <tr>
+    <td><strong>描述品質</strong></td>
+    <td>技術圖表（hardware diagram）效果好；純照片（產品照）效果普通；文字截圖建議直接 OCR</td>
+  </tr>
+  <tr>
+    <td><strong>圖片變更偵測</strong></td>
+    <td>圖片沒有 content hash 機制。如果圖片更新了但 URL 不變，需要手動 force re-index</td>
+  </tr>
+  <tr>
+    <td><strong>隱私</strong></td>
+    <td>圖片會上傳到 Claude Vision API。確保不包含敏感資訊（內部設計稿、未發布產品等）</td>
+  </tr>
+</table>
+
+<!-- ==================== Section 12 ==================== -->
+<h2 id="s12"><span class="num">12</span> 注意事項</h2>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr>
+    <td><strong>OpenAI Key 是必要的</strong></td>
+    <td>Embedding 固定使用 OpenAI <code>text-embedding-3-small</code>。即使用 Claude 回答問題，embedding 仍需 OpenAI key</td>
+  </tr>
+  <tr>
+    <td><strong>索引需手動觸發</strong></td>
+    <td>目前 Sync 後不會自動 re-index。同事更新了 Google Sheet → Sync 完成後，需要到 /ask 頁面點 Re-index</td>
+  </tr>
+  <tr>
+    <td><strong>Content hash 防浪費</strong></td>
+    <td>Re-index 時自動比對 SHA-256 hash，內容沒變的 chunk 不會呼叫 OpenAI API，不浪費費用</td>
+  </tr>
+  <tr>
+    <td><strong>IVFFlat 索引的 lists 參數</strong></td>
+    <td>目前設定 <code>lists = 10</code>，適合 < 1000 筆文件。如果未來文件數量超過 1000，需要增加 lists 數量或改用 HNSW 索引</td>
+  </tr>
+  <tr>
+    <td><strong>相似度門檻</strong></td>
+    <td>設定為 0.3（較寬鬆）。如果發現搜尋結果不相關太多，可以調高到 0.4-0.5</td>
+  </tr>
+  <tr>
+    <td><strong>LLM 費用</strong></td>
+    <td>每次提問約消耗 2000-4000 tokens（context + 回答）。以 Claude Sonnet 為例，約 $0.01-0.03 / 次。小團隊每月數百次查詢，費用可忽略</td></tr>
+  <tr>
+    <td><strong>無 Auth</strong></td>
+    <td>目前 /api/ask endpoint 沒有認證保護。任何知道 URL 的人都能使用。未來加入 Supabase Auth 時一併處理</td>
+  </tr>
+  <tr>
+    <td><strong>回答品質取決於資料品質</strong></td>
+    <td>如果 Google Sheet 的 overview/features 寫得不完整或不準確，AI 的回答也會受影響。「Garbage in, garbage out」</td>
+  </tr>
+  <tr>
+    <td><strong>Persona prompt 長度</strong></td>
+    <td>System prompt 不宜過長（建議 < 500 tokens）。太長會壓縮 context 的空間，影響回答品質</td>
+  </tr>
+  <tr>
+    <td><strong>pgvector 在 Supabase Free Plan</strong></td>
+    <td>pgvector 包含在所有 Supabase 方案中（含免費方案）。不需要額外付費或開通</td>
+  </tr>
+</table>
+
+<!-- ==================== Section 13 ==================== -->
+<h2 id="s13"><span class="num">13</span> 未來擴充</h2>
+
+<p>所有新來源都使用同一張 <code>documents</code> 表，只需要新增 ingestion script：</p>
+
+<h3 id="s13-gitbook">Gitbook 文件</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>source_type</td><td><code>gitbook</code></td></tr>
+  <tr><td>取得方式</td><td>Gitbook API 或 export → Markdown</td></tr>
+  <tr><td>Chunking</td><td>按 heading 分割。長 section 用 recursive split（~500 tokens/chunk）</td></tr>
+  <tr><td>source_id</td><td>Page slug, e.g. <code>cloud-camera/quick-start</code></td></tr>
+  <tr><td>metadata</td><td><code>{"collection": "Cloud Camera", "path": "quick-start"}</code></td></tr>
+  <tr><td>圖片處理</td><td>Gitbook 圖片通常有 alt text。沒有 alt text 的圖片用 Claude Vision 生成描述</td></tr>
+  <tr><td>更新策略</td><td>定期拉取（daily cron）或手動觸發</td></tr>
+  <tr><td>需要開發</td><td><code>src/lib/rag/ingest-gitbook.ts</code></td></tr>
+</table>
+
+<h3 id="s13-web">Web Link（網頁）</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>source_type</td><td><code>web</code></td></tr>
+  <tr><td>取得方式</td><td>Server-side fetch → Readability（<code>mozilla/readability</code>）提取正文</td></tr>
+  <tr><td>Chunking</td><td>按段落或 heading 區塊分割，overlapping window（~500 tokens/chunk, 50 tokens overlap）</td></tr>
+  <tr><td>source_id</td><td>URL 的 SHA-256 hash（前 12 位）</td></tr>
+  <tr><td>metadata</td><td><code>{"url": "https://...", "domain": "engenius.com"}</code></td></tr>
+  <tr><td>圖片處理</td><td>正文中的 <code>&lt;img&gt;</code> 用 alt text 或 Claude Vision 描述，存入 chunk content</td></tr>
+  <tr><td>注意</td><td>需要處理 JavaScript-rendered 頁面（可能需要 Puppeteer）、robots.txt 遵守、rate limiting</td></tr>
+  <tr><td>需要開發</td><td><code>src/lib/rag/ingest-web.ts</code> + URL 管理 UI</td></tr>
+</table>
+
+<h3 id="s13-gdoc">Google Docs</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>source_type</td><td><code>google_doc</code></td></tr>
+  <tr><td>取得方式</td><td>Google Docs API（已有 service account）→ export as plain text 或 HTML</td></tr>
+  <tr><td>Chunking</td><td>按 heading 區塊分割。如果沒有 heading，用 recursive splitting</td></tr>
+  <tr><td>source_id</td><td>Google Doc ID</td></tr>
+  <tr><td>metadata</td><td><code>{"title": "Product Brief - ECC100", "folder": "Marketing"}</code></td></tr>
+  <tr><td>圖片處理</td><td>Google Docs API 可取得內嵌圖片的 URL → 下載 → Claude Vision 描述</td></tr>
+  <tr><td>優勢</td><td>專案已接好 Google Drive API，可直接復用 credentials</td></tr>
+  <tr><td>需要開發</td><td><code>src/lib/rag/ingest-google-doc.ts</code> + Doc ID 管理 UI</td></tr>
+</table>
+
+<h3 id="s13-file">Word / PDF 上傳</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>source_type</td><td><code>file</code></td></tr>
+  <tr><td>取得方式</td><td>使用者上傳 → Supabase Storage → server-side 解析</td></tr>
+  <tr><td>解析工具</td><td>PDF: <code>pdf-parse</code> 或 <code>pdfjs-dist</code>；Word: <code>mammoth</code></td></tr>
+  <tr><td>Chunking</td><td>PDF 按頁面 + overlap 分割；Word 按 heading/段落分割</td></tr>
+  <tr><td>source_id</td><td>檔案的 SHA-256 hash（前 12 位）</td></tr>
+  <tr><td>metadata</td><td><code>{"filename": "ECC100_Datasheet_v1.2.pdf", "file_type": "pdf", "pages": 3}</code></td></tr>
+  <tr><td>圖片處理</td><td>PDF 中的圖片用 <code>pdfjs-dist</code> 提取 → Claude Vision 描述；Word 中的圖片用 <code>mammoth</code> 提取</td></tr>
+  <tr><td>需要開發</td><td><code>src/lib/rag/ingest-file.ts</code> + 上傳 UI + 檔案管理頁面</td></tr>
+</table>
+
+<div class="callout callout-amber">
+  <strong>PDF/Word 是最複雜的來源</strong>
+  <p>PDF 的格式問題很多：多欄排版會被解析成交錯文字、表格可能變成亂序、掃描檔需要 OCR、圖片中的文字無法直接提取。建議：</p>
+  <ul>
+    <li>先處理「文字型 PDF」（我們自己生成的 Datasheet PDF），這些格式規律</li>
+    <li>掃描型 PDF 和複雜排版的第三方文件最後再做</li>
+    <li>考慮使用更強的解析服務（如 Unstructured.io）取代本地 parsing</li>
+  </ul>
+</div>
+
+<h3 id="s13-text">Text Snippets（手動文字片段）</h3>
+
+<table>
+  <tr><th>項目</th><th>說明</th></tr>
+  <tr><td>source_type</td><td><code>text_snippet</code></td></tr>
+  <tr><td>取得方式</td><td>使用者在管理介面手動貼入文字</td></tr>
+  <tr><td>用途</td><td>FAQ、內部公告、產品差異說明、競品比較、常見客戶問題的標準回答</td></tr>
+  <tr><td>Chunking</td><td>不切割，整段就是一個 chunk</td></tr>
+  <tr><td>source_id</td><td>使用者自訂的 slug</td></tr>
+  <tr><td>圖片處理</td><td>不適用（純文字）</td></tr>
+  <tr><td>需要開發</td><td>管理 UI（CRUD 頁面）+ 簡單的 ingestion</td></tr>
+</table>
+
+<div class="callout callout-purple">
+  <strong>Text Snippet 是最快能產生價值的擴充</strong>
+  <p>如果同事常常問同類問題（例如「ECC100 跟競品比怎麼樣？」），你可以直接貼入一段標準回答作為 text snippet，AI 就會在回答中引用這段內容。不需要任何外部 API 或解析邏輯。</p>
+  <p>另一個用途：把內部常用的「產品定位說明」「功能差異表」「市場策略文件」摘要貼入，讓業務團隊可以快速查詢。</p>
+</div>
+
+<h3 id="s13-roadmap">開發 Roadmap</h3>
+
+<h4>建議實作順序</h4>
+
+<table>
+  <tr><th>階段</th><th>項目</th><th>複雜度</th><th>理由</th></tr>
+  <tr>
+    <td>Phase 1<br><span class="badge badge-green">已完成</span></td>
+    <td>product_spec ingestion + Ask UI + Persona</td>
+    <td>低</td>
+    <td>核心功能，驗證整個 RAG 流程</td>
+  </tr>
+  <tr>
+    <td>Phase 2</td>
+    <td><span class="badge badge-purple">text_snippet</span> CRUD + ingestion</td>
+    <td>低</td>
+    <td>最簡單的擴充，立即可用。FAQ + 競品比較</td>
+  </tr>
+  <tr>
+    <td>Phase 3</td>
+    <td>自動 re-index + Sync 整合</td>
+    <td>低</td>
+    <td>目前手動 re-index 是最大的使用摩擦點</td>
+  </tr>
+  <tr>
+    <td>Phase 4</td>
+    <td><span class="badge badge-blue">gitbook</span> ingestion</td>
+    <td>中</td>
+    <td>有 API，結構化程度高，技術文件對 support 最有價值</td>
+  </tr>
+  <tr>
+    <td>Phase 5</td>
+    <td><span class="badge badge-blue">google_doc</span> ingestion</td>
+    <td>中</td>
+    <td>已有 Google API credentials 可復用</td>
+  </tr>
+  <tr>
+    <td>Phase 6</td>
+    <td>Streaming response + Conversation history</td>
+    <td>中</td>
+    <td>提升使用體驗：回答即時顯示 + 支援追問</td>
+  </tr>
+  <tr>
+    <td>Phase 7</td>
+    <td>圖片處理（Claude Vision）</td>
+    <td>中</td>
+    <td>配合 Gitbook/Google Docs 中的圖片</td>
+  </tr>
+  <tr>
+    <td>Phase 8</td>
+    <td><span class="badge badge-amber">web</span> link ingestion</td>
+    <td>中高</td>
+    <td>需要 HTML 解析和清理</td>
+  </tr>
+  <tr>
+    <td>Phase 9</td>
+    <td><span class="badge badge-amber">file</span> (Word/PDF) upload + ingestion</td>
+    <td>高</td>
+    <td>格式最複雜，建議最後做</td>
+  </tr>
+  <tr>
+    <td>Phase 10</td>
+    <td>Supabase Auth + 使用記錄 + feedback</td>
+    <td>中</td>
+    <td>上線給更多人用之前必須完成</td>
+  </tr>
+</table>
+
+<h4>其他未來改進</h4>
+
+<table>
+  <tr><th>功能</th><th>說明</th><th>優先級</th></tr>
+  <tr><td><strong>Hybrid search</strong></td><td>結合向量搜尋 + PostgreSQL 全文搜尋（<code>tsvector</code>），對型號查詢更精準。例如搜尋 "ECW536" 用 keyword match 比向量搜尋更準</td><td>中</td></tr>
+  <tr><td><strong>文件管理 UI</strong></td><td>獨立的 <code>/documents</code> 頁面，管理所有已索引的來源、查看 chunk 內容、手動刪除/重建</td><td>中</td></tr>
+  <tr><td><strong>Persona + source_type 綁定</strong></td><td>每個 Persona 可以限定搜尋範圍。例如 support persona 同時搜 product_spec + gitbook，sales 只搜 product_spec + text_snippet</td><td>低</td></tr>
+  <tr><td><strong>回答品質 feedback</strong></td><td>使用者可以對回答按 thumbs up/down，用於改進 prompt 和識別資料缺口</td><td>低</td></tr>
+  <tr><td><strong>多語言 embedding</strong></td><td>目前只 embed 英文原文。未來可以同時 embed 日文/中文翻譯版本，讓非英文搜尋更精準</td><td>低</td></tr>
+  <tr><td><strong>Cache 常見問題</strong></td><td>對相同或相似的問題快取回答，減少 LLM 呼叫。用 embedding 相似度判斷問題是否「夠像」</td><td>低</td></tr>
+</table>
+
+<!-- Footer -->
+<div style="margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--gray-light);">
+  Product SpecHub — Ask SpecHub RAG System Documentation<br>
+  Generated: 2026-04-12 &nbsp;|&nbsp; EnGenius Technologies
+</div>
+
+</div>
+</body>
+</html>

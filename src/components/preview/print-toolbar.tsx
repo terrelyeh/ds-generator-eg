@@ -20,10 +20,14 @@ export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en"
     setGenerating(true);
     try {
       const res = await fetch(
-        `/api/generate-pdf?model=${encodeURIComponent(model)}&mode=${mode}`,
+        `/api/generate-pdf?model=${encodeURIComponent(model)}&mode=${mode}&lang=${locale}`,
         { method: "POST" }
       );
       const data = await res.json();
+      if (res.status === 409) {
+        alert(data.error || "Another PDF generation is in progress. Please wait.");
+        return;
+      }
       if (data.ok && data.pdfUrl) {
         window.open(data.pdfUrl, "_blank");
       } else {

@@ -40,8 +40,9 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { settings } = body as {
+  const { settings, expected_updated_at } = body as {
     settings: { key: string; value: string }[];
+    expected_updated_at?: Record<string, string>;
   };
 
   if (!settings || settings.length === 0) {
@@ -49,6 +50,29 @@ export async function POST(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // Optimistic locking: check if any key was modified since we loaded
+  if (expected_updated_at) {
+    const keysToCheck = Object.keys(expected_updated_at);
+    if (keysToCheck.length > 0) {
+      const { data: currentRows } = await supabase
+        .from("app_settings" as "products")
+        .select("key, updated_at")
+        .in("key", keysToCheck) as { data: { key: string; updated_at: string }[] | null };
+
+      for (const row of currentRows ?? []) {
+        const expected = expected_updated_at[row.key];
+        if (expected && row.updated_at > expected) {
+          return NextResponse.json(
+            { error: "Settings were modified by another user. Please reload and try again." },
+            { status: 409 }
+          );
+        }
+      }
+    }
+  }
+
+  const now = new Date().toISOString();
 
   for (const s of settings) {
     if (!s.value || s.value.trim().length === 0) continue;
@@ -59,7 +83,7 @@ export async function POST(request: Request) {
     await supabase
       .from("app_settings" as "products")
       .upsert(
-        { key: s.key, value: s.value.trim(), updated_at: new Date().toISOString() },
+        { key: s.key, value: s.value.trim(), updated_at: now },
         { onConflict: "key" }
       );
   }

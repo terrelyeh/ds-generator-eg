@@ -30,6 +30,7 @@ export function TypographyEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [serverUpdatedAt, setServerUpdatedAt] = useState<string | null>(null);
 
   // Custom fonts
   const [customFonts, setCustomFonts] = useState<FontOption[]>([]);
@@ -55,6 +56,7 @@ export function TypographyEditor() {
       if (typoData.ok) {
         setSettings(typoData.settings);
         setDefaults(typoData.defaults);
+        setServerUpdatedAt(typoData.updated_at ?? null);
         setDirty(false);
       }
       if (fontsData.ok) {
@@ -84,11 +86,17 @@ export function TypographyEditor() {
       const res = await fetch("/api/settings/typography", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ locale, settings }),
+        body: JSON.stringify({ locale, settings, expected_updated_at: serverUpdatedAt }),
       });
       const data = await res.json();
+      if (res.status === 409) {
+        toast.error(data.error || "Settings were modified by another user. Reloading...");
+        fetchSettings();
+        return;
+      }
       if (data.ok) {
         toast.success("Typography settings saved");
+        setServerUpdatedAt(data.updated_at ?? null);
         setDirty(false);
         setPreviewKey((k) => k + 1); // refresh preview
       } else {
@@ -420,7 +428,7 @@ export function TypographyEditor() {
               <div className="rounded-lg border bg-white shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)" }}>
                 <iframe
                   key={previewKey}
-                  src={`/preview/${previewModel}?lang=${locale}&mode=light&t=${previewKey}`}
+                  src={`/preview/${previewModel}?lang=${locale}&mode=light&toolbar=false&t=${previewKey}`}
                   className="w-full h-full border-0"
                   style={{
                     transform: `scale(${previewScale})`,

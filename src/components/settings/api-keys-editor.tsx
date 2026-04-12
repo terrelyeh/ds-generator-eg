@@ -18,21 +18,21 @@ const API_KEYS: ApiKeyConfig[] = [
   {
     key: "anthropic_api_key",
     label: "Anthropic (Claude)",
-    description: "Used for Claude Sonnet and Claude Opus translation models.",
+    description: "Translation + Ask SpecHub answers. Models: Claude Sonnet / Opus.",
     placeholder: "sk-ant-api03-...",
     docsUrl: "https://console.anthropic.com/settings/keys",
   },
   {
     key: "openai_api_key",
-    label: "OpenAI (GPT-4o)",
-    description: "Used for GPT-4o translation model.",
+    label: "OpenAI",
+    description: "Embedding (required for Ask SpecHub indexing & search) + Translation + Ask answers. Models: text-embedding-3-small, GPT-4o.",
     placeholder: "sk-proj-...",
     docsUrl: "https://platform.openai.com/api-keys",
   },
   {
     key: "google_ai_api_key",
     label: "Google AI (Gemini)",
-    description: "Used for Gemini 2.5 Pro translation model.",
+    description: "Translation + Ask SpecHub answers. Models: Gemini 2.5 Pro / Flash.",
     placeholder: "AIza...",
     docsUrl: "https://aistudio.google.com/apikey",
   },
@@ -107,14 +107,25 @@ export function ApiKeysEditor() {
 
     setSaving(true);
     try {
+      const expected_updated_at: Record<string, string> = {};
+      if (keyState.updated_at) {
+        expected_updated_at[key] = keyState.updated_at;
+      }
+
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           settings: [{ key, value: keyState.value }],
+          expected_updated_at,
         }),
       });
       const data = await res.json();
+      if (res.status === 409) {
+        toast.error(data.error || "This key was modified by another user. Reloading...");
+        window.location.reload();
+        return;
+      }
       if (data.ok) {
         // Reload to get masked value
         const reloadRes = await fetch(`/api/settings?keys=${key}`);
@@ -160,15 +171,15 @@ export function ApiKeysEditor() {
           <span className="text-muted-foreground/40">/</span>
           <span className="font-medium text-foreground">API Keys</span>
         </nav>
-        <h1 className="text-2xl font-bold tracking-tight">AI Translation API Keys</h1>
+        <h1 className="text-2xl font-bold tracking-tight">AI API Keys</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Manage API keys for AI translation providers. Keys are stored securely in the database.
+          Manage API keys for AI translation, Ask SpecHub (RAG), and embedding. Keys are stored securely in the database.
         </p>
       </div>
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">AI Translation API Keys</CardTitle>
+          <CardTitle className="text-base">AI API Keys</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {loading ? (
@@ -238,17 +249,17 @@ export function ApiKeysEditor() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-between">
-                      <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
                         {state.hasValue ? (
-                          <code className="rounded bg-muted px-2 py-1 text-xs font-mono text-muted-foreground">
+                          <code className="block truncate rounded bg-muted px-2 py-1 text-xs font-mono text-muted-foreground">
                             {state.masked}
                           </code>
                         ) : (
                           <span className="text-xs text-muted-foreground/60">Not configured</span>
                         )}
                         {state.updated_at && (
-                          <span className="ml-3 text-xs text-muted-foreground/50">
+                          <span className="mt-1 block text-xs text-muted-foreground/50">
                             Updated {formatDate(state.updated_at)}
                           </span>
                         )}
@@ -257,6 +268,7 @@ export function ApiKeysEditor() {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEdit(config.key)}
+                        className="flex-shrink-0"
                       >
                         {state.hasValue ? "Update" : "Add Key"}
                       </Button>

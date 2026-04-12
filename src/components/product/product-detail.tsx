@@ -254,6 +254,10 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
         { method: "POST" }
       );
       const data = await res.json();
+      if (res.status === 409) {
+        alert(data.error || "Another PDF generation is in progress. Please wait.");
+        return;
+      }
       if (data.ok && data.pdfUrl) {
         window.open(data.pdfUrl, "_blank");
         router.refresh();
