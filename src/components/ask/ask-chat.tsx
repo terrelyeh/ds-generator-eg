@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
@@ -306,7 +308,13 @@ export function AskChat() {
                       : "bg-muted"
                   }`}
                 >
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</div>
+                  {msg.role === "assistant" ? (
+                    <div className="text-sm leading-relaxed prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-0.5 prose-headings:my-2 prose-table:my-2 prose-th:px-3 prose-th:py-1.5 prose-th:bg-foreground/5 prose-td:px-3 prose-td:py-1.5 prose-td:border prose-th:border prose-th:text-left prose-strong:font-semibold">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    </div>
+                  ) : (
+                    <div className="text-sm leading-relaxed">{msg.content}</div>
+                  )}
 
                   {/* Sources */}
                   {msg.sources && msg.sources.length > 0 && (
