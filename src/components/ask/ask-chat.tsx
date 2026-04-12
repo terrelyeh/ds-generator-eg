@@ -34,9 +34,11 @@ interface PersonaOption {
 }
 
 const PROVIDER_OPTIONS = [
-  { id: "claude", label: "Claude", checkKeys: ["claude-sonnet", "claude-opus"] },
-  { id: "openai", label: "GPT-4o", checkKeys: ["gpt-4o"] },
-  { id: "gemini", label: "Gemini", checkKeys: ["gemini-2.5-pro"] },
+  { id: "claude-sonnet", label: "Claude Sonnet", checkKeys: ["claude-sonnet"] },
+  { id: "claude-opus", label: "Claude Opus", checkKeys: ["claude-opus"] },
+  { id: "gpt-4o", label: "GPT-4o", checkKeys: ["gpt-4o"] },
+  { id: "gemini-pro", label: "Gemini Pro", checkKeys: ["gemini-2.5-pro"] },
+  { id: "gemini-flash", label: "Gemini Flash", checkKeys: ["gemini-2.5-pro"] },
 ];
 
 const EXAMPLE_QUESTIONS = [
@@ -52,7 +54,7 @@ export function AskChat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [provider, setProvider] = useState("gemini");
+  const [provider, setProvider] = useState("gemini-flash");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});

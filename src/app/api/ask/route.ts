@@ -55,7 +55,7 @@ interface MatchedDoc {
  */
 export async function POST(request: Request) {
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, provider = "gemini", persona: personaId = "default", history = [] } = body;
+  const { question, source_type, product_line, provider = "gemini-flash", persona: personaId = "default", history = [] } = body;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -169,7 +169,7 @@ Current question: ${question}`;
 
 /**
  * Call LLM with the given system prompt and user message.
- * Supports: claude (default), openai, gemini
+ * Supports multiple models per provider.
  */
 async function callLLM(
   provider: string,
@@ -177,20 +177,28 @@ async function callLLM(
   userMessage: string
 ): Promise<string> {
   switch (provider) {
-    case "openai":
-    case "gpt-4o":
-      return callOpenAI(systemPrompt, userMessage);
-    case "gemini":
-      return callGemini(systemPrompt, userMessage);
+    case "claude-sonnet":
+      return callClaude(systemPrompt, userMessage, "claude-sonnet-4-5-20241219");
+    case "claude-opus":
+      return callClaude(systemPrompt, userMessage, "claude-opus-4-5-20250415");
     case "claude":
+      return callClaude(systemPrompt, userMessage, "claude-sonnet-4-5-20241219");
+    case "gpt-4o":
+    case "openai":
+      return callOpenAI(systemPrompt, userMessage);
+    case "gemini-pro":
+      return callGemini(systemPrompt, userMessage, "gemini-2.5-pro");
+    case "gemini-flash":
+    case "gemini":
     default:
-      return callClaude(systemPrompt, userMessage);
+      return callGemini(systemPrompt, userMessage, "gemini-2.5-flash");
   }
 }
 
 async function callClaude(
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  model: string
 ): Promise<string> {
   const apiKey = await getApiKey("anthropic_api_key", API_KEY_MAP.anthropic_api_key);
   if (!apiKey) throw new Error("Anthropic API key not configured");
@@ -203,8 +211,8 @@ async function callClaude(
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
-      model: "claude-sonnet-4-5-20241219",
-      max_tokens: 2048,
+      model,
+      max_tokens: 4096,
       system: systemPrompt,
       messages: [{ role: "user", content: userMessage }],
     }),
@@ -233,7 +241,7 @@ async function callOpenAI(
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
     ],
-    max_tokens: 2048,
+    max_tokens: 4096,
   });
 
   return response.choices[0]?.message?.content ?? "";
@@ -241,13 +249,14 @@ async function callOpenAI(
 
 async function callGemini(
   systemPrompt: string,
-  userMessage: string
+  userMessage: string,
+  model: string
 ): Promise<string> {
   const apiKey = await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
   if (!apiKey) throw new Error("Google AI API key not configured");
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
