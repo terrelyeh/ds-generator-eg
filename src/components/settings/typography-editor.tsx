@@ -39,6 +39,7 @@ export function TypographyEditor() {
   // Preview
   const [previewModel, setPreviewModel] = useState("ECC100");
   const [previewKey, setPreviewKey] = useState(0);
+  const [previewScale, setPreviewScale] = useState(0.75);
 
   // Fetch settings
   const fetchSettings = useCallback(async () => {
@@ -396,19 +397,44 @@ export function TypographyEditor() {
             <div className="sticky top-16">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-muted-foreground">Preview</h3>
-                <button
-                  onClick={() => setPreviewKey((k) => k + 1)}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-                >
-                  ↻ Refresh
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPreviewScale((s) => Math.max(0.3, s - 0.1))}
+                    className="flex h-6 w-6 items-center justify-center rounded border border-input text-xs text-muted-foreground hover:bg-muted transition-colors"
+                    title="Zoom out"
+                  >
+                    −
+                  </button>
+                  <span className="text-xs tabular-nums text-muted-foreground w-10 text-center">
+                    {Math.round(previewScale * 100)}%
+                  </span>
+                  <button
+                    onClick={() => setPreviewScale((s) => Math.min(1.5, s + 0.1))}
+                    className="flex h-6 w-6 items-center justify-center rounded border border-input text-xs text-muted-foreground hover:bg-muted transition-colors"
+                    title="Zoom in"
+                  >
+                    +
+                  </button>
+                  <span className="text-border mx-1">|</span>
+                  <button
+                    onClick={() => setPreviewKey((k) => k + 1)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    ↻ Refresh
+                  </button>
+                </div>
               </div>
               <div className="rounded-lg border bg-white shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)" }}>
                 <iframe
                   key={previewKey}
                   src={`/preview/${previewModel}?lang=${locale}&mode=light&t=${previewKey}`}
                   className="w-full h-full border-0"
-                  style={{ transform: "scale(0.75)", transformOrigin: "top left", width: "133.33%", height: "133.33%" }}
+                  style={{
+                    transform: `scale(${previewScale})`,
+                    transformOrigin: "top left",
+                    width: `${100 / previewScale}%`,
+                    height: `${100 / previewScale}%`,
+                  }}
                 />
               </div>
             </div>
