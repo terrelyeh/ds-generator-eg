@@ -33,19 +33,48 @@
       display: flex;
     }
 
-    /* Left TOC panel */
+    /* Left TOC panel — collapsible */
     .toc-panel {
       position: fixed;
       top: 0;
       left: 0;
-      width: 260px;
+      width: 280px;
       height: 100vh;
       background: var(--gray-bg);
       border-right: 1px solid var(--border);
       overflow-y: auto;
       padding: 24px 16px;
       z-index: 100;
+      transition: transform 0.25s ease;
     }
+
+    .toc-panel.collapsed {
+      transform: translateX(-100%);
+    }
+
+    .toc-toggle {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 200;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: white;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      transition: left 0.25s ease;
+      font-size: 18px;
+      color: var(--gray);
+    }
+
+    .toc-toggle:hover { background: var(--gray-bg); }
+
+    .toc-toggle.open { left: 292px; }
 
     .toc-panel h3 {
       font-size: 11px;
@@ -96,11 +125,17 @@
       color: var(--blue);
     }
 
-    /* Main content */
+    /* Main content — centered */
     .content {
-      margin-left: 260px;
-      max-width: 780px;
-      padding: 40px 40px 100px;
+      margin-left: 280px;
+      max-width: 860px;
+      padding: 40px 48px 100px;
+      margin-right: auto;
+      transition: margin-left 0.25s ease;
+    }
+
+    body.toc-hidden .content {
+      margin-left: auto;
     }
 
     h1 {
@@ -155,9 +190,9 @@
       margin: 20px 0 6px;
     }
 
-    p { margin: 8px 0; font-size: 14px; }
-    ul, ol { margin: 8px 0 8px 24px; font-size: 14px; }
-    li { margin: 4px 0; }
+    p { margin: 10px 0; font-size: 15px; }
+    ul, ol { margin: 10px 0 10px 24px; font-size: 15px; }
+    li { margin: 5px 0; }
 
     code {
       background: #f0f1f3;
@@ -194,7 +229,7 @@
       width: 100%;
       border-collapse: collapse;
       margin: 12px 0;
-      font-size: 13px;
+      font-size: 14px;
     }
 
     th {
@@ -213,10 +248,10 @@
     }
 
     .callout {
-      padding: 14px 18px;
+      padding: 16px 20px;
       border-radius: 8px;
       margin: 16px 0;
-      font-size: 13px;
+      font-size: 14px;
       line-height: 1.6;
     }
 
@@ -272,15 +307,19 @@
     .file-tree .desc { color: var(--gray-light); font-size: 11px; }
 
     @media (max-width: 900px) {
-      .toc-panel { display: none; }
-      .content { margin-left: 0; padding: 24px 16px 60px; }
+      .toc-panel { transform: translateX(-100%); }
+      .toc-toggle { left: 16px !important; }
+      .content { margin-left: 0 !important; padding: 24px 16px 60px; }
     }
   </style>
 </head>
 <body>
 
+<!-- TOC toggle button -->
+<button class="toc-toggle open" id="tocToggle" onclick="toggleToc()" title="Toggle table of contents">☰</button>
+
 <!-- Left TOC -->
-<nav class="toc-panel">
+<nav class="toc-panel" id="tocPanel">
   <h3>Ask SpecHub RAG</h3>
   <a href="#s1"><span class="num">1</span> Overview</a>
   <a href="#s1-caps" class="sub">Capabilities</a>
@@ -840,5 +879,15 @@ POST /api/ask { <span class="string">"persona"</span>: <span class="string">"par
 </table>
 
 </div>
+
+<script>
+function toggleToc() {
+  const panel = document.getElementById('tocPanel');
+  const btn = document.getElementById('tocToggle');
+  const isCollapsed = panel.classList.toggle('collapsed');
+  btn.classList.toggle('open', !isCollapsed);
+  document.body.classList.toggle('toc-hidden', isCollapsed);
+}
+</script>
 </body>
 </html>
