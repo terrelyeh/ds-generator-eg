@@ -43,8 +43,8 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
 const SUMMARY_CARDS = [
   { key: "types", label: "Source Types", sub: "已啟用的內容來源類別" },
   { key: "sources", label: "Sources", sub: "已索引的產品 / 文件數量" },
-  { key: "chunks", label: "Chunks", sub: "切割後的搜尋片段" },
   { key: "tokens", label: "Tokens", sub: "文字總量" },
+  { key: "last_indexed", label: "Last Indexed", sub: "最後一次索引時間" },
 ];
 
 function formatDate(dateStr: string | null) {
@@ -122,12 +122,14 @@ export function KnowledgeBase() {
   const totalSources = Object.values(stats).reduce((s, v) => s + v.sources, 0);
   const totalTokens = Object.values(stats).reduce((s, v) => s + v.total_tokens, 0);
   const activeTypes = Object.keys(stats).length;
+  const lastIndexed = Object.values(stats).reduce((latest, v) =>
+    v.last_updated && (!latest || v.last_updated > latest) ? v.last_updated : latest, null as string | null);
 
   const summaryValues: Record<string, string> = {
     types: `${activeTypes}`,
     sources: `${totalSources}`,
-    chunks: `${total}`,
     tokens: formatTokens(totalTokens),
+    last_indexed: lastIndexed ? formatDate(lastIndexed) : "—",
   };
 
   return (
@@ -180,7 +182,9 @@ export function KnowledgeBase() {
           <Card key={card.key} className="shadow-sm">
             <CardContent className="pt-4 pb-4 px-5">
               <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">{card.label}</div>
-              <div className="text-3xl font-bold tabular-nums mt-1">{summaryValues[card.key]}</div>
+              <div className={`font-bold tabular-nums mt-1 ${card.key === "last_indexed" ? "text-lg" : "text-3xl"}`}>
+                {summaryValues[card.key]}
+              </div>
               <div className="text-xs text-muted-foreground/60 mt-1">{card.sub}</div>
             </CardContent>
           </Card>
@@ -209,7 +213,7 @@ export function KnowledgeBase() {
                           {typeStat ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              {typeStat.sources} sources, {typeStat.count} chunks
+                              {typeStat.sources} sources · {typeStat.count} chunks · {formatTokens(typeStat.total_tokens)} tokens
                             </span>
                           ) : config.status === "planned" ? (
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Coming Soon</span>
@@ -228,14 +232,9 @@ export function KnowledgeBase() {
 
                     <div className="flex items-center gap-2">
                       {typeStat && (
-                        <>
-                          <span className="text-xs text-muted-foreground/50 tabular-nums">
-                            {formatTokens(typeStat.total_tokens)} tokens
-                          </span>
-                          <Button variant="outline" size="sm" onClick={() => setExpandedType(isExpanded ? null : config.id)} className="text-xs">
-                            {isExpanded ? "Hide" : "Details"}
-                          </Button>
-                        </>
+                        <Button variant="outline" size="sm" onClick={() => setExpandedType(isExpanded ? null : config.id)} className="text-xs">
+                          {isExpanded ? "Hide" : "Details"}
+                        </Button>
                       )}
                       {config.canIngest && (
                         <Button size="sm" onClick={() => handleIngest(config.id)} disabled={isIngesting} className="text-xs">
