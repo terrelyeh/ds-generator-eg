@@ -55,15 +55,25 @@ export function AskChat() {
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
   const [stats, setStats] = useState<IndexStats | null>(null);
+  const [indexedSources, setIndexedSources] = useState<{ source_id: string; title: string; chunks: number; total_tokens: number; last_updated: string }[]>([]);
   const [indexing, setIndexing] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Load index stats, personas, and available providers
-  useEffect(() => {
+  function refreshStats() {
     fetch("/api/documents?source_type=product_spec")
       .then((r) => r.json())
-      .then((d) => { if (d.ok) setStats(d.stats); })
+      .then((d) => {
+        if (d.ok) {
+          setStats(d.stats);
+          setIndexedSources(d.sources ?? []);
+        }
+      })
       .catch(() => {});
+  }
+
+  // Load index stats, personas, and available providers
+  useEffect(() => {
+    refreshStats();
     fetch("/api/ask")
       .then((r) => r.json())
       .then((d) => { if (d.ok) setPersonas(d.personas); })
@@ -134,15 +144,16 @@ export function AskChat() {
       });
       const data = await res.json();
       if (data.ok) {
-        const msg = `Indexed ${data.processed} chunks (${data.skipped} unchanged).${data.errors?.length ? ` Errors: ${data.errors.length}` : ""}`;
+        const errorDetail = data.errors?.length
+          ? `\n\nErrors (${data.errors.length}):\n${data.errors.slice(0, 5).join("\n")}${data.errors.length > 5 ? `\n...and ${data.errors.length - 5} more` : ""}`
+          : "";
+        const msg = `Indexed ${data.processed} chunks (${data.skipped} unchanged).${errorDetail}`;
         setMessages((prev) => [
           ...prev,
           { role: "assistant", content: msg },
         ]);
         // Refresh stats
-        const statsRes = await fetch("/api/documents?source_type=product_spec");
-        const statsData = await statsRes.json();
-        if (statsData.ok) setStats(statsData.stats);
+        refreshStats();
       } else {
         setMessages((prev) => [
           ...prev,
@@ -180,34 +191,56 @@ export function AskChat() {
       </div>
 
       {/* Index status bar */}
-      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-2.5">
-        <div className="flex items-center gap-3 text-sm">
-          {specStats ? (
-            <>
-              <span className="inline-flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                <span className="font-medium">{specStats.sources} products</span>
-                <span className="text-muted-foreground">indexed ({specStats.count} chunks)</span>
-              </span>
-              {specStats.last_updated && (
-                <span className="text-xs text-muted-foreground">
-                  Last: {new Date(specStats.last_updated).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+      <div className="rounded-lg border bg-muted/30">
+        <div className="flex items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-3 text-sm">
+            {specStats ? (
+              <>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span className="font-medium">{specStats.sources} products</span>
+                  <span className="text-muted-foreground">indexed ({specStats.count} chunks: overview + specs)</span>
                 </span>
-              )}
-            </>
-          ) : (
-            <span className="text-muted-foreground">No products indexed yet</span>
-          )}
+                {specStats.last_updated && (
+                  <span className="text-xs text-muted-foreground">
+                    Last: {new Date(specStats.last_updated).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="text-muted-foreground">No products indexed yet</span>
+            )}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleIndex}
+            disabled={indexing}
+            className="text-xs"
+          >
+            {indexing ? "Indexing..." : specStats ? "Re-index" : "Index Products"}
+          </Button>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleIndex}
-          disabled={indexing}
-          className="text-xs"
-        >
-          {indexing ? "Indexing..." : specStats ? "Re-index" : "Index Products"}
-        </Button>
+        {/* Expandable indexed products list */}
+        {indexedSources.length > 0 && (
+          <details className="border-t">
+            <summary className="cursor-pointer px-4 py-2 text-xs text-muted-foreground hover:text-foreground transition-colors">
+              View indexed products ({indexedSources.length})
+            </summary>
+            <div className="px-4 pb-3 max-h-48 overflow-y-auto">
+              <div className="grid grid-cols-3 gap-x-4 gap-y-0.5 text-xs">
+                {indexedSources.map((s) => (
+                  <span key={s.source_id} className="text-muted-foreground truncate" title={s.title}>
+                    {s.source_id}
+                  </span>
+                ))}
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground/50">
+                Each product has 2 chunks: Overview (name, subtitle, overview text, features) + Specifications (full spec table)
+              </p>
+            </div>
+          </details>
+        )}
       </div>
 
       {/* Persona selector */}

@@ -208,20 +208,24 @@ export async function ingestProducts(options?: {
     return { processed: 0, skipped, errors };
   }
 
-  // Generate embeddings in batches of 50
-  const BATCH_SIZE = 50;
+  // Generate embeddings in batches of 20 (conservative to avoid token limits)
+  const BATCH_SIZE = 20;
+  // Truncate very long texts to ~6000 tokens (~21000 chars) to stay under API limit
+  const MAX_CHARS = 21000;
   let processed = 0;
 
   for (let i = 0; i < chunksToEmbed.length; i += BATCH_SIZE) {
     const batch = chunksToEmbed.slice(i, i + BATCH_SIZE);
-    const texts = batch.map((c) => c.content);
+    const texts = batch.map((c) =>
+      c.content.length > MAX_CHARS ? c.content.slice(0, MAX_CHARS) : c.content
+    );
 
     let embeddings: number[][];
     try {
       embeddings = await generateEmbeddings(texts);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`Embedding batch ${i / BATCH_SIZE + 1} failed: ${msg}`);
+      errors.push(`Embedding batch ${i / BATCH_SIZE + 1} (${batch.length} chunks) failed: ${msg}`);
       continue;
     }
 
@@ -248,7 +252,7 @@ export async function ingestProducts(options?: {
               status: chunk.product.status,
               chunk_type: chunk.chunkIndex === 0 ? "overview" : "specifications",
             },
-            embedding: JSON.stringify(embedding),
+            embedding: `[${embedding.join(",")}]`,
             content_hash: chunk.hash,
             updated_at: new Date().toISOString(),
           } as Record<string, unknown>,
@@ -256,7 +260,7 @@ export async function ingestProducts(options?: {
         );
 
       if (upsertError) {
-        errors.push(`${chunk.product.model_name} chunk ${chunk.chunkIndex}: ${upsertError}`);
+        errors.push(`${chunk.product.model_name} chunk ${chunk.chunkIndex}: ${JSON.stringify(upsertError)}`);
       } else {
         processed++;
       }
