@@ -11,8 +11,16 @@ import {
   WEIGHT_OPTIONS,
   TYPOGRAPHY_DEFAULTS,
   FONT_OPTIONS,
+  TYPOGRAPHY_GROUPS,
+  parseGoogleFontUrl,
 } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
+
+interface FontOption {
+  value: string;
+  label: string;
+  import: string;
+}
 
 export function TypographyEditor() {
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
@@ -23,15 +31,33 @@ export function TypographyEditor() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
 
+  // Custom fonts
+  const [customFonts, setCustomFonts] = useState<FontOption[]>([]);
+  const [showAddFont, setShowAddFont] = useState(false);
+  const [fontUrl, setFontUrl] = useState("");
+
+  // Preview
+  const [previewModel, setPreviewModel] = useState("ECC100");
+  const [previewKey, setPreviewKey] = useState(0);
+
+  // Fetch settings
   const fetchSettings = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/settings/typography?locale=${locale}`);
-      const data = await res.json();
-      if (data.ok) {
-        setSettings(data.settings);
-        setDefaults(data.defaults);
+      const [typoRes, fontsRes] = await Promise.all([
+        fetch(`/api/settings/typography?locale=${locale}`),
+        fetch(`/api/settings/fonts?locale=${locale}`),
+      ]);
+      const typoData = await typoRes.json();
+      const fontsData = await fontsRes.json();
+
+      if (typoData.ok) {
+        setSettings(typoData.settings);
+        setDefaults(typoData.defaults);
         setDirty(false);
+      }
+      if (fontsData.ok) {
+        setCustomFonts(fontsData.fonts ?? []);
       }
     } catch {
       // ignore
@@ -40,18 +66,13 @@ export function TypographyEditor() {
     }
   }, [locale]);
 
-  useEffect(() => {
-    fetchSettings();
-  }, [fetchSettings]);
+  useEffect(() => { fetchSettings(); }, [fetchSettings]);
 
   function handleChange(key: keyof TypographySettings, value: string) {
     if (!settings) return;
     const isStringField = key === "text_color" || key === "font_family";
     const numVal = parseFloat(value);
-    setSettings({
-      ...settings,
-      [key]: isStringField ? value : (isNaN(numVal) ? 0 : numVal),
-    });
+    setSettings({ ...settings, [key]: isStringField ? value : (isNaN(numVal) ? 0 : numVal) });
     setDirty(true);
   }
 
@@ -68,6 +89,7 @@ export function TypographyEditor() {
       if (data.ok) {
         toast.success("Typography settings saved");
         setDirty(false);
+        setPreviewKey((k) => k + 1); // refresh preview
       } else {
         toast.error(`Save failed: ${data.error}`);
       }
@@ -80,13 +102,51 @@ export function TypographyEditor() {
 
   async function handleReset() {
     if (!confirm("Reset to defaults? Your custom values will be lost.")) return;
-    try {
-      await fetch(`/api/settings/typography?locale=${locale}`, { method: "DELETE" });
-      toast.success("Reset to defaults");
-      fetchSettings();
-    } catch {
-      toast.error("Reset failed");
+    await fetch(`/api/settings/typography?locale=${locale}`, { method: "DELETE" });
+    toast.success("Reset to defaults");
+    fetchSettings();
+    setPreviewKey((k) => k + 1);
+  }
+
+  async function handleAddFont() {
+    const parsed = parseGoogleFontUrl(fontUrl);
+    if (!parsed) {
+      toast.error("Invalid Google Fonts URL. Use a URL like: https://fonts.google.com/specimen/Noto+Sans+JP");
+      return;
     }
+    // Check duplicate
+    const allFonts = [...(FONT_OPTIONS[locale] ?? []), ...customFonts];
+    if (allFonts.some((f) => f.value === parsed.value)) {
+      toast.error(`"${parsed.value}" already exists`);
+      return;
+    }
+    const updated = [...customFonts, parsed];
+    setCustomFonts(updated);
+    await fetch("/api/settings/fonts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale, fonts: updated }),
+    });
+    setFontUrl("");
+    setShowAddFont(false);
+    toast.success(`Added "${parsed.label}"`);
+  }
+
+  async function handleRemoveFont(fontValue: string) {
+    if (!confirm(`Remove "${fontValue}"?`)) return;
+    const updated = customFonts.filter((f) => f.value !== fontValue);
+    setCustomFonts(updated);
+    await fetch("/api/settings/fonts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ locale, fonts: updated }),
+    });
+    // If the removed font was selected, switch to default
+    if (settings?.font_family === fontValue) {
+      const defaultFont = defaults?.font_family ?? "Roboto";
+      handleChange("font_family", defaultFont);
+    }
+    toast.success("Font removed");
   }
 
   function handleLocaleChange(newLocale: string) {
@@ -99,199 +159,242 @@ export function TypographyEditor() {
     return settings[key] !== defaults[key];
   };
 
+  const allFonts = [...(FONT_OPTIONS[locale] ?? []), ...customFonts];
+  const localeInfo = SUPPORTED_LOCALES.find((l) => l.value === locale);
+
   return (
     <div className="space-y-6">
       <div>
         <nav className="flex items-center gap-1.5 text-sm mb-4">
-          <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">
-            Settings
-          </Link>
+          <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
           <span className="text-muted-foreground/40">/</span>
           <span className="font-medium text-foreground">Typography</span>
         </nav>
         <h1 className="text-2xl font-bold tracking-tight">Typography Settings</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Adjust font sizes and weights for each language. Changes apply to Datasheet PDF preview and generation.
+          Adjust fonts, sizes, and weights per language. Save then preview to see changes.
         </p>
       </div>
 
       {/* Controls */}
       <div className="flex items-center justify-between gap-4">
-        <div className="flex gap-1 rounded-lg bg-muted p-1">
-          {localeOptions.map((l) => (
-            <button
-              key={l.value}
-              onClick={() => handleLocaleChange(l.value)}
-              className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
-                locale === l.value
-                  ? "bg-engenius-blue text-white shadow-sm"
-                  : "text-muted-foreground hover:text-foreground hover:bg-background"
-              }`}
-            >
-              {l.flag} {l.label}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1 rounded-lg bg-muted p-1">
+            {localeOptions.map((l) => (
+              <button
+                key={l.value}
+                onClick={() => handleLocaleChange(l.value)}
+                className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+                  locale === l.value
+                    ? "bg-engenius-blue text-white shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-background"
+                }`}
+              >
+                {l.flag} {l.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Preview model selector */}
+          <div className="flex items-center gap-1.5">
+            <label className="text-xs text-muted-foreground">Preview:</label>
+            <input
+              type="text"
+              value={previewModel}
+              onChange={(e) => setPreviewModel(e.target.value.toUpperCase())}
+              className="w-24 rounded-md border border-input bg-background px-2 py-1 text-xs"
+              placeholder="ECC100"
+            />
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/preview/ECC100?lang=${locale}&mode=light`}
-            target="_blank"
-            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent transition-colors"
-          >
-            Preview ECC100
-            <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M5 3h8v8M13 3 6 10" />
-            </svg>
-          </Link>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleReset}
-          >
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleReset}>
             Reset to Defaults
           </Button>
-          <Button
-            size="sm"
-            onClick={handleSave}
-            disabled={saving || !dirty}
-          >
+          <Button size="sm" onClick={handleSave} disabled={saving || !dirty}>
             {saving ? "Saving..." : "Save"}
           </Button>
         </div>
       </div>
 
-      {/* Settings */}
       {loading ? (
         <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>
       ) : settings ? (
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">
-              {SUPPORTED_LOCALES.find((l) => l.value === locale)?.flag}{" "}
-              {SUPPORTED_LOCALES.find((l) => l.value === locale)?.label} Typography
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Font Family selector */}
-            <div className="mb-6 rounded-lg border p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div>
-                  <h3 className="text-sm font-semibold">Font Family</h3>
-                  <p className="text-xs text-muted-foreground">
-                    Default: {defaults?.font_family}
-                    {settings.font_family !== defaults?.font_family && (
-                      <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Modified</span>
-                    )}
-                  </p>
+        /* ===== Split Layout: Left Settings + Right Preview ===== */
+        <div className="flex gap-6" style={{ minHeight: "800px" }}>
+          {/* Left: Settings */}
+          <div className="w-[420px] flex-shrink-0 space-y-5">
+            {/* Font Family */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-sm">Font Family</CardTitle>
+                  {settings.font_family !== defaults?.font_family && (
+                    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Modified</span>
+                  )}
                 </div>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
-                {(FONT_OPTIONS[locale] ?? []).map((font) => (
-                  <button
-                    key={font.value}
-                    onClick={() => { handleChange("font_family", font.value); }}
-                    className={`rounded-lg border px-3 py-2.5 text-left transition-all ${
-                      settings.font_family === font.value
-                        ? "border-engenius-blue bg-engenius-blue/5 ring-1 ring-engenius-blue"
-                        : "border-border hover:border-engenius-blue/30"
-                    }`}
-                  >
-                    <span className="text-sm font-medium">{font.label}</span>
-                    <p
-                      className="mt-1 text-xs text-muted-foreground truncate"
-                      style={{ fontFamily: `'${font.value}', sans-serif` }}
-                    >
-                      {locale === "ja" ? "クラウド管理型 AI ドームカメラ 256GB" : "雲端管理型 AI 戶外半球攝影機"}
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  {allFonts.map((font) => {
+                    const isCustom = customFonts.some((f) => f.value === font.value);
+                    return (
+                      <div key={font.value} className="relative group">
+                        <button
+                          onClick={() => handleChange("font_family", font.value)}
+                          className={`w-full rounded-lg border px-3 py-2 text-left transition-all ${
+                            settings.font_family === font.value
+                              ? "border-engenius-blue bg-engenius-blue/5 ring-1 ring-engenius-blue"
+                              : "border-border hover:border-engenius-blue/30"
+                          }`}
+                        >
+                          <span className="text-xs font-medium">{font.label}</span>
+                          <p className="mt-0.5 text-[10px] text-muted-foreground truncate" style={{ fontFamily: `'${font.value}', sans-serif` }}>
+                            {locale === "ja" ? "クラウド管理型 AI カメラ" : "雲端管理型 AI 攝影機"}
+                          </p>
+                        </button>
+                        {isCustom && (
+                          <button
+                            onClick={() => handleRemoveFont(font.value)}
+                            className="absolute -top-1.5 -right-1.5 hidden group-hover:flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white text-[10px] shadow-sm"
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Add custom font */}
+                {showAddFont ? (
+                  <div className="rounded-lg border border-dashed border-engenius-blue/30 p-3 space-y-2">
+                    <input
+                      type="text"
+                      value={fontUrl}
+                      onChange={(e) => setFontUrl(e.target.value)}
+                      placeholder="Paste Google Fonts URL..."
+                      className="w-full rounded-md border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                      autoFocus
+                    />
+                    <p className="text-[10px] text-muted-foreground/60">
+                      e.g. https://fonts.google.com/specimen/Noto+Sans+JP
                     </p>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={handleAddFont} disabled={!fontUrl.trim()} className="text-xs h-7">
+                        Add
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => { setShowAddFont(false); setFontUrl(""); }} className="text-xs h-7">
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowAddFont(true)}
+                    className="flex w-full items-center justify-center gap-1 rounded-lg border-2 border-dashed border-muted-foreground/20 py-2 text-xs font-medium text-muted-foreground hover:border-engenius-blue/30 hover:text-engenius-blue transition-colors"
+                  >
+                    <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M8 3v10M3 8h10" />
+                    </svg>
+                    Add Google Font
                   </button>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Typography properties grouped */}
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">{localeInfo?.flag} Size & Weight</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {TYPOGRAPHY_GROUPS.map((group, gi) => (
+                  <div key={group.label}>
+                    {gi > 0 && <div className="border-t-2 border-foreground/8" />}
+                    <div className="px-5 pt-3 pb-1">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/50">{group.label}</span>
+                    </div>
+                    {group.fields.map((fieldKey) => {
+                      const field = TYPOGRAPHY_FIELDS.find((f) => f.key === fieldKey);
+                      if (!field) return null;
+                      const value = settings[field.key];
+                      const defaultVal = defaults?.[field.key];
+                      const modified = isModified(field.key);
+
+                      return (
+                        <div key={field.key} className="flex items-center justify-between px-5 py-2">
+                          <span className="text-xs font-medium w-[40%]">{field.label}</span>
+                          <div className="flex items-center gap-2">
+                            {field.type === "weight" ? (
+                              <select
+                                value={value as number}
+                                onChange={(e) => handleChange(field.key, e.target.value)}
+                                className="rounded border border-input bg-background px-1.5 py-1 text-xs w-20"
+                              >
+                                {WEIGHT_OPTIONS.map((w) => (
+                                  <option key={w} value={w}>{w}</option>
+                                ))}
+                              </select>
+                            ) : field.type === "color" ? (
+                              <div className="flex items-center gap-1.5">
+                                <input type="color" value={value as string} onChange={(e) => handleChange(field.key, e.target.value)} className="h-6 w-6 rounded border cursor-pointer" />
+                                <input type="text" value={value as string} onChange={(e) => handleChange(field.key, e.target.value)} className="rounded border border-input bg-background px-1.5 py-1 text-xs w-20 font-mono" />
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="number"
+                                  value={value as number}
+                                  onChange={(e) => handleChange(field.key, e.target.value)}
+                                  step={field.key.includes("letter") ? 0.1 : 0.5}
+                                  min={0}
+                                  className="rounded border border-input bg-background px-1.5 py-1 text-xs w-16 tabular-nums"
+                                />
+                                {field.unit && <span className="text-[10px] text-muted-foreground">{field.unit}</span>}
+                              </div>
+                            )}
+                            <span className="text-[10px] tabular-nums text-muted-foreground/40 w-12 text-right">
+                              {typeof defaultVal === "number" ? `${defaultVal}${field.unit}` : ""}
+                            </span>
+                            {modified && <span className="h-1.5 w-1.5 rounded-full bg-amber-400" title="Modified" />}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ))}
+                <div className="h-3" />
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right: Live Preview */}
+          <div className="flex-1 min-w-0">
+            <div className="sticky top-16">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-muted-foreground">Preview</h3>
+                <button
+                  onClick={() => setPreviewKey((k) => k + 1)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
+              <div className="rounded-lg border bg-white shadow-sm overflow-hidden" style={{ height: "calc(100vh - 200px)" }}>
+                <iframe
+                  key={previewKey}
+                  src={`/preview/${previewModel}?lang=${locale}&mode=light&t=${previewKey}`}
+                  className="w-full h-full border-0"
+                  style={{ transform: "scale(0.75)", transformOrigin: "top left", width: "133.33%", height: "133.33%" }}
+                />
               </div>
             </div>
-
-            <table className="w-full">
-              <thead>
-                <tr className="border-b-2 border-foreground/10">
-                  <th className="py-2 text-left text-xs font-semibold text-muted-foreground w-[35%]">Property</th>
-                  <th className="py-2 text-left text-xs font-semibold text-muted-foreground w-[25%]">Value</th>
-                  <th className="py-2 text-left text-xs font-semibold text-muted-foreground w-[20%]">Default</th>
-                  <th className="py-2 w-[20%]"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {TYPOGRAPHY_FIELDS.map((field) => {
-                  const value = settings[field.key];
-                  const defaultVal = defaults?.[field.key];
-                  const modified = isModified(field.key);
-
-                  return (
-                    <tr key={field.key} className="border-b border-border/50">
-                      <td className="py-3 text-sm font-medium">{field.label}</td>
-                      <td className="py-3">
-                        {field.type === "weight" ? (
-                          <select
-                            value={value as number}
-                            onChange={(e) => handleChange(field.key, e.target.value)}
-                            className="rounded-md border border-input bg-background px-2 py-1 text-sm w-24"
-                          >
-                            {WEIGHT_OPTIONS.map((w) => (
-                              <option key={w} value={w}>{w}</option>
-                            ))}
-                          </select>
-                        ) : field.type === "color" ? (
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="color"
-                              value={value as string}
-                              onChange={(e) => handleChange(field.key, e.target.value)}
-                              className="h-8 w-8 rounded border border-input cursor-pointer"
-                            />
-                            <input
-                              type="text"
-                              value={value as string}
-                              onChange={(e) => handleChange(field.key, e.target.value)}
-                              className="rounded-md border border-input bg-background px-2 py-1 text-sm w-24 font-mono"
-                            />
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="number"
-                              value={value as number}
-                              onChange={(e) => handleChange(field.key, e.target.value)}
-                              step={field.key.includes("letter") ? 0.1 : 0.5}
-                              min={0}
-                              className="rounded-md border border-input bg-background px-2 py-1 text-sm w-20 tabular-nums"
-                            />
-                            {field.unit && (
-                              <span className="text-xs text-muted-foreground">{field.unit}</span>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="py-3 text-xs tabular-nums text-muted-foreground">
-                        {typeof defaultVal === "number" ? `${defaultVal}${field.unit}` : defaultVal}
-                      </td>
-                      <td className="py-3 text-right">
-                        {modified && (
-                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                            Modified
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       ) : null}
-
-      <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-        <strong>Tip:</strong> Save your changes, then click <strong>Preview ECC100</strong> to see the effect immediately.
-        Use <strong>Reset to Defaults</strong> to restore the original values.
-      </div>
     </div>
   );
 }

@@ -91,3 +91,30 @@ export const TYPOGRAPHY_FIELDS: { key: keyof TypographySettings; label: string; 
 ];
 
 export const WEIGHT_OPTIONS = [300, 400, 500, 600, 700];
+
+/** Group fields for visual separation in the UI */
+export const TYPOGRAPHY_GROUPS: { label: string; fields: (keyof TypographySettings)[] }[] = [
+  { label: "Headline", fields: ["headline_size", "headline_weight", "subtitle_size"] },
+  { label: "Overview", fields: ["overview_size", "overview_weight"] },
+  { label: "Features", fields: ["features_size", "features_weight"] },
+  { label: "Specifications", fields: ["spec_label_size", "spec_label_weight", "spec_value_weight", "section_title_size"] },
+  { label: "Footer & Misc", fields: ["footer_size", "letter_spacing", "text_color"] },
+];
+
+/** Parse a Google Fonts URL to extract font family name and import slug */
+export function parseGoogleFontUrl(url: string): { value: string; label: string; import: string } | null {
+  // Match: https://fonts.google.com/specimen/Noto+Sans+JP
+  // or: https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@...
+  let slug: string | null = null;
+
+  const specimenMatch = url.match(/fonts\.google\.com\/specimen\/([^?&/]+)/);
+  if (specimenMatch) slug = specimenMatch[1];
+
+  const cssMatch = url.match(/family=([^:&]+)/);
+  if (cssMatch) slug = cssMatch[1];
+
+  if (!slug) return null;
+
+  const name = decodeURIComponent(slug.replace(/\+/g, " "));
+  return { value: name, label: name, import: slug };
+}
