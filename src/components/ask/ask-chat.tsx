@@ -446,13 +446,20 @@ export function AskChat() {
                         <button
                           onClick={() => {
                             navigator.clipboard.writeText(msg.content);
-                            const btn = document.getElementById(`copy-${i}`);
-                            if (btn) { btn.textContent = "Copied!"; setTimeout(() => { btn.textContent = "Copy"; }, 1500); }
+                            const el = document.getElementById(`copy-icon-${i}`);
+                            if (el) { el.setAttribute("data-copied", "true"); setTimeout(() => el.removeAttribute("data-copied"), 1500); }
                           }}
-                          id={`copy-${i}`}
-                          className="text-xs text-muted-foreground/50 hover:text-foreground transition-colors px-1.5 py-0.5 rounded hover:bg-muted"
+                          id={`copy-icon-${i}`}
+                          className="group/copy text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                          title="Copy"
                         >
-                          Copy
+                          <svg className="h-4 w-4 group-data-[copied]/copy:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                          </svg>
+                          <svg className="h-4 w-4 hidden group-data-[copied]/copy:block text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M20 6L9 17l-5-5" />
+                          </svg>
                         </button>
                         {msg.sources && msg.sources.length > 0 && (
                           <>
