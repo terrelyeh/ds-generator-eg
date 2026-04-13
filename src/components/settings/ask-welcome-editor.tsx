@@ -6,14 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
 
+const DEFAULT_QUESTIONS = [
+  "哪些 AP 支援 WiFi 7？",
+  "怎麼設定 Site-to-Site VPN？",
+  "ECC100 和 ECC500 差在哪裡？",
+  "PRO license 到期後設備還能用嗎？",
+  "推薦適合飯店的網路方案",
+  "怎麼設定 Captive Portal？",
+  "Cloud AP 和 Fit AP 有什麼差別？",
+  "AirGuard 怎麼偵測 Rogue AP？",
+];
+
 interface WelcomeConfig {
   subtitle: string;
   description: string;
+  questions: string[];
 }
 
 const DEFAULTS: WelcomeConfig = {
   subtitle: "",
   description: "",
+  questions: [],
 };
 
 export function AskWelcomeEditor() {
@@ -29,6 +42,7 @@ export function AskWelcomeEditor() {
           setConfig({
             subtitle: d.welcome.subtitle || "",
             description: d.welcome.description || "",
+            questions: d.welcome.example_questions || [],
           });
         }
         setLoaded(true);
@@ -40,15 +54,21 @@ export function AskWelcomeEditor() {
     setSaving(true);
     try {
       // Save both settings
+      const settings = [
+        { key: "ask_welcome_subtitle", value: config.subtitle.trim() },
+        { key: "ask_welcome_description", value: config.description.trim() },
+      ];
+      // Only save questions if customized (non-empty)
+      const filteredQ = config.questions.filter((q) => q.trim());
+      if (filteredQ.length > 0) {
+        settings.push({ key: "ask_example_questions", value: JSON.stringify(filteredQ) });
+      } else {
+        settings.push({ key: "ask_example_questions", value: "" });
+      }
       const res = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          settings: [
-            { key: "ask_welcome_subtitle", value: config.subtitle.trim() },
-            { key: "ask_welcome_description", value: config.description.trim() },
-          ],
-        }),
+        body: JSON.stringify({ settings }),
       });
       if (!res.ok) throw new Error("Failed to save");
 
@@ -69,6 +89,9 @@ export function AskWelcomeEditor() {
 
   const previewSubtitle = config.subtitle || getGreeting();
   const previewDescription = config.description || "I'm your EnGenius product specialist. Ask me about specs, configurations, licensing, or best practices.";
+  const previewQuestions = config.questions.filter((q) => q.trim()).length > 0
+    ? config.questions.filter((q) => q.trim())
+    : DEFAULT_QUESTIONS;
 
   if (!loaded) {
     return <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>;
@@ -125,6 +148,50 @@ export function AskWelcomeEditor() {
               />
             </div>
 
+            {/* Example Questions */}
+            <div>
+              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                Example Questions
+              </label>
+              <p className="text-[11px] text-muted-foreground/50 mb-2">
+                Shown as clickable buttons below the greeting. Leave empty to use defaults.
+              </p>
+              <div className="space-y-1.5">
+                {(config.questions.length > 0 ? config.questions : DEFAULT_QUESTIONS).map((q, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input
+                      type="text"
+                      value={config.questions.length > 0 ? q : ""}
+                      onChange={(e) => {
+                        const updated = config.questions.length > 0 ? [...config.questions] : [...DEFAULT_QUESTIONS];
+                        updated[i] = e.target.value;
+                        setConfig((c) => ({ ...c, questions: updated }));
+                      }}
+                      placeholder={DEFAULT_QUESTIONS[i] || "New question..."}
+                      className="flex-1 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                    />
+                    <button
+                      onClick={() => {
+                        const updated = config.questions.length > 0 ? [...config.questions] : [...DEFAULT_QUESTIONS];
+                        updated.splice(i, 1);
+                        setConfig((c) => ({ ...c, questions: updated }));
+                      }}
+                      className="rounded p-1 text-muted-foreground/30 hover:text-red-500 transition-colors flex-shrink-0"
+                      title="Remove"
+                    >
+                      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => setConfig((c) => ({ ...c, questions: [...(c.questions.length > 0 ? c.questions : DEFAULT_QUESTIONS), ""] }))}
+                className="mt-2 text-xs text-engenius-blue hover:text-engenius-blue/80 transition-colors"
+              >
+                + Add question
+              </button>
+            </div>
+
             <div className="flex items-center justify-between pt-2">
               <Button
                 variant="outline"
@@ -169,14 +236,13 @@ export function AskWelcomeEditor() {
               <h2 className="text-xl font-semibold mt-4 mb-1">{previewSubtitle}</h2>
               <p className="text-sm text-muted-foreground max-w-xs">{previewDescription}</p>
 
-              {/* Fake example buttons */}
+              {/* Example question preview */}
               <div className="mt-6 grid grid-cols-1 gap-2 w-full max-w-xs">
-                <div className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground/50">
-                  哪些 AP 支援 WiFi 7？
-                </div>
-                <div className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground/50">
-                  怎麼設定 Site-to-Site VPN？
-                </div>
+                {(previewQuestions).slice(0, 4).map((q, i) => (
+                  <div key={i} className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground/50">
+                    {q}
+                  </div>
+                ))}
               </div>
             </div>
           </CardContent>

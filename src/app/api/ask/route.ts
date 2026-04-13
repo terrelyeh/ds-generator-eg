@@ -41,6 +41,16 @@ export async function GET() {
     .select("value")
     .eq("key", "ask_welcome_description")
     .single() as { data: { value: string } | null };
+  const { data: welcomeQuestions } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", "ask_example_questions")
+    .single() as { data: { value: string } | null };
+
+  let exampleQuestions: string[] | null = null;
+  if (welcomeQuestions?.value) {
+    try { exampleQuestions = JSON.parse(welcomeQuestions.value); } catch { /* ignore */ }
+  }
 
   return NextResponse.json({
     ok: true,
@@ -58,6 +68,7 @@ export async function GET() {
     welcome: {
       subtitle: welcomeTitle?.value || null,
       description: welcomeDesc?.value || null,
+      example_questions: exampleQuestions,
     },
   });
 }

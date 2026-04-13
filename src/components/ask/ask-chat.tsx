@@ -370,6 +370,7 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
   const [welcomeSubtitle, setWelcomeSubtitle] = useState<string | null>(null);
   const [welcomeDescription, setWelcomeDescription] = useState<string | null>(null);
+  const [customQuestions, setCustomQuestions] = useState<string[] | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -393,6 +394,7 @@ export function AskChat({ compact = false }: AskChatProps) {
         setProfiles(d.profiles ?? []);
         if (d.welcome?.subtitle) setWelcomeSubtitle(d.welcome.subtitle);
         if (d.welcome?.description) setWelcomeDescription(d.welcome.description);
+        if (d.welcome?.example_questions) setCustomQuestions(d.welcome.example_questions);
       }
     }).catch(() => {});
     fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
@@ -887,7 +889,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                 </p>
                 <div className={`w-full ${compact ? "mt-6" : "mt-8"}`} />
                 <div className={`grid gap-2 w-full ${compact ? "grid-cols-1 max-w-xs" : "grid-cols-2 max-w-xl"}`}>
-                  {EXAMPLE_QUESTIONS.slice(0, compact ? 4 : 8).map((q) => (
+                  {(customQuestions || EXAMPLE_QUESTIONS).slice(0, compact ? 4 : 8).map((q) => (
                     <button key={q} onClick={() => handleSubmit(q)}
                       className="rounded-lg border px-3 py-2.5 text-left text-xs text-muted-foreground hover:border-engenius-blue/40 hover:text-foreground hover:bg-muted/30 transition-all">
                       {q}
