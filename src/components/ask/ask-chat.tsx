@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -13,7 +13,7 @@ interface Source {
   source_type: string;
   source_url: string | null;
   similarity: number;
-  images?: string[];
+  image_urls?: string[];
 }
 
 interface Message {
@@ -22,7 +22,8 @@ interface Message {
   sources?: Source[];
   provider?: string;
   followUps?: string[];
-  imageMap?: Record<string, string>;
+  imageMap?: Record<string, string[]>;
+  isStreaming?: boolean;
 }
 
 interface PersonaOption {
@@ -49,7 +50,7 @@ interface SessionSummary {
 interface ModelOption {
   id: string;
   label: string;
-  tier: string; // "strongest" | "mainstream" | "cp-value"
+  tier: string;
 }
 
 interface ProviderGroup {
@@ -94,16 +95,229 @@ const PROVIDERS: ProviderGroup[] = [
 
 const EXAMPLE_QUESTIONS = [
   "哪些 AP 支援 WiFi 7？",
+  "怎麼設定 Site-to-Site VPN？",
   "ECC100 和 ECC500 差在哪裡？",
-  "哪些 Switch 支援 PoE++？",
-  "推薦一台適合戶外的攝影機",
-  "ESG510 的 VPN throughput 是多少？",
-  "有內建儲存空間的攝影機有哪些？",
+  "PRO license 到期後設備還能用嗎？",
+  "推薦適合飯店的網路方案",
+  "怎麼設定 Captive Portal？",
   "Cloud AP 和 Fit AP 有什麼差別？",
-  "ECS5512FP 最多可以供電幾台 AP？",
+  "AirGuard 怎麼偵測 Rogue AP？",
 ];
 
-export function AskChat() {
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 18) return "Good afternoon";
+  return "Good evening";
+}
+
+/** EnGenius AI assistant icon — stylized network node with sparkle */
+function AssistantIcon({ size = 48 }: { size?: number }) {
+  return (
+    <div className="relative inline-flex items-center justify-center" style={{ width: size * 1.6, height: size * 1.6 }}>
+      <div className="absolute inset-0 rounded-full bg-engenius-blue/8" />
+      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* Network hub */}
+        <circle cx="24" cy="24" r="6" fill="#03a9f4" opacity="0.9" />
+        <circle cx="24" cy="24" r="9" stroke="#03a9f4" strokeWidth="1.5" opacity="0.3" />
+        {/* Connection lines */}
+        <line x1="24" y1="15" x2="24" y2="8" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        <line x1="24" y1="33" x2="24" y2="40" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        <line x1="15" y1="24" x2="8" y2="24" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        <line x1="33" y1="24" x2="40" y2="24" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
+        {/* Outer nodes */}
+        <circle cx="24" cy="7" r="2.5" fill="#03a9f4" opacity="0.6" />
+        <circle cx="24" cy="41" r="2.5" fill="#03a9f4" opacity="0.6" />
+        <circle cx="7" cy="24" r="2.5" fill="#03a9f4" opacity="0.6" />
+        <circle cx="41" cy="24" r="2.5" fill="#03a9f4" opacity="0.6" />
+        {/* AI sparkle */}
+        <path d="M36 10 L37.5 13.5 L41 15 L37.5 16.5 L36 20 L34.5 16.5 L31 15 L34.5 13.5 Z" fill="#03a9f4" opacity="0.7" />
+        <path d="M11 34 L12 36 L14 37 L12 38 L11 40 L10 38 L8 37 L10 36 Z" fill="#03a9f4" opacity="0.5" />
+      </svg>
+    </div>
+  );
+}
+
+/* ─── Citation tooltip ─── */
+function CitationTooltip({ index, sources }: { index: number; sources: Source[] }) {
+  const [show, setShow] = useState(false);
+  const src = sources[index - 1];
+  if (!src) return <sup className="text-engenius-blue font-semibold cursor-default">[{index}]</sup>;
+
+  const typeLabel: Record<string, string> = {
+    product_spec: "Product Spec",
+    gitbook: "Documentation",
+    helpcenter: "Help Center",
+    text_snippet: "Snippet",
+    google_doc: "Internal Doc",
+    web: "Web",
+  };
+
+  return (
+    <span className="relative inline-block">
+      <sup
+        className="text-engenius-blue font-semibold cursor-pointer hover:underline"
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        [{index}]
+      </sup>
+      {show && (
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50 w-56 rounded-lg border bg-white shadow-lg px-3 py-2 text-xs pointer-events-none">
+          <span className="font-semibold text-foreground block truncate">{src.title}</span>
+          <span className="text-muted-foreground">{typeLabel[src.source_type] ?? src.source_type}</span>
+          <span className="text-muted-foreground/60 ml-2">{Math.round(src.similarity * 100)}% match</span>
+        </span>
+      )}
+    </span>
+  );
+}
+
+/* ─── Reference list at bottom of answer ─── */
+function ReferenceList({ sources }: { sources: Source[] }) {
+  const [expandedImgs, setExpandedImgs] = useState<Set<number>>(new Set());
+  const unique = [...new Map(sources.map((s, i) => [i, s])).values()];
+  if (unique.length === 0) return null;
+
+  return (
+    <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
+      <span className="text-xs font-semibold text-muted-foreground/60">References</span>
+      {unique.map((s, i) => (
+        <div key={i}>
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="text-muted-foreground/50 font-mono">[{i + 1}]</span>
+            {s.source_url ? (
+              <Link href={s.source_url} target="_blank" className="text-engenius-blue hover:underline truncate">
+                {s.title}
+              </Link>
+            ) : (
+              <span className="text-foreground truncate">{s.title}</span>
+            )}
+            <span className="text-muted-foreground/40 flex-shrink-0">
+              ({s.source_type === "product_spec" ? "Product Spec" : s.source_type})
+            </span>
+            {s.image_urls && s.image_urls.length > 0 && (
+              <button
+                onClick={() => {
+                  setExpandedImgs((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(i)) next.delete(i); else next.add(i);
+                    return next;
+                  });
+                }}
+                className="text-muted-foreground/50 hover:text-engenius-blue transition-colors flex-shrink-0"
+                title="Show images"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M1 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2V5zm4 3a1 1 0 100-2 1 1 0 000 2zm10.707 2.293a1 1 0 00-1.414 0L11 13.586l-1.293-1.293a1 1 0 00-1.414 0L5 15.586V15a.5.5 0 01.5-.5h9a.5.5 0 01.5.5v.586l-1.293-1.293z" clipRule="evenodd" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {expandedImgs.has(i) && s.image_urls && s.image_urls.length > 0 && (
+            <div className="ml-6 mt-1 flex flex-wrap gap-2">
+              {s.image_urls.map((url, imgIdx) => (
+                <a key={imgIdx} href={url} target="_blank" rel="noopener noreferrer"
+                  className="block rounded-md border overflow-hidden hover:ring-2 hover:ring-engenius-blue/50 transition-all max-w-[200px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt={`${s.title} image ${imgIdx + 1}`} loading="lazy"
+                    className="w-full h-auto object-contain bg-white" />
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ─── Markdown with inline citations ─── */
+function MarkdownWithCitations({ content, sources }: { content: string; sources?: Source[] }) {
+  const markdownComponents: Components = {
+    // Intercept text nodes to find [N] patterns
+    p: ({ children, ...props }) => {
+      return <p {...props}>{processChildren(children, sources ?? [])}</p>;
+    },
+    li: ({ children, ...props }) => {
+      return <li {...props}>{processChildren(children, sources ?? [])}</li>;
+    },
+    td: ({ children, ...props }) => {
+      return <td {...props}>{processChildren(children, sources ?? [])}</td>;
+    },
+    th: ({ children, ...props }) => {
+      return <th {...props}>{processChildren(children, sources ?? [])}</th>;
+    },
+  };
+
+  return (
+    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+      {content}
+    </ReactMarkdown>
+  );
+}
+
+function processChildren(children: React.ReactNode, sources: Source[]): React.ReactNode {
+  if (!children) return children;
+  if (typeof children === "string") {
+    return processTextWithCitations(children, sources);
+  }
+  if (Array.isArray(children)) {
+    return children.map((child, i) => {
+      if (typeof child === "string") {
+        return <span key={i}>{processTextWithCitations(child, sources)}</span>;
+      }
+      return child;
+    });
+  }
+  return children;
+}
+
+function processTextWithCitations(text: string, sources: Source[]): React.ReactNode {
+  // Match [1], [2], etc. but not [Source 1 ...] patterns
+  const parts = text.split(/(\[\d+\])/g);
+  if (parts.length === 1) return text;
+
+  return parts.map((part, i) => {
+    const match = part.match(/^\[(\d+)\]$/);
+    if (match) {
+      const idx = parseInt(match[1], 10);
+      return <CitationTooltip key={i} index={idx} sources={sources} />;
+    }
+    return part;
+  });
+}
+
+/* ─── Parse follow-ups from text after --- separator ─── */
+function parseFollowUps(text: string): { answer: string; followUps: string[] } {
+  // Find the last --- separator
+  const separatorIdx = text.lastIndexOf("\n---\n");
+  if (separatorIdx === -1) return { answer: text, followUps: [] };
+
+  const answerPart = text.slice(0, separatorIdx).replace(/\n+$/, "");
+  const afterSeparator = text.slice(separatorIdx + 5).trim();
+
+  // Parse lines after separator as follow-up questions
+  const lines = afterSeparator.split("\n").map((l) => l.trim()).filter(Boolean);
+  const followUps: string[] = [];
+  for (const line of lines) {
+    // Remove numbered prefixes like "1. ", "2) ", "- ", etc.
+    const cleaned = line.replace(/^[\d]+[.)]\s*/, "").replace(/^[-*]\s*/, "").trim();
+    if (cleaned.length > 5 && cleaned.length < 200) {
+      followUps.push(cleaned);
+    }
+  }
+
+  return { answer: answerPart, followUps: followUps.slice(0, 3) };
+}
+
+/* ─── Main AskChat component ─── */
+export interface AskChatProps {
+  /** Compact mode for panel usage */
+  compact?: boolean;
+}
+
+export function AskChat({ compact = false }: AskChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -126,10 +340,12 @@ export function AskChat() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // For panel mode: session list view toggle
+  const [showSessionList, setShowSessionList] = useState(false);
+
   useEffect(() => {
     fetch("/api/ask").then((r) => r.json()).then((d) => { if (d.ok) { setPersonas(d.personas); setProfiles(d.profiles ?? []); } }).catch(() => {});
     fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
-    // Auto-focus input on mount
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
@@ -167,26 +383,36 @@ export function AskChat() {
       const res = await fetch("/api/chat-sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: sessionId || undefined, title, persona, provider, profile, messages: msgs }),
+        body: JSON.stringify({
+          id: sessionId || undefined, title, persona, provider, profile,
+          messages: msgs.map((m) => ({ role: m.role, content: m.content, sources: m.sources, provider: m.provider, followUps: m.followUps, imageMap: m.imageMap })),
+        }),
       });
       const data = await res.json();
       if (data.ok && data.id && !sessionId) setSessionId(data.id);
       fetchSessions();
     } catch { /* ignore */ }
-  }, [sessionId, persona, provider, fetchSessions]);
+  }, [sessionId, persona, provider, profile, fetchSessions]);
 
   function scheduleSave(msgs: Message[]) {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => saveSession(msgs), 1000);
   }
 
+  /* ─── SSE Streaming submit ─── */
   async function handleSubmit(question?: string) {
     const q = (question ?? input).trim();
     if (!q || loading) return;
     setInput("");
-    const newMessages = [...messages, { role: "user" as const, content: q }];
+    const userMsg: Message = { role: "user", content: q };
+    const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setLoading(true);
+
+    // Create a placeholder assistant message for streaming
+    const assistantMsg: Message = { role: "assistant", content: "", isStreaming: true };
+    setMessages([...newMessages, assistantMsg]);
+
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
@@ -197,22 +423,81 @@ export function AskChat() {
         }),
       });
 
-      // Handle non-JSON responses (Vercel timeout, 502, etc.)
-      const rawText = await res.text();
-      let data;
-      try {
-        data = JSON.parse(rawText);
-      } catch {
-        data = { ok: false, error: `Server error (${res.status})`, details: rawText.slice(0, 200) };
+      if (!res.ok || !res.body) {
+        const errText = await res.text();
+        const finalMessages = [...newMessages, { role: "assistant" as const, content: `Error: Server error (${res.status}). ${errText.slice(0, 200)}` }];
+        setMessages(finalMessages);
+        setLoading(false);
+        return;
       }
 
-      const updatedMessages = data.ok
-        ? [...newMessages, { role: "assistant" as const, content: data.answer, sources: data.sources, provider: data.provider, followUps: data.follow_ups, imageMap: data.image_map }]
-        : [...newMessages, { role: "assistant" as const, content: `Error: ${data.error}${data.details ? `\n\n${data.details}` : ""}` }];
-      setMessages(updatedMessages);
-      scheduleSave(updatedMessages);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let fullContent = "";
+      let streamSources: Source[] = [];
+      let streamFollowUps: string[] = [];
+      let streamImageMap: Record<string, string[]> = {};
+      let streamProvider = provider;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() ?? "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") continue;
+
+          try {
+            const event = JSON.parse(payload);
+            if (event.type === "chunk") {
+              fullContent += event.content;
+              // Update the assistant message in-place
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant") {
+                  updated[updated.length - 1] = { ...last, content: fullContent };
+                }
+                return updated;
+              });
+            } else if (event.type === "sources") {
+              streamSources = event.sources ?? [];
+            } else if (event.type === "metadata") {
+              streamFollowUps = event.follow_ups ?? [];
+              streamImageMap = event.image_map ?? {};
+              streamProvider = event.provider ?? provider;
+            }
+          } catch {
+            // skip unparseable
+          }
+        }
+      }
+
+      // Parse follow-ups from the text (after --- separator)
+      const { answer, followUps: parsedFollowUps } = parseFollowUps(fullContent);
+      const finalFollowUps = parsedFollowUps.length > 0 ? parsedFollowUps : streamFollowUps;
+
+      const finalAssistantMsg: Message = {
+        role: "assistant",
+        content: answer,
+        sources: streamSources,
+        followUps: finalFollowUps,
+        imageMap: Object.keys(streamImageMap).length > 0 ? streamImageMap : undefined,
+        provider: streamProvider,
+        isStreaming: false,
+      };
+
+      const finalMessages = [...newMessages, finalAssistantMsg];
+      setMessages(finalMessages);
+      scheduleSave(finalMessages);
     } catch (err) {
-      setMessages([...newMessages, { role: "assistant" as const, content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
+      setMessages([...newMessages, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
     } finally {
       setLoading(false);
     }
@@ -222,7 +507,7 @@ export function AskChat() {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
   }
 
-  function handleNewChat() { setMessages([]); setSessionId(null); }
+  function handleNewChat() { setMessages([]); setSessionId(null); setShowSessionList(false); }
 
   async function handleLoadSession(id: string) {
     try {
@@ -238,6 +523,7 @@ export function AskChat() {
         setPersona(data.session.persona || "default");
         setProvider(data.session.provider || "gemini-2.5-flash");
         setShowSidebar(false);
+        setShowSessionList(false);
       }
     } catch { /* ignore */ }
   }
@@ -289,147 +575,241 @@ export function AskChat() {
   }
 
   const isEmpty = messages.length === 0;
-
-  // Find current model label for display
   const currentModelLabel = PROVIDERS.flatMap((g) => g.models).find((m) => m.id === provider)?.label ?? provider;
   const currentPersonaLabel = personas.find((p) => p.id === persona);
   const currentProfileLabel = profiles.find((p) => p.id === profile);
   const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.provider);
   const lastUsedModel = lastAssistantMsg?.provider;
 
-  return (
-    <div className="flex h-[calc(100vh-120px)] gap-0">
-      {/* ===== Sidebar ===== */}
-      <div
-        className={`flex-shrink-0 overflow-hidden transition-all duration-200 ease-in-out ${
-          showSidebar ? "w-60 border-r mr-4" : "w-0"
-        }`}
-      >
-        <div className="w-60 h-full flex flex-col bg-background">
-          <div className="flex items-center justify-between px-3 py-2.5 border-b">
-            <span className="text-xs font-semibold text-muted-foreground">History</span>
-            <div className="flex items-center gap-1">
-              {sessions.length > 0 && (
-                <button
-                  onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
-                  className={`rounded px-1.5 py-0.5 text-xs transition-colors ${selectMode ? "bg-engenius-blue text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
-                  title="Select multiple"
-                >
-                  {selectMode ? "Cancel" : "Select"}
-                </button>
-              )}
-              <button onClick={handleNewChat} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
-                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10" /></svg>
-              </button>
-              <button onClick={() => setShowSidebar(false)} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-                <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
-              </button>
-            </div>
-          </div>
+  // Current session title
+  const currentSessionTitle = messages.length > 0
+    ? (messages.find((m) => m.role === "user")?.content.slice(0, 40) ?? "Chat")
+    : "New Chat";
 
-          {/* Batch delete bar */}
-          {selectMode && selectedIds.size > 0 && (
-            <div className="flex items-center justify-between px-3 py-2 border-b bg-red-50">
-              <span className="text-xs text-red-700">{selectedIds.size} selected</span>
-              <button onClick={handleBatchDelete} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
-                Delete
+  /* ─── Session list view (for compact/panel mode) ─── */
+  if (compact && showSessionList) {
+    return (
+      <div className="flex flex-col h-full">
+        <div className="flex items-center justify-between px-3 py-2.5 border-b flex-shrink-0">
+          <span className="text-xs font-semibold text-muted-foreground">History</span>
+          <div className="flex items-center gap-1">
+            {sessions.length > 0 && (
+              <button
+                onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
+                className={`rounded px-1.5 py-0.5 text-xs transition-colors ${selectMode ? "bg-engenius-blue text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+              >
+                {selectMode ? "Cancel" : "Select"}
               </button>
-            </div>
-          )}
-
-          <div className="flex-1 overflow-y-auto">
-            {sessions.length === 0 ? (
-              <div className="px-3 py-6 text-center text-xs text-muted-foreground/50">No conversations yet</div>
-            ) : (
-              sessions.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={() => selectMode ? toggleSelect(s.id) : handleLoadSession(s.id)}
-                  className={`w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors group ${
-                    sessionId === s.id && !selectMode ? "bg-muted" : ""
-                  } ${selectedIds.has(s.id) ? "bg-engenius-blue/5" : ""}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    {selectMode && (
-                      <div className={`flex-shrink-0 mt-0.5 h-4 w-4 rounded border-2 transition-colors ${
-                        selectedIds.has(s.id) ? "bg-engenius-blue border-engenius-blue" : "border-muted-foreground/30"
-                      }`}>
-                        {selectedIds.has(s.id) && (
-                          <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5" /></svg>
-                        )}
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <div className="text-xs font-medium truncate">{s.title}</div>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground/50">{s.message_count} msgs</span>
-                        <span className="text-xs text-muted-foreground/50">{formatRelativeTime(s.updated_at)}</span>
-                      </div>
-                    </div>
-                    <button onClick={(e) => handleDeleteSession(s.id, e)} className="hidden group-hover:block flex-shrink-0 mt-0.5 text-muted-foreground/30 hover:text-red-500 transition-colors">
-                      <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 3V2a1 1 0 011-1h4a1 1 0 011 1v1M2.5 3.5h11M6 6.5v5M10 6.5v5M3.5 3.5l.5 9a1 1 0 001 1h6a1 1 0 001-1l.5-9" /></svg>
-                    </button>
-                  </div>
-                </button>
-              ))
             )}
+            <button onClick={() => setShowSessionList(false)} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+            </button>
           </div>
         </div>
+        {selectMode && selectedIds.size > 0 && (
+          <div className="flex items-center justify-between px-3 py-2 border-b bg-red-50 flex-shrink-0">
+            <span className="text-xs text-red-700">{selectedIds.size} selected</span>
+            <button onClick={handleBatchDelete} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">Delete</button>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto">
+          {sessions.length === 0 ? (
+            <div className="px-3 py-6 text-center text-xs text-muted-foreground/50">No conversations yet</div>
+          ) : (
+            sessions.map((s) => (
+              <button
+                key={s.id}
+                onClick={() => selectMode ? toggleSelect(s.id) : handleLoadSession(s.id)}
+                className={`w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors group ${
+                  sessionId === s.id && !selectMode ? "bg-muted" : ""
+                } ${selectedIds.has(s.id) ? "bg-engenius-blue/5" : ""}`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  {selectMode && (
+                    <div className={`flex-shrink-0 mt-0.5 h-4 w-4 rounded border-2 transition-colors ${
+                      selectedIds.has(s.id) ? "bg-engenius-blue border-engenius-blue" : "border-muted-foreground/30"
+                    }`}>
+                      {selectedIds.has(s.id) && (
+                        <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5" /></svg>
+                      )}
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium truncate">{s.title}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-muted-foreground/50">{s.message_count} msgs</span>
+                      <span className="text-xs text-muted-foreground/50">{formatRelativeTime(s.updated_at)}</span>
+                    </div>
+                  </div>
+                  <button onClick={(e) => handleDeleteSession(s.id, e)} className="hidden group-hover:block flex-shrink-0 mt-0.5 text-muted-foreground/30 hover:text-red-500 transition-colors">
+                    <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 3V2a1 1 0 011-1h4a1 1 0 011 1v1M2.5 3.5h11M6 6.5v5M10 6.5v5M3.5 3.5l.5 9a1 1 0 001 1h6a1 1 0 001-1l.5-9" /></svg>
+                  </button>
+                </div>
+              </button>
+            ))
+          )}
+        </div>
       </div>
+    );
+  }
+
+  return (
+    <div className={compact ? "flex flex-col h-full" : "flex h-[calc(100vh-120px)] gap-0"}>
+      {/* ===== Sidebar (non-compact mode only) ===== */}
+      {!compact && (
+        <div
+          className={`flex-shrink-0 overflow-hidden transition-all duration-200 ease-in-out ${
+            showSidebar ? "w-60 border-r mr-4" : "w-0"
+          }`}
+        >
+          <div className="w-60 h-full flex flex-col bg-background">
+            <div className="flex items-center justify-between px-3 py-2.5 border-b">
+              <span className="text-xs font-semibold text-muted-foreground">History</span>
+              <div className="flex items-center gap-1">
+                {sessions.length > 0 && (
+                  <button
+                    onClick={() => { setSelectMode(!selectMode); setSelectedIds(new Set()); }}
+                    className={`rounded px-1.5 py-0.5 text-xs transition-colors ${selectMode ? "bg-engenius-blue text-white" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}
+                    title="Select multiple"
+                  >
+                    {selectMode ? "Cancel" : "Select"}
+                  </button>
+                )}
+                <button onClick={handleNewChat} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10" /></svg>
+                </button>
+                <button onClick={() => setShowSidebar(false)} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Batch delete bar */}
+            {selectMode && selectedIds.size > 0 && (
+              <div className="flex items-center justify-between px-3 py-2 border-b bg-red-50">
+                <span className="text-xs text-red-700">{selectedIds.size} selected</span>
+                <button onClick={handleBatchDelete} className="text-xs font-medium text-red-600 hover:text-red-800 transition-colors">
+                  Delete
+                </button>
+              </div>
+            )}
+
+            <div className="flex-1 overflow-y-auto">
+              {sessions.length === 0 ? (
+                <div className="px-3 py-6 text-center text-xs text-muted-foreground/50">No conversations yet</div>
+              ) : (
+                sessions.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => selectMode ? toggleSelect(s.id) : handleLoadSession(s.id)}
+                    className={`w-full text-left px-3 py-2.5 border-b border-border/50 hover:bg-muted/50 transition-colors group ${
+                      sessionId === s.id && !selectMode ? "bg-muted" : ""
+                    } ${selectedIds.has(s.id) ? "bg-engenius-blue/5" : ""}`}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      {selectMode && (
+                        <div className={`flex-shrink-0 mt-0.5 h-4 w-4 rounded border-2 transition-colors ${
+                          selectedIds.has(s.id) ? "bg-engenius-blue border-engenius-blue" : "border-muted-foreground/30"
+                        }`}>
+                          {selectedIds.has(s.id) && (
+                            <svg className="h-3 w-3 text-white" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 6l3 3 5-5" /></svg>
+                          )}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-medium truncate">{s.title}</div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground/50">{s.message_count} msgs</span>
+                          <span className="text-xs text-muted-foreground/50">{formatRelativeTime(s.updated_at)}</span>
+                        </div>
+                      </div>
+                      <button onClick={(e) => handleDeleteSession(s.id, e)} className="hidden group-hover:block flex-shrink-0 mt-0.5 text-muted-foreground/30 hover:text-red-500 transition-colors">
+                        <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M5 3V2a1 1 0 011-1h4a1 1 0 011 1v1M2.5 3.5h11M6 6.5v5M10 6.5v5M3.5 3.5l.5 9a1 1 0 001 1h6a1 1 0 001-1l.5-9" /></svg>
+                      </button>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ===== Main area ===== */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="mb-3 flex-shrink-0 space-y-2">
+        <div className={`flex-shrink-0 space-y-2 ${compact ? "px-3 py-2" : "mb-3"}`}>
           {/* Title row */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Conversation history">
-                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
-              </button>
-              <h1 className="text-lg font-bold tracking-tight">Ask SpecHub</h1>
+          {compact ? (
+            /* Panel mode header: session title + history + new chat */
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground truncate max-w-[200px]">{currentSessionTitle}</span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setShowSessionList(true)}
+                  className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                  title="History"
+                >
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                  </svg>
+                </button>
+                <button onClick={handleNewChat} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
+                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10" /></svg>
+                </button>
+              </div>
             </div>
-            {messages.length > 0 && (
-              <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
-                + New
-              </button>
-            )}
-          </div>
+          ) : (
+            /* Full page header */
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Conversation history">
+                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                </button>
+                <h1 className="text-lg font-bold tracking-tight">Ask SpecHub</h1>
+              </div>
+              {messages.length > 0 && (
+                <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
+                  + New
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Persona + Profile selector row */}
-          <div className="flex items-center gap-6">
-            {/* Dimension 1: 回答角度 */}
+          <div className={`flex items-center ${compact ? "gap-3 flex-wrap" : "gap-6"}`}>
+            {/* Dimension 1: Persona */}
             {personas.length > 0 && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground flex-shrink-0">回答角度：</span>
+                {!compact && <span className="text-xs text-muted-foreground flex-shrink-0">Persona:</span>}
                 <div className="flex gap-1.5">
                   {personas.map((p) => (
                     <button
                       key={p.id}
                       onClick={() => setPersona(p.id)}
                       title={p.description}
-                      className={`cursor-pointer rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+                      className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${
                         persona === p.id
                           ? "bg-engenius-blue text-white shadow-sm"
                           : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                       }`}
                     >
                       {p.icon && <span className="mr-1">{p.icon}</span>}
-                      {p.name}
+                      {compact ? (p.icon || p.name.charAt(0)) : p.name}
                     </button>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Dimension 2: 對話對象 */}
+            {/* Dimension 2: User Profile */}
             {profiles.length > 1 && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground flex-shrink-0">對話對象：</span>
+                {!compact && <span className="text-xs text-muted-foreground flex-shrink-0">Profile:</span>}
                 <select
                   value={profile}
                   onChange={(e) => setProfile(e.target.value)}
-                  className="rounded-lg border border-input bg-background px-2.5 py-1.5 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
                 >
                   {profiles.map((p) => (
                     <option key={p.id} value={p.id}>{p.label}</option>
@@ -440,22 +820,20 @@ export function AskChat() {
           </div>
         </div>
 
-        {/* Chat card — fills remaining space */}
-        <Card className="flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden">
-          <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+        {/* Chat card */}
+        <Card className={`flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden ${compact ? "border-0 rounded-none shadow-none" : ""}`}>
+          <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-4 ${compact ? "px-3 py-3" : "px-5 py-4"}`}>
             {isEmpty ? (
-              <div className="flex flex-col items-center justify-center h-full text-center">
-                <svg className="h-10 w-10 mx-auto text-engenius-blue/30 mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                </svg>
-                <h2 className="text-base font-semibold mb-1">Ask anything about EnGenius products</h2>
-                <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-                  Compare specs, find models, or get technical details.
+              <div className="flex flex-col items-center justify-center h-full text-center px-4">
+                <AssistantIcon size={compact ? 40 : 48} />
+                <h2 className={`font-semibold mt-3 mb-0.5 ${compact ? "text-sm" : "text-lg"}`}>{getGreeting()}</h2>
+                <p className={`text-muted-foreground mb-5 max-w-sm ${compact ? "text-xs" : "text-sm"}`}>
+                  I&apos;m your EnGenius product specialist. Ask me about specs, configurations, licensing, or best practices.
                 </p>
-                <div className="grid grid-cols-2 gap-2 max-w-xl w-full">
-                  {EXAMPLE_QUESTIONS.map((q) => (
+                <div className={`grid gap-2 w-full ${compact ? "grid-cols-1 max-w-xs" : "grid-cols-2 max-w-xl"}`}>
+                  {EXAMPLE_QUESTIONS.slice(0, compact ? 4 : 8).map((q) => (
                     <button key={q} onClick={() => handleSubmit(q)}
-                      className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground hover:border-engenius-blue/40 hover:text-foreground hover:bg-muted/30 transition-all">
+                      className="rounded-lg border px-3 py-2.5 text-left text-xs text-muted-foreground hover:border-engenius-blue/40 hover:text-foreground hover:bg-muted/30 transition-all">
                       {q}
                     </button>
                   ))}
@@ -465,76 +843,70 @@ export function AskChat() {
               messages.map((msg, i) => (
                 <div key={i} className={msg.role === "user" ? "flex justify-end" : ""}>
                   {msg.role === "user" ? (
-                    <div className="max-w-[80%] rounded-xl px-4 py-2.5 bg-engenius-blue text-white text-sm leading-relaxed">
+                    <div className={`rounded-xl px-4 py-2.5 bg-engenius-blue text-white text-sm leading-relaxed ${compact ? "max-w-[90%]" : "max-w-[80%]"}`}>
                       {msg.content}
                     </div>
                   ) : (
-                    <div className="text-sm leading-relaxed group/msg">
+                    <div className="flex gap-2.5 text-sm leading-relaxed group/msg">
+                      {/* AI avatar */}
+                      <div className="flex-shrink-0 mt-0.5">
+                        <div className="h-6 w-6 rounded-full bg-engenius-blue/10 flex items-center justify-center">
+                          <svg className="h-3.5 w-3.5 text-engenius-blue" viewBox="0 0 48 48" fill="none">
+                            <circle cx="24" cy="24" r="6" fill="currentColor" opacity="0.9" />
+                            <circle cx="24" cy="7" r="2.5" fill="currentColor" opacity="0.5" />
+                            <circle cx="24" cy="41" r="2.5" fill="currentColor" opacity="0.5" />
+                            <circle cx="7" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
+                            <circle cx="41" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
+                            <line x1="24" y1="15" x2="24" y2="8" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+                            <line x1="24" y1="33" x2="24" y2="40" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+                            <line x1="15" y1="24" x2="8" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+                            <line x1="33" y1="24" x2="40" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+                            <path d="M36 10 L37.5 13.5 L41 15 L37.5 16.5 L36 20 L34.5 16.5 L31 15 L34.5 13.5 Z" fill="currentColor" opacity="0.6" />
+                          </svg>
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
                       <div className="ask-markdown">
-                        {msg.imageMap && Object.keys(msg.imageMap).length > 0
-                          ? /* Split content on [IMG:N] markers and render images inline */
-                            msg.content.split(/(\[IMG:\d+\])/).map((part, pi) => {
-                              const imgMatch = part.match(/^\[IMG:(\d+)\]$/);
-                              if (imgMatch && msg.imageMap) {
-                                const imgUrl = msg.imageMap[`IMG:${imgMatch[1]}`];
-                                if (imgUrl) {
-                                  return (
-                                    <a key={pi} href={imgUrl} target="_blank" rel="noopener noreferrer"
-                                      className="block my-3 rounded-lg border overflow-hidden hover:ring-2 hover:ring-engenius-blue/50 transition-all max-w-lg">
-                                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                                      <img src={imgUrl} alt={`Reference ${imgMatch[1]}`} loading="lazy"
-                                        className="w-full h-auto object-contain bg-white" />
-                                    </a>
-                                  );
-                                }
-                              }
-                              if (!part.trim()) return null;
-                              return <ReactMarkdown key={pi} remarkPlugins={[remarkGfm]}>{part}</ReactMarkdown>;
-                            })
-                          : <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                        }
+                        <MarkdownWithCitations content={msg.content} sources={msg.sources} />
+                        {msg.isStreaming && (
+                          <span className="inline-block w-2 h-4 bg-engenius-blue/60 animate-pulse ml-0.5 rounded-sm" />
+                        )}
                       </div>
 
-                      {/* Action bar: copy + sources + provider */}
-                      <div className="mt-3 pt-2 border-t border-border/50 flex flex-wrap items-center gap-1.5">
-                        <button
-                          onClick={() => {
-                            navigator.clipboard.writeText(msg.content);
-                            const el = document.getElementById(`copy-icon-${i}`);
-                            if (el) { el.setAttribute("data-copied", "true"); setTimeout(() => el.removeAttribute("data-copied"), 1500); }
-                          }}
-                          id={`copy-icon-${i}`}
-                          className="group/copy text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                          title="Copy"
-                        >
-                          <svg className="h-4 w-4 group-data-[copied]/copy:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                            <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                          </svg>
-                          <svg className="h-4 w-4 hidden group-data-[copied]/copy:block text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M20 6L9 17l-5-5" />
-                          </svg>
-                        </button>
-                        {msg.sources && msg.sources.length > 0 && (
-                          <>
-                            <span className="text-border">|</span>
-                            <span className="text-xs text-muted-foreground/50">Sources:</span>
-                            {[...new Map(msg.sources.map((s) => [s.source_id, s])).values()].map((s) => (
-                              <Link key={s.source_id} href={s.source_url || "#"}
-                                className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-engenius-blue hover:underline">
-                                {s.source_id}
-                                <span className="text-muted-foreground/40">{Math.round(s.similarity * 100)}%</span>
-                              </Link>
-                            ))}
-                          </>
-                        )}
-                        {msg.provider && (
-                          <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
-                        )}
-                      </div>
+                      {/* Reference list (replaces old source badges) */}
+                      {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
+                        <ReferenceList sources={msg.sources} />
+                      )}
+
+                      {/* Action bar: copy + provider */}
+                      {!msg.isStreaming && (
+                        <div className="mt-2 pt-1.5 flex items-center gap-1.5">
+                          <button
+                            onClick={() => {
+                              navigator.clipboard.writeText(msg.content);
+                              const el = document.getElementById(`copy-icon-${i}`);
+                              if (el) { el.setAttribute("data-copied", "true"); setTimeout(() => el.removeAttribute("data-copied"), 1500); }
+                            }}
+                            id={`copy-icon-${i}`}
+                            className="group/copy text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                            title="Copy"
+                          >
+                            <svg className="h-3.5 w-3.5 group-data-[copied]/copy:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                            </svg>
+                            <svg className="h-3.5 w-3.5 hidden group-data-[copied]/copy:block text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                          </button>
+                          {msg.provider && (
+                            <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
+                          )}
+                        </div>
+                      )}
 
                       {/* Follow-up questions */}
-                      {msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
+                      {!msg.isStreaming && msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {msg.followUps.map((q, qi) => (
                             <button
@@ -547,28 +919,29 @@ export function AskChat() {
                           ))}
                         </div>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>
               ))
             )}
 
-            {/* Loading animation */}
-            {loading && (
+            {/* Loading animation (shown before streaming starts) */}
+            {loading && messages[messages.length - 1]?.content === "" && (
               <div className="flex items-center gap-3 py-2">
                 <div className="flex gap-1.5">
-                  <span className="h-3 w-3 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "0ms", animationDuration: "0.8s" }} />
-                  <span className="h-3 w-3 rounded-full bg-engenius-blue/70 animate-bounce" style={{ animationDelay: "200ms", animationDuration: "0.8s" }} />
-                  <span className="h-3 w-3 rounded-full bg-engenius-blue/40 animate-bounce" style={{ animationDelay: "400ms", animationDuration: "0.8s" }} />
+                  <span className="h-2.5 w-2.5 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "0ms", animationDuration: "0.8s" }} />
+                  <span className="h-2.5 w-2.5 rounded-full bg-engenius-blue/70 animate-bounce" style={{ animationDelay: "200ms", animationDuration: "0.8s" }} />
+                  <span className="h-2.5 w-2.5 rounded-full bg-engenius-blue/40 animate-bounce" style={{ animationDelay: "400ms", animationDuration: "0.8s" }} />
                 </div>
-                <span className="text-sm text-muted-foreground animate-pulse">AI 思考中...</span>
+                <span className="text-xs text-muted-foreground animate-pulse">Thinking...</span>
               </div>
             )}
           </div>
 
           {/* Input area */}
-          <div className="border-t px-4 py-3 space-y-2 flex-shrink-0">
-            {/* Model selector — provider tabs + dropdown */}
+          <div className={`border-t space-y-2 flex-shrink-0 ${compact ? "px-3 py-2" : "px-4 py-3"}`}>
+            {/* Model selector */}
             <div className="flex items-center gap-1.5" ref={dropdownRef}>
               <span className="text-xs text-muted-foreground/50 flex-shrink-0">AI:</span>
               {PROVIDERS.map((group) => {
@@ -582,14 +955,10 @@ export function AskChat() {
                     <button
                       onClick={() => {
                         if (!isAvailable) return;
-                        if (isOpen) {
-                          setOpenDropdown(null);
-                        } else {
-                          setOpenDropdown(group.id);
-                        }
+                        if (isOpen) { setOpenDropdown(null); } else { setOpenDropdown(group.id); }
                       }}
                       disabled={!isAvailable}
-                      className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-all ${
                         isActiveGroup
                           ? "bg-engenius-blue text-white shadow-sm"
                           : isAvailable
@@ -597,7 +966,7 @@ export function AskChat() {
                             : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
                       }`}
                     >
-                      {isActiveGroup ? activeModel.label : group.label}
+                      {compact ? (isActiveGroup ? activeModel.label.split(" ").pop() : group.label) : (isActiveGroup ? activeModel.label : group.label)}
                       {isAvailable && (
                         <svg className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M3 5l3 3 3-3" />
@@ -605,20 +974,16 @@ export function AskChat() {
                       )}
                     </button>
 
-                    {/* Dropdown */}
                     {isOpen && (
-                      <div className="absolute bottom-full left-0 mb-1 w-52 rounded-lg border bg-background shadow-lg py-1 z-50">
-                        <div className="px-3 py-1.5 text-xs font-semibold text-muted-foreground/50 uppercase tracking-wider">
-                          {group.label} Models
+                      <div className="absolute bottom-full left-0 mb-1 w-48 rounded-lg border bg-background shadow-lg py-1 z-50">
+                        <div className="px-3 py-1 text-xs font-semibold text-muted-foreground/50 uppercase tracking-wider">
+                          {group.label}
                         </div>
                         {group.models.map((model) => (
                           <button
                             key={model.id}
-                            onClick={() => {
-                              setProvider(model.id);
-                              setOpenDropdown(null);
-                            }}
-                            className={`w-full text-left px-3 py-2 text-xs hover:bg-muted/50 transition-colors flex items-center justify-between ${
+                            onClick={() => { setProvider(model.id); setOpenDropdown(null); }}
+                            className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted/50 transition-colors flex items-center justify-between ${
                               provider === model.id ? "bg-engenius-blue/5 text-engenius-blue font-medium" : ""
                             }`}
                           >
@@ -640,24 +1005,24 @@ export function AskChat() {
             </div>
             <div className="flex items-end gap-2">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                placeholder="Ask about products, specs, or comparisons..."
+                placeholder={compact ? "Ask about products..." : "Ask about products, specs, or comparisons..."}
                 rows={1}
-                className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
-                style={{ minHeight: 40, maxHeight: 120 }}
+                className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                style={{ minHeight: 36, maxHeight: compact ? 80 : 120 }}
               />
-              <Button onClick={() => handleSubmit()} disabled={loading || !input.trim()} className="h-10 px-5">
+              <Button onClick={() => handleSubmit()} disabled={loading || !input.trim()} size={compact ? "sm" : "default"} className={compact ? "h-9 px-3" : "h-10 px-5"}>
                 {loading ? "..." : "Ask"}
               </Button>
             </div>
             {/* Current model info */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground/40 px-1">
-              <span>
-                Model: {currentModelLabel}
+            <div className="flex items-center justify-between text-xs text-muted-foreground/40 px-0.5">
+              <span className="truncate">
+                {currentModelLabel}
                 {currentPersonaLabel ? ` · ${currentPersonaLabel.name}` : ""}
                 {currentProfileLabel && currentProfileLabel.id !== "default" ? ` · ${currentProfileLabel.label}` : ""}
               </span>
-              {lastUsedModel && (
-                <span>Last answer via {lastUsedModel}</span>
+              {!compact && lastUsedModel && (
+                <span>Last via {lastUsedModel}</span>
               )}
             </div>
           </div>
@@ -666,4 +1031,3 @@ export function AskChat() {
     </div>
   );
 }
-
