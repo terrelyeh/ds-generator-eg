@@ -148,13 +148,30 @@ export async function POST(request: Request) {
       ? `Previous conversation:\n${recentHistory.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n")}\n\n---\n\n`
       : "";
 
+    // Build image catalog from matched docs for inline image references
+    const imageCatalog: { id: string; url: string; source: string }[] = [];
+    for (const d of docs) {
+      const urls = (d.metadata?.image_urls as string[]) ?? [];
+      for (const url of urls) {
+        imageCatalog.push({
+          id: `IMG:${imageCatalog.length + 1}`,
+          url,
+          source: d.title,
+        });
+      }
+    }
+
+    const imageInstruction = imageCatalog.length > 0
+      ? `\n\nAvailable reference images from documentation:\n${imageCatalog.map((img) => `- [${img.id}] from "${img.source}"`).join("\n")}\n\nWhen your answer describes a step or concept that has a matching image, insert the marker (e.g. [IMG:1]) on its own line right after the relevant paragraph. Only use images that are directly relevant — don't force all images into the answer. If no image is relevant to a particular section, skip it.`
+      : "";
+
     const userMessage = `${historyText}Context documents:
 
 ${context}
 
 ---
 
-Current question: ${question}
+Current question: ${question}${imageInstruction}
 
 ---
 
@@ -194,10 +211,17 @@ These should be natural extensions of the current topic, written in the same lan
       images: (d.metadata?.image_urls as string[]) ?? [],
     }));
 
+    // Build image map for frontend to resolve [IMG:N] markers
+    const imageMap: Record<string, string> = {};
+    for (const img of imageCatalog) {
+      imageMap[img.id] = img.url;
+    }
+
     return NextResponse.json({
       ok: true,
       answer,
       sources,
+      image_map: Object.keys(imageMap).length > 0 ? imageMap : undefined,
       follow_ups: followUps.slice(0, 3),
       persona: personaId,
       profile: profileId,

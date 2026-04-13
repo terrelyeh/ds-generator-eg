@@ -22,6 +22,7 @@ interface Message {
   sources?: Source[];
   provider?: string;
   followUps?: string[];
+  imageMap?: Record<string, string>;
 }
 
 interface PersonaOption {
@@ -206,7 +207,7 @@ export function AskChat() {
       }
 
       const updatedMessages = data.ok
-        ? [...newMessages, { role: "assistant" as const, content: data.answer, sources: data.sources, provider: data.provider, followUps: data.follow_ups }]
+        ? [...newMessages, { role: "assistant" as const, content: data.answer, sources: data.sources, provider: data.provider, followUps: data.follow_ups, imageMap: data.image_map }]
         : [...newMessages, { role: "assistant" as const, content: `Error: ${data.error}${data.details ? `\n\n${data.details}` : ""}` }];
       setMessages(updatedMessages);
       scheduleSave(updatedMessages);
@@ -470,7 +471,28 @@ export function AskChat() {
                   ) : (
                     <div className="text-sm leading-relaxed group/msg">
                       <div className="ask-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        {msg.imageMap && Object.keys(msg.imageMap).length > 0
+                          ? /* Split content on [IMG:N] markers and render images inline */
+                            msg.content.split(/(\[IMG:\d+\])/).map((part, pi) => {
+                              const imgMatch = part.match(/^\[IMG:(\d+)\]$/);
+                              if (imgMatch && msg.imageMap) {
+                                const imgUrl = msg.imageMap[`IMG:${imgMatch[1]}`];
+                                if (imgUrl) {
+                                  return (
+                                    <a key={pi} href={imgUrl} target="_blank" rel="noopener noreferrer"
+                                      className="block my-3 rounded-lg border overflow-hidden hover:ring-2 hover:ring-engenius-blue/50 transition-all max-w-lg">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={imgUrl} alt={`Reference ${imgMatch[1]}`} loading="lazy"
+                                        className="w-full h-auto object-contain bg-white" />
+                                    </a>
+                                  );
+                                }
+                              }
+                              if (!part.trim()) return null;
+                              return <ReactMarkdown key={pi} remarkPlugins={[remarkGfm]}>{part}</ReactMarkdown>;
+                            })
+                          : <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                        }
                       </div>
 
                       {/* Action bar: copy + sources + provider */}
@@ -510,31 +532,6 @@ export function AskChat() {
                           <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
                         )}
                       </div>
-
-                      {/* Reference images from documentation */}
-                      {msg.sources && (() => {
-                        const allImages = [...new Map(msg.sources.map((s) => [s.source_id, s])).values()]
-                          .flatMap((s) => (s.images || []).map((img) => ({ url: img, source: s.title || s.source_id })));
-                        if (allImages.length === 0) return null;
-                        return (
-                          <details className="mt-2 group/imgs">
-                            <summary className="cursor-pointer text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors select-none">
-                              📷 {allImages.length} reference image{allImages.length > 1 ? "s" : ""} from documentation
-                            </summary>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {allImages.map((img, idx) => (
-                                <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer"
-                                  className="block rounded-lg border overflow-hidden hover:ring-2 hover:ring-engenius-blue/50 transition-all"
-                                  title={img.source}>
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img src={img.url} alt={img.source} loading="lazy"
-                                    className="max-h-40 w-auto object-contain bg-white" />
-                                </a>
-                              ))}
-                            </div>
-                          </details>
-                        );
-                      })()}
 
                       {/* Follow-up questions */}
                       {msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
