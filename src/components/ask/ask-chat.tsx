@@ -1036,7 +1036,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                       disabled={!isAvailable}
                       className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-all ${
                         isActiveGroup
-                          ? "bg-engenius-blue text-white shadow-sm"
+                          ? "bg-[#3a3f47] text-white shadow-sm"
                           : isAvailable
                             ? "bg-muted text-muted-foreground hover:bg-muted/80 cursor-pointer"
                             : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
