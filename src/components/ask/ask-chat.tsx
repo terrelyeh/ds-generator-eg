@@ -1012,7 +1012,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                             : "bg-muted/50 text-muted-foreground/30 cursor-not-allowed line-through"
                       }`}
                     >
-                      {compact ? (isActiveGroup ? activeModel.label.split(" ").pop() : group.label) : (isActiveGroup ? activeModel.label : group.label)}
+                      {isActiveGroup ? activeModel.label : group.label}
                       {isAvailable && (
                         <svg className={`h-3 w-3 transition-transform ${isOpen ? "rotate-180" : ""}`} viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
                           <path d="M3 5l3 3 3-3" />
