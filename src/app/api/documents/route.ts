@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
+import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 
 // Allow up to 300s for Gitbook ingestion (many pages + Vision API)
 export const maxDuration = 300;
@@ -84,6 +85,8 @@ export async function GET(request: Request) {
       product_line: (meta?.product_line_label as string) ?? (meta?.product_line as string) ?? null,
       space_label: (meta?.space_label as string) ?? null,
       space_url: (meta?.space_url as string) ?? null,
+      helpcenter_label: (meta?.helpcenter_label as string) ?? null,
+      collection: (meta?.collection as string) ?? null,
     };
   });
 
@@ -141,6 +144,31 @@ export async function POST(request: Request) {
       spaceLabel: space_label || space_url,
       force,
       enableVision: enable_vision ?? true,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      ...result,
+    });
+  }
+
+  if (source_type === "helpcenter") {
+    const { collection_urls, label: hcLabel } = body as {
+      collection_urls?: string[];
+      label?: string;
+    };
+
+    if (!collection_urls || collection_urls.length === 0) {
+      return NextResponse.json(
+        { error: "Missing collection_urls for helpcenter ingestion" },
+        { status: 400 }
+      );
+    }
+
+    const result = await ingestHelpcenter({
+      collectionUrls: collection_urls,
+      label: hcLabel || "Help Center",
+      force,
     });
 
     return NextResponse.json({

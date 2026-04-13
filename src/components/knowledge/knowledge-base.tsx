@@ -36,6 +36,7 @@ interface SourceTypeConfig {
 const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "product_spec", label: "Product Specs", icon: "📦", description: "Product overview, features, and technical specifications from the database", status: "active", canIngest: true },
   { id: "gitbook", label: "Gitbook Docs", icon: "📖", description: "Technical documentation from Gitbook pages", status: "active", canIngest: true },
+  { id: "helpcenter", label: "Help Center", icon: "💡", description: "Technical articles from Intercom Help Center — best practices, feature guides", status: "active", canIngest: true },
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
   { id: "google_doc", label: "Google Docs", icon: "📄", description: "Product briefs, marketing docs, internal documents from Google Drive", status: "planned", canIngest: false },
   { id: "web", label: "Web Pages", icon: "🌐", description: "Website content, product pages, landing pages", status: "planned", canIngest: false },
@@ -177,6 +178,43 @@ export function KnowledgeBase() {
     }
   }
 
+  async function handleHelpcenterIngest(force = false) {
+    setIngesting("helpcenter");
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "helpcenter",
+          collection_urls: [
+            "https://helpcenter.engenius.ai/en/collections/10870912-industry-vertical-best-practice",
+            "https://helpcenter.engenius.ai/en/collections/10870934-engenius-help-center-documents",
+          ],
+          label: "EnGenius Help Center",
+          force,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const parts = [
+          `${data.processed} chunks indexed`,
+          `${data.skipped} unchanged`,
+          `${data.articles_fetched} articles fetched`,
+        ].filter(Boolean);
+        const errMsg = data.errors?.length ? ` (${data.errors.length} errors)` : "";
+        toast.success(`Help Center: ${parts.join(", ")}${errMsg}`);
+        fetchData();
+      } else {
+        toast.error(`Ingestion failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIngesting(null);
+    }
+  }
+
   const totalSources = Object.values(stats).reduce((s, v) => s + v.sources, 0);
   const totalTokens = Object.values(stats).reduce((s, v) => s + v.total_tokens, 0);
   const activeTypes = Object.keys(stats).length;
@@ -302,7 +340,12 @@ export function KnowledgeBase() {
                           {isIngesting ? "Indexing..." : "Add Space"}
                         </Button>
                       )}
-                      {config.canIngest && config.id !== "gitbook" && (
+                      {config.canIngest && config.id === "helpcenter" && (
+                        <Button size="sm" onClick={() => handleHelpcenterIngest()} disabled={!!ingesting} className="text-xs">
+                          {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
+                        </Button>
+                      )}
+                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && (
                         <Button size="sm" onClick={() => handleIngest(config.id)} disabled={!!ingesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>

@@ -122,6 +122,7 @@ export async function POST(request: Request) {
     const SOURCE_TYPE_LABELS: Record<string, string> = {
       product_spec: "Product Spec",
       gitbook: "Documentation / How-to",
+      helpcenter: "Help Center / Tech Article",
       text_snippet: "Knowledge Snippet",
       google_doc: "Internal Doc",
       web: "Web Page",
