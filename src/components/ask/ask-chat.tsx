@@ -154,17 +154,25 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
   if (!src) return <sup className="text-engenius-blue/70 font-medium cursor-default text-[10px]">[{index}]</sup>;
 
   const images = src.image_urls ?? [];
+  const hasExternalLink = src.source_url?.startsWith("http") && src.source_type !== "product_spec";
 
   return (
     <span
       className="relative inline-block"
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
-      onClick={() => setShow(!show)}
     >
-      <sup className="text-engenius-blue/70 font-medium cursor-pointer hover:text-engenius-blue text-[10px]">
-        [{index}]
-      </sup>
+      {hasExternalLink ? (
+        <a href={src.source_url!} target="_blank" rel="noopener noreferrer">
+          <sup className="text-engenius-blue/70 font-medium cursor-pointer hover:text-engenius-blue hover:underline text-[10px]">
+            [{index}]
+          </sup>
+        </a>
+      ) : (
+        <sup className="text-engenius-blue/70 font-medium cursor-default text-[10px]">
+          [{index}]
+        </sup>
+      )}
       {show && (
         <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 rounded-xl border bg-white shadow-xl text-xs pointer-events-auto"
           style={{ width: images.length > 0 ? 320 : 220 }}>
