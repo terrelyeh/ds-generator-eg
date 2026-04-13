@@ -54,10 +54,14 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **AI 產品規格查詢** — 用自然語言（中文/英文）詢問產品規格、比較、推薦
 - **向量搜尋** — pgvector + OpenAI Embedding，語意搜尋而非關鍵字匹配
 - **多 AI 模型** — Gemini（Pro/Flash/Lite）、GPT（4o/4o-mini/Nano）、Claude（Opus/Sonnet/Haiku），可即時切換比較
-- **Persona 系統** — 4 個內建角色（Product Specialist / Sales / Support / PM），可自訂
-- **對話持久化** — 對話自動存入 DB，側邊欄歷史列表，可恢復過往對話
+- **三維度 Prompt 架構**：
+  - **回答角度**（Persona）— 4 個內建角色（Product Specialist / Sales / Support / PM），可自訂
+  - **對話對象**（User Profile）— 6 種角色（一般同事 / 新進同仁 / 業務 / Channel Sales / PM / 客戶）
+  - **產出格式**（規劃中）— 未來支援生成簡報、比較表、Email 草稿
+- **對話持久化** — 對話自動存入 DB，側邊欄歷史列表，可恢復 / 批次刪除
 - **Markdown 渲染** — 表格、列表、粗體等格式化回答
-- **來源引用** — 回答附上匹配的產品連結和相似度分數
+- **來源引用 + 延伸問題** — 回答附上匹配的產品連結，並生成 3 個延伸問題引導探索
+- **複製按鈕** — 一鍵複製回答內容（保留 Markdown 格式）
 
 ### Knowledge Base
 - **索引管理**（`/knowledge`）— 查看已索引的內容、source 數量、chunk 數、token 數

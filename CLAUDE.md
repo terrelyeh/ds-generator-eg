@@ -86,7 +86,7 @@ src/
     rag/
       embeddings.ts                    # OpenAI embedding wrapper + contentHash + estimateTokens
       ingest-products.ts               # Products → 2 chunks (overview + specs) → embed → DB
-      personas.ts                      # 4 built-in personas + CRUD (stored in app_settings)
+      personas.ts                      # Persona (Dim1) + UserProfile (Dim2) + CRUD
     google/drive-versions.ts           # detectLatestVersion() + getLocaleSuffix()
     translate/                         # 5-layer prompt + multi-provider translation
       providers/claude.ts, openai.ts, gemini.ts
@@ -225,14 +225,21 @@ Key tables:
 
 ## Ask SpecHub (RAG System)
 
-完整架構、API、Persona、Chunking、圖片處理、Roadmap 請參考 [`docs/rag-system.md`](docs/rag-system.md)。
+完整架構、API、三維度 Prompt、Chunking、Roadmap 請參考 [`docs/rag-system.md`](docs/rag-system.md)。
+說明文件網頁版：`/docs/rag-system.html`（與 Drive 文件同風格，繁中）。
 
-**核心流程**：問題 → OpenAI Embedding → pgvector 搜尋 → Persona prompt + context → LLM 回答
-**資料表**：`documents`（向量索引）、`chat_sessions`（對話持久化）
-**Persona**：4 內建（Product Specialist / Sales / Support / PM）+ 自訂，存 `app_settings` 表（`persona_{id}`）
-**Model 選擇**：3 家 provider × 3 tier（Strongest / Mainstream / Best CP），`callLLM()` 內 `MODEL_MAP` 統一映射
+**三維度 Prompt 架構**：
+- **維度 1（回答角度 / Persona）**：4 內建 + 自訂，存 `app_settings`（`persona_{id}`）
+- **維度 2（對話對象 / User Profile）**：6 個 profile（一般同事/新人/業務/Channel/PM/客戶），定義在 `personas.ts` 的 `USER_PROFILES`，prompt 附加到 persona 後面
+- **維度 3（產出格式）**：規劃中（簡報/比較表/Email/提案）
+- 三維度在 `callLLM()` 前組裝：`systemPrompt = personaPrompt + profilePrompt`
+
+**核心流程**：問題(+history) → Embed → pgvector 搜尋 → 組裝 prompt(Persona+Profile+Context) → LLM → 回答+延伸問題+來源
+**資料表**：`documents`（向量索引）、`chat_sessions`（對話持久化，messages 直接存 JSONB array 不要 stringify）
+**Model 選擇**：3 家 provider × 3 tier，`callLLM()` 內 `MODEL_MAP` 統一映射。Gemini 回應用 `res.text()` 再 parse JSON（處理 thinking parts）
 **Concurrency**：PDF 生成有 DB lock（`pdf_lock_{model}_{lang}`，5 分鐘 auto-expire）；Settings 有 optimistic locking（`updated_at` 比對）
-**頁面寬度**：Dashboard/Compare/Translations/Typography/Ask = `1400px`，其餘 = `1100px`
+**頁面寬度**：Dashboard/Compare/Translations/Typography/Ask/Product = `1400px`，其餘 = `1100px`
+**最小字體**：全站消滅 `text-[10px]`，最小為 `text-[11px]`（11px）
 
 ## Current Status
 
@@ -285,3 +292,5 @@ npm run lint   # ESLint check
 11. **zh-TW locale 在 Drive 用 zh** — `getLocaleSuffix("zh-TW")` 回傳 `"zh"`，資料夾命名和 PDF 檔名用 `_zh` 不用 `_zh-TW`
 12. **Gemini API model 名稱** — 翻譯用 `gemini-2.5-pro`（加 `responseMimeType: "application/json"` 穩定 JSON 輸出）。Ask RAG 用 `gemini-2.5-flash`（預設）或 `gemini-2.5-pro`。注意：`-latest` suffix 已棄用
 13. **Preview CSS 動態化** — per-locale 的字級/字重/顏色不再 hardcode 在 CSS，而是從 `app_settings` 讀 `typography_${lang}` JSON，fallback 到 `TYPOGRAPHY_DEFAULTS[lang]`
+14. **Gemini 回應解析** — Ask RAG 的 `callGemini()` 必須用 `res.text()` 再 `JSON.parse()`（不能直接 `res.json()`，大回應會失敗）。2.5 Pro 可能回傳 thinking parts，要取最後一個 text part
+15. **chat_sessions messages 格式** — 存入時直接傳 raw array 給 Supabase JSONB，**不要** `JSON.stringify()`，否則會 double-encode 成字串。讀取時用 `parseMessages()` 安全處理兩種格式
