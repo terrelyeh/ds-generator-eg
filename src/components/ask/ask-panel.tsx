@@ -36,18 +36,18 @@ export function AskPanel({ isOpen, onClose }: AskPanelProps) {
 
   return (
     <>
-      {/* Backdrop */}
+      {/* Backdrop — covers everything including navbar */}
       <div
-        className={`fixed inset-0 top-14 z-40 bg-black/20 transition-opacity duration-300 ${
+        className={`fixed inset-0 z-50 bg-black/30 transition-opacity duration-300 ${
           isOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Panel */}
+      {/* Panel — overlays navbar */}
       <div
-        className={`fixed top-14 right-0 bottom-0 z-40 flex flex-col bg-background border-l shadow-xl transition-transform duration-300 ease-in-out ${
+        className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-background border-l shadow-2xl transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
         style={{ width: "min(600px, max(42vw, 520px))" }}

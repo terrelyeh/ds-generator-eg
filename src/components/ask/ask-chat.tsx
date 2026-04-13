@@ -139,34 +139,61 @@ function AssistantIcon({ size = 56, animate = true }: { size?: number; animate?:
 }
 
 /* ─── Citation tooltip ─── */
+const SOURCE_TYPE_LABEL: Record<string, string> = {
+  product_spec: "Product Spec",
+  gitbook: "Documentation",
+  helpcenter: "Help Center",
+  text_snippet: "Snippet",
+  google_doc: "Internal Doc",
+  web: "Web",
+};
+
 function CitationTooltip({ index, sources }: { index: number; sources: Source[] }) {
   const [show, setShow] = useState(false);
   const src = sources[index - 1];
-  if (!src) return <sup className="text-engenius-blue font-semibold cursor-default">[{index}]</sup>;
+  if (!src) return <sup className="text-engenius-blue/70 font-medium cursor-default text-[10px]">[{index}]</sup>;
 
-  const typeLabel: Record<string, string> = {
-    product_spec: "Product Spec",
-    gitbook: "Documentation",
-    helpcenter: "Help Center",
-    text_snippet: "Snippet",
-    google_doc: "Internal Doc",
-    web: "Web",
-  };
+  const images = src.image_urls ?? [];
 
   return (
-    <span className="relative inline-block">
-      <sup
-        className="text-engenius-blue font-semibold cursor-pointer hover:underline"
-        onMouseEnter={() => setShow(true)}
-        onMouseLeave={() => setShow(false)}
-      >
+    <span
+      className="relative inline-block"
+      onMouseEnter={() => setShow(true)}
+      onMouseLeave={() => setShow(false)}
+    >
+      <sup className="text-engenius-blue/70 font-medium cursor-pointer hover:text-engenius-blue text-[10px]">
         [{index}]
       </sup>
       {show && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-50 w-56 rounded-lg border bg-white shadow-lg px-3 py-2 text-xs pointer-events-none">
-          <span className="font-semibold text-foreground block truncate">{src.title}</span>
-          <span className="text-muted-foreground">{typeLabel[src.source_type] ?? src.source_type}</span>
-          <span className="text-muted-foreground/60 ml-2">{Math.round(src.similarity * 100)}% match</span>
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 rounded-xl border bg-white shadow-xl text-xs pointer-events-auto"
+          style={{ width: images.length > 0 ? 280 : 220 }}>
+          <span className="block px-3 pt-2.5 pb-2">
+            <span className="font-semibold text-foreground block truncate leading-tight">{src.title}</span>
+            <span className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-muted-foreground">{SOURCE_TYPE_LABEL[src.source_type] ?? src.source_type}</span>
+              <span className="text-muted-foreground/40">·</span>
+              <span className="text-muted-foreground/50">{Math.round(src.similarity * 100)}%</span>
+            </span>
+          </span>
+          {images.length > 0 && (
+            <span className="block border-t px-2 py-2">
+              <span className="flex gap-1.5 overflow-x-auto">
+                {images.slice(0, 3).map((url, i) => (
+                  <a key={i} href={url} target="_blank" rel="noopener noreferrer"
+                    className="block flex-shrink-0 rounded-md border overflow-hidden hover:ring-1 hover:ring-engenius-blue/40 transition-all">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={url} alt={`Ref ${index}-${i + 1}`} loading="lazy"
+                      className="h-16 w-auto object-contain bg-white" />
+                  </a>
+                ))}
+                {images.length > 3 && (
+                  <span className="flex-shrink-0 flex items-center justify-center h-16 w-10 rounded-md bg-muted text-[10px] text-muted-foreground">
+                    +{images.length - 3}
+                  </span>
+                )}
+              </span>
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -247,6 +274,25 @@ function MarkdownWithCitations({ content, sources }: { content: string; sources?
     },
     th: ({ children, ...props }) => {
       return <th {...props}>{processChildren(children, sources ?? [])}</th>;
+    },
+    // Detect UI navigation paths in bold text: **Configure > Gateway > VPN**
+    strong: ({ children, ...props }) => {
+      const text = typeof children === "string" ? children : Array.isArray(children) ? children.join("") : "";
+      // If text contains " > " separators, render as UI path breadcrumb
+      if (typeof text === "string" && text.includes(" > ")) {
+        const segments = text.split(/\s*>\s*/);
+        return (
+          <span className="inline-flex items-center gap-0.5 rounded bg-muted/70 px-1.5 py-0.5 text-[12px] font-medium text-foreground/90" style={{ fontFamily: "var(--font-sans)" }}>
+            {segments.map((seg, i) => (
+              <span key={i} className="inline-flex items-center gap-0.5">
+                {i > 0 && <span className="text-muted-foreground/40 mx-0.5">›</span>}
+                <span>{seg.trim()}</span>
+              </span>
+            ))}
+          </span>
+        );
+      }
+      return <strong {...props}>{processChildren(children, sources ?? [])}</strong>;
     },
   };
 
