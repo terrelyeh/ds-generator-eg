@@ -202,58 +202,23 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
 
 /* ─── Reference list at bottom of answer ─── */
 function ReferenceList({ sources }: { sources: Source[] }) {
-  const [expandedImgs, setExpandedImgs] = useState<Set<number>>(new Set());
   const unique = [...new Map(sources.map((s, i) => [i, s])).values()];
   if (unique.length === 0) return null;
 
   return (
-    <div className="mt-3 pt-2 border-t border-border/30 space-y-1">
-      <span className="text-xs font-semibold text-muted-foreground/60">References</span>
+    <div className="mt-2 pt-1.5 border-t border-border/20 flex flex-wrap items-center gap-x-1 gap-y-0.5">
+      <span className="text-[10px] text-muted-foreground/40 mr-0.5">Sources:</span>
       {unique.map((s, i) => (
-        <div key={i}>
-          <div className="flex items-center gap-1.5 text-xs">
-            <span className="text-muted-foreground/50 font-mono">[{i + 1}]</span>
-            {s.source_url ? (
-              <Link href={s.source_url} target="_blank" className="text-engenius-blue hover:underline truncate">
-                {s.title}
-              </Link>
-            ) : (
-              <span className="text-foreground truncate">{s.title}</span>
-            )}
-            <span className="text-muted-foreground/40 flex-shrink-0">
-              ({s.source_type === "product_spec" ? "Product Spec" : s.source_type})
-            </span>
-            {s.image_urls && s.image_urls.length > 0 && (
-              <button
-                onClick={() => {
-                  setExpandedImgs((prev) => {
-                    const next = new Set(prev);
-                    if (next.has(i)) next.delete(i); else next.add(i);
-                    return next;
-                  });
-                }}
-                className="text-muted-foreground/50 hover:text-engenius-blue transition-colors flex-shrink-0"
-                title="Show images"
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M1 5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H3a2 2 0 01-2-2V5zm4 3a1 1 0 100-2 1 1 0 000 2zm10.707 2.293a1 1 0 00-1.414 0L11 13.586l-1.293-1.293a1 1 0 00-1.414 0L5 15.586V15a.5.5 0 01.5-.5h9a.5.5 0 01.5.5v.586l-1.293-1.293z" clipRule="evenodd" />
-                </svg>
-              </button>
-            )}
-          </div>
-          {expandedImgs.has(i) && s.image_urls && s.image_urls.length > 0 && (
-            <div className="ml-6 mt-1 flex flex-wrap gap-2">
-              {s.image_urls.map((url, imgIdx) => (
-                <a key={imgIdx} href={url} target="_blank" rel="noopener noreferrer"
-                  className="block rounded-md border overflow-hidden hover:ring-2 hover:ring-engenius-blue/50 transition-all max-w-[200px]">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={url} alt={`${s.title} image ${imgIdx + 1}`} loading="lazy"
-                    className="w-full h-auto object-contain bg-white" />
-                </a>
-              ))}
-            </div>
+        <span key={i} className="text-[10px] text-muted-foreground/40">
+          {s.source_url ? (
+            <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+              [{i + 1}] {s.title}
+            </a>
+          ) : (
+            <span>[{i + 1}] {s.title}</span>
           )}
-        </div>
+          {i < unique.length - 1 && <span className="mx-1">·</span>}
+        </span>
       ))}
     </div>
   );
