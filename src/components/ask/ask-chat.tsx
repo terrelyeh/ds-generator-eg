@@ -160,13 +160,14 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
       className="relative inline-block"
       onMouseEnter={() => setShow(true)}
       onMouseLeave={() => setShow(false)}
+      onClick={() => setShow(!show)}
     >
       <sup className="text-engenius-blue/70 font-medium cursor-pointer hover:text-engenius-blue text-[10px]">
         [{index}]
       </sup>
       {show && (
         <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 z-50 rounded-xl border bg-white shadow-xl text-xs pointer-events-auto"
-          style={{ width: images.length > 0 ? 280 : 220 }}>
+          style={{ width: images.length > 0 ? 320 : 220 }}>
           <span className="block px-3 pt-2.5 pb-2">
             <span className="font-semibold text-foreground block truncate leading-tight">{src.title}</span>
             <span className="flex items-center gap-1.5 mt-0.5">
@@ -176,19 +177,19 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
             </span>
           </span>
           {images.length > 0 && (
-            <span className="block border-t px-2 py-2">
-              <span className="flex gap-1.5 overflow-x-auto">
-                {images.slice(0, 3).map((url, i) => (
+            <span className="block border-t px-2.5 py-2.5">
+              <span className="flex flex-col gap-2">
+                {images.slice(0, 2).map((url, i) => (
                   <a key={i} href={url} target="_blank" rel="noopener noreferrer"
-                    className="block flex-shrink-0 rounded-md border overflow-hidden hover:ring-1 hover:ring-engenius-blue/40 transition-all">
+                    className="block rounded-lg border overflow-hidden hover:ring-2 hover:ring-engenius-blue/40 transition-all cursor-pointer">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={url} alt={`Ref ${index}-${i + 1}`} loading="lazy"
-                      className="h-16 w-auto object-contain bg-white" />
+                      className="w-full h-auto max-h-36 object-contain bg-slate-50" />
                   </a>
                 ))}
-                {images.length > 3 && (
-                  <span className="flex-shrink-0 flex items-center justify-center h-16 w-10 rounded-md bg-muted text-[10px] text-muted-foreground">
-                    +{images.length - 3}
+                {images.length > 2 && (
+                  <span className="text-[10px] text-muted-foreground/50 text-center">
+                    +{images.length - 2} more — click to view
                   </span>
                 )}
               </span>
@@ -206,21 +207,24 @@ function ReferenceList({ sources }: { sources: Source[] }) {
   if (unique.length === 0) return null;
 
   return (
-    <div className="mt-2 pt-1.5 border-t border-border/20 flex flex-wrap items-center gap-x-1 gap-y-0.5">
-      <span className="text-[10px] text-muted-foreground/40 mr-0.5">Sources:</span>
-      {unique.map((s, i) => (
-        <span key={i} className="text-[10px] text-muted-foreground/40">
-          {s.source_url ? (
-            <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
-              [{i + 1}] {s.title}
-            </a>
-          ) : (
-            <span>[{i + 1}] {s.title}</span>
-          )}
-          {i < unique.length - 1 && <span className="mx-1">·</span>}
-        </span>
-      ))}
-    </div>
+    <details className="mt-2 pt-1 border-t border-border/15 group/ref">
+      <summary className="cursor-pointer text-[10px] text-muted-foreground/35 hover:text-muted-foreground/60 transition-colors select-none list-none">
+        {unique.length} sources referenced
+      </summary>
+      <div className="mt-1 space-y-0.5">
+        {unique.map((s, i) => (
+          <div key={i} className="text-[10px] text-muted-foreground/40 truncate">
+            {s.source_url ? (
+              <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+                [{i + 1}] {s.title}
+              </a>
+            ) : (
+              <span>[{i + 1}] {s.title}</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </details>
   );
 }
 

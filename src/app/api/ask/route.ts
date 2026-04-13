@@ -205,7 +205,7 @@ Current question: ${question}
 ---
 
 IMPORTANT formatting rules:
-1. Use inline citations like [1], [2], etc. to reference the source documents by their index number. Place these citations right after the relevant claim or sentence.
+1. Use inline citations like [1] to reference source documents. Rules: place ONE citation at the END of a paragraph or key claim (not after every sentence). Maximum 2 citations per paragraph. Never stack multiple citations together like [1, 3, 4, 5] — pick the single most relevant source.
 2. After your main answer, add a line with just "---" as a separator.
 3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in the same language as the question.`;
 
