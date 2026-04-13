@@ -153,20 +153,22 @@ export async function POST(request: Request) {
   }
 
   if (source_type === "helpcenter") {
-    const { collection_urls, label: hcLabel } = body as {
+    const { collection_urls, article_urls, label: hcLabel } = body as {
       collection_urls?: string[];
+      article_urls?: string[];
       label?: string;
     };
 
-    if (!collection_urls || collection_urls.length === 0) {
+    if (!collection_urls?.length && !article_urls?.length) {
       return NextResponse.json(
-        { error: "Missing collection_urls for helpcenter ingestion" },
+        { error: "Missing collection_urls or article_urls for helpcenter ingestion" },
         { status: 400 }
       );
     }
 
     const result = await ingestHelpcenter({
-      collectionUrls: collection_urls,
+      collectionUrls: collection_urls || [],
+      articleUrls: article_urls,
       label: hcLabel || "Help Center",
       force,
     });

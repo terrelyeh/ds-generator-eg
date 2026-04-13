@@ -79,6 +79,7 @@ export function KnowledgeBase() {
   const [gitbookLabel, setGitbookLabel] = useState("");
   const [gitbookVision, setGitbookVision] = useState(true);
   const [gitbookIngesting, setGitbookIngesting] = useState(false);
+  const [newArticleUrl, setNewArticleUrl] = useState("");
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -215,6 +216,37 @@ export function KnowledgeBase() {
     }
   }
 
+  async function handleAddArticle() {
+    if (!newArticleUrl.trim()) return;
+    setIngesting("helpcenter");
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "helpcenter",
+          article_urls: [newArticleUrl.trim()],
+          label: "EnGenius Help Center",
+        }),
+      });
+      const data = await res.json();
+      if (data.ok && data.processed > 0) {
+        toast.success(`Article indexed: ${data.processed} chunks`);
+        setNewArticleUrl("");
+        fetchData();
+      } else if (data.ok && data.processed === 0) {
+        toast.error("No content found — check the URL");
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIngesting(null);
+    }
+  }
+
   const totalSources = Object.values(stats).reduce((s, v) => s + v.sources, 0);
   const totalTokens = Object.values(stats).reduce((s, v) => s + v.total_tokens, 0);
   const activeTypes = Object.keys(stats).length;
@@ -311,6 +343,8 @@ export function KnowledgeBase() {
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                               {config.id === "gitbook"
                                 ? `${new Set(typeSources.map((s) => s.space_label || "Unknown")).size} space${new Set(typeSources.map((s) => s.space_label || "Unknown")).size > 1 ? "s" : ""}`
+                                : config.id === "helpcenter"
+                                ? `${typeStat.sources} articles`
                                 : `${typeStat.sources} sources`
                               } · {typeStat.count} chunks · {formatTokens(typeStat.total_tokens)} tokens
                             </span>
@@ -432,7 +466,58 @@ export function KnowledgeBase() {
                   </CardContent>
                 )}
 
-                {isExpanded && typeSources.length > 0 && config.id !== "gitbook" && (
+                {/* Expanded details — Help Center shows article list + add article */}
+                {isExpanded && config.id === "helpcenter" && (
+                  <CardContent className="pt-0">
+                    {typeSources.length > 0 && (
+                      <div className="rounded-lg border overflow-hidden mb-3">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="bg-muted/50">
+                              <th className="text-left px-3 py-2 font-medium">Article</th>
+                              <th className="text-center px-3 py-2 font-medium">Chunks</th>
+                              <th className="text-center px-3 py-2 font-medium">Tokens</th>
+                              <th className="text-right px-3 py-2 font-medium">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {typeSources.map((s) => (
+                              <tr key={s.source_id} className="border-t hover:bg-muted/30 transition-colors">
+                                <td className="px-3 py-2">
+                                  <span className="font-medium">{s.title}</span>
+                                </td>
+                                <td className="px-3 py-2 text-center tabular-nums">{s.chunks}</td>
+                                <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{formatTokens(s.total_tokens)}</td>
+                                <td className="px-3 py-2 text-right">
+                                  <button onClick={() => handleDelete("helpcenter", s.source_id)}
+                                    className="text-xs text-muted-foreground/50 hover:text-red-500 transition-colors">Delete</button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+
+                    {/* Add Article */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="url"
+                        value={newArticleUrl}
+                        onChange={(e) => setNewArticleUrl(e.target.value)}
+                        placeholder="https://helpcenter.engenius.ai/en/articles/..."
+                        className="flex-1 rounded-md border px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                        disabled={!!ingesting}
+                        onKeyDown={(e) => e.key === "Enter" && handleAddArticle()}
+                      />
+                      <Button size="sm" onClick={handleAddArticle} disabled={!newArticleUrl.trim() || !!ingesting} className="text-xs">
+                        {ingesting === "helpcenter" ? "Adding..." : "Add Article"}
+                      </Button>
+                    </div>
+                  </CardContent>
+                )}
+
+                {isExpanded && typeSources.length > 0 && config.id !== "gitbook" && config.id !== "helpcenter" && (
                   <CardContent className="pt-0">
                     <div className="rounded-lg border overflow-hidden">
                       <table className="w-full text-xs">
