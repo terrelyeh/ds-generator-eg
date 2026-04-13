@@ -207,15 +207,15 @@ function ReferenceList({ sources }: { sources: Source[] }) {
   if (unique.length === 0) return null;
 
   return (
-    <details className="mt-2 pt-1 border-t border-border/15 group/ref">
-      <summary className="cursor-pointer text-[10px] text-muted-foreground/35 hover:text-muted-foreground/60 transition-colors select-none list-none">
-        {unique.length} sources referenced
+    <details className="mt-3 pt-2 border-t border-border/30">
+      <summary className="cursor-pointer text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none">
+        📎 {unique.length} sources referenced
       </summary>
-      <div className="mt-1 space-y-0.5">
+      <div className="mt-1.5 space-y-0.5">
         {unique.map((s, i) => (
-          <div key={i} className="text-[10px] text-muted-foreground/40 truncate">
+          <div key={i} className="text-xs text-muted-foreground/50 truncate">
             {s.source_url ? (
-              <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-muted-foreground transition-colors">
+              <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-engenius-blue transition-colors">
                 [{i + 1}] {s.title}
               </a>
             ) : (
