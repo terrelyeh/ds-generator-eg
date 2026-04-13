@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Product SpecHub — Ask SpecHub RAG 系統說明</title>
+  <title>Ask SpecHub — RAG 系統架構與使用說明</title>
   <style>
     :root {
       --blue: #03a9f4;
@@ -19,8 +19,6 @@
       --red-bg: #fef2f2;
       --green: #059669;
       --green-bg: #ecfdf5;
-      --purple: #7c3aed;
-      --purple-bg: #f5f3ff;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -28,137 +26,101 @@
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
       color: var(--gray-dark);
-      line-height: 1.7;
+      font-size: 16px;
+      line-height: 1.8;
       background: #fff;
-      display: flex;
+      margin: 0;
+      padding: 0;
     }
 
-    /* Left TOC panel — collapsible */
-    .toc-panel {
-      position: fixed;
+    .page-layout {
+      display: flex;
+      max-width: 1280px;
+      margin: 0 auto;
+    }
+
+    /* Left sidebar TOC */
+    .sidebar {
+      width: 240px;
+      flex-shrink: 0;
+      position: sticky;
       top: 0;
-      left: 0;
-      width: 280px;
       height: 100vh;
-      background: var(--gray-bg);
-      border-right: 1px solid var(--border);
       overflow-y: auto;
-      padding: 24px 16px;
-      z-index: 100;
-      transition: transform 0.25s ease;
+      border-right: 1px solid var(--border);
+      padding: 32px 20px;
+      background: var(--gray-bg);
     }
 
-    .toc-panel.collapsed {
-      transform: translateX(-100%);
-    }
-
-    .toc-toggle {
-      position: fixed;
-      top: 16px;
-      left: 16px;
-      z-index: 200;
-      width: 36px;
-      height: 36px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: white;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-      transition: left 0.25s ease;
-      font-size: 18px;
-      color: var(--gray);
-    }
-
-    .toc-toggle:hover { background: var(--gray-bg); }
-
-    .toc-toggle.open { left: 292px; }
-
-    .toc-panel h3 {
-      font-size: 11px;
+    .sidebar-title {
       font-weight: 700;
+      font-size: 13px;
       text-transform: uppercase;
-      letter-spacing: 0.08em;
+      letter-spacing: 0.05em;
       color: var(--gray-light);
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
 
-    .toc-panel a {
+    .sidebar ol {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .sidebar li {
+      margin: 0;
+    }
+
+    .sidebar a {
       display: block;
-      padding: 4px 8px;
-      margin: 2px 0;
-      font-size: 13px;
+      padding: 7px 12px;
+      border-radius: 6px;
+      font-size: 14px;
       color: var(--gray);
       text-decoration: none;
-      border-radius: 4px;
       transition: all 0.15s;
+      line-height: 1.4;
     }
 
-    .toc-panel a:hover {
-      background: var(--blue);
-      color: #fff;
+    .sidebar a:hover {
+      background: rgba(3,169,244,0.08);
+      color: var(--blue-dark);
     }
 
-    .toc-panel a.sub {
-      padding-left: 20px;
-      font-size: 12px;
-      color: var(--gray-light);
+    .sidebar a.active {
+      background: rgba(3,169,244,0.12);
+      color: var(--blue-dark);
+      font-weight: 600;
     }
 
-    .toc-panel a .num {
-      display: inline-block;
-      background: var(--blue);
-      color: #fff;
-      width: 20px;
-      height: 20px;
-      border-radius: 4px;
-      text-align: center;
-      line-height: 20px;
-      font-size: 11px;
-      margin-right: 6px;
-    }
-
-    .toc-panel a:hover .num {
-      background: #fff;
-      color: var(--blue);
-    }
-
-    /* Main content — centered */
-    .content {
-      margin-left: 280px;
-      max-width: 860px;
-      padding: 40px 48px 100px;
-      margin-right: auto;
-      transition: margin-left 0.25s ease;
-    }
-
-    body.toc-hidden .content {
-      margin-left: auto;
+    /* Main content */
+    .main-content {
+      flex: 1;
+      min-width: 0;
+      padding: 48px 48px 80px;
     }
 
     h1 {
-      font-size: 28px;
+      font-size: 36px;
       font-weight: 700;
       color: var(--blue-dark);
-      margin-bottom: 4px;
+      margin-bottom: 6px;
       border-bottom: 3px solid var(--blue);
-      padding-bottom: 12px;
+      padding-bottom: 14px;
     }
 
     .subtitle {
-      font-size: 14px;
+      font-size: 16px;
       color: var(--gray-light);
-      margin-bottom: 32px;
+      margin-bottom: 36px;
     }
 
     h2 {
-      font-size: 20px;
+      font-size: 24px;
       font-weight: 700;
       color: var(--gray-dark);
-      margin: 48px 0 16px;
-      padding-bottom: 8px;
+      margin: 48px 0 20px;
+      padding-bottom: 10px;
       border-bottom: 2px solid var(--border);
     }
 
@@ -166,728 +128,689 @@
       display: inline-block;
       background: var(--blue);
       color: #fff;
-      width: 28px;
-      height: 28px;
+      width: 32px;
+      height: 32px;
       border-radius: 6px;
       text-align: center;
-      line-height: 28px;
-      font-size: 14px;
-      margin-right: 8px;
+      line-height: 32px;
+      font-size: 16px;
+      margin-right: 10px;
       vertical-align: middle;
     }
 
     h3 {
-      font-size: 16px;
+      font-size: 19px;
       font-weight: 600;
       color: var(--gray);
-      margin: 28px 0 8px;
+      margin: 28px 0 10px;
     }
 
-    h4 {
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--gray-dark);
-      margin: 20px 0 6px;
-    }
-
-    p { margin: 10px 0; font-size: 15px; }
-    ul, ol { margin: 10px 0 10px 24px; font-size: 15px; }
-    li { margin: 5px 0; }
-
-    code {
-      background: #f0f1f3;
-      padding: 1px 5px;
-      border-radius: 3px;
-      font-size: 13px;
-      font-family: "SF Mono", "Fira Code", monospace;
-    }
-
-    pre {
-      background: #1e293b;
-      color: #e2e8f0;
-      padding: 16px 20px;
-      border-radius: 8px;
-      overflow-x: auto;
-      font-size: 13px;
-      line-height: 1.5;
-      margin: 12px 0;
-      font-family: "SF Mono", "Fira Code", monospace;
-    }
-
-    pre code {
-      background: none;
-      padding: 0;
-      color: inherit;
-    }
-
-    .comment { color: #64748b; }
-    .keyword { color: #93c5fd; }
-    .string { color: #86efac; }
-    .type { color: #c4b5fd; }
+    p { margin-bottom: 14px; }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      margin: 12px 0;
-      font-size: 14px;
+      margin: 14px 0 24px;
+      font-size: 15px;
     }
 
-    th {
-      background: var(--gray-bg);
-      text-align: left;
-      padding: 8px 12px;
+    thead th {
+      background: var(--gray-dark);
+      color: #fff;
       font-weight: 600;
-      border: 1px solid var(--border);
-      font-size: 12px;
+      padding: 10px 14px;
+      text-align: left;
+      white-space: nowrap;
     }
 
-    td {
-      padding: 8px 12px;
-      border: 1px solid var(--border);
+    tbody td {
+      padding: 9px 14px;
+      border-bottom: 1px solid var(--border);
       vertical-align: top;
     }
 
-    .callout {
-      padding: 16px 20px;
-      border-radius: 8px;
-      margin: 16px 0;
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+    tbody tr:hover { background: rgba(3, 169, 244, 0.06); }
+
+    code {
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
       font-size: 14px;
-      line-height: 1.6;
+      background: #f0f2f5;
+      padding: 2px 7px;
+      border-radius: 4px;
+      color: #c7254e;
     }
 
-    .callout-blue { background: #ebf8fe; border-left: 4px solid var(--blue); }
-    .callout-amber { background: var(--amber-bg); border-left: 4px solid var(--amber); }
-    .callout-green { background: var(--green-bg); border-left: 4px solid var(--green); }
-    .callout-red { background: var(--red-bg); border-left: 4px solid var(--red); }
-    .callout-purple { background: var(--purple-bg); border-left: 4px solid var(--purple); }
-
-    .callout strong { display: block; margin-bottom: 4px; }
-
-    .flow-diagram {
-      background: var(--gray-bg);
-      border: 1px solid var(--border);
+    pre {
+      background: #1e1e2e;
+      color: #cdd6f4;
+      padding: 20px 24px;
       border-radius: 8px;
-      padding: 20px;
-      margin: 16px 0;
-      font-family: "SF Mono", "Fira Code", monospace;
-      font-size: 13px;
-      line-height: 1.8;
       overflow-x: auto;
-      white-space: pre;
+      font-size: 14px;
+      line-height: 1.7;
+      margin: 14px 0 24px;
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
     }
+
+    pre .comment { color: #6c7086; }
+    pre .folder { color: #89b4fa; }
+    pre .file { color: #a6e3a1; }
+    pre .highlight { color: #f9e2af; }
 
     .badge {
       display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-
-    .badge-blue { background: #dbeafe; color: #1d4ed8; }
-    .badge-green { background: #dcfce7; color: #15803d; }
-    .badge-amber { background: #fef3c7; color: #92400e; }
-    .badge-gray { background: #f1f5f9; color: #475569; }
-    .badge-purple { background: #ede9fe; color: #6d28d9; }
-
-    .file-tree {
-      background: var(--gray-bg);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 16px 20px;
-      font-family: "SF Mono", "Fira Code", monospace;
       font-size: 13px;
-      line-height: 1.6;
-      margin: 12px 0;
+      font-weight: 600;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
     }
 
-    .file-tree .dir { color: var(--blue); font-weight: 600; }
-    .file-tree .file { color: var(--gray); }
-    .file-tree .new { color: var(--green); font-weight: 600; }
-    .file-tree .desc { color: var(--gray-light); font-size: 11px; }
+    .badge-blue { background: rgba(3,169,244,0.12); color: var(--blue-dark); }
+    .badge-gray { background: #eee; color: var(--gray); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+    .badge-red { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
 
-    @media (max-width: 900px) {
-      .toc-panel { transform: translateX(-100%); }
-      .toc-toggle { left: 16px !important; }
-      .content { margin-left: 0 !important; padding: 24px 16px 60px; }
+    .callout {
+      background: rgba(3,169,244,0.06);
+      border-left: 4px solid var(--blue);
+      padding: 14px 20px;
+      border-radius: 0 8px 8px 0;
+      margin: 14px 0 24px;
+      font-size: 15px;
+    }
+
+    .callout-warn {
+      background: var(--amber-bg);
+      border-left-color: var(--amber);
+    }
+
+    .callout-green {
+      background: var(--green-bg);
+      border-left-color: var(--green);
+    }
+
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn strong { color: var(--amber); }
+    .callout-green strong { color: var(--green); }
+
+    .checklist {
+      list-style: none;
+      padding: 0;
+    }
+
+    .checklist li {
+      padding: 8px 0 8px 30px;
+      position: relative;
+      font-size: 15px;
+    }
+
+    .checklist li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 9px;
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--border);
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .version-dash { color: #ccc; }
+
+    @media print {
+      .sidebar { display: none; }
+      .main-content { padding: 20px; }
+      h2 { break-before: auto; }
+      table, pre { break-inside: avoid; }
+    }
+
+    @media (max-width: 768px) {
+      .page-layout { flex-direction: column; }
+      .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        padding: 20px;
+      }
+      .main-content { padding: 24px 20px 60px; }
     }
   </style>
 </head>
 <body>
 
-<!-- TOC toggle button -->
-<button class="toc-toggle open" id="tocToggle" onclick="toggleToc()" title="Toggle table of contents">☰</button>
+<div class="page-layout">
 
-<!-- Left TOC -->
-<nav class="toc-panel" id="tocPanel">
-  <h3>Ask SpecHub RAG</h3>
-  <a href="#s1"><span class="num">1</span> Overview</a>
-  <a href="#s1-caps" class="sub">Capabilities</a>
-  <a href="#s1-terms" class="sub">Key Terms</a>
-  <a href="#s2"><span class="num">2</span> Architecture</a>
-  <a href="#s2-flow" class="sub">Query Workflow</a>
-  <a href="#s2-index" class="sub">Indexing Workflow</a>
-  <a href="#s3"><span class="num">3</span> Database Design</a>
-  <a href="#s3-docs" class="sub">documents table</a>
-  <a href="#s3-chat" class="sub">chat_sessions table</a>
-  <a href="#s3-indexes" class="sub">Indexes</a>
-  <a href="#s3-source" class="sub">Source Types</a>
-  <a href="#s4"><span class="num">4</span> AI Involvement</a>
-  <a href="#s4-embed" class="sub">Embedding</a>
-  <a href="#s4-llm" class="sub">LLM Answer</a>
-  <a href="#s4-models" class="sub">Available Models</a>
-  <a href="#s5"><span class="num">5</span> Chunking Strategy</a>
-  <a href="#s5-future" class="sub">Per-Source (future)</a>
-  <a href="#s6"><span class="num">6</span> File Structure</a>
-  <a href="#s7"><span class="num">7</span> Setup &amp; Usage</a>
-  <a href="#s7-setup" class="sub">First-time Setup</a>
-  <a href="#s7-daily" class="sub">Daily Usage</a>
-  <a href="#s7-knowledge" class="sub">Knowledge Base</a>
-  <a href="#s7-reindex" class="sub">Re-indexing</a>
-  <a href="#s8"><span class="num">8</span> API Reference</a>
-  <a href="#s8-ask-post" class="sub">POST /api/ask</a>
-  <a href="#s8-ask-get" class="sub">GET /api/ask</a>
-  <a href="#s8-docs" class="sub">/api/documents</a>
-  <a href="#s8-chat" class="sub">/api/chat-sessions</a>
-  <a href="#s8-personas" class="sub">/api/personas</a>
-  <a href="#s9"><span class="num">9</span> Three-Dimension Prompt</a>
-  <a href="#s9-dim1" class="sub">Dim 1: Persona</a>
-  <a href="#s9-dim2" class="sub">Dim 2: User Profile</a>
-  <a href="#s9-dim3" class="sub">Dim 3: Output Format</a>
-  <a href="#s9-mult" class="sub">Dimension Multiplication</a>
-  <a href="#s9-custom" class="sub">Custom Personas</a>
-  <a href="#s9-ext" class="sub">External API</a>
-  <a href="#s10"><span class="num">10</span> Conversation History</a>
-  <a href="#s10-how" class="sub">How it works</a>
-  <a href="#s10-mgmt" class="sub">Session Management</a>
-  <a href="#s11"><span class="num">11</span> Image Handling</a>
-  <a href="#s12"><span class="num">12</span> Intent Detection</a>
-  <a href="#s13"><span class="num">13</span> Important Notes</a>
-  <a href="#s14"><span class="num">14</span> Roadmap</a>
-  <a href="#s15"><span class="num">15</span> Page Layout</a>
+<!-- Left Sidebar TOC -->
+<nav class="sidebar">
+  <div class="sidebar-title">目錄</div>
+  <ol>
+    <li><a href="#s1">功能概述</a></li>
+    <li><a href="#s2">系統架構</a></li>
+    <li><a href="#s3">三維度 Prompt 架構</a></li>
+    <li><a href="#s4">資料庫設計</a></li>
+    <li><a href="#s5">AI 模型與 Embedding</a></li>
+    <li><a href="#s6">Chunking 策略</a></li>
+    <li><a href="#s7">Knowledge Base 管理</a></li>
+    <li><a href="#s8">對話歷史與持久化</a></li>
+    <li><a href="#s9">API 參考</a></li>
+    <li><a href="#s10">設定與使用</a></li>
+    <li><a href="#s11">圖片處理策略</a></li>
+    <li><a href="#s12">注意事項</a></li>
+    <li><a href="#s13">開發 Roadmap</a></li>
+  </ol>
 </nav>
 
-<!-- Main content -->
-<div class="content">
+<!-- Main Content -->
+<div class="main-content">
 
-<h1>Ask SpecHub — RAG System</h1>
-<p class="subtitle">Retrieval-Augmented Generation for EnGenius Product Specifications &nbsp;|&nbsp; Last updated: 2026-04-12</p>
+<h1>Ask SpecHub</h1>
+<p class="subtitle">RAG 系統架構與使用說明 &mdash; 2026-04-13</p>
 
-<!-- ==================== Section 1 ==================== -->
-<h2 id="s1"><span class="num">1</span> Overview</h2>
+<!-- ========== 1. 功能概述 ========== -->
+<h2 id="s1"><span class="num">1</span>功能概述</h2>
 
-<p><strong>Ask SpecHub</strong> is an AI-powered product query assistant built into Product SpecHub. Colleagues can ask natural language questions (Chinese or English) about EnGenius products. The system retrieves relevant data from the vector database and generates accurate answers with source citations.</p>
+<p><strong>Ask SpecHub</strong> 是內建於 Product SpecHub 的 AI 產品問答助理。同事可以用自然語言（中文或英文）詢問 EnGenius 產品相關問題，系統會從向量資料庫檢索相關資料，再由 LLM 生成帶來源引用的精準回答。</p>
 
-<h3 id="s1-caps">Capabilities</h3>
-<ul>
-  <li><strong>Spec queries</strong> — "ESG510 的 VPN throughput 是多少？"</li>
-  <li><strong>Product comparisons</strong> — "ECC100 和 ECC500 差在哪裡？"</li>
-  <li><strong>Filtered search</strong> — "哪些 AP 支援 WiFi 7？"</li>
-  <li><strong>Recommendations</strong> — "推薦一台適合戶外的攝影機"</li>
-  <li><strong>Follow-up questions</strong> — "那你可以幫我比較這幾台的規格嗎？"</li>
-  <li><strong>Multilingual</strong> — auto-detects question language and responds accordingly</li>
-</ul>
-
-<h3 id="s1-terms">Key Terms</h3>
+<h3>主要功能</h3>
 <table>
-  <tr><th>Term</th><th>Description</th></tr>
-  <tr><td><strong>RAG</strong></td><td>Retrieval-Augmented Generation — search first, then LLM answers based on retrieved context</td></tr>
-  <tr><td><strong>Embedding</strong></td><td>Text → 1536-dim vector. Semantically similar text = close vectors</td></tr>
-  <tr><td><strong>pgvector</strong></td><td>PostgreSQL vector search extension, built into Supabase (all plans including free)</td></tr>
-  <tr><td><strong>Chunk</strong></td><td>A document split into smaller pieces, each independently embedded and searchable</td></tr>
-  <tr><td><strong>Persona</strong></td><td>A system prompt profile that defines the AI's answering style for different audiences</td></tr>
+  <thead>
+    <tr><th>功能</th><th>範例</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>規格查詢</td><td>「ESG510 的 VPN throughput 是多少？」</td></tr>
+    <tr><td>產品比較</td><td>「ECC100 和 ECC500 差在哪裡？」</td></tr>
+    <tr><td>篩選搜尋</td><td>「哪些 AP 支援 WiFi 7？」</td></tr>
+    <tr><td>產品推薦</td><td>「推薦一台適合戶外的攝影機」</td></tr>
+    <tr><td>追問對話</td><td>「那你可以幫我比較這幾台的規格嗎？」</td></tr>
+    <tr><td>多語言</td><td>自動偵測問題語言，以相同語言回答</td></tr>
+  </tbody>
 </table>
 
-<!-- ==================== Section 2 ==================== -->
-<h2 id="s2"><span class="num">2</span> Architecture</h2>
-
-<h3 id="s2-flow">Query Workflow</h3>
-<div class="flow-diagram">User question (+ conversation history)
-    → Enrich query with history context
-    → Embed (OpenAI text-embedding-3-small)
-    → Vector search (pgvector, top 8)
-    → Load Persona system prompt
-    → Build context (history + matched docs + question)
-    → LLM answer (Claude/GPT/Gemini — user selects model)
-    → Response + source citations
-    → Auto-save to chat_sessions DB</div>
-
-<h3 id="s2-index">Indexing Workflow</h3>
-<div class="flow-diagram">Products DB → Build chunks (overview + specs per product)
-→ Content hash check (skip unchanged) → Batch embed (OpenAI)
-→ Upsert to documents table</div>
-
-<!-- ==================== Section 3 ==================== -->
-<h2 id="s3"><span class="num">3</span> Database Design</h2>
-
-<h3 id="s3-docs"><code>documents</code> table (universal, all source types)</h3>
-<pre><code><span class="keyword">documents</span> (
-  id UUID PRIMARY KEY,
-  source_type TEXT NOT NULL,       <span class="comment">-- 'product_spec' | 'gitbook' | 'web' | 'google_doc' | 'file' | 'text_snippet'</span>
-  source_id TEXT NOT NULL,         <span class="comment">-- model_name, URL, Doc ID, etc.</span>
-  source_url TEXT,                 <span class="comment">-- for citation in answers</span>
-  title TEXT NOT NULL,
-  chunk_index INT DEFAULT 0,
-  content TEXT NOT NULL,
-  token_count INT,
-  metadata JSONB DEFAULT '{}',     <span class="comment">-- product_line, locale, tags, images, etc.</span>
-  embedding VECTOR(1536),          <span class="comment">-- OpenAI text-embedding-3-small</span>
-  content_hash TEXT,               <span class="comment">-- SHA-256, skip re-embed if unchanged</span>
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
-)</code></pre>
-
-<h3 id="s3-chat"><code>chat_sessions</code> table (conversation persistence)</h3>
-<pre><code><span class="keyword">chat_sessions</span> (
-  id UUID PRIMARY KEY,
-  user_id TEXT DEFAULT 'anonymous', <span class="comment">-- future: Supabase Auth user ID</span>
-  title TEXT,                       <span class="comment">-- auto-generated from first user message</span>
-  persona TEXT DEFAULT 'default',
-  provider TEXT DEFAULT 'gemini-flash',
-  messages JSONB DEFAULT '[]',      <span class="comment">-- array of {role, content, sources?, provider?}</span>
-  message_count INT DEFAULT 0,
-  created_at TIMESTAMPTZ,
-  updated_at TIMESTAMPTZ
-)</code></pre>
-
-<h3 id="s3-indexes">Indexes</h3>
-<ul>
-  <li><code>documents_embedding_idx</code> — IVFFlat cosine for vector search</li>
-  <li><code>documents_source_type_idx</code> — filter by source type</li>
-  <li><code>documents_source_chunk_unique</code> — prevents duplicate chunks on re-embed</li>
-  <li><code>chat_sessions_user_idx</code> — list user's sessions by updated_at desc</li>
-</ul>
-
-<h4><code>match_documents()</code> RPC function</h4>
-<p>Performs vector similarity search with optional <code>source_type</code> and <code>metadata</code> filters.</p>
-
-<h3 id="s3-source">Source Types (planned)</h3>
+<h3>關鍵術語</h3>
 <table>
-  <tr><th>source_type</th><th>Status</th><th>Description</th></tr>
-  <tr><td><code>product_spec</code></td><td><span class="badge badge-green">Done</span></td><td>Product overview + specifications from DB</td></tr>
-  <tr><td><code>text_snippet</code></td><td><span class="badge badge-amber">Planned</span></td><td>Manual text entries (FAQ, competitive analysis)</td></tr>
-  <tr><td><code>gitbook</code></td><td><span class="badge badge-amber">Planned</span></td><td>Gitbook documentation pages</td></tr>
-  <tr><td><code>google_doc</code></td><td><span class="badge badge-amber">Planned</span></td><td>Google Docs via Drive API</td></tr>
-  <tr><td><code>web</code></td><td><span class="badge badge-amber">Planned</span></td><td>Web page content</td></tr>
-  <tr><td><code>file</code></td><td><span class="badge badge-amber">Planned</span></td><td>Uploaded Word/PDF files</td></tr>
+  <thead>
+    <tr><th>術語</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>RAG</strong></td><td>Retrieval-Augmented Generation — 先搜尋再生成，LLM 基於檢索到的上下文回答</td></tr>
+    <tr><td><strong>Embedding</strong></td><td>文字轉為 1536 維向量，語意相近的文字 = 距離相近的向量</td></tr>
+    <tr><td><strong>pgvector</strong></td><td>PostgreSQL 向量搜尋擴充，內建於 Supabase（含免費方案）</td></tr>
+    <tr><td><strong>Chunk</strong></td><td>文件被切分為小片段，每片獨立做 Embedding 並可被搜尋</td></tr>
+    <tr><td><strong>Persona</strong></td><td>系統提示詞角色，定義 AI 對不同受眾的回答風格</td></tr>
+  </tbody>
 </table>
 
-<!-- ==================== Section 4 ==================== -->
-<h2 id="s4"><span class="num">4</span> AI Involvement</h2>
+<!-- ========== 2. 系統架構 ========== -->
+<h2 id="s2"><span class="num">2</span>系統架構</h2>
 
-<p>Two AI calls per query:</p>
+<h3>查詢流程 (Query Workflow)</h3>
+<pre>
+<span class="highlight">使用者提問</span> (+ 對話歷史)
+    &rarr; 結合歷史脈絡豐富查詢
+    &rarr; <span class="file">Embed</span> (OpenAI text-embedding-3-small)
+    &rarr; <span class="folder">向量搜尋</span> (pgvector, top 8)
+    &rarr; 載入 Persona 系統提示詞
+    &rarr; 組建上下文 (歷史 + 匹配文件 + 問題)
+    &rarr; <span class="highlight">LLM 回答</span> (Claude / GPT / Gemini — 使用者選擇模型)
+    &rarr; 回應 + 來源引用
+    &rarr; 自動儲存到 <span class="file">chat_sessions</span> DB
+</pre>
 
-<h3 id="s4-embed">Step 1: Embedding (text → vector)</h3>
-<ul>
-  <li><strong>Model</strong>: OpenAI <code>text-embedding-3-small</code> (1536 dims)</li>
-  <li><strong>Cost</strong>: $0.02/1M tokens (~$0.001 for all 66 products)</li>
-  <li><strong>When</strong>: indexing (per chunk) + each user question</li>
-</ul>
+<h3>索引流程 (Indexing Workflow)</h3>
+<pre>
+<span class="folder">Products DB</span> &rarr; 建立 chunks (overview + specs per product)
+    &rarr; <span class="file">Content hash 檢查</span> (跳過未變動的)
+    &rarr; 批次 Embed (OpenAI)
+    &rarr; Upsert 到 <span class="highlight">documents</span> 表
+</pre>
 
-<h3 id="s4-llm">Step 2: LLM Answer (context + question → answer)</h3>
-<ul>
-  <li><strong>Models</strong>: user-selectable per provider (see Model Selector below)</li>
-  <li><strong>System prompt</strong>: loaded from Persona, includes clarification + honesty rules</li>
-  <li><strong>Anti-hallucination</strong>: prompt instructs "NEVER fabricate specs not in context"</li>
-  <li><strong>Clarification</strong>: AI asks follow-up questions when user's question is vague</li>
-  <li><strong>Language</strong>: auto-detect from question</li>
-</ul>
+<!-- ========== 3. 三維度 Prompt 架構 ========== -->
+<h2 id="s3"><span class="num">3</span>三維度 Prompt 架構</h2>
 
-<h3 id="s4-models">Available Models</h3>
+<p>系統使用 <strong>3 層 Prompt 組裝</strong>來決定 AI 如何回答。每個維度獨立且可組合，形成一個回應風格的矩陣。</p>
+
+<pre>
+Prompt 組裝：
+  Layer 1: <span class="highlight">Persona</span>        (回答角度 — 從什麼角度回答)
+  Layer 2: <span class="highlight">User Profile</span>   (對話對象 — 誰在問)
+  Layer 3: <span class="highlight">Output Format</span>  (產出格式 — 要生成什麼)  <span class="comment">[未來]</span>
+  Layer 4: <span class="file">RAG Context</span>    (檢索到的產品資料)
+  Layer 5: <span class="file">User Question</span>  (實際問題)
+</pre>
+
+<h3>3.1 維度一：回答角度 (Persona)</h3>
+
+<p>控制<strong>強調什麼內容、如何結構化回答</strong>，不只是語氣。</p>
+
 <table>
-  <tr><th>Provider</th><th>Strongest</th><th>Mainstream</th><th>Best CP</th></tr>
-  <tr><td><strong>Gemini</strong></td><td>2.5 Pro</td><td>2.5 Flash <span class="badge badge-blue">default</span></td><td>2.0 Flash Lite</td></tr>
-  <tr><td><strong>GPT</strong></td><td>4o</td><td>4o Mini</td><td>4.1 Nano</td></tr>
-  <tr><td><strong>Claude</strong></td><td>Opus 4</td><td>Sonnet 4</td><td>Haiku 3.5</td></tr>
+  <thead>
+    <tr><th>Persona</th><th>強調重點</th><th>「ECC100 PoE?」回答差異</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Product Specialist</strong></td><td>精確規格、相關型號</td><td>「802.3af，最大 15.4W」</td></tr>
+    <tr><td><strong>Sales Assistant</strong></td><td>客戶價值、搭配建議</td><td>「支援標準 PoE，一般企業 Switch 就能供電」</td></tr>
+    <tr><td><strong>Technical Support</strong></td><td>實務檢查、故障排除</td><td>「802.3af（15.4W）。確認 Switch 有開 PoE」</td></tr>
+    <tr><td><strong>Product Manager</strong></td><td>跨型號模式、功能缺口</td><td>「802.3af。ECC500 系列用 802.3at，這是分水嶺」</td></tr>
+  </tbody>
 </table>
 
-<div class="callout callout-blue">
-  <strong>Model Selection UX</strong>
-  Users select provider first, then pick a specific model from a dropdown showing tier badges.
+<div class="callout">
+  <strong>同一個問題，四種角度：</strong> 問「ECC100 PoE?」— Product Specialist 給精確規格數字、Sales 從客戶角度解釋供電相容性、Support 提醒實際檢查步驟、PM 分析產品線定位差異。4 個內建 Persona + 可在 <code>/settings/personas</code> 自訂。
 </div>
 
-<!-- ==================== Section 5 ==================== -->
-<h2 id="s5"><span class="num">5</span> Chunking Strategy</h2>
+<h3>3.2 維度二：對話對象 (User Profile)</h3>
 
-<p>Each product generates <strong>2 chunks</strong>:</p>
-<ul>
-  <li><strong>Chunk 0 (Overview)</strong>: model name, subtitle, overview text, key features</li>
-  <li><strong>Chunk 1 (Specs)</strong>: full specification table in <code>[Category] label: value</code> format</li>
-</ul>
-
-<p>Target: 300-800 tokens/chunk. Product specs are naturally small, no complex splitting needed.</p>
-
-<h3 id="s5-future">Per-Source Chunking (future)</h3>
-<table>
-  <tr><th>Source</th><th>Strategy</th><th>Notes</th></tr>
-  <tr><td>product_spec</td><td>Fixed 2 chunks/product</td><td>Already implemented</td></tr>
-  <tr><td>gitbook</td><td>Split by heading (h1/h2/h3)</td><td>Markdown = natural split points</td></tr>
-  <tr><td>google_doc</td><td>Split by heading + recursive</td><td>Handle docs with/without headings</td></tr>
-  <tr><td>web</td><td>Readability extract + section split</td><td>Remove nav/footer/ads first</td></tr>
-  <tr><td>file (PDF)</td><td>Page-based + 50 token overlap</td><td>Handles cross-page paragraphs</td></tr>
-  <tr><td>file (Word)</td><td>Heading/paragraph split</td><td>Cleaner structure than PDF</td></tr>
-  <tr><td>text_snippet</td><td>No splitting</td><td>Manually entered, usually short</td></tr>
-</table>
-
-<!-- ==================== Section 6 ==================== -->
-<h2 id="s6"><span class="num">6</span> File Structure</h2>
-
-<div class="file-tree"><span class="dir">src/lib/rag/</span>
-  <span class="file">embeddings.ts</span>         <span class="desc">— OpenAI embedding wrapper + hash + token estimation</span>
-  <span class="file">ingest-products.ts</span>    <span class="desc">— Products → chunks → embeddings → DB</span>
-  <span class="file">personas.ts</span>           <span class="desc">— Persona (Dim 1) + User Profile (Dim 2) definitions, CRUD</span>
-
-<span class="dir">src/app/api/</span>
-  <span class="file">ask/route.ts</span>          <span class="desc">— GET (personas + profiles) + POST (RAG query with 3 dimensions)</span>
-  <span class="file">documents/route.ts</span>    <span class="desc">— GET/POST/DELETE document management + trigger ingestion</span>
-  <span class="file">personas/route.ts</span>     <span class="desc">— GET/POST/DELETE persona management</span>
-  <span class="file">chat-sessions/route.ts</span> <span class="desc">— GET/POST/DELETE conversation persistence</span>
-
-<span class="dir">src/app/(main)/</span>
-  <span class="file">ask/page.tsx</span>                  <span class="desc">— Ask SpecHub chat page (max-w-[1400px])</span>
-  <span class="file">knowledge/page.tsx</span>            <span class="desc">— Knowledge Base management (max-w-[1100px])</span>
-  <span class="file">settings/personas/page.tsx</span>    <span class="desc">— Persona prompt management (max-w-[1100px])</span>
-
-<span class="dir">src/components/</span>
-  <span class="file">ask/ask-chat.tsx</span>              <span class="desc">— Chat UI + sidebar + persona + profile + model selector</span>
-  <span class="file">knowledge/knowledge-base.tsx</span>  <span class="desc">— Knowledge index dashboard + per-source management</span>
-  <span class="file">settings/personas-editor.tsx</span>  <span class="desc">— Persona CRUD editor</span>
-
-<span class="dir">supabase/migrations/</span>
-  <span class="file">00009_add_rag_documents.sql</span>   <span class="desc">— pgvector + documents table + match_documents</span>
-  <span class="file">00010_add_chat_sessions.sql</span>   <span class="desc">— chat_sessions table for conversation persistence</span></div>
-
-<!-- ==================== Section 7 ==================== -->
-<h2 id="s7"><span class="num">7</span> Setup &amp; Usage</h2>
-
-<h3 id="s7-setup">First-time Setup</h3>
-<ol>
-  <li><strong>API Keys</strong>: OpenAI key required (for embedding). At least one LLM key (Claude/GPT/Gemini) for answers. Set at <code>/settings/api-keys</code>.</li>
-  <li><strong>Migration</strong>: <code>00009</code> (documents) and <code>00010</code> (chat_sessions) — already applied.</li>
-  <li><strong>Index</strong>: Go to <code>/knowledge</code> → click <strong>Index</strong> on the Product Specs card → wait ~10-20s for 66 products.</li>
-</ol>
-
-<h3 id="s7-daily">Daily Usage</h3>
-<ol>
-  <li>Click <strong>Ask</strong> in navbar</li>
-  <li><strong>回答角度</strong> — Select persona (Product Specialist / Sales / Support / PM)</li>
-  <li><strong>對話對象</strong> — Select user profile (一般同事 / 新進同仁 / 業務 / Channel Sales / PM / 客戶)</li>
-  <li>Select AI model (Gemini / GPT / Claude → pick specific model from dropdown)</li>
-  <li>Type question or click example</li>
-  <li>Follow up with additional questions (system remembers context)</li>
-  <li>Past conversations auto-save and appear in the sidebar (hamburger icon)</li>
-</ol>
-
-<h3 id="s7-knowledge">Knowledge Base Management</h3>
-<ul>
-  <li>Go to <code>/knowledge</code> to see all indexed content</li>
-  <li>Summary cards: Sources, Chunks, Tokens, Source Types</li>
-  <li>Per source type: Details table, Re-index, Force Re-index, Delete</li>
-  <li>Last indexed timestamp shown on each card</li>
-</ul>
-
-<h3 id="s7-reindex">Re-indexing</h3>
-<p>After Google Sheets sync updates product data, go to <code>/knowledge</code> and click <strong>Re-index</strong> on Product Specs. Content hash ensures only changed chunks are re-embedded.</p>
-
-<!-- ==================== Section 8 ==================== -->
-<h2 id="s8"><span class="num">8</span> API Reference</h2>
-
-<h3 id="s8-ask-post">POST /api/ask</h3>
-<pre><code>{
-  <span class="string">"question"</span>: <span class="string">"哪些 AP 支援 WiFi 7？"</span>,
-  <span class="string">"persona"</span>: <span class="string">"sales"</span>,
-  <span class="string">"profile"</span>: <span class="string">"channel-sales"</span>,
-  <span class="string">"provider"</span>: <span class="string">"gemini-2.5-flash"</span>,
-  <span class="string">"history"</span>: [{<span class="string">"role"</span>:<span class="string">"user"</span>,<span class="string">"content"</span>:<span class="string">"..."</span>},{<span class="string">"role"</span>:<span class="string">"assistant"</span>,<span class="string">"content"</span>:<span class="string">"..."</span>}],
-  <span class="string">"source_type"</span>: <span class="string">"product_spec"</span>,
-  <span class="string">"product_line"</span>: <span class="string">"Cloud AP"</span>
-}</code></pre>
+<p>根據<strong>提問者身份</strong>調整解釋深度與術語使用。</p>
 
 <table>
-  <tr><th>Parameter</th><th>Required</th><th>Description</th></tr>
-  <tr><td><code>question</code></td><td>Yes</td><td>The question to ask</td></tr>
-  <tr><td><code>persona</code></td><td>No</td><td>Dimension 1: answering angle (default: <code>default</code>)</td></tr>
-  <tr><td><code>profile</code></td><td>No</td><td>Dimension 2: who is asking (default: <code>default</code>)</td></tr>
-  <tr><td><code>provider</code></td><td>No</td><td>AI model ID (default: <code>gemini-2.5-flash</code>)</td></tr>
-  <tr><td><code>history</code></td><td>No</td><td>Previous messages for conversation context</td></tr>
-  <tr><td><code>source_type</code></td><td>No</td><td>Filter search to specific source type</td></tr>
-  <tr><td><code>product_line</code></td><td>No</td><td>Filter search to specific product line</td></tr>
+  <thead>
+    <tr><th>Profile</th><th>行為調整</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>一般同事</strong> (預設)</td><td>不做額外調整 — 基線回應</td></tr>
+    <tr><td><strong>新進同仁</strong></td><td>解釋術語、加入產品線背景、對基礎問題有耐心</td></tr>
+    <tr><td><strong>業務人員</strong></td><td>實用答案，可直接面對客戶使用，建議搭配方案</td></tr>
+    <tr><td><strong>Channel Sales</strong></td><td>市場定位、sell-through 策略、競爭優勢</td></tr>
+    <tr><td><strong>產品經理</strong></td><td>完整技術深度、表格、功能差距分析</td></tr>
+    <tr><td><strong>終端客戶</strong></td><td>最簡單語言、不用術語、聚焦好處而非規格</td></tr>
+  </tbody>
 </table>
 
-<p>Response includes <code>answer</code>, <code>sources[]</code>, <code>follow_ups[]</code>, <code>persona</code>, <code>profile</code>, <code>provider</code>.</p>
-
-<div class="callout callout-purple">
-  <strong>Provider values</strong>
-  <code>gemini-2.5-pro</code>, <code>gemini-2.5-flash</code>, <code>gemini-2.5-flash-lite</code>, <code>gpt-4o</code>, <code>gpt-4o-mini</code>, <code>gpt-4.1-nano</code>, <code>claude-opus</code>, <code>claude-sonnet</code>, <code>claude-haiku</code>
+<div class="callout">
+  <strong>零摩擦設計：</strong> 預設「一般同事」不附加任何額外 Prompt。Profile Prompt 以獨立區段附加在 Persona Prompt 之後。每個 Session 會記住選擇，對話中不需重新選取。
 </div>
 
-<div class="callout callout-purple">
-  <strong>Profile values</strong>
-  <code>default</code>, <code>new-hire</code>, <code>sales-rep</code>, <code>channel-sales</code>, <code>pm</code>, <code>customer</code>
-</div>
+<h3>3.3 維度三：產出格式 (Output Format)</h3>
 
-<h3 id="s8-ask-get">GET /api/ask</h3>
-<p>Returns list of available personas and user profiles.</p>
-
-<h3 id="s8-docs">/api/documents (GET/POST/DELETE)</h3>
-<ul>
-  <li><strong>GET</strong>: index stats (source count, chunk count, last updated)</li>
-  <li><strong>POST</strong>: <code>{ "action": "ingest", "source_type": "product_spec", "force": false }</code></li>
-  <li><strong>DELETE</strong>: <code>{ "source_type": "product_spec", "source_id": "ECC100" }</code></li>
-</ul>
-
-<h3 id="s8-chat">/api/chat-sessions (GET/POST/DELETE)</h3>
-<ul>
-  <li><strong>GET</strong>: list sessions or get specific session <code>?id=xxx</code></li>
-  <li><strong>POST</strong>: create/update session <code>{ "id?", "title?", "messages?", "persona?", "provider?" }</code></li>
-  <li><strong>DELETE</strong>: <code>{ "id": "xxx" }</code></li>
-</ul>
-
-<h3 id="s8-personas">/api/personas (GET/POST/DELETE)</h3>
-<p>CRUD for persona management.</p>
-
-<!-- ==================== Section 9 ==================== -->
-<h2 id="s9"><span class="num">9</span> Three-Dimension Prompt Architecture</h2>
-
-<p>The system uses a 3-layer prompt assembly that determines how AI responds. Each dimension is independent and combinable — creating a matrix of response styles.</p>
-
-<div class="flow-diagram">Prompt Assembly:
-  Layer 1: Persona        (回答角度 — what angle to answer from)
-  Layer 2: User Profile   (對話對象 — who is asking)
-  Layer 3: Output Format  (產出格式 — what to generate)  [Future]
-  Layer 4: RAG Context    (retrieved product data)
-  Layer 5: User Question  (the actual question)</div>
-
-<h3 id="s9-dim1">Dimension 1: 回答角度 (Persona) — <span class="badge badge-green">Done</span></h3>
-
-<p>Controls <strong>what content to emphasize and how to structure the answer</strong>, not just tone.</p>
+<p>控制<strong>生成什麼格式的內容</strong>，超越一般問答。<span class="badge badge-gray">未來</span></p>
 
 <table>
-  <tr><th>Persona</th><th>Emphasizes</th><th>Example for "ECC100 PoE?"</th></tr>
-  <tr><td><strong>Product Specialist</strong></td><td>Precise specs, related models</td><td>「802.3af，最大 15.4W」</td></tr>
-  <tr><td><strong>Sales Assistant</strong></td><td>Customer value, pairings</td><td>「支援標準 PoE，一般企業 Switch 就能供電」</td></tr>
-  <tr><td><strong>Technical Support</strong></td><td>Practical checks, troubleshooting</td><td>「802.3af（15.4W）。確認 Switch 有開 PoE」</td></tr>
-  <tr><td><strong>Product Manager</strong></td><td>Cross-model patterns, gaps</td><td>「802.3af。ECC500 系列用 802.3at，這是分水嶺」</td></tr>
+  <thead>
+    <tr><th>範本</th><th>使用場景</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Q&amp;A</strong> (目前)</td><td>問問題、得到回答</td></tr>
+    <tr><td><strong>業務簡報</strong></td><td>為特定市場 + 產品生成 Pitch Deck 大綱</td></tr>
+    <tr><td><strong>產品比較表</strong></td><td>結構化比較表</td></tr>
+    <tr><td><strong>Email 草稿</strong></td><td>給客戶的產品推薦郵件</td></tr>
+    <tr><td><strong>提案文件</strong></td><td>含痛點 + 解決方案的提案文件</td></tr>
+  </tbody>
 </table>
 
-<ul>
-  <li>4 built-in personas + custom via <code>/settings/personas</code></li>
-  <li>Stored in <code>app_settings</code> as <code>persona_{id}</code></li>
-  <li>Each includes clarification rules (ask before guessing) and honesty rules (never fabricate)</li>
-</ul>
-
-<h3 id="s9-dim2">Dimension 2: 對話對象 (User Profile) — <span class="badge badge-green">Done</span></h3>
-
-<p>Controls <strong>depth of explanation and terminology</strong> based on who is asking.</p>
-
-<table>
-  <tr><th>Profile</th><th>Behavior adjustment</th></tr>
-  <tr><td><strong>一般同事</strong> (default)</td><td>No adjustment — baseline response</td></tr>
-  <tr><td><strong>新進同仁</strong></td><td>Explain terms, add product line context, patient with basics</td></tr>
-  <tr><td><strong>業務人員</strong></td><td>Practical answers they can use with customers, suggest pairings</td></tr>
-  <tr><td><strong>Channel Sales</strong></td><td>Market positioning, sell-through strategy, competitive advantages</td></tr>
-  <tr><td><strong>產品經理</strong></td><td>Full technical depth, tables, feature gap analysis</td></tr>
-  <tr><td><strong>終端客戶</strong></td><td>Simplest language, no jargon, focus on benefits not specs</td></tr>
-</table>
+<h3>3.4 維度相乘範例</h3>
 
 <div class="callout callout-green">
-  <strong>Zero Friction Design</strong>
-  Default "一般同事" adds no extra prompt. Profile prompt appended to persona prompt as a separate section. Saved per session — no need to re-select within a conversation.
+  <strong>Channel Sales &times; Education 市場：</strong><br><br>
+  維度 1：<strong>Sales Assistant</strong>（強調價值、建議搭配）<br>
+  維度 2：<strong>Channel Sales</strong>（市場定位、sell-through 策略）<br>
+  維度 3：<strong>業務簡報</strong>（結構化 Pitch 格式）<span class="badge badge-gray">未來</span><br><br>
+  + RAG：ECW536、ECW526、ECS5512FP 規格<br>
+  + 問題：「幫我準備教育市場的推薦方案」<br><br>
+  &rarr; AI 生成結構化 Pitch，包含市場痛點、產品推薦理由、競爭定位
 </div>
 
-<h3 id="s9-dim3">Dimension 3: 產出格式 (Output Format) — <span class="badge badge-amber">Future</span></h3>
+<h3>3.5 外部 API 整合</h3>
 
-<p>Will control <strong>what format of content to generate</strong>, beyond Q&amp;A.</p>
+<p><code>/api/ask</code> 端點是獨立的 REST API，外部系統可直接呼叫：</p>
 
-<table>
-  <tr><th>Template</th><th>Use case</th></tr>
-  <tr><td>Q&amp;A (current)</td><td>Ask questions, get answers</td></tr>
-  <tr><td>業務簡報</td><td>Generate pitch deck outline for specific market + products</td></tr>
-  <tr><td>產品比較表</td><td>Structured comparison sheet</td></tr>
-  <tr><td>Email 草稿</td><td>Product recommendation email to customer</td></tr>
-  <tr><td>提案文件</td><td>Proposal document with pain points + solution</td></tr>
-</table>
+<pre>
+<span class="comment"># 內部：業務團隊前端</span>
+POST /api/ask { <span class="highlight">"persona": "sales"</span>, "profile": "sales-rep", ... }
 
-<h3 id="s9-mult">Dimension Multiplication</h3>
+<span class="comment"># 內部：客服系統 chatbot</span>
+POST /api/ask { <span class="highlight">"persona": "support"</span>, "profile": "customer", ... }
 
-<p>The three dimensions multiply to create highly targeted responses:</p>
+<span class="comment"># 外部：合作夥伴入口</span>
+POST /api/ask { <span class="highlight">"persona": "partner"</span>, "profile": "channel-sales", ... }
+</pre>
 
-<div class="flow-diagram">Example: Channel Sales wants a pitch for education market
-
-  Dimension 1: Sales Assistant (emphasize value, suggest pairings)
-  Dimension 2: Channel Sales (market positioning, sell-through)
-  Dimension 3: 業務簡報 (structured pitch format)  [Future]
-
-  + RAG: ECW536, ECW526, ECS5512FP specs
-  + Question: "幫我準備教育市場的推薦方案"
-
-  → AI generates a structured pitch with market pain points,
-    product recommendations with reasons, and competitive positioning</div>
-
-<h3 id="s9-custom">Custom Personas</h3>
-<ul>
-  <li>Manage at <code>/settings/personas</code></li>
-  <li>Edit built-in prompts or create new ones (Reset to restore defaults)</li>
-  <li>Stored in <code>app_settings</code> table as <code>persona_{id}</code></li>
-</ul>
-
-<h3 id="s9-ext">External API Integration</h3>
-
-<p>The <code>/api/ask</code> endpoint is a standalone REST API that external systems can call directly:</p>
-
-<pre><code><span class="comment"># Internal: 業務團隊前端</span>
-POST /api/ask { <span class="string">"persona"</span>: <span class="string">"sales"</span>, <span class="string">"profile"</span>: <span class="string">"sales-rep"</span>, ... }
-
-<span class="comment"># Internal: 客服系統 chatbot</span>
-POST /api/ask { <span class="string">"persona"</span>: <span class="string">"support"</span>, <span class="string">"profile"</span>: <span class="string">"customer"</span>, ... }
-
-<span class="comment"># External: 合作夥伴入口</span>
-POST /api/ask { <span class="string">"persona"</span>: <span class="string">"partner"</span>, <span class="string">"profile"</span>: <span class="string">"channel-sales"</span>, ... }</code></pre>
-
-<div class="callout callout-amber">
-  <strong>Future: API Key access control (after Supabase Auth)</strong>
-  Each partner/department gets a unique API key. Keys can restrict <code>source_type</code> scope (e.g., partners can only search <code>product_spec</code>, not <code>google_doc</code>). Usage tracking per key (call count, token consumption). Rate limiting per key tier.
+<div class="callout callout-warn">
+  <strong>未來：API Key 存取控制</strong>（Supabase Auth 之後）— 每個合作夥伴/部門取得唯一 API Key，可限制 <code>source_type</code> 搜尋範圍（如：夥伴只能搜 <code>product_spec</code>），並追蹤使用量（呼叫次數、Token 消耗）和依層級限速。
 </div>
 
-<!-- ==================== Section 10 ==================== -->
-<h2 id="s10"><span class="num">10</span> Conversation History &amp; Persistence</h2>
+<!-- ========== 4. 資料庫設計 ========== -->
+<h2 id="s4"><span class="num">4</span>資料庫設計</h2>
 
-<h3 id="s10-how">How it works</h3>
-<ol>
-  <li>Frontend sends last 20 messages as <code>history[]</code> with each API call</li>
-  <li>Backend enriches the embedding query with history context — so "這幾台" resolves to models from the previous answer</li>
-  <li>Previous conversation included in LLM prompt as context</li>
-  <li>If vector search finds nothing but history exists, LLM answers from conversation context</li>
-  <li><strong>Auto-save</strong>: conversations saved to <code>chat_sessions</code> table after each exchange (1s debounce)</li>
-  <li><strong>Sidebar</strong>: hamburger icon opens history panel — click to resume, delete, or start new</li>
-</ol>
+<h3><code>documents</code> 表（通用，支援所有來源類型）</h3>
+<pre>
+<span class="folder">documents</span> (
+  id           <span class="highlight">UUID PRIMARY KEY</span>,
+  source_type  TEXT NOT NULL,       <span class="comment">-- 'product_spec' | 'gitbook' | 'web' | 'google_doc' | 'file' | 'text_snippet'</span>
+  source_id    TEXT NOT NULL,       <span class="comment">-- model_name, URL, Doc ID 等</span>
+  source_url   TEXT,                <span class="comment">-- 用於回答中的引用</span>
+  title        TEXT NOT NULL,
+  chunk_index  INT DEFAULT 0,
+  content      TEXT NOT NULL,
+  token_count  INT,
+  metadata     JSONB DEFAULT '{}', <span class="comment">-- product_line, locale, tags, images 等</span>
+  embedding    <span class="highlight">VECTOR(1536)</span>,       <span class="comment">-- OpenAI text-embedding-3-small</span>
+  content_hash TEXT,                <span class="comment">-- SHA-256，未變動則跳過 re-embed</span>
+  created_at   TIMESTAMPTZ,
+  updated_at   TIMESTAMPTZ
+)
+</pre>
 
-<h3 id="s10-mgmt">Session Management</h3>
-<ul>
-  <li>Title auto-generated from first user message</li>
-  <li>Persona and provider saved per session (restored on resume)</li>
-  <li><code>user_id</code> defaults to <code>anonymous</code> — ready for Supabase Auth (add WHERE clause later)</li>
-  <li>Sessions listed by most recent, showing message count and relative time</li>
-</ul>
+<h3><code>chat_sessions</code> 表（對話持久化）</h3>
+<pre>
+<span class="folder">chat_sessions</span> (
+  id            <span class="highlight">UUID PRIMARY KEY</span>,
+  user_id       TEXT DEFAULT 'anonymous', <span class="comment">-- 未來：Supabase Auth user ID</span>
+  title         TEXT,                     <span class="comment">-- 自動從第一則訊息生成</span>
+  persona       TEXT DEFAULT 'default',
+  provider      TEXT DEFAULT 'gemini-flash',
+  messages      JSONB DEFAULT '[]',       <span class="comment">-- [{role, content, sources?, provider?}]</span>
+  message_count INT DEFAULT 0,
+  created_at    TIMESTAMPTZ,
+  updated_at    TIMESTAMPTZ
+)
+</pre>
 
-<!-- ==================== Section 11 ==================== -->
-<h2 id="s11"><span class="num">11</span> Image Handling Strategy <span class="badge badge-amber">Future</span></h2>
+<h3>來源類型 (Source Types)</h3>
+<table>
+  <thead>
+    <tr><th>source_type</th><th>狀態</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>product_spec</code></td><td><span class="badge badge-green">已完成</span></td><td>產品概述 + 規格，來自資料庫</td></tr>
+    <tr><td><code>text_snippet</code></td><td><span class="badge badge-amber">計畫中</span></td><td>手動文字片段（FAQ、競品分析）</td></tr>
+    <tr><td><code>gitbook</code></td><td><span class="badge badge-gray">計畫中</span></td><td>Gitbook 技術文件頁面</td></tr>
+    <tr><td><code>google_doc</code></td><td><span class="badge badge-gray">計畫中</span></td><td>Google Docs（透過 Drive API）</td></tr>
+    <tr><td><code>web</code></td><td><span class="badge badge-gray">計畫中</span></td><td>網頁內容</td></tr>
+    <tr><td><code>file</code></td><td><span class="badge badge-gray">計畫中</span></td><td>上傳的 Word / PDF 檔案</td></tr>
+  </tbody>
+</table>
 
-<p>For sources with images (Gitbook, Google Docs, PDF, web):</p>
+<!-- ========== 5. AI 模型與 Embedding ========== -->
+<h2 id="s5"><span class="num">5</span>AI 模型與 Embedding</h2>
 
-<ol>
-  <li><strong>Image Description</strong>: Claude Vision API generates text description of each image</li>
-  <li><strong>Image-Context Binding</strong>: Description text embedded inline in the chunk content as <code>[Image: ...]</code></li>
-  <li><strong>Image Storage</strong>: Original images stored in Supabase Storage; URL reference in <code>metadata.images[]</code></li>
-  <li><strong>Frontend Rendering</strong>: When a chunk with images is returned, the frontend can display the image alongside the text</li>
-</ol>
+<p>每次查詢涉及 <strong>兩次 AI 呼叫</strong>：</p>
 
-<div class="callout callout-blue">
-  <strong>Not needed for product_spec (current)</strong>
-  Implement when adding Gitbook/Google Docs/PDF sources.
+<h3>Step 1：Embedding（文字 &rarr; 向量）</h3>
+<table>
+  <thead>
+    <tr><th>項目</th><th>內容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>模型</td><td>OpenAI <code>text-embedding-3-small</code> (1536 dims)</td></tr>
+    <tr><td>費用</td><td>$0.02/1M tokens（約 $0.001 索引全部 66 個產品）</td></tr>
+    <tr><td>執行時機</td><td>索引（每個 chunk）+ 每次使用者提問</td></tr>
+  </tbody>
+</table>
+
+<h3>Step 2：LLM 回答（上下文 + 問題 &rarr; 回答）</h3>
+<p>使用者可選擇 Provider &rarr; 再從下拉選單選特定模型（含等級 Badge）。</p>
+
+<table>
+  <thead>
+    <tr><th>Provider</th><th>Strongest</th><th>Mainstream</th><th>Best CP</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Gemini</strong></td><td>2.5 Pro</td><td>2.5 Flash <span class="badge badge-blue">預設</span></td><td>2.0 Flash Lite</td></tr>
+    <tr><td><strong>GPT</strong></td><td>4o</td><td>4o Mini</td><td>4.1 Nano</td></tr>
+    <tr><td><strong>Claude</strong></td><td>Opus 4</td><td>Sonnet 4</td><td>Haiku 3.5</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>防幻覺機制：</strong> Prompt 指示「絕不捏造 context 中沒有的規格」。當問題模糊時，AI 會先追問釐清。語言自動偵測：問中文答中文、問英文答英文。
 </div>
 
-<!-- ==================== Section 12 ==================== -->
-<h2 id="s12"><span class="num">12</span> Intent Detection <span class="badge badge-amber">Future</span></h2>
+<!-- ========== 6. Chunking 策略 ========== -->
+<h2 id="s6"><span class="num">6</span>Chunking 策略</h2>
 
-<h4>When is it needed?</h4>
-<p>Not now (105 chunks, single source_type). Needed when documents grow to 1000+ chunks across multiple source types.</p>
-
-<h4>What it does</h4>
-<p>Classifies the user's question intent before searching, to pick the right source types and search strategy.</p>
-
+<p>每個產品生成 <strong>2 個 Chunks</strong>：</p>
 <table>
-  <tr><th>Intent</th><th>Example</th><th>Search Strategy</th></tr>
-  <tr><td>Spec query</td><td>"ECC100 解析度多少？"</td><td>product_spec only</td></tr>
-  <tr><td>Product comparison</td><td>"ECC100 vs ECC500"</td><td>product_spec, top_k: 12</td></tr>
-  <tr><td>Installation/setup</td><td>"怎麼設定 cloud AP？"</td><td>gitbook + text_snippet</td></tr>
-  <tr><td>Troubleshooting</td><td>"PoE 不供電怎麼辦？"</td><td>gitbook + text_snippet</td></tr>
-  <tr><td>Recommendation</td><td>"適合倉庫的 AP？"</td><td>product_spec + text_snippet</td></tr>
-  <tr><td>Policy/process</td><td>"RMA 流程？"</td><td>google_doc + text_snippet</td></tr>
+  <thead>
+    <tr><th>Chunk</th><th>內容</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Chunk 0 (Overview)</strong></td><td>型號名稱、副標、概述文字、重點功能</td></tr>
+    <tr><td><strong>Chunk 1 (Specs)</strong></td><td>完整規格表，以 <code>[Category] label: value</code> 格式</td></tr>
+  </tbody>
+</table>
+<p>目標：300-800 tokens/chunk。產品規格天然短小，不需要複雜的切分邏輯。</p>
+
+<h3>各來源 Chunking 策略（未來）</h3>
+<table>
+  <thead>
+    <tr><th>來源</th><th>策略</th><th>備註</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>product_spec</code></td><td>固定 2 chunks/product</td><td><span class="badge badge-green">已實作</span></td></tr>
+    <tr><td><code>gitbook</code></td><td>依標題切分 (h1/h2/h3)</td><td>Markdown 天然切分點</td></tr>
+    <tr><td><code>google_doc</code></td><td>標題切分 + 遞迴</td><td>處理有/無標題的文件</td></tr>
+    <tr><td><code>web</code></td><td>Readability 萃取 + 段落切分</td><td>先移除導覽列/頁尾/廣告</td></tr>
+    <tr><td><code>file</code> (PDF)</td><td>頁面切分 + 50 token 重疊</td><td>處理跨頁段落</td></tr>
+    <tr><td><code>file</code> (Word)</td><td>標題/段落切分</td><td>結構比 PDF 更乾淨</td></tr>
+    <tr><td><code>text_snippet</code></td><td>不切分</td><td>手動輸入，通常很短</td></tr>
+  </tbody>
 </table>
 
-<h4>Implementation approaches (simple → complex)</h4>
-<ol>
-  <li><strong>Persona + source_types binding</strong> — each persona limits search scope (already supported in schema)</li>
-  <li><strong>Keyword rules</strong> — question contains "怎麼裝/設定" → prioritize gitbook (500+ chunks)</li>
-  <li><strong>LLM Router</strong> — cheap LLM classifies intent first, then routes (1000+ chunks)</li>
-  <li><strong>Multi-query</strong> — break complex questions into sub-queries (advanced)</li>
-</ol>
+<!-- ========== 7. Knowledge Base 管理 ========== -->
+<h2 id="s7"><span class="num">7</span>Knowledge Base 管理</h2>
 
-<!-- ==================== Section 13 ==================== -->
-<h2 id="s13"><span class="num">13</span> Important Notes</h2>
+<p>前往 <code>/knowledge</code> 頁面管理所有已索引的內容：</p>
 
 <table>
-  <tr><th>Item</th><th>Detail</th></tr>
-  <tr><td><strong>OpenAI Key is required</strong></td><td>For embedding, even if using Claude/Gemini for answers</td></tr>
-  <tr><td><strong>Re-index is manual</strong></td><td>After Sync, go to /knowledge and click Re-index</td></tr>
-  <tr><td><strong>Content hash</strong></td><td>Prevents unnecessary API calls on re-index</td></tr>
-  <tr><td><strong>IVFFlat lists=10</strong></td><td>Suitable for &lt; 1000 documents. Increase if growing beyond</td></tr>
-  <tr><td><strong>Similarity threshold 0.3</strong></td><td>Adjust to 0.4-0.5 if too many irrelevant results</td></tr>
-  <tr><td><strong>No Auth</strong></td><td>/api/ask is currently unprotected. Add Supabase Auth before wider rollout</td></tr>
-  <tr><td><strong>pgvector is free</strong></td><td>Included in all Supabase plans including Free</td></tr>
-  <tr><td><strong>Persona prompt length</strong></td><td>Keep &lt; 500 tokens to leave room for context</td></tr>
-  <tr><td><strong>Markdown rendering</strong></td><td>AI responses render as Markdown (tables, lists, bold, code) via react-markdown + remark-gfm</td></tr>
-  <tr><td><strong>Chat auto-save</strong></td><td>Conversations persist in DB, survive page refresh</td></tr>
-  <tr><td><strong>Model selection</strong></td><td>Users pick provider → specific model from dropdown with tier badges</td></tr>
+  <thead>
+    <tr><th>功能</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>總覽卡片</strong></td><td>Sources、Chunks、Tokens、Source Types 四張摘要卡片</td></tr>
+    <tr><td><strong>每個來源類型</strong></td><td>詳細表格、Re-index、Force Re-index、Delete 按鈕</td></tr>
+    <tr><td><strong>最後索引時間</strong></td><td>每張卡片顯示 Last indexed 時間戳</td></tr>
+    <tr><td><strong>Re-index</strong></td><td>Content hash 確保只有變動的 chunks 會重新 embed</td></tr>
+  </tbody>
 </table>
 
-<!-- ==================== Section 14 ==================== -->
-<h2 id="s14"><span class="num">14</span> Roadmap</h2>
-
-<table>
-  <tr><th>Phase</th><th>Item</th><th>Complexity</th><th>Status</th></tr>
-  <tr><td>1</td><td>product_spec + Ask UI + Persona (Dim 1)</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>2</td><td>Conversation history + DB persistence</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>3</td><td>Multi-model selector (3 tiers per provider)</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>4</td><td>Knowledge Base management page</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>5</td><td>Markdown rendering + copy button + follow-up questions</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>6</td><td>Clarification + honesty prompt rules</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>7</td><td>User Profile (Dim 2: 對話對象)</td><td>Low</td><td><span class="badge badge-green">Done</span></td></tr>
-  <tr><td>8</td><td>text_snippet CRUD</td><td>Low</td><td><span class="badge badge-blue">Next</span></td></tr>
-  <tr><td>9</td><td>Auto re-index after Sync</td><td>Low</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>10</td><td>Gitbook ingestion</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>11</td><td>Google Docs ingestion</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>12</td><td>Streaming response (SSE)</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>13</td><td>Output Templates (Dim 3: 產出格式)</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>14</td><td>Image handling (Claude Vision)</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>15</td><td>Intent detection / query routing</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>16</td><td>Web link ingestion</td><td>Medium-High</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>17</td><td>Word/PDF upload + ingestion</td><td>High</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>18</td><td>Supabase Auth + API keys + usage tracking</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-  <tr><td>19</td><td>External partner API access</td><td>Medium</td><td><span class="badge badge-gray">Planned</span></td></tr>
-</table>
-
-<h3>Other improvements</h3>
-<ul>
-  <li>Hybrid search (vector + tsvector keyword match)</li>
-  <li>Persona + source_type binding (limit search scope per persona)</li>
-  <li>Answer quality feedback (thumbs up/down)</li>
-  <li>Multi-language embeddings (embed translated content too)</li>
-  <li>Query caching for common questions</li>
-  <li>Conversation export (share/download chat history)</li>
-  <li>Content generation export (PPTX, PDF, Word) for Dimension 3</li>
-</ul>
-
-<!-- ==================== Section 15 ==================== -->
-<h2 id="s15"><span class="num">15</span> Page Layout</h2>
-
-<table>
-  <tr><th>Page</th><th>Max Width</th><th>Purpose</th></tr>
-  <tr><td>Dashboard, Compare, Translations, Typography, Ask</td><td><code>1400px</code></td><td>Wide — tables, split layouts, chat</td></tr>
-  <tr><td>All other pages (Knowledge, Settings, Product, etc.)</td><td><code>1100px</code></td><td>Standard — forms, cards, lists</td></tr>
-</table>
-
+<div class="callout">
+  <strong>Re-index 時機：</strong> 當 Google Sheets Sync 更新產品資料後，前往 <code>/knowledge</code> 點擊 Product Specs 卡片上的 <strong>Re-index</strong>。Content hash 機制確保只有真正變動的 chunk 會重新呼叫 API。
 </div>
 
-<script>
-function toggleToc() {
-  const panel = document.getElementById('tocPanel');
-  const btn = document.getElementById('tocToggle');
-  const isCollapsed = panel.classList.toggle('collapsed');
-  btn.classList.toggle('open', !isCollapsed);
-  document.body.classList.toggle('toc-hidden', isCollapsed);
+<!-- ========== 8. 對話歷史與持久化 ========== -->
+<h2 id="s8"><span class="num">8</span>對話歷史與持久化</h2>
+
+<h3>運作方式</h3>
+<table>
+  <thead>
+    <tr><th>#</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>前端每次 API 呼叫帶上最近 20 則訊息作為 <code>history[]</code></td></tr>
+    <tr><td>2</td><td>後端以歷史脈絡豐富 Embedding 查詢 — 讓「這幾台」能對應到上一輪提到的型號</td></tr>
+    <tr><td>3</td><td>前輪對話納入 LLM Prompt 作為上下文</td></tr>
+    <tr><td>4</td><td>若向量搜尋無結果但有歷史，LLM 從對話脈絡回答</td></tr>
+    <tr><td>5</td><td><strong>自動儲存</strong>：每次交換後，對話儲存到 <code>chat_sessions</code> 表（1 秒 debounce）</td></tr>
+    <tr><td>6</td><td><strong>Sidebar</strong>：漢堡圖示開啟歷史面板 — 點擊恢復、刪除或開新對話</td></tr>
+  </tbody>
+</table>
+
+<h3>Session 管理</h3>
+<table>
+  <thead>
+    <tr><th>項目</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>標題</td><td>從第一則使用者訊息自動生成</td></tr>
+    <tr><td>Persona &amp; Provider</td><td>隨 Session 儲存，恢復時自動還原</td></tr>
+    <tr><td>user_id</td><td>預設 <code>anonymous</code> — Supabase Auth 之後加 WHERE 條件即可</td></tr>
+    <tr><td>排序</td><td>最近更新優先，顯示訊息數與相對時間</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== 9. API 參考 ========== -->
+<h2 id="s9"><span class="num">9</span>API 參考</h2>
+
+<h3>POST /api/ask</h3>
+<pre>
+{
+  "question": <span class="highlight">"哪些 AP 支援 WiFi 7？"</span>,
+  "persona": "sales",
+  "profile": "channel-sales",
+  "provider": "gemini-2.5-flash",
+  "history": [{"role":"user","content":"..."},{"role":"assistant","content":"..."}],
+  "source_type": "product_spec",
+  "product_line": "Cloud AP"
 }
-</script>
+</pre>
+
+<table>
+  <thead>
+    <tr><th>參數</th><th>必填</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>question</code></td><td><span class="badge badge-red">必填</span></td><td>要問的問題</td></tr>
+    <tr><td><code>persona</code></td><td>選填</td><td>維度 1：回答角度（預設：<code>default</code>）</td></tr>
+    <tr><td><code>profile</code></td><td>選填</td><td>維度 2：對話對象（預設：<code>default</code>）</td></tr>
+    <tr><td><code>provider</code></td><td>選填</td><td>AI 模型 ID（預設：<code>gemini-2.5-flash</code>）</td></tr>
+    <tr><td><code>history</code></td><td>選填</td><td>前輪訊息，用於對話脈絡</td></tr>
+    <tr><td><code>source_type</code></td><td>選填</td><td>限定搜尋特定來源類型</td></tr>
+    <tr><td><code>product_line</code></td><td>選填</td><td>限定搜尋特定產品線</td></tr>
+  </tbody>
+</table>
+
+<p>回應包含：<code>answer</code>、<code>sources[]</code>、<code>follow_ups[]</code>、<code>persona</code>、<code>profile</code>、<code>provider</code></p>
+
+<h3>其他端點</h3>
+<table>
+  <thead>
+    <tr><th>端點</th><th>方法</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>/api/ask</code></td><td>GET</td><td>回傳可用的 Personas 與 User Profiles 清單</td></tr>
+    <tr><td><code>/api/documents</code></td><td>GET</td><td>索引統計（來源數、chunk 數、最後更新）</td></tr>
+    <tr><td><code>/api/documents</code></td><td>POST</td><td><code>{ "action": "ingest", "source_type": "product_spec", "force": false }</code></td></tr>
+    <tr><td><code>/api/documents</code></td><td>DELETE</td><td><code>{ "source_type": "product_spec", "source_id": "ECC100" }</code></td></tr>
+    <tr><td><code>/api/chat-sessions</code></td><td>GET</td><td>列出 Sessions 或取得特定 Session <code>?id=xxx</code></td></tr>
+    <tr><td><code>/api/chat-sessions</code></td><td>POST</td><td>建立/更新 Session</td></tr>
+    <tr><td><code>/api/chat-sessions</code></td><td>DELETE</td><td><code>{ "id": "xxx" }</code></td></tr>
+    <tr><td><code>/api/personas</code></td><td>GET/POST/DELETE</td><td>Persona CRUD 管理</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== 10. 設定與使用 ========== -->
+<h2 id="s10"><span class="num">10</span>設定與使用</h2>
+
+<h3>首次設定檢查清單</h3>
+<ul class="checklist">
+  <li>設定 <strong>OpenAI API Key</strong>（Embedding 必需），前往 <code>/settings/api-keys</code></li>
+  <li>設定至少一組 LLM Key（Claude / GPT / Gemini 擇一），用於回答</li>
+  <li>確認 Migration <code>00009</code>（documents）和 <code>00010</code>（chat_sessions）已套用</li>
+  <li>前往 <code>/knowledge</code> &rarr; 點擊 Product Specs 卡片的 <strong>Index</strong> &rarr; 等待約 10-20 秒索引 66 個產品</li>
+</ul>
+
+<h3>日常使用步驟</h3>
+<table>
+  <thead>
+    <tr><th>步驟</th><th>操作</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>點擊 Navbar 的 <strong>Ask</strong></td></tr>
+    <tr><td>2</td><td><strong>回答角度</strong> — 選擇 Persona（Product Specialist / Sales / Support / PM）</td></tr>
+    <tr><td>3</td><td><strong>對話對象</strong> — 選擇 User Profile（一般同事 / 新進同仁 / 業務 / Channel Sales / PM / 客戶）</td></tr>
+    <tr><td>4</td><td>選擇 AI 模型（Gemini / GPT / Claude &rarr; 從下拉選單選特定模型）</td></tr>
+    <tr><td>5</td><td>輸入問題或點擊範例</td></tr>
+    <tr><td>6</td><td>追問更多問題（系統記住上下文）</td></tr>
+    <tr><td>7</td><td>過去對話自動儲存，出現在 Sidebar（漢堡圖示）</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== 11. 圖片處理策略 ========== -->
+<h2 id="s11"><span class="num">11</span>圖片處理策略</h2>
+
+<p>針對含有圖片的來源（Gitbook、Google Docs、PDF、網頁），未來將實施三步驟處理流程：<span class="badge badge-gray">未來</span></p>
+
+<table>
+  <thead>
+    <tr><th>步驟</th><th>處理</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td><strong>圖片描述</strong></td><td>Claude Vision API 為每張圖片生成文字描述</td></tr>
+    <tr><td>2</td><td><strong>圖文綁定</strong></td><td>描述文字以 <code>[Image: ...]</code> 內嵌在 chunk 內容中</td></tr>
+    <tr><td>3</td><td><strong>圖片儲存</strong></td><td>原始圖片存 Supabase Storage；URL 參照在 <code>metadata.images[]</code></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>目前不需要：</strong> <code>product_spec</code> 來源不含圖片。待加入 Gitbook / Google Docs / PDF 來源時實施。
+</div>
+
+<!-- ========== 12. 注意事項 ========== -->
+<h2 id="s12"><span class="num">12</span>注意事項</h2>
+
+<table>
+  <thead>
+    <tr><th>項目</th><th>細節</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>OpenAI Key 必須</strong></td><td>即使用 Claude/Gemini 回答，Embedding 仍需 OpenAI Key</td></tr>
+    <tr><td><strong>Re-index 手動操作</strong></td><td>Sync 後需手動到 <code>/knowledge</code> 點擊 Re-index</td></tr>
+    <tr><td><strong>Content hash</strong></td><td>避免 re-index 時不必要的 API 呼叫</td></tr>
+    <tr><td><strong>IVFFlat lists=10</strong></td><td>適合 &lt; 1000 筆文件，超過需調整</td></tr>
+    <tr><td><strong>相似度閾值 0.3</strong></td><td>若結果太多不相關，調整為 0.4-0.5</td></tr>
+    <tr><td><strong>無身份驗證</strong></td><td><code>/api/ask</code> 目前未保護，廣泛推廣前需加 Supabase Auth</td></tr>
+    <tr><td><strong>pgvector 免費</strong></td><td>Supabase 所有方案（含免費）皆包含</td></tr>
+    <tr><td><strong>Persona Prompt 長度</strong></td><td>建議 &lt; 500 tokens，留空間給 context</td></tr>
+    <tr><td><strong>Markdown 渲染</strong></td><td>AI 回答以 Markdown 渲染（表格、列表、粗體、程式碼）via react-markdown + remark-gfm</td></tr>
+    <tr><td><strong>對話自動儲存</strong></td><td>對話存入 DB，頁面重新整理不會遺失</td></tr>
+    <tr><td><strong>模型選擇</strong></td><td>使用者先選 Provider &rarr; 再從帶等級 Badge 的下拉選單選模型</td></tr>
+  </tbody>
+</table>
+
+<!-- ========== 13. 開發 Roadmap ========== -->
+<h2 id="s13"><span class="num">13</span>開發 Roadmap</h2>
+
+<table>
+  <thead>
+    <tr><th>階段</th><th>項目</th><th>複雜度</th><th>狀態</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>1</td><td>product_spec + Ask UI + Persona（維度 1）</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>2</td><td>對話歷史 + DB 持久化</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>3</td><td>多模型選擇器（每個 Provider 3 等級）</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>4</td><td>Knowledge Base 管理頁面</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>5</td><td>Markdown 渲染 + 複製按鈕 + 追問建議</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>6</td><td>釐清 + 誠實提示規則</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>7</td><td>User Profile（維度 2：對話對象）</td><td>低</td><td><span class="badge badge-green">已完成</span></td></tr>
+    <tr><td>8</td><td>text_snippet CRUD</td><td>低</td><td><span class="badge badge-blue">下一步</span></td></tr>
+    <tr><td>9</td><td>Sync 後自動 re-index</td><td>低</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>10</td><td>Gitbook 索引</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>11</td><td>Google Docs 索引</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>12</td><td>Streaming 回應 (SSE)</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>13</td><td>Output Templates（維度 3：產出格式）</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>14</td><td>圖片處理（Claude Vision）</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>15</td><td>Intent 偵測 / 查詢路由</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>16</td><td>網頁連結索引</td><td>中高</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>17</td><td>Word/PDF 上傳 + 索引</td><td>高</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>18</td><td>Supabase Auth + API Keys + 使用量追蹤</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+    <tr><td>19</td><td>外部合作夥伴 API 存取</td><td>中</td><td><span class="badge badge-gray">計畫中</span></td></tr>
+  </tbody>
+</table>
+
+<h3>其他改進項目</h3>
+<table>
+  <thead>
+    <tr><th>項目</th><th>說明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Hybrid Search</td><td>向量 + tsvector 關鍵字匹配</td></tr>
+    <tr><td>Persona + source_type 綁定</td><td>限制每個 Persona 的搜尋範圍</td></tr>
+    <tr><td>回答品質回饋</td><td>讚 / 踩按鈕</td></tr>
+    <tr><td>多語言 Embedding</td><td>也索引翻譯後的內容</td></tr>
+    <tr><td>查詢快取</td><td>常見問題快取</td></tr>
+    <tr><td>對話匯出</td><td>分享 / 下載聊天記錄</td></tr>
+    <tr><td>內容生成匯出</td><td>PPTX、PDF、Word（配合維度 3）</td></tr>
+  </tbody>
+</table>
+
+</div><!-- end main-content -->
+</div><!-- end page-layout -->
+
 </body>
 </html>
