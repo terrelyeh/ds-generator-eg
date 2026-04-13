@@ -232,13 +232,15 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
   const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
   const hasOverview = !!product.overview && product.overview.trim().length > 0;
   const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
-  const canGenerate = hasProductImage && hasHardwareImage && hasOverview && hasFeatures;
+  const hasSpecs = product.spec_sections.length > 0;
+  const canGenerate = hasProductImage && hasHardwareImage && hasOverview && hasFeatures && hasSpecs;
 
   const missingItems: string[] = [];
   if (!hasProductImage) missingItems.push("Product Image");
   if (!hasHardwareImage) missingItems.push("Hardware Image");
   if (!hasOverview) missingItems.push("Overview");
   if (!hasFeatures) missingItems.push("Features");
+  if (!hasSpecs) missingItems.push("Spec Details");
 
   const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
   const localesWithTranslations = translations.map((t) => t.locale);

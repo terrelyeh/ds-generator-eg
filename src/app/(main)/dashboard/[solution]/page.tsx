@@ -109,6 +109,22 @@ export default async function SolutionDashboardPage({
       })
     : { data: [] as ChangeLogRow[] };
 
+  // Fetch spec_sections count per product (for SP readiness indicator)
+  const { data: specCounts } = productIds.length
+    ? ((await supabase
+        .from("spec_sections")
+        .select("product_id, id")
+        .in("product_id", productIds)) as {
+        data: { product_id: string; id: string }[] | null;
+      })
+    : { data: [] as { product_id: string; id: string }[] };
+
+  // Build map: product_id → has specs
+  const specCountMap = new Map<string, number>();
+  for (const sc of specCounts ?? []) {
+    specCountMap.set(sc.product_id, (specCountMap.get(sc.product_id) || 0) + 1);
+  }
+
   // Fetch translation locales per product (model_name based)
   const productModelNames = (products ?? []).map((p) => p.model_name);
   const { data: translationRows } = productModelNames.length
@@ -195,6 +211,7 @@ export default async function SolutionDashboardPage({
       status: p.status || "active",
       has_overview: !!p.overview && p.overview.trim().length > 0,
       has_features: Array.isArray(p.features) && p.features.length > 0,
+      has_specs: (specCountMap.get(p.id) || 0) > 0,
       has_product_image: hasProductImage,
       has_hardware_image: hasHardwareImage,
       radio_patterns: radioPatterns,

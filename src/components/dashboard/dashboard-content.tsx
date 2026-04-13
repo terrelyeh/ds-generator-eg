@@ -26,6 +26,7 @@ interface ProductSummary {
   has_hardware_image: boolean;
   has_overview: boolean;
   has_features: boolean;
+  has_specs: boolean;
   radio_patterns: { band: string; h_plane: boolean; e_plane: boolean }[];
   last_content_changed: string | null;
   last_change_by: string | null;
@@ -123,6 +124,7 @@ function ProductTable({
           <TableHead className="w-24">Last Changed</TableHead>
           <TableHead className="w-14 text-center">OV</TableHead>
           <TableHead className="w-14 text-center">FT</TableHead>
+          <TableHead className="w-14 text-center">SP</TableHead>
           <TableHead className="w-14 text-center">Prod</TableHead>
           <TableHead className="w-14 text-center">HW</TableHead>
           {isAP && (
@@ -192,6 +194,9 @@ function ProductTable({
             </TableCell>
             <TableCell className="text-center">
               <ImgStatus ok={product.has_features} />
+            </TableCell>
+            <TableCell className="text-center">
+              <ImgStatus ok={product.has_specs} />
             </TableCell>
             <TableCell className="text-center">
               <ImgStatus ok={product.has_product_image} />
