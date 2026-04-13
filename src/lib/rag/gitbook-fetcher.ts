@@ -170,11 +170,15 @@ export async function fetchGitbookPage(url: string): Promise<{
   const textContent = htmlToText(html);
 
   // Extract title: first heading or from URL
-  const titleMatch = html.match(/<h1[^>]*>(.*?)<\/h1>/i) ||
-    html.match(/<h2[^>]*>(.*?)<\/h2>/i);
-  const title = titleMatch
-    ? stripHtmlTags(titleMatch[1]).trim()
-    : urlToTitle(url);
+  const titleMatch = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) ||
+    html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
+  let title = titleMatch
+    ? stripHtmlTags(titleMatch[1]).replace(/hashtag/gi, "").replace(/link/gi, "").trim()
+    : "";
+  // Fallback to URL-derived title if heading was empty or just noise
+  if (!title || title.length < 3) {
+    title = urlToTitle(url);
+  }
 
   return { content: textContent, imageUrls, title };
 }
@@ -227,12 +231,36 @@ function htmlToText(html: string): string {
   text = text.replace(/<nav[\s\S]*?<\/nav>/gi, "");
   text = text.replace(/<header[\s\S]*?<\/header>/gi, "");
   text = text.replace(/<footer[\s\S]*?<\/footer>/gi, "");
+  // Remove Gitbook-specific noise: chatbot widget, assistant, banners, sidebar
+  text = text.replace(/<aside[\s\S]*?<\/aside>/gi, "");
+  text = text.replace(/<button[\s\S]*?<\/button>/gi, "");
+  // Remove Gitbook assistant/chatbot sections
+  text = text.replace(/GitBook Assistant[\s\S]*?(?=<(?:h[1-6]|main|article|section))/gi, "");
+  // Remove promotional banners (e.g., "Join EnGenius at ISC West...")
+  text = text.replace(/<div[^>]*class="[^"]*banner[^"]*"[\s\S]*?<\/div>/gi, "");
+  // Remove SVG icons
+  text = text.replace(/<svg[\s\S]*?<\/svg>/gi, "");
+
+  // Extract main content area if available (Gitbook wraps content in <main> or <article>)
+  const mainMatch = text.match(/<main[\s\S]*?>([\s\S]*)<\/main>/i) ||
+    text.match(/<article[\s\S]*?>([\s\S]*)<\/article>/i);
+  if (mainMatch) {
+    text = mainMatch[1];
+  }
 
   // Convert headings to text with markdown-style markers
-  text = text.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "\n# $1\n");
-  text = text.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "\n## $1\n");
-  text = text.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "\n### $1\n");
-  text = text.replace(/<h4[^>]*>(.*?)<\/h4>/gi, "\n#### $1\n");
+  // First strip common Gitbook heading noise: anchor links, SVG icons, "hashtag" alt text
+  text = text.replace(/<h([1-6])[^>]*>([\s\S]*?)<\/h\1>/gi, (_, level, content) => {
+    // Strip HTML tags from heading content, then clean up
+    let heading = content.replace(/<[^>]+>/g, "").trim();
+    // Remove "hashtag" text that comes from SVG icon alt text in Gitbook headings
+    heading = heading.replace(/^hashtag\s*/i, "").trim();
+    // Remove "link" text from anchor icons
+    heading = heading.replace(/\blink\b/gi, "").trim();
+    if (!heading) return "\n";
+    const prefix = "#".repeat(Number(level));
+    return `\n${prefix} ${heading}\n`;
+  });
 
   // Convert lists
   text = text.replace(/<li[^>]*>(.*?)<\/li>/gi, "• $1\n");
@@ -265,6 +293,16 @@ function htmlToText(html: string): string {
   text = text.replace(/&#x20;/g, " ");
   text = text.replace(/&#39;/g, "'");
   text = text.replace(/&nbsp;/g, " ");
+
+  // Remove Gitbook noise text that survives HTML stripping
+  text = text.replace(/GitBook Assistant[\s\S]*?What should I read next\?/gi, "");
+  text = text.replace(/Good morning.*?I'm here to help you with the docs\./gi, "");
+  text = text.replace(/Working…|Thinking…|Waiting for your answer…/gi, "");
+  text = text.replace(/circle-info.*?arrow-up-right/gi, "");
+  text = text.replace(/Join EnGenius at[\s\S]*?View event details/gi, "");
+  // Remove standalone "hashtag" or "link" words (from SVG icon alt text)
+  text = text.replace(/^\s*hashtag\s*$/gm, "");
+  text = text.replace(/^\s*link\s*$/gm, "");
 
   // Clean up whitespace
   text = text.replace(/[ \t]+/g, " "); // collapse horizontal whitespace

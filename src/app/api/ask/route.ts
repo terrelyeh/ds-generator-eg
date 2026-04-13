@@ -91,7 +91,7 @@ export async function POST(request: Request) {
       "match_documents",
       {
         query_embedding: JSON.stringify(queryEmbedding),
-        match_count: 8,
+        match_count: 12,
         match_threshold: 0.3,
         filter_source_type: source_type || null,
         filter_metadata: filterMetadata,
@@ -117,10 +117,22 @@ export async function POST(request: Request) {
       });
     }
 
-    // Step 3: Build context from matched documents
+    // Step 3: Build context from matched documents — include source_type so LLM knows
+    // whether the content is a spec sheet, a how-to guide, or FAQ
+    const SOURCE_TYPE_LABELS: Record<string, string> = {
+      product_spec: "Product Spec",
+      gitbook: "Documentation / How-to",
+      text_snippet: "Knowledge Snippet",
+      google_doc: "Internal Doc",
+      web: "Web Page",
+    };
+
     const context = docs.length > 0
       ? docs
-          .map((d, i) => `[Source ${i + 1}: ${d.title}]\n${d.content}`)
+          .map((d, i) => {
+            const typeLabel = SOURCE_TYPE_LABELS[d.source_type] || d.source_type;
+            return `[Source ${i + 1} (${typeLabel}): ${d.title}]\n${d.content}`;
+          })
           .join("\n\n---\n\n")
       : "(No new documents found — answer based on conversation history)";
 
