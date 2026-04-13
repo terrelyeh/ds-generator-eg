@@ -870,13 +870,14 @@ export function AskChat({ compact = false }: AskChatProps) {
           <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-4 ${compact ? "px-5 py-3" : "px-5 py-4"}`}>
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <AssistantIcon size={compact ? 44 : 56} />
-                <h2 className={`font-semibold mt-4 mb-0.5 ${compact ? "text-sm" : "text-lg"}`}>
+                <AssistantIcon size={compact ? 48 : 60} />
+                <h2 className={`font-semibold mt-5 ${compact ? "text-base" : "text-xl"}`}>
                   {welcomeSubtitle || getGreeting()}
                 </h2>
-                <p className={`text-muted-foreground mb-5 max-w-sm ${compact ? "text-xs" : "text-sm"}`}>
+                <p className={`text-muted-foreground mt-1.5 max-w-sm ${compact ? "text-xs" : "text-sm"}`}>
                   {welcomeDescription || "I'm your EnGenius product specialist. Ask me about specs, configurations, licensing, or best practices."}
                 </p>
+                <div className={`w-full ${compact ? "mt-6" : "mt-8"}`} />
                 <div className={`grid gap-2 w-full ${compact ? "grid-cols-1 max-w-xs" : "grid-cols-2 max-w-xl"}`}>
                   {EXAMPLE_QUESTIONS.slice(0, compact ? 4 : 8).map((q) => (
                     <button key={q} onClick={() => handleSubmit(q)}
