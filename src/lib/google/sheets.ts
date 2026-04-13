@@ -13,6 +13,9 @@ const SPEC_CATEGORIES = new Set([
   "Environmental", "Software", "Security", "Layer 2 Features",
   "Layer 3 Features", "Management", "Standards", "Certifications",
   "PoE", "Switching", "Ports", "Port", "LED",
+  // Cloud Switch specific categories
+  "Physical Interface", "L2 Software Features", "L3 Software Features",
+  "Network Management",
 ]);
 
 export interface SheetSpecItem {
@@ -103,9 +106,13 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
 
     if (!value || value === "-") continue;
 
-    if (currentCategory) {
-      currentItems.push({ label, value });
+    // Fallback: if no category has been set yet, create a "General" category
+    // This handles sheets where spec items start immediately after "Technical Specifications"
+    if (!currentCategory) {
+      currentCategory = "General";
     }
+
+    currentItems.push({ label, value });
   }
 
   if (currentCategory && currentItems.length > 0) {
