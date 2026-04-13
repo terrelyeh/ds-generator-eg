@@ -119,6 +119,9 @@ export async function POST(request: Request) {
       }
 
       try {
+        // Immediately signal that we're working
+        sendEvent(JSON.stringify({ type: "status", status: "searching" }));
+
         // Step 1: Build search query
         const recentHistory = history.slice(-20);
         const searchQuery = recentHistory.length > 0
@@ -220,6 +223,7 @@ IMPORTANT formatting rules:
         }));
 
         // Step 5: Stream LLM response
+        sendEvent(JSON.stringify({ type: "status", status: "generating" }));
         const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-2.5-flash" };
 
         switch (mapped.fn) {

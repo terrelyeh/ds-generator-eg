@@ -353,6 +353,7 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingStatus, setLoadingStatus] = useState<"searching" | "generating" | null>(null);
   const [provider, setProvider] = useState("gemini-2.5-flash");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
@@ -468,7 +469,7 @@ export function AskChat({ compact = false }: AskChatProps) {
         const errText = await res.text();
         const finalMessages = [...newMessages, { role: "assistant" as const, content: `Error: Server error (${res.status}). ${errText.slice(0, 200)}` }];
         setMessages(finalMessages);
-        setLoading(false);
+        setLoading(false); setLoadingStatus(null);
         return;
       }
 
@@ -496,6 +497,10 @@ export function AskChat({ compact = false }: AskChatProps) {
 
           try {
             const event = JSON.parse(payload);
+            if (event.type === "status") {
+              setLoadingStatus(event.status);
+              continue;
+            }
             if (event.type === "chunk") {
               fullContent += event.content;
               // Update the assistant message in-place
@@ -540,7 +545,7 @@ export function AskChat({ compact = false }: AskChatProps) {
     } catch (err) {
       setMessages([...newMessages, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
     } finally {
-      setLoading(false);
+      setLoading(false); setLoadingStatus(null);
     }
   }
 
@@ -779,7 +784,7 @@ export function AskChat({ compact = false }: AskChatProps) {
       {/* ===== Main area ===== */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
-        <div className={`flex-shrink-0 space-y-2 ${compact ? "px-3 py-2" : "mb-3"}`}>
+        <div className={`flex-shrink-0 space-y-2 ${compact ? "px-5 py-2" : "mb-3"}`}>
           {/* Title row */}
           {compact ? (
             /* Panel mode header: session title + history + new chat */
@@ -862,7 +867,7 @@ export function AskChat({ compact = false }: AskChatProps) {
 
         {/* Chat card */}
         <Card className={`flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden ${compact ? "border-0 rounded-none shadow-none" : ""}`}>
-          <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-4 ${compact ? "px-3 py-3" : "px-5 py-4"}`}>
+          <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-4 ${compact ? "px-5 py-3" : "px-5 py-4"}`}>
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <AssistantIcon size={compact ? 44 : 56} />
@@ -968,17 +973,19 @@ export function AskChat({ compact = false }: AskChatProps) {
               ))
             )}
 
-            {/* Loading state — clean, minimal */}
+            {/* Loading state — shows current phase */}
             {loading && messages[messages.length - 1]?.content === "" && (
               <div className="flex items-center gap-2.5 py-2 pl-9">
                 <div className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
-                <span className="text-xs text-muted-foreground/70">搜尋資料思考中...</span>
+                <span className="text-xs text-muted-foreground/70">
+                  {loadingStatus === "generating" ? "整理回覆中..." : "搜尋相關資料中..."}
+                </span>
               </div>
             )}
           </div>
 
           {/* Input area */}
-          <div className={`border-t space-y-2 flex-shrink-0 ${compact ? "px-3 py-2" : "px-4 py-3"}`}>
+          <div className={`border-t space-y-2 flex-shrink-0 ${compact ? "px-5 py-2.5" : "px-4 py-3"}`}>
             {/* Model selector */}
             <div className="flex items-center gap-1.5" ref={dropdownRef}>
               <span className="text-xs text-muted-foreground/50 flex-shrink-0">AI:</span>
