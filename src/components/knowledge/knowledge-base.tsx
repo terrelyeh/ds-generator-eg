@@ -13,6 +13,8 @@ interface SourceItem {
   total_tokens: number;
   last_updated: string;
   product_line?: string | null;
+  space_label?: string | null;
+  space_url?: string | null;
 }
 
 interface SourceTypeStats {
@@ -33,8 +35,8 @@ interface SourceTypeConfig {
 
 const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "product_spec", label: "Product Specs", icon: "📦", description: "Product overview, features, and technical specifications from the database", status: "active", canIngest: true },
+  { id: "gitbook", label: "Gitbook Docs", icon: "📖", description: "Technical documentation from Gitbook pages", status: "active", canIngest: true },
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
-  { id: "gitbook", label: "Gitbook Docs", icon: "📖", description: "Technical documentation from Gitbook pages", status: "planned", canIngest: false },
   { id: "google_doc", label: "Google Docs", icon: "📄", description: "Product briefs, marketing docs, internal documents from Google Drive", status: "planned", canIngest: false },
   { id: "web", label: "Web Pages", icon: "🌐", description: "Website content, product pages, landing pages", status: "planned", canIngest: false },
   { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word documents", status: "planned", canIngest: false },
@@ -57,6 +59,12 @@ function formatTokens(tokens: number) {
   return `${(tokens / 1000).toFixed(1)}k`;
 }
 
+/** Known Gitbook spaces — easily add more here */
+const GITBOOK_SPACES: { url: string; label: string }[] = [
+  { url: "https://doc.engenius.ai/cloud-licensing", label: "Cloud Licensing" },
+  { url: "https://doc.engenius.ai/home-cloud-user-manual", label: "Cloud User Manual" },
+];
+
 export function KnowledgeBase() {
   const [stats, setStats] = useState<Record<string, SourceTypeStats>>({});
   const [sources, setSources] = useState<SourceItem[]>([]);
@@ -65,6 +73,11 @@ export function KnowledgeBase() {
   const [ingesting, setIngesting] = useState<string | null>(null);
   const [expandedType, setExpandedType] = useState<string | null>(null);
   const [showInfo, setShowInfo] = useState(false);
+  const [showGitbookDialog, setShowGitbookDialog] = useState(false);
+  const [gitbookUrl, setGitbookUrl] = useState("");
+  const [gitbookLabel, setGitbookLabel] = useState("");
+  const [gitbookVision, setGitbookVision] = useState(true);
+  const [gitbookIngesting, setGitbookIngesting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -119,6 +132,51 @@ export function KnowledgeBase() {
     } catch { toast.error("Delete failed"); }
   }
 
+  async function handleGitbookIngest(spaceUrl: string, spaceLabel: string, enableVision: boolean, force = false) {
+    setGitbookIngesting(true);
+    setIngesting("gitbook");
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "gitbook",
+          space_url: spaceUrl,
+          space_label: spaceLabel,
+          enable_vision: enableVision,
+          force,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const parts = [
+          `${data.processed} chunks indexed`,
+          `${data.skipped} unchanged`,
+          `${data.pages_fetched} pages fetched`,
+          data.pages_skipped > 0 ? `${data.pages_skipped} empty pages skipped` : null,
+          data.images_described > 0 ? `${data.images_described} images described` : null,
+        ].filter(Boolean);
+        const errMsg = data.errors?.length ? ` (${data.errors.length} errors)` : "";
+        toast.success(`${spaceLabel}: ${parts.join(", ")}${errMsg}`);
+        if (data.errors?.length) {
+          console.warn("Gitbook ingestion errors:", data.errors);
+        }
+        fetchData();
+        setShowGitbookDialog(false);
+        setGitbookUrl("");
+        setGitbookLabel("");
+      } else {
+        toast.error(`Ingestion failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Ingestion failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setGitbookIngesting(false);
+      setIngesting(null);
+    }
+  }
+
   const totalSources = Object.values(stats).reduce((s, v) => s + v.sources, 0);
   const totalTokens = Object.values(stats).reduce((s, v) => s + v.total_tokens, 0);
   const activeTypes = Object.keys(stats).length;
@@ -170,7 +228,7 @@ export function KnowledgeBase() {
               <p><strong className="text-foreground">4. Answer</strong> — Retrieved chunks are sent to the AI model as context, which generates an accurate answer based only on your data.</p>
             </div>
             <div className="mt-4 pt-4 border-t">
-              <p className="text-xs text-muted-foreground">Currently supports Product Specs. More source types (Gitbook, Google Docs, PDF, etc.) coming soon.</p>
+              <p className="text-xs text-muted-foreground">Currently supports Product Specs and Gitbook Docs (with AI image descriptions). More source types (Google Docs, PDF, etc.) coming soon.</p>
             </div>
           </div>
         </div>
@@ -213,7 +271,10 @@ export function KnowledgeBase() {
                           {typeStat ? (
                             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
                               <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              {typeStat.sources} sources · {typeStat.count} chunks · {formatTokens(typeStat.total_tokens)} tokens
+                              {config.id === "gitbook"
+                                ? `${new Set(typeSources.map((s) => s.space_label || "Unknown")).size} space${new Set(typeSources.map((s) => s.space_label || "Unknown")).size > 1 ? "s" : ""}`
+                                : `${typeStat.sources} sources`
+                              } · {typeStat.count} chunks · {formatTokens(typeStat.total_tokens)} tokens
                             </span>
                           ) : config.status === "planned" ? (
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Coming Soon</span>
@@ -236,8 +297,13 @@ export function KnowledgeBase() {
                           {isExpanded ? "Hide" : "Details"}
                         </Button>
                       )}
-                      {config.canIngest && (
-                        <Button size="sm" onClick={() => handleIngest(config.id)} disabled={isIngesting} className="text-xs">
+                      {config.canIngest && config.id === "gitbook" && (
+                        <Button size="sm" onClick={() => setShowGitbookDialog(true)} disabled={!!ingesting} className="text-xs">
+                          {isIngesting ? "Indexing..." : "Add Space"}
+                        </Button>
+                      )}
+                      {config.canIngest && config.id !== "gitbook" && (
+                        <Button size="sm" onClick={() => handleIngest(config.id)} disabled={!!ingesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
                       )}
@@ -245,8 +311,85 @@ export function KnowledgeBase() {
                   </div>
                 </CardHeader>
 
-                {/* Expanded details */}
-                {isExpanded && typeSources.length > 0 && (
+                {/* Expanded details — Gitbook shows space-level summary table */}
+                {isExpanded && typeSources.length > 0 && config.id === "gitbook" && (
+                  <CardContent className="pt-0">
+                    {(() => {
+                      // Group by space_label
+                      const spaceMap = new Map<string, { pages: number; chunks: number; tokens: number; lastUpdated: string; url: string }>();
+                      for (const s of typeSources) {
+                        const label = s.space_label || "Unknown";
+                        const existing = spaceMap.get(label) || { pages: 0, chunks: 0, tokens: 0, lastUpdated: "", url: s.space_url || "" };
+                        existing.pages++;
+                        existing.chunks += s.chunks;
+                        existing.tokens += s.total_tokens;
+                        if (s.last_updated > existing.lastUpdated) existing.lastUpdated = s.last_updated;
+                        if (!existing.url && s.space_url) existing.url = s.space_url;
+                        spaceMap.set(label, existing);
+                      }
+                      const spaces = [...spaceMap.entries()];
+                      return (
+                        <div className="rounded-lg border overflow-hidden">
+                          <table className="w-full text-xs">
+                            <thead>
+                              <tr className="bg-muted/50">
+                                <th className="text-left px-3 py-2 font-medium">Space</th>
+                                <th className="text-center px-3 py-2 font-medium">Pages</th>
+                                <th className="text-center px-3 py-2 font-medium">Chunks</th>
+                                <th className="text-center px-3 py-2 font-medium">Tokens</th>
+                                <th className="text-left px-3 py-2 font-medium">Last Updated</th>
+                                <th className="text-right px-3 py-2 font-medium">Action</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {spaces.map(([label, info]) => (
+                                <tr key={label} className="border-t hover:bg-muted/30 transition-colors">
+                                  <td className="px-3 py-2 font-medium">{label}</td>
+                                  <td className="px-3 py-2 text-center tabular-nums">{info.pages}</td>
+                                  <td className="px-3 py-2 text-center tabular-nums">{info.chunks}</td>
+                                  <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{formatTokens(info.tokens)}</td>
+                                  <td className="px-3 py-2 text-muted-foreground">{formatDate(info.lastUpdated)}</td>
+                                  <td className="px-3 py-2 text-right">
+                                    <div className="flex items-center justify-end gap-3">
+                                      <button
+                                        onClick={() => {
+                                          if (!info.url) { toast.error("Space URL not found"); return; }
+                                          handleGitbookIngest(info.url, label, gitbookVision);
+                                        }}
+                                        disabled={gitbookIngesting}
+                                        className="text-xs text-muted-foreground/50 hover:text-engenius-blue transition-colors disabled:opacity-30"
+                                      >
+                                        {gitbookIngesting ? "Syncing..." : "Sync"}
+                                      </button>
+                                      <button
+                                        onClick={() => {
+                                          if (!confirm(`Delete all "${label}" pages from the index?`)) return;
+                                          const toDelete = typeSources.filter((s) => (s.space_label || "Unknown") === label);
+                                          Promise.all(toDelete.map((s) =>
+                                            fetch("/api/documents", {
+                                              method: "DELETE",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ source_type: "gitbook", source_id: s.source_id }),
+                                            })
+                                          )).then(() => { toast.success(`Deleted "${label}"`); fetchData(); });
+                                        }}
+                                        className="text-xs text-muted-foreground/50 hover:text-red-500 transition-colors"
+                                      >
+                                        Delete
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </CardContent>
+                )}
+
+                {isExpanded && typeSources.length > 0 && config.id !== "gitbook" && (
                   <CardContent className="pt-0">
                     <div className="rounded-lg border overflow-hidden">
                       <table className="w-full text-xs">
@@ -266,7 +409,7 @@ export function KnowledgeBase() {
                         <tbody>
                           {typeSources.map((s) => (
                             <tr key={`${s.source_type}:${s.source_id}`} className="border-t hover:bg-muted/30 transition-colors">
-                              <td className="px-3 py-2 font-mono font-medium text-engenius-blue">{s.source_id}</td>
+                              <td className="px-3 py-2 font-mono font-medium text-engenius-blue max-w-[200px] truncate" title={s.source_id}>{s.source_id}</td>
                               {config.id === "product_spec" && (
                                 <td className="px-3 py-2 text-muted-foreground">{s.product_line || "—"}</td>
                               )}
@@ -294,9 +437,11 @@ export function KnowledgeBase() {
                         {typeSources.length} sources indexed
                       </p>
                       <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleIngest(config.id, true)} disabled={isIngesting} className="text-xs">
-                          {isIngesting ? "Indexing..." : "Force Re-index All"}
-                        </Button>
+                        {config.id === "product_spec" && (
+                          <Button variant="outline" size="sm" onClick={() => handleIngest(config.id, true)} disabled={!!ingesting} className="text-xs">
+                            {isIngesting ? "Indexing..." : "Force Re-index All"}
+                          </Button>
+                        )}
                         <Button variant="outline" size="sm" onClick={() => handleDelete(config.id)} className="text-xs text-red-500 hover:text-red-700">
                           Delete All
                         </Button>
@@ -307,6 +452,116 @@ export function KnowledgeBase() {
               </Card>
             );
           })}
+        </div>
+      )}
+
+      {/* Gitbook Add Space Dialog */}
+      {showGitbookDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !gitbookIngesting && setShowGitbookDialog(false)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Index Gitbook Space</h2>
+              <button
+                onClick={() => !gitbookIngesting && setShowGitbookDialog(false)}
+                className="rounded-md p-1 hover:bg-muted transition-colors"
+                disabled={gitbookIngesting}
+              >
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+
+            {/* Quick select from known spaces */}
+            <div className="mb-4">
+              <label className="block text-xs font-medium text-muted-foreground mb-2">Quick Select</label>
+              <div className="flex flex-wrap gap-2">
+                {GITBOOK_SPACES.map((space) => (
+                  <button
+                    key={space.url}
+                    onClick={() => { setGitbookUrl(space.url); setGitbookLabel(space.label); }}
+                    className={`rounded-md border px-3 py-1.5 text-xs transition-colors ${
+                      gitbookUrl === space.url
+                        ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue"
+                        : "hover:border-engenius-blue/50 hover:bg-muted"
+                    }`}
+                  >
+                    {space.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Manual URL input */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Space URL</label>
+                <input
+                  type="url"
+                  value={gitbookUrl}
+                  onChange={(e) => setGitbookUrl(e.target.value)}
+                  placeholder="https://doc.engenius.ai/cloud-licensing"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                  disabled={gitbookIngesting}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Label</label>
+                <input
+                  type="text"
+                  value={gitbookLabel}
+                  onChange={(e) => setGitbookLabel(e.target.value)}
+                  placeholder="Cloud Licensing"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                  disabled={gitbookIngesting}
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="gitbook-vision"
+                  checked={gitbookVision}
+                  onChange={(e) => setGitbookVision(e.target.checked)}
+                  className="rounded border"
+                  disabled={gitbookIngesting}
+                />
+                <label htmlFor="gitbook-vision" className="text-xs text-muted-foreground">
+                  Describe images with AI Vision (uses Gemini API credits)
+                </label>
+              </div>
+            </div>
+
+            {gitbookIngesting && (
+              <div className="mt-4 rounded-lg bg-muted/50 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <svg className="h-4 w-4 animate-spin text-engenius-blue" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <span>Fetching pages, describing images, and generating embeddings...</span>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">This may take a few minutes for large spaces.</p>
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowGitbookDialog(false)}
+                disabled={gitbookIngesting}
+                className="text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleGitbookIngest(gitbookUrl, gitbookLabel, gitbookVision)}
+                disabled={!gitbookUrl || !gitbookLabel || gitbookIngesting}
+                className="text-xs"
+              >
+                {gitbookIngesting ? "Indexing..." : "Start Indexing"}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>

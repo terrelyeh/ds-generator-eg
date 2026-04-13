@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ingestProducts } from "@/lib/rag/ingest-products";
+import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 
-// Allow up to 120s for full re-embed
-export const maxDuration = 120;
+// Allow up to 300s for Gitbook ingestion (many pages + Vision API)
+export const maxDuration = 300;
 
 /**
  * GET /api/documents?source_type=product_spec
@@ -81,6 +82,8 @@ export async function GET(request: Request) {
       last_updated: chunks.reduce((latest, c) =>
         !latest || c.updated_at > latest ? c.updated_at : latest, "" as string),
       product_line: (meta?.product_line_label as string) ?? (meta?.product_line as string) ?? null,
+      space_label: (meta?.space_label as string) ?? null,
+      space_url: (meta?.space_url as string) ?? null,
     };
   });
 
@@ -119,7 +122,34 @@ export async function POST(request: Request) {
     });
   }
 
-  // Future source types: gitbook, web, google_doc, file, text_snippet
+  if (source_type === "gitbook") {
+    const { space_url, space_label, enable_vision } = body as {
+      space_url?: string;
+      space_label?: string;
+      enable_vision?: boolean;
+    };
+
+    if (!space_url) {
+      return NextResponse.json(
+        { error: "Missing space_url for gitbook ingestion" },
+        { status: 400 }
+      );
+    }
+
+    const result = await ingestGitbook({
+      spaceUrl: space_url,
+      spaceLabel: space_label || space_url,
+      force,
+      enableVision: enable_vision ?? true,
+    });
+
+    return NextResponse.json({
+      ok: true,
+      ...result,
+    });
+  }
+
+  // Future source types: web, google_doc, file, text_snippet
   return NextResponse.json(
     { error: `Source type "${source_type}" ingestion not yet implemented` },
     { status: 400 }
