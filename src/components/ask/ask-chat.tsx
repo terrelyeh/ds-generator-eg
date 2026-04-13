@@ -794,86 +794,106 @@ export function AskChat({ compact = false }: AskChatProps) {
       {/* ===== Main area ===== */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
-        <div className={`flex-shrink-0 space-y-2 ${compact ? "px-5 py-2" : "mb-3"}`}>
-          {/* Title row */}
+        <div className={`flex-shrink-0 ${compact ? "px-5 pt-3 pb-2" : "mb-3"}`}>
           {compact ? (
-            /* Panel mode header: session title + history + new chat */
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground truncate max-w-[200px]">{currentSessionTitle}</span>
-              <div className="flex items-center gap-1.5">
-                <button
-                  onClick={() => setShowSessionList(true)}
-                  className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                  title="History"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                  </svg>
-                </button>
-                <button onClick={handleNewChat} className="rounded p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10" /></svg>
-                </button>
-              </div>
-            </div>
-          ) : (
-            /* Full page header */
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Conversation history">
-                  <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
-                </button>
-                <h1 className="text-lg font-bold tracking-tight">Ask SpecHub</h1>
-              </div>
-              {messages.length > 0 && (
-                <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="New conversation">
-                  + New
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Persona + Profile selector row */}
-          <div className={`flex items-center ${compact ? "gap-3 flex-wrap" : "gap-6"}`}>
-            {/* Dimension 1: Persona */}
-            {personas.length > 0 && (
-              <div className="flex items-center gap-2">
-                {!compact && <span className="text-xs text-muted-foreground flex-shrink-0">Persona:</span>}
-                <div className="flex gap-1.5">
-                  {personas.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => setPersona(p.id)}
-                      title={p.description}
-                      className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${
-                        persona === p.id
-                          ? "bg-engenius-blue text-white shadow-sm"
-                          : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
-                      }`}
-                    >
-                      {compact ? p.name.split(" ")[0] : p.name}
-                    </button>
-                  ))}
+            <>
+              {/* Row 1: Session title + history/new */}
+              <div className="flex items-center justify-between mb-2.5">
+                <h3 className="text-sm font-semibold text-foreground truncate max-w-[300px]">
+                  {currentSessionTitle}
+                </h3>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    onClick={() => setShowSessionList(true)}
+                    className="rounded-md p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors"
+                    title="History"
+                  >
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                  </button>
+                  <button onClick={handleNewChat} className="rounded-md p-1.5 text-muted-foreground/50 hover:text-foreground hover:bg-muted transition-colors" title="New chat">
+                    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M8 3v10M3 8h10" /></svg>
+                  </button>
                 </div>
               </div>
-            )}
 
-            {/* Dimension 2: User Profile */}
-            {profiles.length > 1 && (
-              <div className="flex items-center gap-2">
-                {!compact && <span className="text-xs text-muted-foreground flex-shrink-0">Profile:</span>}
-                <select
-                  value={profile}
-                  onChange={(e) => setProfile(e.target.value)}
-                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
-                >
-                  {profiles.map((p) => (
-                    <option key={p.id} value={p.id}>{p.label}</option>
-                  ))}
-                </select>
+              {/* Row 2: Persona (left) + Profile (right) */}
+              <div className="flex items-center justify-between">
+                {personas.length > 0 && (
+                  <div className="flex gap-1.5">
+                    {personas.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setPersona(p.id)}
+                        title={p.description}
+                        className={`cursor-pointer rounded-md px-2 py-1 text-[11px] font-medium whitespace-nowrap transition-all ${
+                          persona === p.id
+                            ? "bg-engenius-blue text-white shadow-sm"
+                            : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
+                        }`}
+                      >
+                        {p.name.split(" ")[0]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {profiles.length > 1 && (
+                  <select
+                    value={profile}
+                    onChange={(e) => setProfile(e.target.value)}
+                    className="rounded-md border border-input bg-background px-2 py-1 text-[11px] text-muted-foreground cursor-pointer focus:outline-none"
+                  >
+                    {profiles.map((p) => (
+                      <option key={p.id} value={p.id}>{p.label}</option>
+                    ))}
+                  </select>
+                )}
               </div>
-            )}
-          </div>
+            </>
+          ) : (
+            <>
+              {/* Full page: Title + new */}
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-3">
+                  <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="History">
+                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                  </button>
+                  <h1 className="text-lg font-bold tracking-tight">Ask SpecHub</h1>
+                </div>
+                {messages.length > 0 && (
+                  <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">+ New</button>
+                )}
+              </div>
+              {/* Full page: Persona (left) + Profile (right) */}
+              <div className="flex items-center justify-between">
+                {personas.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground flex-shrink-0">Persona:</span>
+                    <div className="flex gap-1.5">
+                      {personas.map((p) => (
+                        <button key={p.id} onClick={() => setPersona(p.id)} title={p.description}
+                          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${persona === p.id ? "bg-engenius-blue text-white shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}>
+                          {p.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {profiles.length > 1 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Profile:</span>
+                    <select value={profile} onChange={(e) => setProfile(e.target.value)}
+                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30">
+                      {profiles.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
+                    </select>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
         </div>
+
 
         {/* Chat card */}
         <Card className={`flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden ${compact ? "border-0 rounded-none shadow-none" : ""}`}>

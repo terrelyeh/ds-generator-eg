@@ -52,13 +52,19 @@ export function AskPanel({ isOpen, onClose }: AskPanelProps) {
         }`}
         style={{ width: "min(600px, max(42vw, 520px))" }}
       >
-        {/* Panel header */}
-        <div className="flex items-center justify-between px-4 py-2.5 border-b flex-shrink-0">
-          <h2 className="text-sm font-bold tracking-tight">Ask SpecHub</h2>
+        {/* Panel header — brand title bar */}
+        <div className="flex items-center justify-between px-5 py-3 border-b flex-shrink-0">
+          <div className="flex items-center gap-2">
+            <svg className="h-5 w-5 text-engenius-blue" viewBox="0 0 56 56" fill="none">
+              <path d="M28 8 L31 22 L45 25 L31 28 L28 42 L25 28 L11 25 L25 22 Z" fill="currentColor" opacity="0.85" />
+              <circle cx="28" cy="25" r="3" fill="white" opacity="0.9" />
+            </svg>
+            <h2 className="text-sm font-bold tracking-tight">Ask SpecHub</h2>
+          </div>
           <button
             onClick={onClose}
-            className="rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-            title="Close panel"
+            className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            title="Close"
           >
             <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M4 4l8 8M12 4l-8 8" />
