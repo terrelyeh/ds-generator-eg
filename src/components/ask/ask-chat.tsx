@@ -922,7 +922,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                             <button
                               key={qi}
                               onClick={() => handleSubmit(q)}
-                              className="rounded-lg border border-engenius-blue/20 px-3 py-1.5 text-xs text-engenius-blue hover:bg-engenius-blue/5 hover:border-engenius-blue/40 transition-all"
+                              className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border transition-all"
                             >
                               {q}
                             </button>
@@ -1009,19 +1009,26 @@ export function AskChat({ compact = false }: AskChatProps) {
                 );
               })}
             </div>
-            <div className="flex items-end gap-2">
+            <div className="relative">
               <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
-                placeholder={compact ? "Ask about products..." : "Ask about products, specs, or comparisons..."}
-                rows={1}
-                className="flex-1 resize-none rounded-lg border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
-                style={{ minHeight: 36, maxHeight: compact ? 80 : 120 }}
+                placeholder="Ask, search, or explain..."
+                rows={compact ? 2 : 2}
+                className="w-full resize-none rounded-xl border border-input bg-background px-4 pt-3 pb-10 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/20 focus:border-engenius-blue/30"
+                style={{ minHeight: compact ? 72 : 80, maxHeight: compact ? 120 : 160 }}
               />
-              <Button onClick={() => handleSubmit()} disabled={loading || !input.trim()} size={compact ? "sm" : "default"} className={compact ? "h-9 px-3" : "h-10 px-5"}>
-                {loading ? "..." : "Ask"}
-              </Button>
+              <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground/40">
+                  <span className="inline-flex items-center justify-center rounded bg-engenius-blue/10 text-engenius-blue px-1 py-0.5 text-[10px] font-semibold leading-none">AI</span>
+                  Based on EnGenius product data
+                </span>
+                <button onClick={() => handleSubmit()} disabled={loading || !input.trim()}
+                  className="text-sm font-medium text-engenius-blue hover:text-engenius-blue/80 disabled:text-muted-foreground/30 transition-colors">
+                  {loading ? "..." : "Send"}
+                </button>
+              </div>
             </div>
             {/* Current model info */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground/40 px-0.5">
+            <div className="flex items-center justify-between text-xs text-muted-foreground/30 px-1">
               <span className="truncate">
                 {currentModelLabel}
                 {currentPersonaLabel ? ` · ${currentPersonaLabel.name}` : ""}
