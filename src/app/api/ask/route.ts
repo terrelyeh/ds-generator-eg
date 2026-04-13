@@ -184,13 +184,14 @@ These should be natural extensions of the current topic, written in the same lan
     // Clean trailing empty lines from answer
     const answer = answerLines.join("\n").replace(/\n+$/, "");
 
-    // Step 6: Return answer with sources
+    // Step 6: Return answer with sources + images
     const sources = docs.map((d) => ({
       title: d.title,
       source_id: d.source_id,
       source_type: d.source_type,
       source_url: d.source_url,
       similarity: Math.round(d.similarity * 100) / 100,
+      images: (d.metadata?.image_urls as string[]) ?? [],
     }));
 
     return NextResponse.json({

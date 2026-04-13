@@ -63,12 +63,14 @@ interface ChunkToEmbed {
 /**
  * Split page content into chunks by headings.
  * Each chunk gets the page breadcrumb prepended for context.
+ * Also maps images to the chunk whose heading section they belong to.
  */
 function chunkByHeadings(
   content: string,
   breadcrumb: string[],
-  pageTitle: string
-): { title: string; content: string }[] {
+  pageTitle: string,
+  sectionImages?: Map<string, string[]>
+): { title: string; content: string; images: string[] }[] {
   const breadcrumbPrefix = breadcrumb.length > 0
     ? `[${breadcrumb.join(" > ")}]\n\n`
     : "";
@@ -76,7 +78,20 @@ function chunkByHeadings(
   // Split on H1/H2/H3 markers (from our htmlToText converter)
   const sections = content.split(/\n(?=#{1,3} )/);
 
-  const chunks: { title: string; content: string }[] = [];
+  const chunks: { title: string; content: string; images: string[] }[] = [];
+
+  // Helper: find images for a section title by fuzzy matching against sectionImages keys
+  function findSectionImages(title: string): string[] {
+    if (!sectionImages || sectionImages.size === 0) return [];
+    // Exact match
+    if (sectionImages.has(title)) return sectionImages.get(title) || [];
+    // Case-insensitive match
+    const lower = title.toLowerCase();
+    for (const [key, urls] of sectionImages) {
+      if (key.toLowerCase() === lower) return urls;
+    }
+    return [];
+  }
 
   for (const section of sections) {
     const trimmed = section.trim();
@@ -88,22 +103,27 @@ function chunkByHeadings(
       ? headingMatch[1].trim()
       : pageTitle;
 
+    const images = findSectionImages(sectionTitle);
     const fullContent = breadcrumbPrefix + trimmed;
 
     // If section is too long, split further by paragraphs
     if (fullContent.length > MAX_CHUNK_CHARS) {
       const subChunks = splitLongSection(fullContent, sectionTitle, breadcrumbPrefix);
-      chunks.push(...subChunks);
+      // Attach images only to the first sub-chunk
+      chunks.push(...subChunks.map((c, i) => ({ ...c, images: i === 0 ? images : [] })));
     } else {
-      chunks.push({ title: sectionTitle, content: fullContent });
+      chunks.push({ title: sectionTitle, content: fullContent, images });
     }
   }
 
   // If no heading-based chunks were created, treat entire content as one chunk
   if (chunks.length === 0 && content.trim().length >= MIN_CHUNK_CHARS) {
+    // Collect all intro images
+    const introImages = findSectionImages("_intro");
     chunks.push({
       title: pageTitle,
       content: breadcrumbPrefix + content.trim(),
+      images: introImages,
     });
   }
 
@@ -117,9 +137,9 @@ function splitLongSection(
   content: string,
   title: string,
   breadcrumbPrefix: string
-): { title: string; content: string }[] {
+): { title: string; content: string; images: string[] }[] {
   const paragraphs = content.split(/\n\n+/);
-  const chunks: { title: string; content: string }[] = [];
+  const chunks: { title: string; content: string; images: string[] }[] = [];
   let current = breadcrumbPrefix;
   let partIndex = 1;
 
@@ -128,6 +148,7 @@ function splitLongSection(
       chunks.push({
         title: `${title} (Part ${partIndex})`,
         content: current.trim(),
+        images: [],
       });
       current = breadcrumbPrefix;
       partIndex++;
@@ -139,6 +160,7 @@ function splitLongSection(
     chunks.push({
       title: partIndex > 1 ? `${title} (Part ${partIndex})` : title,
       content: current.trim(),
+      images: [],
     });
   }
 
@@ -175,12 +197,19 @@ function injectImageDescriptions(
 /**
  * Fetch pages concurrently with rate limiting.
  */
+interface FetchedPage {
+  content: string;
+  imageUrls: string[];
+  sectionImages: Map<string, string[]>;
+  title: string;
+}
+
 async function fetchPagesWithConcurrency(
   urls: { url: string; lastModified?: string }[],
   concurrency: number,
   errors: string[]
-): Promise<Map<string, { content: string; imageUrls: string[]; title: string }>> {
-  const results = new Map<string, { content: string; imageUrls: string[]; title: string }>();
+): Promise<Map<string, FetchedPage>> {
+  const results = new Map<string, FetchedPage>();
 
   for (let i = 0; i < urls.length; i += concurrency) {
     const batch = urls.slice(i, i + concurrency);
@@ -196,6 +225,7 @@ async function fetchPagesWithConcurrency(
         results.set(result.value.url, {
           content: result.value.content,
           imageUrls: result.value.imageUrls,
+          sectionImages: result.value.sectionImages,
           title: result.value.title,
         });
       } else {
@@ -288,8 +318,8 @@ export async function ingestGitbook(
     // Build breadcrumb
     const breadcrumb = urlToBreadcrumb(url, baseUrl);
 
-    // Chunk the content
-    const chunks = chunkByHeadings(enrichedContent, breadcrumb, page.title);
+    // Chunk the content — pass sectionImages for chunk-level image mapping
+    const chunks = chunkByHeadings(enrichedContent, breadcrumb, page.title, page.sectionImages);
 
     // Generate source_id from URL path (remove domain)
     const urlPath = new URL(url).pathname.replace(/^\//, "").replace(/\/$/, "");
@@ -317,9 +347,9 @@ export async function ingestGitbook(
           space_label: spaceLabel,
           breadcrumb,
           page_title: page.title,
-          has_images: page.imageUrls.length > 0,
-          images_count: page.imageUrls.length,
-          image_urls: page.imageUrls.length > 0 ? page.imageUrls : undefined,
+          has_images: chunk.images.length > 0,
+          images_count: chunk.images.length,
+          image_urls: chunk.images.length > 0 ? chunk.images : undefined,
         },
       });
     }

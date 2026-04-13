@@ -133,6 +133,8 @@ function resolveGitbookImageUrl(src: string): string | null {
 export async function fetchGitbookPage(url: string): Promise<{
   content: string;
   imageUrls: string[];
+  /** Map of section heading → image URLs that appear in that section */
+  sectionImages: Map<string, string[]>;
   title: string;
 }> {
   const res = await fetch(url, {
@@ -149,20 +151,46 @@ export async function fetchGitbookPage(url: string): Promise<{
   const html = await res.text();
 
   // Extract image URLs from the HTML
-  // Gitbook has two URL patterns:
-  // 1. Proxy: /~gitbook/image?url=<encoded-original>&sign=... — returns 400 for server-side fetch
-  // 2. Original: https://xxxxx-files.gitbook.io/~/files/v0/b/... — directly fetchable
-  // We extract original URLs from proxy params, or use direct URLs.
   const imageUrls: string[] = [];
   const imgRegex = /<img[^>]+src="([^"]+)"/g;
   let imgMatch;
   while ((imgMatch = imgRegex.exec(html)) !== null) {
-    // Raw src from HTML may contain &amp; — decode HTML entities only (NOT URL-decode here,
-    // because resolveGitbookImageUrl will handle URL decoding to preserve %2F in paths)
     const src = imgMatch[1].replace(/&amp;/g, "&");
     const resolved = resolveGitbookImageUrl(src);
     if (resolved && !imageUrls.includes(resolved)) {
       imageUrls.push(resolved);
+    }
+  }
+
+  // Build section-level image mapping:
+  // Walk through HTML tokens (headings and images) in order to know
+  // which images belong to which heading section.
+  const sectionImages = new Map<string, string[]>();
+  const tokenRegex = /<h([1-3])[^>]*>([\s\S]*?)<\/h\1>|<img[^>]+src="([^"]+)"/gi;
+  let currentSection = "_intro"; // images before first heading
+  sectionImages.set(currentSection, []);
+  let tokenMatch;
+  while ((tokenMatch = tokenRegex.exec(html)) !== null) {
+    if (tokenMatch[1]) {
+      // It's a heading — start new section
+      let heading = stripHtmlTags(tokenMatch[2]).replace(/hashtag/gi, "").replace(/link/gi, "").trim();
+      if (heading && heading.length >= 2) {
+        currentSection = heading;
+        if (!sectionImages.has(currentSection)) {
+          sectionImages.set(currentSection, []);
+        }
+      }
+    } else if (tokenMatch[3]) {
+      // It's an image
+      const src = tokenMatch[3].replace(/&amp;/g, "&");
+      const resolved = resolveGitbookImageUrl(src);
+      if (resolved) {
+        const arr = sectionImages.get(currentSection) || [];
+        if (!arr.includes(resolved)) {
+          arr.push(resolved);
+          sectionImages.set(currentSection, arr);
+        }
+      }
     }
   }
 
@@ -175,12 +203,11 @@ export async function fetchGitbookPage(url: string): Promise<{
   let title = titleMatch
     ? stripHtmlTags(titleMatch[1]).replace(/hashtag/gi, "").replace(/link/gi, "").trim()
     : "";
-  // Fallback to URL-derived title if heading was empty or just noise
   if (!title || title.length < 3) {
     title = urlToTitle(url);
   }
 
-  return { content: textContent, imageUrls, title };
+  return { content: textContent, imageUrls, sectionImages, title };
 }
 
 /**

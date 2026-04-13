@@ -13,6 +13,7 @@ interface Source {
   source_type: string;
   source_url: string | null;
   similarity: number;
+  images?: string[];
 }
 
 interface Message {
@@ -509,6 +510,31 @@ export function AskChat() {
                           <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
                         )}
                       </div>
+
+                      {/* Reference images from documentation */}
+                      {msg.sources && (() => {
+                        const allImages = [...new Map(msg.sources.map((s) => [s.source_id, s])).values()]
+                          .flatMap((s) => (s.images || []).map((img) => ({ url: img, source: s.title || s.source_id })));
+                        if (allImages.length === 0) return null;
+                        return (
+                          <details className="mt-2 group/imgs">
+                            <summary className="cursor-pointer text-xs text-muted-foreground/50 hover:text-muted-foreground transition-colors select-none">
+                              📷 {allImages.length} reference image{allImages.length > 1 ? "s" : ""} from documentation
+                            </summary>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {allImages.map((img, idx) => (
+                                <a key={idx} href={img.url} target="_blank" rel="noopener noreferrer"
+                                  className="block rounded-lg border overflow-hidden hover:ring-2 hover:ring-engenius-blue/50 transition-all"
+                                  title={img.source}>
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={img.url} alt={img.source} loading="lazy"
+                                    className="max-h-40 w-auto object-contain bg-white" />
+                                </a>
+                              ))}
+                            </div>
+                          </details>
+                        );
+                      })()}
 
                       {/* Follow-up questions */}
                       {msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
