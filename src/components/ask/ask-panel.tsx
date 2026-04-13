@@ -67,7 +67,7 @@ export function AskPanel({ isOpen, onClose }: AskPanelProps) {
         </div>
 
         {/* Chat content */}
-        <div className="flex-1 min-h-0">
+        <div className="flex-1 min-h-0 overflow-hidden">
           <AskChat compact />
         </div>
       </div>
