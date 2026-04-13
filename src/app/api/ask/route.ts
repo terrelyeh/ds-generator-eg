@@ -28,6 +28,20 @@ interface AskRequest {
  */
 export async function GET() {
   const personas = await listPersonas();
+
+  // Fetch welcome config from app_settings
+  const supabase = createAdminClient();
+  const { data: welcomeTitle } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", "ask_welcome_subtitle")
+    .single() as { data: { value: string } | null };
+  const { data: welcomeDesc } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", "ask_welcome_description")
+    .single() as { data: { value: string } | null };
+
   return NextResponse.json({
     ok: true,
     personas: personas.map((p) => ({
@@ -41,6 +55,10 @@ export async function GET() {
       label: p.label,
       description: p.description,
     })),
+    welcome: {
+      subtitle: welcomeTitle?.value || null,
+      description: welcomeDesc?.value || null,
+    },
   });
 }
 

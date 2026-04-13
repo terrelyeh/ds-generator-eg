@@ -50,7 +50,7 @@ export function AskPanel({ isOpen, onClose }: AskPanelProps) {
         className={`fixed top-14 right-0 bottom-0 z-40 flex flex-col bg-background border-l shadow-xl transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
-        style={{ width: "min(460px, max(33.33vw, 400px))" }}
+        style={{ width: "min(600px, max(42vw, 520px))" }}
       >
         {/* Panel header */}
         <div className="flex items-center justify-between px-4 py-2.5 border-b flex-shrink-0">

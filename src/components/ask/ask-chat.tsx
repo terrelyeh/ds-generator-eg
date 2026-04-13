@@ -111,28 +111,28 @@ function getGreeting(): string {
   return "Good evening";
 }
 
-/** EnGenius AI assistant icon — stylized network node with sparkle */
-function AssistantIcon({ size = 48 }: { size?: number }) {
+/** EnGenius AI assistant icon — clean, minimal with breathing animation */
+function AssistantIcon({ size = 56, animate = true }: { size?: number; animate?: boolean }) {
   return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: size * 1.6, height: size * 1.6 }}>
-      <div className="absolute inset-0 rounded-full bg-engenius-blue/8" />
-      <svg width={size} height={size} viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
-        {/* Network hub */}
-        <circle cx="24" cy="24" r="6" fill="#03a9f4" opacity="0.9" />
-        <circle cx="24" cy="24" r="9" stroke="#03a9f4" strokeWidth="1.5" opacity="0.3" />
-        {/* Connection lines */}
-        <line x1="24" y1="15" x2="24" y2="8" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        <line x1="24" y1="33" x2="24" y2="40" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        <line x1="15" y1="24" x2="8" y2="24" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        <line x1="33" y1="24" x2="40" y2="24" stroke="#03a9f4" strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        {/* Outer nodes */}
-        <circle cx="24" cy="7" r="2.5" fill="#03a9f4" opacity="0.6" />
-        <circle cx="24" cy="41" r="2.5" fill="#03a9f4" opacity="0.6" />
-        <circle cx="7" cy="24" r="2.5" fill="#03a9f4" opacity="0.6" />
-        <circle cx="41" cy="24" r="2.5" fill="#03a9f4" opacity="0.6" />
-        {/* AI sparkle */}
-        <path d="M36 10 L37.5 13.5 L41 15 L37.5 16.5 L36 20 L34.5 16.5 L31 15 L34.5 13.5 Z" fill="#03a9f4" opacity="0.7" />
-        <path d="M11 34 L12 36 L14 37 L12 38 L11 40 L10 38 L8 37 L10 36 Z" fill="#03a9f4" opacity="0.5" />
+    <div
+      className={`relative inline-flex items-center justify-center ${animate ? "animate-[breathe_3s_ease-in-out_infinite]" : ""}`}
+      style={{ width: size * 1.5, height: size * 1.5 }}
+    >
+      {/* Outer glow ring */}
+      <div className={`absolute inset-0 rounded-full bg-engenius-blue/6 ${animate ? "animate-[pulse_3s_ease-in-out_infinite]" : ""}`} />
+      <div className="absolute inset-2 rounded-full bg-engenius-blue/4" />
+      <svg width={size} height={size} viewBox="0 0 56 56" fill="none">
+        {/* Simple sparkle / AI star */}
+        <path
+          d="M28 8 L31 22 L45 25 L31 28 L28 42 L25 28 L11 25 L25 22 Z"
+          fill="#03a9f4"
+          opacity="0.85"
+        />
+        {/* Inner glow dot */}
+        <circle cx="28" cy="25" r="3" fill="white" opacity="0.9" />
+        {/* Small accent sparkle */}
+        <path d="M40 12 L41.2 15.8 L45 17 L41.2 18.2 L40 22 L38.8 18.2 L35 17 L38.8 15.8 Z" fill="#03a9f4" opacity="0.4" />
+        <path d="M14 36 L15 38.5 L17.5 39.5 L15 40.5 L14 43 L13 40.5 L10.5 39.5 L13 38.5 Z" fill="#03a9f4" opacity="0.3" />
       </svg>
     </div>
   );
@@ -327,6 +327,8 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
   const [profile, setProfile] = useState("default");
   const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
+  const [welcomeSubtitle, setWelcomeSubtitle] = useState<string | null>(null);
+  const [welcomeDescription, setWelcomeDescription] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -344,7 +346,14 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [showSessionList, setShowSessionList] = useState(false);
 
   useEffect(() => {
-    fetch("/api/ask").then((r) => r.json()).then((d) => { if (d.ok) { setPersonas(d.personas); setProfiles(d.profiles ?? []); } }).catch(() => {});
+    fetch("/api/ask").then((r) => r.json()).then((d) => {
+      if (d.ok) {
+        setPersonas(d.personas);
+        setProfiles(d.profiles ?? []);
+        if (d.welcome?.subtitle) setWelcomeSubtitle(d.welcome.subtitle);
+        if (d.welcome?.description) setWelcomeDescription(d.welcome.description);
+      }
+    }).catch(() => {});
     fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
@@ -794,8 +803,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                           : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"
                       }`}
                     >
-                      {p.icon && <span className="mr-1">{p.icon}</span>}
-                      {compact ? (p.icon || p.name.charAt(0)) : p.name}
+                      {compact ? p.name.split(" ")[0] : p.name}
                     </button>
                   ))}
                 </div>
@@ -825,10 +833,12 @@ export function AskChat({ compact = false }: AskChatProps) {
           <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-4 ${compact ? "px-3 py-3" : "px-5 py-4"}`}>
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
-                <AssistantIcon size={compact ? 40 : 48} />
-                <h2 className={`font-semibold mt-3 mb-0.5 ${compact ? "text-sm" : "text-lg"}`}>{getGreeting()}</h2>
+                <AssistantIcon size={compact ? 44 : 56} />
+                <h2 className={`font-semibold mt-4 mb-0.5 ${compact ? "text-sm" : "text-lg"}`}>
+                  {welcomeSubtitle || getGreeting()}
+                </h2>
                 <p className={`text-muted-foreground mb-5 max-w-sm ${compact ? "text-xs" : "text-sm"}`}>
-                  I&apos;m your EnGenius product specialist. Ask me about specs, configurations, licensing, or best practices.
+                  {welcomeDescription || "I'm your EnGenius product specialist. Ask me about specs, configurations, licensing, or best practices."}
                 </p>
                 <div className={`grid gap-2 w-full ${compact ? "grid-cols-1 max-w-xs" : "grid-cols-2 max-w-xl"}`}>
                   {EXAMPLE_QUESTIONS.slice(0, compact ? 4 : 8).map((q) => (
@@ -926,15 +936,11 @@ export function AskChat({ compact = false }: AskChatProps) {
               ))
             )}
 
-            {/* Loading animation (shown before streaming starts) */}
+            {/* Loading state — clean, minimal */}
             {loading && messages[messages.length - 1]?.content === "" && (
-              <div className="flex items-center gap-3 py-2">
-                <div className="flex gap-1.5">
-                  <span className="h-2.5 w-2.5 rounded-full bg-engenius-blue animate-bounce" style={{ animationDelay: "0ms", animationDuration: "0.8s" }} />
-                  <span className="h-2.5 w-2.5 rounded-full bg-engenius-blue/70 animate-bounce" style={{ animationDelay: "200ms", animationDuration: "0.8s" }} />
-                  <span className="h-2.5 w-2.5 rounded-full bg-engenius-blue/40 animate-bounce" style={{ animationDelay: "400ms", animationDuration: "0.8s" }} />
-                </div>
-                <span className="text-xs text-muted-foreground animate-pulse">Thinking...</span>
+              <div className="flex items-center gap-2.5 py-2 pl-9">
+                <div className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
+                <span className="text-xs text-muted-foreground/70">搜尋資料思考中...</span>
               </div>
             )}
           </div>
