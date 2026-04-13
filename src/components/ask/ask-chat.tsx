@@ -289,15 +289,32 @@ function processChildren(children: React.ReactNode, sources: Source[]): React.Re
 }
 
 function processTextWithCitations(text: string, sources: Source[]): React.ReactNode {
-  // Match [1], [2], etc. but not [Source 1 ...] patterns
-  const parts = text.split(/(\[\d+\])/g);
+  // Match citation patterns: [1], [2], [1, 3, 4], [1,3], [1, 2, 5, 9] etc.
+  const parts = text.split(/(\[\d+(?:\s*,\s*\d+)*\])/g);
   if (parts.length === 1) return text;
 
   return parts.map((part, i) => {
-    const match = part.match(/^\[(\d+)\]$/);
-    if (match) {
-      const idx = parseInt(match[1], 10);
+    // Single citation: [1]
+    const singleMatch = part.match(/^\[(\d+)\]$/);
+    if (singleMatch) {
+      const idx = parseInt(singleMatch[1], 10);
       return <CitationTooltip key={i} index={idx} sources={sources} />;
+    }
+    // Multi citation: [1, 3, 4] — render each as individual tooltip
+    const multiMatch = part.match(/^\[([\d\s,]+)\]$/);
+    if (multiMatch) {
+      const nums = multiMatch[1].split(",").map((n) => parseInt(n.trim(), 10)).filter((n) => !isNaN(n));
+      if (nums.length > 0) {
+        // Only show the first 2 to avoid clutter
+        const shown = nums.slice(0, 2);
+        return (
+          <span key={i}>
+            {shown.map((idx, j) => (
+              <CitationTooltip key={j} index={idx} sources={sources} />
+            ))}
+          </span>
+        );
+      }
     }
     return part;
   });
