@@ -1068,7 +1068,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                   Based on EnGenius product data
                 </span>
                 <button onClick={() => handleSubmit()} disabled={loading || !input.trim()}
-                  className="text-sm font-medium text-engenius-blue hover:text-engenius-blue/80 disabled:text-muted-foreground/30 transition-colors">
+                  className="rounded-lg bg-engenius-blue/90 px-3.5 py-1 text-xs font-medium text-white hover:bg-engenius-blue disabled:bg-muted disabled:text-muted-foreground/40 transition-colors">
                   {loading ? "..." : "Send"}
                 </button>
               </div>
