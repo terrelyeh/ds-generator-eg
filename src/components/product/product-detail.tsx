@@ -46,6 +46,7 @@ function ImageUploadButton({
   onUploaded: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -78,37 +79,112 @@ function ImageUploadButton({
     }
   }
 
+  async function handleDownload() {
+    try {
+      const res = await fetch(currentUrl);
+      const blob = await res.blob();
+      const ext = currentUrl.match(/\.(png|jpg|jpeg|webp)/i)?.[1] || "png";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${modelName}_${imageType}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      // Fallback: open in new tab
+      window.open(currentUrl, "_blank");
+    }
+  }
+
   const label = imageType === "product" ? "Product Image" : "Hardware Image";
   const hasImage = currentUrl && !currentUrl.startsWith("cache/");
 
   return (
-    <div className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-engenius-blue/30">
-      {hasImage ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={currentUrl}
-          alt={`${modelName} ${imageType}`}
-          className="h-32 w-auto object-contain"
-        />
-      ) : (
-        <div className="flex h-32 w-32 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
-          No image
+    <>
+      <div className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-engenius-blue/30">
+        {hasImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={currentUrl}
+            alt={`${modelName} ${imageType}`}
+            className="h-32 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setLightbox(true)}
+            title="Click to enlarge"
+          />
+        ) : (
+          <div className="flex h-32 w-32 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+            No image
+          </div>
+        )}
+        <span className="text-sm font-medium">{label}</span>
+        <div className="flex items-center gap-1.5">
+          {hasImage && (
+            <button
+              onClick={handleDownload}
+              className="inline-flex h-8 items-center rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+              title="Download original"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+          )}
+          <label>
+            <span className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors">
+              {uploading ? "Uploading..." : hasImage ? "Replace" : "Upload"}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={uploading}
+            />
+          </label>
+        </div>
+      </div>
+
+      {/* Lightbox modal */}
+      {lightbox && hasImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8"
+          onClick={() => setLightbox(false)}
+        >
+          <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={currentUrl}
+              alt={`${modelName} ${imageType}`}
+              className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+            />
+            <div className="absolute top-3 right-3 flex items-center gap-2">
+              <button
+                onClick={handleDownload}
+                className="rounded-full bg-white/90 p-2 text-gray-700 hover:bg-white transition-colors shadow-md"
+                title="Download"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setLightbox(false)}
+                className="rounded-full bg-white/90 p-2 text-gray-700 hover:bg-white transition-colors shadow-md"
+                title="Close"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
-      <span className="text-sm font-medium">{label}</span>
-      <label>
-        <span className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors">
-          {uploading ? "Uploading..." : hasImage ? "Replace" : "Upload"}
-        </span>
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-          disabled={uploading}
-        />
-      </label>
-    </div>
+    </>
   );
 }
 
@@ -130,6 +206,7 @@ function RadioPatternSlot({
   onUploaded: () => void;
 }) {
   const [uploading, setUploading] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -157,6 +234,7 @@ function RadioPatternSlot({
   }
 
   return (
+    <>
     <div
       className={`flex w-36 flex-col items-center gap-2 rounded-lg border-2 border-dashed p-3 transition-colors ${
         hasImage
@@ -166,7 +244,9 @@ function RadioPatternSlot({
     >
       {hasImage && imageUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={imageUrl} alt={`${modelName} ${label}`} className="h-16 w-auto object-contain" />
+        <img src={imageUrl} alt={`${modelName} ${label}`}
+          className="h-16 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => setLightbox(true)} title="Click to enlarge" />
       ) : (
         <svg className="h-10 w-10 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
@@ -188,6 +268,22 @@ function RadioPatternSlot({
         />
       </label>
     </div>
+
+    {/* Lightbox */}
+    {lightbox && hasImage && imageUrl && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8" onClick={() => setLightbox(false)}>
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt={`${modelName} ${label}`} className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
+          <button onClick={() => setLightbox(false)} className="absolute top-3 right-3 rounded-full bg-white/90 p-2 text-gray-700 hover:bg-white transition-colors shadow-md" title="Close">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
