@@ -218,24 +218,24 @@ export async function POST(request: Request) {
 
           const hasChanges = isNew || details.length > 0;
 
-          // Even if no content changes, always update sheet metadata + sync missing images
+          // Even if no content changes, always update sheet metadata + sync images
+          // Smart sync: always check Drive for updated images (not just missing ones)
           if (!hasChanges && existing) {
-            const missingImages =
-              !existing.product_image || existing.product_image.startsWith("cache/") ||
-              !existing.hardware_image || existing.hardware_image.startsWith("cache/");
-
             const updateFields: Record<string, unknown> = {
               sheet_last_modified: metadata.last_modified,
               sheet_last_editor: metadata.last_editor,
             };
 
-            if (missingImages) {
-              try {
-                const imgResult = await syncProductImages(modelName, supabase, pl.ds_images_folder_id);
-                if (imgResult.product_image_url) updateFields.product_image = imgResult.product_image_url;
-                if (imgResult.hardware_image_url) updateFields.hardware_image = imgResult.hardware_image_url;
-              } catch { /* image sync failure is non-fatal */ }
-            }
+            try {
+              const imgResult = await syncProductImages(modelName, supabase, pl.ds_images_folder_id, {
+                existingImages: {
+                  product_image: existing.product_image || undefined,
+                  hardware_image: existing.hardware_image || undefined,
+                },
+              });
+              if (imgResult.product_image_url) updateFields.product_image = imgResult.product_image_url;
+              if (imgResult.hardware_image_url) updateFields.hardware_image = imgResult.hardware_image_url;
+            } catch { /* image sync failure is non-fatal */ }
 
             await supabase
               .from("products")
@@ -278,9 +278,14 @@ export async function POST(request: Request) {
             ? "New product added"
             : buildSummaryText(details);
 
-          // Sync images from Google Drive → Supabase Storage
+          // Sync images from Google Drive → Supabase Storage (smart: skip if unchanged)
           try {
-            const images = await syncProductImages(modelName, supabase, pl.ds_images_folder_id);
+            const images = await syncProductImages(modelName, supabase, pl.ds_images_folder_id, {
+              existingImages: existing ? {
+                product_image: existing.product_image || undefined,
+                hardware_image: existing.hardware_image || undefined,
+              } : undefined,
+            });
             if (images.product_image_url || images.hardware_image_url) {
               await supabase
                 .from("products")

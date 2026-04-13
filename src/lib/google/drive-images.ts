@@ -6,16 +6,22 @@ import { getGoogleAuth } from "./auth";
  * Find a file by exact name within a specific Google Drive folder.
  * Returns the Drive file ID and mimeType, or null if not found.
  */
+interface DriveFileInfo {
+  id: string;
+  mimeType: string;
+  modifiedTime?: string;
+}
+
 async function findFileInFolder(
   folderId: string,
   fileName: string
-): Promise<{ id: string; mimeType: string } | null> {
+): Promise<DriveFileInfo | null> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
   const res = await drive.files.list({
     q: `'${folderId}' in parents and name = '${fileName}' and mimeType contains 'image/' and trashed = false`,
-    fields: "files(id, name, mimeType)",
+    fields: "files(id, name, mimeType, modifiedTime)",
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
     pageSize: 1,
@@ -23,7 +29,7 @@ async function findFileInFolder(
 
   const file = res.data.files?.[0];
   if (!file?.id || !file.mimeType) return null;
-  return { id: file.id, mimeType: file.mimeType };
+  return { id: file.id, mimeType: file.mimeType, modifiedTime: file.modifiedTime ?? undefined };
 }
 
 /**
@@ -31,13 +37,13 @@ async function findFileInFolder(
  */
 async function findFileByName(
   fileName: string
-): Promise<{ id: string; mimeType: string } | null> {
+): Promise<DriveFileInfo | null> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
   const res = await drive.files.list({
     q: `name = '${fileName}' and mimeType contains 'image/' and trashed = false`,
-    fields: "files(id, name, mimeType)",
+    fields: "files(id, name, mimeType, modifiedTime)",
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
     pageSize: 1,
@@ -45,7 +51,7 @@ async function findFileByName(
 
   const file = res.data.files?.[0];
   if (!file?.id || !file.mimeType) return null;
-  return { id: file.id, mimeType: file.mimeType };
+  return { id: file.id, mimeType: file.mimeType, modifiedTime: file.modifiedTime ?? undefined };
 }
 
 /**
@@ -124,10 +130,23 @@ export interface ImageSyncResult {
  * Images are searched in the product line's DS Images folder first,
  * then fall back to a global Drive search.
  */
+/**
+ * Options for syncProductImages.
+ * Pass existingImages to enable smart sync — only re-download if Drive file is newer.
+ */
+export interface ImageSyncOptions {
+  /** Existing image URLs from DB — used to check Storage timestamps */
+  existingImages?: {
+    product_image?: string;
+    hardware_image?: string;
+  };
+}
+
 export async function syncProductImages(
   modelName: string,
   supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
-  dsImagesFolderId?: string | null
+  dsImagesFolderId?: string | null,
+  options?: ImageSyncOptions
 ): Promise<ImageSyncResult> {
   const result: ImageSyncResult = {
     product_image_url: null,
@@ -135,11 +154,11 @@ export async function syncProductImages(
   };
 
   const imageTypes = [
-    { suffix: "product", key: "product_image_url" as const },
-    { suffix: "hardware", key: "hardware_image_url" as const },
+    { suffix: "product", key: "product_image_url" as const, dbField: "product_image" as const },
+    { suffix: "hardware", key: "hardware_image_url" as const, dbField: "hardware_image" as const },
   ];
 
-  for (const { suffix, key } of imageTypes) {
+  for (const { suffix, key, dbField } of imageTypes) {
     // Try .png first, then .jpg
     for (const ext of ["png", "jpg"]) {
       const fileName = `${modelName}_${suffix}.${ext}`;
@@ -153,8 +172,32 @@ export async function syncProductImages(
 
         if (!file) continue;
 
-        const buffer = await downloadFile(file.id);
         const storagePath = `images/${modelName}/${modelName}_${suffix}.${ext}`;
+
+        // Smart sync: if we have an existing image, compare Drive modifiedTime
+        // with Storage last-modified to skip unnecessary re-downloads
+        const existingUrl = options?.existingImages?.[dbField];
+        if (existingUrl && file.modifiedTime) {
+          try {
+            const headRes = await fetch(existingUrl, { method: "HEAD" });
+            const storageLastMod = headRes.headers.get("last-modified");
+            if (storageLastMod) {
+              const driveTime = new Date(file.modifiedTime).getTime();
+              const storageTime = new Date(storageLastMod).getTime();
+              if (storageTime >= driveTime) {
+                // Storage is up-to-date, skip re-download
+                result[key] = existingUrl;
+                break;
+              }
+              // Drive is newer — fall through to re-download
+              console.log(`${fileName}: Drive updated (${file.modifiedTime}), re-syncing...`);
+            }
+          } catch {
+            // HEAD request failed — fall through to re-download
+          }
+        }
+
+        const buffer = await downloadFile(file.id);
 
         // Upload to Supabase Storage (upsert to overwrite if exists)
         const { error } = await supabase.storage
