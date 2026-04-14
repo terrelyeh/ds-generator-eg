@@ -363,6 +363,91 @@ export async function ingestGitbook(
     }
   }
 
+  // Step 5b: Create dedicated "focused" chunks for extracted tables.
+  //
+  // Large Vision-extracted tables (especially LED behavior tables on QSG pages)
+  // live inside big page chunks alongside many unrelated image descriptions.
+  // That dilutes the embedding signal so even the correct chunk loses to more
+  // generic LED-ish chunks from other pages. For any image whose description
+  // contains a table pattern (markdown table with LED/Status/Color/Behavior
+  // keywords), we emit an extra dedicated chunk that holds ONLY the table plus
+  // a clean title derived from the page breadcrumb. This ranks reliably on
+  // queries like "ECW536 LED Behavior".
+  const FOCUSED_CHUNK_OFFSET = 10000; // well above any natural chunk_index
+  let focusedIndex = 0;
+
+  for (const [url, page] of pages) {
+    if (!hasSubstantialContent(page.content)) continue;
+
+    const breadcrumb = urlToBreadcrumb(url, baseUrl);
+    const urlPath = new URL(url).pathname.replace(/^\//, "").replace(/\/$/, "");
+    const sourceId = urlPath || "index";
+
+    // Derive a model hint from the last breadcrumb segment (e.g. "ecw536" -> "ECW536")
+    const modelHint = breadcrumb[breadcrumb.length - 1]?.toUpperCase() || page.title;
+
+    for (const imageUrl of page.imageUrls) {
+      const desc = imageDescriptions.get(imageUrl);
+      if (!desc) continue;
+
+      // Detect table content — markdown pipe table with LED/Status/Color/Behavior keywords
+      const looksLikeTable = /\|.*\|.*\|/.test(desc) && /\|\s*:?-+/.test(desc);
+      const looksLikeLedTable =
+        looksLikeTable &&
+        (/LED\s*(Color|Behavior|Status)/i.test(desc) ||
+          /\bPWR\b.*\b(Orange|Blue|Green|Red|White|Amber)\b/i.test(desc) ||
+          /\bFlashing\b[\s\S]*\bSolid\b/i.test(desc));
+
+      if (!looksLikeLedTable) continue;
+
+      // Extract just the table portion (from first `|` line to end of contiguous `|` lines)
+      const lines = desc.split("\n");
+      const startIdx = lines.findIndex((l) => l.trim().startsWith("|"));
+      if (startIdx < 0) continue;
+      let endIdx = startIdx;
+      while (endIdx < lines.length && (lines[endIdx].trim().startsWith("|") || lines[endIdx].trim() === "")) {
+        endIdx++;
+      }
+      const tableMd = lines.slice(startIdx, endIdx).join("\n").trim();
+      if (tableMd.length < 60) continue;
+
+      // Bilingual header so both English ("LED behavior") and Chinese
+      // ("LED 燈號 / 指示燈 / 狀態") queries match the embedding.
+      const focusedContent = `${breadcrumb.join(" > ")}\n\n## ${modelHint} — LED Behavior Table / LED 燈號行為表 / 指示燈狀態說明\n\nModel / 型號: ${modelHint}\nKeywords: LED status indicator light color behavior meaning, LED 指示燈 狀態 顏色 含義 閃爍 恆亮\n\n${tableMd}`;
+      const focusedTitle = `${modelHint} — LED Behavior`;
+      const chunkIndex = FOCUSED_CHUNK_OFFSET + focusedIndex++;
+      const hash = contentHash(focusedContent);
+
+      if (!force && hashMap.get(`${sourceId}:${chunkIndex}`) === hash) {
+        skipped++;
+        continue;
+      }
+
+      allChunks.push({
+        sourceId,
+        sourceUrl: url,
+        chunkIndex,
+        content: focusedContent,
+        title: focusedTitle,
+        hash,
+        metadata: {
+          space_url: baseUrl,
+          space_label: spaceLabel,
+          breadcrumb,
+          page_title: page.title,
+          chunk_type: "focused_led_table",
+          source_image_url: imageUrl,
+          solution: tax.solution,
+          product_lines: tax.product_lines,
+          models: tax.models,
+        },
+      });
+
+      // Only emit one focused LED chunk per page (first match wins)
+      break;
+    }
+  }
+
   if (allChunks.length === 0) {
     return {
       processed: 0,

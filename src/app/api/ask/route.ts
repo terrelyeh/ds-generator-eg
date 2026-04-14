@@ -124,7 +124,17 @@ export async function POST(request: Request) {
   // can't express the "empty product_lines = applies to all lines" inheritance
   // rule), so fetch a larger candidate pool then narrow it.
   const hasTaxonomyFilter = !!(taxonomy && (taxonomy.solution || (taxonomy.product_lines && taxonomy.product_lines.length > 0) || (taxonomy.models && taxonomy.models.length > 0)));
-  const matchCount = hasTaxonomyFilter ? 40 : 12;
+
+  // Detect model-number mentions in the question (e.g., "ECW536", "ECC500",
+  // "EVS1004D"). When present, we fetch more candidates and re-rank so the
+  // chunks that literally mention that model float to the top — necessary
+  // because text-embedding-3-small has weaker cross-lingual performance so
+  // a Chinese query may not match an English model-specific chunk tightly.
+  const modelMentionRegex = /\b(E[CWS][CWS]?\d{2,4}[A-Z]?|EVS\d{2,4}[A-Z]?|ESG\d{2,4}[A-Z]?|EOC\d{2,4}[A-Z]?|EAP\d{2,4}[A-Z]?|ECP\d{2,4}[A-Z]?)\b/gi;
+  const mentionedModels = [...new Set((question.match(modelMentionRegex) ?? []).map((m) => m.toUpperCase()))];
+  const hasModelMention = mentionedModels.length > 0;
+
+  const matchCount = hasTaxonomyFilter || hasModelMention ? 40 : 12;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -182,9 +192,64 @@ export async function POST(request: Request) {
         // should also be included when filtering by a specific product_line).
         if (hasTaxonomyFilter && taxonomy) {
           docs = docs.filter((d) => matchesTaxonomyFilter(extractTaxonomy(d.metadata), taxonomy));
-          // Keep only the top 12 after filtering to match original context budget
-          docs = docs.slice(0, 12);
         }
+
+        // Model-mention supplementary lookup — text-embedding-3-small has weak
+        // cross-lingual performance so a Chinese query like "ECW536 橘色 LED"
+        // may not surface the English-language model-specific chunk. When the
+        // question names one or more models explicitly, run a direct content
+        // ILIKE lookup and merge those chunks into the candidate pool, then
+        // re-rank so they float to the top.
+        if (hasModelMention && mentionedModels.length > 0) {
+          const existingIds = new Set(docs.map((d) => d.id));
+          const addUnique = (rows: Omit<MatchedDoc, "similarity">[] | null) => {
+            if (!rows) return;
+            for (const r of rows) {
+              if (!existingIds.has(r.id)) {
+                docs.push({ ...r, similarity: 0 });
+                existingIds.add(r.id);
+              }
+            }
+          };
+
+          // Pass 1: pull ALL focused-table chunks matching this model (they are
+          // high-signal and we never want them cut off by a low limit).
+          for (const m of mentionedModels) {
+            const { data: focused } = await supabase
+              .from("documents" as "products")
+              .select("id, source_type, source_id, source_url, title, content, metadata")
+              .gte("chunk_index", 10000)
+              .or(`content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
+              .limit(10) as { data: Omit<MatchedDoc, "similarity">[] | null };
+            addUnique(focused);
+          }
+
+          // Pass 2: broader content match for the model (product_spec + gitbook).
+          const orClauses = mentionedModels
+            .map((m) => `content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
+            .join(",");
+          const { data: modelMatches } = await supabase
+            .from("documents" as "products")
+            .select("id, source_type, source_id, source_url, title, content, metadata")
+            .or(orClauses)
+            .limit(30) as { data: Omit<MatchedDoc, "similarity">[] | null };
+          addUnique(modelMatches);
+
+          // Re-rank: model-mention literal matches first, then similarity
+          const scored = docs.map((d) => {
+            const haystack = `${d.source_id} ${d.title} ${d.content}`.toUpperCase();
+            const literalMatches = mentionedModels.filter((m) => haystack.includes(m)).length;
+            // Bonus for focused LED chunks specifically
+            const isFocusedLed =
+              (d.metadata?.chunk_type as string) === "focused_led_table" ? 1 : 0;
+            return { doc: d, score: literalMatches * 10 + isFocusedLed * 5 + d.similarity };
+          });
+          scored.sort((a, b) => b.score - a.score);
+          docs = scored.map((s) => s.doc);
+        }
+
+        // Trim to final context budget
+        docs = docs.slice(0, 12);
 
         if (docs.length === 0 && recentHistory.length === 0) {
           sendEvent(JSON.stringify({ type: "chunk", content: "I couldn't find relevant product information to answer your question. Try rephrasing or asking about a specific product model." }));
