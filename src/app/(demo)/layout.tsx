@@ -11,7 +11,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  themeColor: "#faf9f5",
 };
 
 export default function DemoLayout({
@@ -19,5 +19,5 @@ export default function DemoLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="min-h-[100dvh] bg-background">{children}</div>;
+  return <div className="min-h-[100dvh] bg-[#faf9f5]">{children}</div>;
 }

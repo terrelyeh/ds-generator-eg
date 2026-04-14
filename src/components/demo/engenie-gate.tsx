@@ -54,13 +54,13 @@ export function EngenieGate({ children }: { children: React.ReactNode }) {
   }
 
   if (authed === null) {
-    return <div className="min-h-[100dvh] bg-background" />;
+    return <div className="min-h-[100dvh] bg-[#faf9f5]" />;
   }
 
   if (authed) return <>{children}</>;
 
   return (
-    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-background px-6">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-[#faf9f5] px-6">
       <div className="flex w-full max-w-[320px] flex-col items-center">
         <EngenieMark size={56} />
         <h1 className="mt-5 font-heading text-[28px] font-bold tracking-tight text-engenius-dark">
@@ -80,7 +80,7 @@ export function EngenieGate({ children }: { children: React.ReactNode }) {
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={loading}
-            className={`h-12 w-full rounded-full border bg-white px-5 text-[15px] outline-none transition-all placeholder:text-engenius-gray/60 focus:border-engenius-blue focus:ring-2 focus:ring-engenius-blue/20 ${
+            className={`h-12 w-full rounded-full border bg-white px-5 text-[15px] text-engenius-dark outline-none transition-all placeholder:text-engenius-dark/35 focus:border-engenius-blue focus:ring-2 focus:ring-engenius-blue/20 ${
               error ? "animate-[shake_0.4s_ease-in-out] border-red-400" : "border-border"
             }`}
           />

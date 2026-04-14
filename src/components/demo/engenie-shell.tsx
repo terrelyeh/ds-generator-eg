@@ -32,17 +32,17 @@ export function EngenieShell() {
   }, []);
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-background">
-      {/* Header — no divider, merges with background */}
+    <div className="flex h-[100dvh] flex-col bg-[#faf9f5]">
+      {/* Header — locked at top with warm paper backdrop blur */}
       <header
-        className="relative flex flex-shrink-0 items-center justify-center px-4 pb-2"
-        style={{ paddingTop: "max(env(safe-area-inset-top), 12px)" }}
+        className="relative z-20 flex flex-shrink-0 items-center justify-center bg-[#faf9f5]/85 px-4 pb-3 backdrop-blur-md"
+        style={{ paddingTop: "max(env(safe-area-inset-top), 14px)" }}
       >
         <button
           onClick={() => setDrawerOpen(true)}
           aria-label="Open menu"
           className="absolute left-3 flex h-10 w-10 items-center justify-center rounded-full text-engenius-dark/80 transition-colors hover:bg-black/[0.04] active:bg-black/[0.08]"
-          style={{ top: "max(env(safe-area-inset-top), 12px)" }}
+          style={{ top: "max(env(safe-area-inset-top), 10px)" }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <path d="M4 6h16M4 12h16M4 18h16" />

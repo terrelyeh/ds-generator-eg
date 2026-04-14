@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { EngenieMark } from "./engenie-mark";
@@ -47,9 +47,34 @@ export function EngenieChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<"searching" | "generating" | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // rAF-batched streaming: accumulate chunks in a ref, flush to state once per frame
+  const pendingContentRef = useRef<string>("");
+  const rafIdRef = useRef<number | null>(null);
+
+  const scheduleFlush = useCallback(() => {
+    if (rafIdRef.current !== null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const content = pendingContentRef.current;
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant") {
+          updated[updated.length - 1] = { ...last, content };
+        }
+        return updated;
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
@@ -57,6 +82,11 @@ export function EngenieChat({
       behavior: "smooth",
     });
   }, [messages, loading]);
+
+  useEffect(() => {
+    const t = setTimeout(() => textareaRef.current?.focus(), 120);
+    return () => clearTimeout(t);
+  }, []);
 
   function autosize() {
     const el = textareaRef.current;
@@ -75,7 +105,7 @@ export function EngenieChat({
     const history = [...messages, userMsg];
     setMessages([...history, { role: "assistant", content: "", isStreaming: true }]);
     setLoading(true);
-    setStatus("searching");
+    pendingContentRef.current = "";
 
     try {
       const res = await fetch("/api/ask", {
@@ -118,18 +148,10 @@ export function EngenieChat({
           if (payload === "[DONE]") continue;
           try {
             const event = JSON.parse(payload);
-            if (event.type === "status") {
-              setStatus(event.status);
-            } else if (event.type === "chunk") {
+            if (event.type === "chunk") {
               fullContent += event.content;
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last?.role === "assistant") {
-                  updated[updated.length - 1] = { ...last, content: fullContent };
-                }
-                return updated;
-              });
+              pendingContentRef.current = fullContent;
+              scheduleFlush();
             } else if (event.type === "sources") {
               streamSources = event.sources ?? [];
             }
@@ -139,7 +161,12 @@ export function EngenieChat({
         }
       }
 
-      // Strip trailing follow-ups (after "---")
+      // Final flush — cancel pending rAF and commit final state
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+
       const sepIdx = fullContent.lastIndexOf("\n---\n");
       const finalContent = sepIdx >= 0 ? fullContent.slice(0, sepIdx).trimEnd() : fullContent;
 
@@ -162,7 +189,6 @@ export function EngenieChat({
       ]);
     } finally {
       setLoading(false);
-      setStatus(null);
     }
   }
 
@@ -178,25 +204,27 @@ export function EngenieChat({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      {/* Messages area */}
       <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
         {isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center px-6 pb-8">
-            <EngenieMark size={64} />
-            <h2 className="mt-6 text-center font-heading text-[22px] font-bold tracking-tight text-engenius-dark">
-              {welcomeSubtitle || "How can I help you?"}
+            <EngenieMark size={56} />
+            <h2
+              className="mt-7 text-center text-[30px] font-normal leading-[1.2] tracking-[-0.01em] text-engenius-dark"
+              style={{ fontFamily: "ui-serif, Georgia, 'Times New Roman', serif" }}
+            >
+              {welcomeSubtitle || "How can I help you today?"}
             </h2>
             {welcomeDescription && (
-              <p className="mt-2 max-w-[280px] text-center text-[13px] leading-relaxed text-engenius-gray">
+              <p className="mt-3 max-w-[280px] text-center text-[13px] leading-relaxed text-engenius-gray">
                 {welcomeDescription}
               </p>
             )}
-            <div className="mt-8 flex w-full max-w-[320px] flex-col gap-2">
+            <div className="mt-10 flex w-full max-w-[320px] flex-col gap-2">
               {questions.slice(0, 4).map((q, i) => (
                 <button
                   key={i}
                   onClick={() => handleSubmit(q)}
-                  className="w-full rounded-2xl border border-border/60 bg-white px-4 py-3 text-left text-[13px] text-engenius-dark/90 transition-all hover:border-engenius-blue/40 hover:bg-engenius-blue/[0.03]"
+                  className="w-full rounded-2xl border border-black/[0.06] bg-white/60 px-4 py-3 text-left text-[13px] text-engenius-dark/90 transition-all hover:border-engenius-blue/40 hover:bg-white"
                 >
                   {q}
                 </button>
@@ -204,20 +232,10 @@ export function EngenieChat({
             </div>
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-[720px] px-4 pt-4 pb-6">
+          <div className="mx-auto w-full max-w-[720px] px-5 pt-6 pb-8">
             {messages.map((m, i) => (
               <MessageBubble key={i} message={m} />
             ))}
-            {loading && status && (
-              <div className="mt-2 flex items-center gap-2 px-1 text-[12px] text-engenius-gray">
-                <span className="flex gap-1">
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-engenius-blue" style={{ animationDelay: "0ms" }} />
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-engenius-blue" style={{ animationDelay: "150ms" }} />
-                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-engenius-blue" style={{ animationDelay: "300ms" }} />
-                </span>
-                <span>{status === "searching" ? "Searching knowledge base..." : "Thinking..."}</span>
-              </div>
-            )}
           </div>
         )}
       </div>
@@ -227,11 +245,12 @@ export function EngenieChat({
         className="flex-shrink-0 px-3 pt-2"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}
       >
-        <div className="mx-auto flex w-full max-w-[720px] items-end gap-2 rounded-[28px] border border-border/60 bg-white px-4 py-2 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.08)] transition-all focus-within:border-engenius-blue/50 focus-within:shadow-[0_4px_20px_-4px_rgba(3,169,244,0.15)]">
+        <div className="mx-auto flex w-full max-w-[720px] items-end gap-2 rounded-[28px] border border-black/[0.08] bg-white px-4 py-2 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] transition-all focus-within:border-engenius-blue/50 focus-within:shadow-[0_4px_20px_-4px_rgba(3,169,244,0.15)]">
           <textarea
             ref={textareaRef}
             value={input}
             rows={1}
+            autoFocus
             onChange={(e) => {
               setInput(e.target.value);
               autosize();
@@ -239,7 +258,7 @@ export function EngenieChat({
             onKeyDown={handleKeyDown}
             placeholder="Ask EnGenie..."
             disabled={loading}
-            className="flex-1 resize-none bg-transparent py-2 text-[15px] leading-relaxed text-engenius-dark outline-none placeholder:text-engenius-gray/60 disabled:opacity-50"
+            className="flex-1 resize-none bg-transparent py-2 text-[15px] leading-relaxed text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
           />
           <button
             onClick={() => handleSubmit()}
@@ -257,46 +276,103 @@ export function EngenieChat({
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+/* ─── Message bubble (memoized to prevent re-render of prior messages during streaming) ─── */
+const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
   if (message.role === "user") {
     return (
-      <div className="mb-4 flex justify-end">
-        <div className="max-w-[85%] rounded-[20px] rounded-br-md bg-engenius-blue/[0.08] px-4 py-2.5 text-[15px] leading-relaxed text-engenius-dark">
+      <div className="mb-6 flex justify-end">
+        <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-2.5 text-[15.5px] leading-[1.6] text-engenius-dark">
           {message.content}
         </div>
       </div>
     );
   }
 
+  // Streaming cursor: appear after the last paragraph/heading/list item in the prose
+  const cursor =
+    "[&_p:last-child]:after:ml-1 [&_p:last-child]:after:inline-block [&_p:last-child]:after:h-[0.95em] [&_p:last-child]:after:w-[2.5px] [&_p:last-child]:after:translate-y-[0.15em] [&_p:last-child]:after:rounded-[1px] [&_p:last-child]:after:bg-engenius-dark/70 [&_p:last-child]:after:animate-pulse [&_p:last-child]:after:content-['']";
+
   return (
-    <div className="mb-5 flex gap-3">
-      <div className="flex-shrink-0 pt-0.5">
-        <EngenieMark size={22} />
+    <div className="mb-8 w-full">
+      <div
+        className={`prose max-w-none text-[15.5px] text-engenius-dark
+          prose-p:my-4 prose-p:leading-[1.75]
+          prose-headings:mb-3 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
+          prose-h1:mt-8 prose-h1:text-[22px]
+          prose-h2:mt-7 prose-h2:text-[19px]
+          prose-h3:mt-6 prose-h3:text-[16px]
+          prose-strong:font-semibold prose-strong:text-engenius-dark
+          prose-ul:my-4 prose-ul:pl-5 prose-ol:my-4 prose-ol:pl-5 prose-li:my-1.5 prose-li:leading-[1.7] prose-li:marker:text-engenius-dark/40
+          prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[13px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
+          prose-pre:bg-black/[0.04] prose-pre:text-[13px] prose-pre:border prose-pre:border-black/[0.06]
+          prose-blockquote:border-l-2 prose-blockquote:border-engenius-blue/40 prose-blockquote:pl-4 prose-blockquote:text-engenius-dark/80 prose-blockquote:font-normal prose-blockquote:not-italic
+          prose-hr:my-6 prose-hr:border-black/[0.08]
+          prose-table:text-[13.5px] prose-th:bg-black/[0.03] prose-th:py-2 prose-th:px-3 prose-td:py-2 prose-td:px-3 prose-td:align-top
+          ${message.isStreaming && message.content ? cursor : ""}`}
+      >
+        {message.content ? (
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+            {stripCitations(message.content)}
+          </ReactMarkdown>
+        ) : message.isStreaming ? (
+          <ThinkingOrb />
+        ) : null}
       </div>
-      <div className="min-w-0 flex-1 pt-1">
-        <div className="prose prose-sm max-w-none text-[15px] leading-relaxed text-engenius-dark prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-headings:font-semibold prose-headings:text-engenius-dark prose-strong:text-engenius-dark prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:text-[13px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none prose-pre:bg-muted prose-pre:text-[13px]">
-          {message.content ? (
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {stripCitations(message.content)}
-            </ReactMarkdown>
-          ) : message.isStreaming ? (
-            <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-engenius-blue/40" />
-          ) : null}
+      {message.sources && message.sources.length > 0 && !message.isStreaming && (
+        <ReferenceList sources={message.sources} />
+      )}
+    </div>
+  );
+});
+
+function ReferenceList({ sources }: { sources: Source[] }) {
+  const [open, setOpen] = useState(false);
+  const unique = dedupe(sources);
+  if (unique.length === 0) return null;
+  return (
+    <div className="mt-5">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1.5 text-[12px] text-engenius-gray transition-colors hover:text-engenius-dark"
+      >
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+        >
+          <polyline points="9 18 15 12 9 6" />
+        </svg>
+        <span>{unique.length} references</span>
+      </button>
+      {open && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {unique.slice(0, 8).map((s, i) => (
+            <SourceChip key={i} source={s} />
+          ))}
         </div>
-        {message.sources && message.sources.length > 0 && !message.isStreaming && (
-          <div className="mt-3 flex flex-wrap gap-1.5">
-            {dedupe(message.sources).slice(0, 4).map((s, i) => (
-              <SourceChip key={i} source={s} />
-            ))}
-          </div>
-        )}
-      </div>
+      )}
+    </div>
+  );
+}
+
+function ThinkingOrb() {
+  return (
+    <div className="flex items-center gap-2.5 py-1">
+      <span className="relative inline-flex h-2.5 w-2.5">
+        <span className="absolute inset-0 animate-ping rounded-full bg-engenius-blue/40" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-engenius-blue/70" />
+      </span>
     </div>
   );
 }
 
 function stripCitations(text: string): string {
-  // Remove [1], [1,2] inline citation markers for cleaner demo display
   return text.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, "");
 }
 
@@ -312,7 +388,7 @@ function dedupe(sources: Source[]): Source[] {
 
 function SourceChip({ source }: { source: Source }) {
   const content = (
-    <span className="inline-flex max-w-[180px] items-center gap-1 rounded-full border border-border/60 bg-white px-2.5 py-1 text-[11px] text-engenius-gray transition-colors hover:border-engenius-blue/40 hover:text-engenius-dark">
+    <span className="inline-flex max-w-[200px] items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] text-engenius-gray transition-colors hover:border-engenius-blue/40 hover:text-engenius-dark">
       <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />

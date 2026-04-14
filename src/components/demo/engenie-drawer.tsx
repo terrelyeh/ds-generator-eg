@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { EngenieMark } from "./engenie-mark";
 
 interface Model {
@@ -66,6 +66,7 @@ export interface EngenieDrawerProps {
 
 export function EngenieDrawer(props: EngenieDrawerProps) {
   const { open, onClose } = props;
+  const [modelExpanded, setModelExpanded] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -73,6 +74,11 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  const allModels = MODEL_GROUPS.flatMap((g) =>
+    g.models.map((m) => ({ ...m, groupLabel: g.label })),
+  );
+  const currentModel = allModels.find((m) => m.id === props.provider);
 
   return (
     <>
@@ -86,7 +92,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 
       {/* Drawer */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-[340px] flex-col bg-background shadow-2xl transition-transform duration-300 ease-out ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-[85%] max-w-[340px] flex-col bg-[#faf9f5] shadow-2xl transition-transform duration-300 ease-out ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}
@@ -113,26 +119,73 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 pb-6">
           <Section title="Model">
-            <div className="space-y-4">
-              {MODEL_GROUPS.map((group) => (
-                <div key={group.label}>
-                  <div className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-engenius-gray/80">
-                    {group.label}
-                  </div>
-                  <div className="space-y-1.5">
-                    {group.models.map((m) => (
-                      <RadioCard
-                        key={m.id}
-                        selected={props.provider === m.id}
-                        onClick={() => props.onProviderChange(m.id)}
-                        title={m.label}
-                        subtitle={m.tier}
-                      />
-                    ))}
-                  </div>
+            <button
+              onClick={() => setModelExpanded((v) => !v)}
+              className="flex w-full items-center justify-between rounded-2xl border border-black/[0.06] bg-white px-3.5 py-3 text-left transition-all hover:border-engenius-blue/30"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-medium text-engenius-dark">
+                  {currentModel?.label ?? "Select model"}
                 </div>
-              ))}
-            </div>
+                {currentModel && (
+                  <div className="mt-0.5 text-[12px] text-engenius-gray">
+                    {currentModel.groupLabel} · {currentModel.tier}
+                  </div>
+                )}
+              </div>
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className={`flex-shrink-0 text-engenius-gray transition-transform duration-200 ${
+                  modelExpanded ? "rotate-180" : ""
+                }`}
+              >
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {modelExpanded && (
+              <div className="mt-2 space-y-3 rounded-2xl border border-black/[0.04] bg-white/50 p-3">
+                {MODEL_GROUPS.map((group) => (
+                  <div key={group.label}>
+                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-engenius-gray/80">
+                      {group.label}
+                    </div>
+                    <div className="space-y-1">
+                      {group.models.map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => {
+                            props.onProviderChange(m.id);
+                            setModelExpanded(false);
+                          }}
+                          className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left transition-colors ${
+                            props.provider === m.id
+                              ? "bg-engenius-blue/10 text-engenius-dark"
+                              : "hover:bg-black/[0.03]"
+                          }`}
+                        >
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-[13px] font-medium">{m.label}</span>
+                            <span className="text-[11px] text-engenius-gray">{m.tier}</span>
+                          </div>
+                          {props.provider === m.id && (
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#03a9f4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </Section>
 
           <div className="my-6 h-px bg-border/60" />
@@ -208,8 +261,8 @@ function RadioCard({
       onClick={onClick}
       className={`flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all ${
         selected
-          ? "border-engenius-blue bg-engenius-blue/[0.06]"
-          : "border-border/60 bg-white hover:border-engenius-blue/30 hover:bg-black/[0.015]"
+          ? "border-engenius-blue/50 bg-engenius-blue/[0.06]"
+          : "border-black/[0.06] bg-white hover:border-engenius-blue/30"
       }`}
     >
       {icon && <span className="text-[18px] leading-none">{icon}</span>}
