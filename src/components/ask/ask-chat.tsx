@@ -154,7 +154,13 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
   if (!src) return <sup className="text-engenius-blue/70 font-medium cursor-default text-[10px]">[{index}]</sup>;
 
   const images = src.image_urls ?? [];
-  const hasExternalLink = src.source_url?.startsWith("http") && src.source_type !== "product_spec";
+  // Citations are linkable for:
+  //   - External http URLs (gitbook, helpcenter, google_doc)
+  //   - Internal relative paths for wifi_regulation (/wifi-regulation/{code})
+  // product_spec intentionally not linkable (no canonical public page yet).
+  const isExternal = !!src.source_url?.startsWith("http") && src.source_type !== "product_spec";
+  const isInternal = !!src.source_url?.startsWith("/") && src.source_type === "wifi_regulation";
+  const hasExternalLink = isExternal || isInternal;
 
   return (
     <span

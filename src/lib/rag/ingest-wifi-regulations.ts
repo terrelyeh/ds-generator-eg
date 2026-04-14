@@ -161,7 +161,11 @@ export async function ingestWifiRegulations(
 
       const cleanContent = md.trim();
       const sourceId = country.code.toUpperCase();
-      const sourceUrl = `${API_BASE}/countries/${country.code}/text`;
+      // Point citations at our own internal page (which renders the markdown
+      // nicely with auth handled server-side). The upstream API endpoint
+      // requires a Bearer token so it can't be opened directly from the
+      // browser.
+      const sourceUrl = `/wifi-regulation/${sourceId}`;
       const title = `${country.name} (${country.code}) — WiFi Regulation`;
       const chunkIndex = 0;
       const hash = contentHash(cleanContent);
