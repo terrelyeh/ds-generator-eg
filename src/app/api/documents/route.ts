@@ -21,31 +21,53 @@ export async function GET(request: Request) {
   const supabase = createAdminClient();
 
   // Get stats per source_type.
-  // Supabase default cap is 1000 rows per query — explicitly raise it so we
-  // never silently truncate the index (which was hiding google_doc rows when
-  // product_spec + gitbook + helpcenter already summed to exactly 1000).
-  let query = supabase
-    .from("documents" as "products")
-    .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash, metadata")
-    .limit(50000);
+  //
+  // Supabase/PostgREST has a server-side row cap (default 1000) that overrides
+  // any client-side `.limit()`. To reliably fetch the full documents index
+  // regardless of how many chunks exist, paginate with `.range()` until the
+  // batch is smaller than the page size.
+  type DocRow = {
+    source_type: string;
+    source_id: string;
+    title: string;
+    chunk_index: number;
+    token_count: number | null;
+    updated_at: string;
+    content_hash: string;
+    metadata: Record<string, unknown> | null;
+  };
 
-  if (sourceType) {
-    query = query.eq("source_type", sourceType);
+  const PAGE_SIZE = 1000;
+  const MAX_PAGES = 50; // hard safety stop at 50000 rows
+  const allRows: DocRow[] = [];
+
+  for (let page = 0; page < MAX_PAGES; page++) {
+    let pageQuery = supabase
+      .from("documents" as "products")
+      .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash, metadata")
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+
+    if (sourceType) {
+      pageQuery = pageQuery.eq("source_type", sourceType);
+    }
+
+    const { data: pageData, error: pageError } = await pageQuery as {
+      data: DocRow[] | null;
+      error: unknown;
+    };
+
+    if (pageError) {
+      return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
+    }
+
+    const batch = pageData ?? [];
+    allRows.push(...batch);
+
+    if (batch.length < PAGE_SIZE) break;
   }
 
-  const { data, error } = await query as {
-    data: {
-      source_type: string;
-      source_id: string;
-      title: string;
-      chunk_index: number;
-      token_count: number | null;
-      updated_at: string;
-      content_hash: string;
-      metadata: Record<string, unknown> | null;
-    }[] | null;
-    error: unknown;
-  };
+  const data = allRows;
+  const error = null;
 
   if (error) {
     return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
