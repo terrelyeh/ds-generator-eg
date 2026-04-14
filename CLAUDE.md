@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-04-14
+> Last updated: 2026-04-14 (taxonomy + WiFi regulation session)
 
 ## Project Overview
 
@@ -54,45 +54,48 @@ src/
       settings/glossary/page.tsx      # Translation glossary management
       settings/typography/page.tsx    # Font + size/weight per locale (split layout with live preview)
       settings/personas/page.tsx      # Ask Persona prompt management
+      wifi-regulation/[code]/page.tsx  # Per-country WiFi regulation markdown viewer
     (print)/
       preview/[model]/page.tsx        # Datasheet HTML preview (?lang=ja&mode=full&toolbar=false)
     api/
-      sync/route.ts                   # Google Sheets → Supabase sync
-      generate-pdf/route.ts           # Puppeteer PDF + generation lock (GET: check lock, POST: generate)
+      sync/route.ts                   # Sheets → Supabase sync + auto re-index products
+      ask/route.ts                    # RAG SSE stream + taxonomy/model/country re-rank
+      documents/route.ts              # RAG index mgmt (GET/POST/PATCH/DELETE, paginates via range())
+      taxonomy/route.ts               # Returns solutions + product_lines + products for dropdowns
+      generate-pdf/route.ts           # Puppeteer PDF + generation lock
       upload-image/route.ts           # Upload to Supabase + Google Drive
       translate/route.ts              # AI translation endpoint (multi-provider)
-      ask/route.ts                    # RAG query (GET: personas, POST: question + history → answer)
-      documents/route.ts              # RAG document index management (GET/POST/DELETE)
-      chat-sessions/route.ts          # Conversation persistence (GET/POST/DELETE)
+      chat-sessions/route.ts          # Conversation persistence
       personas/route.ts               # Persona CRUD
-      settings/route.ts               # API key CRUD (with optimistic locking)
-      settings/providers/route.ts     # Which AI providers have keys configured
-      settings/typography/route.ts    # Typography settings (with optimistic locking)
-      settings/fonts/route.ts         # Custom Google Font management per locale
-      glossary/route.ts               # Translation glossary CRUD (with optimistic locking)
+      settings/route.ts               # API key CRUD (optimistic locking)
+      settings/{providers,typography,fonts}/route.ts
+      glossary/route.ts               # Translation glossary CRUD
   components/
-    layout/navbar.tsx, solution-sidebar.tsx  # Navbar: Ask, Knowledge, Settings links
-    ask/ask-chat.tsx                    # Chat UI + sidebar history + persona + model dropdown
-    knowledge/knowledge-base.tsx        # Index dashboard + per-source management
+    layout/navbar.tsx, solution-sidebar.tsx
+    ask/ask-chat.tsx                    # Chat UI + citations (http external OR /wifi-regulation/* internal)
+    knowledge/
+      knowledge-base.tsx                # Source cards + per-row Sync/Edit, TaxonomyBadges
+      taxonomy-picker.tsx               # Cascading Solution > Product Line > Model multi-select
     dashboard/dashboard-content.tsx     # Tabs + Lang column + Translations link
-    product/product-detail.tsx          # Detail/Translations tabs, 🌐 menu, version history
-    preview/print-toolbar.tsx           # Locale badge (hidden via ?toolbar=false in typography preview)
-    settings/
-      settings-page.tsx                 # Navigation hub (4 cards)
-      personas-editor.tsx               # Persona prompt CRUD
-      api-keys-editor.tsx, glossary-editor.tsx, typography-editor.tsx
+    product/product-detail.tsx
+    preview/print-toolbar.tsx
+    settings/{settings-page,personas-editor,api-keys-editor,glossary-editor,typography-editor}.tsx
     compare/compare-table.tsx
   lib/
     rag/
-      embeddings.ts                    # OpenAI embedding wrapper + contentHash + estimateTokens
-      ingest-products.ts               # Products → 2 chunks (overview + specs) → embed → DB
-      personas.ts                      # Persona (Dim1) + UserProfile (Dim2) + CRUD
-    google/drive-versions.ts           # detectLatestVersion() + getLocaleSuffix()
-    translate/                         # 5-layer prompt + multi-provider translation
-      providers/claude.ts, openai.ts, gemini.ts
-    datasheet/
-      typography.ts                    # TypographySettings, defaults, FONT_OPTIONS
-    settings.ts                        # getApiKey(): DB first, env var fallback
+      embeddings.ts                    # OpenAI embedding + contentHash + estimateTokens
+      taxonomy.ts                      # TaxonomyMeta types + matchesTaxonomyFilter (inheritance rule)
+      vision.ts                        # Gemini Vision — full-table extraction, 2000 max tokens
+      ingest-products.ts               # Auto-derives taxonomy from product_lines.solution_id FK
+      ingest-gitbook.ts                # Main chunks + focused LED chunks (chunk_index ≥ 10000)
+      ingest-helpcenter.ts, ingest-google-doc.ts
+      ingest-wifi-regulations.ts       # WiFi RegHub API → per-country chunk, source_id = ISO code
+      personas.ts                      # Persona + UserProfile
+    google/
+      auth.ts, drive-versions.ts, drive-images.ts
+      docs.ts                          # Service Account first → public export URL fallback
+    translate/, datasheet/typography.ts
+    settings.ts                        # getApiKey() + API_KEY_MAP (wifi_reghub_api_key lives here)
   types/database.ts
 ```
 
@@ -129,6 +132,7 @@ Dashboard 預設只顯示 Active，有 Active/All toggle。
 - Deep diff 含 status 欄位 — status-only 變更也會觸發 upsert
 - **圖片同步**：即使內容無變更，若 product_image 或 hardware_image 缺失仍會從 Drive 拉取
 - `sheet_last_editor` fallback 到 Drive API `displayName`（Service Account 看不到 email）
+- **Auto re-index after sync**：sync 完成後，對 `allChanges` 中的每個 `product_name` 呼叫 `ingestProducts({ modelName })`，自動更新 RAG 向量。`content_hash` 去重確保未變更的 chunks 被 skip。失敗隔離不中斷 sync 回應，`response.reindex` 顯示 `{processed, skipped, errors}`
 
 ### Image 雙向同步
 
@@ -225,32 +229,62 @@ Key tables:
 
 ## Ask SpecHub (RAG System)
 
-完整架構詳見 [`docs/rag-system.md`](docs/rag-system.md)（需更新以反映以下變動）。
-
-### UX 架構（2026-04-14 大改版）
+### UX 架構
 - **Slide Panel**：Navbar Ask 按鈕 → 右側 panel 滑出（600px / 42vw），不離開當前頁面
-- **SSE Streaming**：`/api/ask` POST 回傳 `text/event-stream`，逐字輸出。三家 LLM 都用 streaming（streamClaude/streamOpenAI/streamGemini）
-- **Inline Citations**：LLM 回答用 `[1]` `[2]` 標記，前端 `CitationTooltip` hover 顯示來源 + 圖片縮圖。外部來源（gitbook/helpcenter）可點擊跳轉原文
-- **UI Path Styling**：`**Configure > Gateway > VPN**` 自動渲染為 breadcrumb pill 樣式
-- **Welcome Screen**：可自訂（`app_settings`: `ask_welcome_subtitle`, `ask_welcome_description`, `ask_example_questions`），Settings > Ask Welcome 有 UI
-- **AI Avatar**：每則回覆左側有 network-node icon
+- **SSE Streaming**：`/api/ask` POST 回傳 `text/event-stream`。三家 LLM 都用 streaming（streamClaude/streamOpenAI/streamGemini）
+- **Inline Citations**：LLM 回答用 `[1]` `[2]` 標記。`CitationTooltip` hover 顯示來源。連結規則：外部 `http` URL（gitbook/helpcenter/google_doc）+ 內部相對路徑（`wifi_regulation` → `/wifi-regulation/{CODE}`）可點擊；`product_spec` 目前不可點擊
+- **UI Path Styling**：`**Configure > Gateway > VPN**` 自動渲染為 breadcrumb pill
+- **Welcome Screen**：可自訂（`app_settings`: `ask_welcome_subtitle/description/example_questions`）
 
-### Persona & Profile（精簡版）
+### Persona & Profile
 - **3 Personas**：Product Specialist（預設）、Sales Assistant、Technical Support
-- **4 Profiles**：同事（預設，帶基本白話解釋）、業務/Channel、產品經理、終端客戶
-- **核心原則**：禁止客套開場白、Feature-Benefit 原則、站在對方立場、寧多勿少
+- **4 Profiles**：同事（預設）、業務/Channel、產品經理、終端客戶
+- **核心原則**：禁止客套開場白、Feature-Benefit、站在對方立場、寧多勿少
 - Persona prompt 在 `personas.ts` 的 `DEFAULT_PERSONAS`；Profile 在 `USER_PROFILES`
 
-### 知識庫 Source Types（2026-04-14）
-| Type | Pipeline | 已索引 | 備註 |
-|---|---|---|---|
-| `product_spec` | `ingest-products.ts` | 66 products | 從 Supabase DB 建 chunk |
-| `gitbook` | `ingest-gitbook.ts` | 4 spaces (~900 chunks) | sitemap → fetch → chunk。有 `/ingest-gitbook` Skill |
-| `helpcenter` | `ingest-helpcenter.ts` | 41 articles (~235 chunks) | Intercom SPA，用 `KNOWN_ARTICLES` fallback。有 `/ingest-helpcenter` Skill |
-| `google_doc` | `ingest-google-doc.ts` | 1 doc (70 chunks) | Drive API / export → tab split → chunk。UI 支援 Add Doc |
+### 知識庫 Source Types
 
-**核心流程**：問題(+history) → Embed → pgvector 搜尋(top 12) → 組裝 prompt(Persona+Profile+Context with source_type labels) → SSE Stream LLM → 回答+citations+follow-ups
-**資料表**：`documents`（向量索引，chunk-level image_urls in metadata）、`chat_sessions`（對話持久化）
+| Type | Pipeline | 備註 |
+|---|---|---|
+| `product_spec` | `ingest-products.ts` | 每 product 2 chunks (overview + specs)。taxonomy 從 product_lines.solution_id FK 自動帶入 |
+| `gitbook` | `ingest-gitbook.ts` | sitemap → fetch → chunk → Vision describe images。QSG 額外產出 focused LED chunks (chunk_index ≥ 10000) |
+| `helpcenter` | `ingest-helpcenter.ts` | Intercom SPA fallback 用 `KNOWN_ARTICLES` |
+| `google_doc` | `ingest-google-doc.ts` | Service Account Drive API → public export fallback。Tab split by `\[vX.X\]` markers |
+| `wifi_regulation` | `ingest-wifi-regulations.ts` | WiFi RegHub API → 1 chunk per country (ISO code = source_id)，markdown 已預格式化 |
+
+### Unified Taxonomy (Solution > Product Line > Model)
+
+所有 source types 在 `documents.metadata` 共用三個 optional 欄位：
+```typescript
+{
+  solution: string | null,      // solutions.slug 或 null = global
+  product_lines: string[],      // product_lines.name[]，[] = 套用整個 solution
+  models: string[],             // products.model_name[]，[] = line-level
+}
+```
+
+**繼承規則**（`lib/rag/taxonomy.ts` 的 `matchesTaxonomyFilter`）：當使用者以 `product_lines: ["Cloud Camera"]` filter 檢索，同時包含 **(a)** 該 doc 的 `product_lines` 包含 `"Cloud Camera"`、**(b)** 該 doc 的 `product_lines` 為空（代表套用整個 solution → 自動涵蓋 Camera）。`matchCount=40` 先抓多，app-level filter 後再 trim 到 12。
+
+**Auto-tagging**：product_spec 自動從 DB FK 推；其他 source 透過 UI `TaxonomyPicker` 或 API 的 `taxonomy` 參數顯式指定。`PATCH /api/documents` 可 backfill 既有 chunks 的 taxonomy 而不重跑 ingest。
+
+### 檢索 Re-rank（Cross-lingual）
+
+`text-embedding-3-small` 對跨語言短查詢（中文問題對英文 chunk）retrieval 偏弱。`/api/ask/route.ts` 加了兩層 literal-match supplementary lookup：
+
+- **Model-mention**：regex 偵測 `ECW536` / `EVS1004D` 等型號 → 直接 ILIKE 查 gitbook/product_spec，另外專門撈 `chunk_index ≥ 10000` 的 focused chunks（繞開 similarity 排序）
+- **Country-mention**：20 個主要市場的多語 alias map（英/中/ISO code）→ `wifi_regulation` 用 `source_id` 直接查
+
+Unified re-rank 評分：`modelMatch*10 + focusedLed*5 + countryMatch*20 + similarity`。這樣即使 embedding 分數低，literal match 仍能浮到頂。
+
+### 流程總覽
+
+```
+question + history → searchQuery embed → match_documents RPC (top 40)
+  → (optional) taxonomy filter → (optional) supplementary lookup (model/country)
+  → unified re-rank → trim to 12 → prompt → SSE stream LLM → answer + citations + follow-ups
+```
+
+資料表：`documents`（向量索引，metadata JSONB 含 taxonomy + source-specific fields）、`chat_sessions`（對話持久化）
 
 ## Current Status
 
@@ -260,18 +294,17 @@ Key tables:
 
 **RAG**：
 1. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較）
-2. **Auto re-index after Sync** — Sync 完成後自動觸發 re-embed
-3. **QSG 批次 Vision** — 100+ model 的 LED table 截圖轉文字
-4. **更新 `docs/rag-system.md`** — 反映 SSE/citations/panel/source types 變動
+2. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation 變動
+3. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
 
 **Datasheet 系統**：
-5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
-6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
-7. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
+4. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
+5. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
+6. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
 
 **系統**：
-8. **Supabase Auth + email 白名單** — 控制存取權限
-9. **Smart Image Sync** — 已實作 Drive modifiedTime 比對，但需觀察 production 穩定性
+7. **Supabase Auth + email 白名單** — 控制存取權限
+8. **Smart Image Sync** — 已實作 Drive modifiedTime 比對，需觀察 production 穩定性
 
 ## Deployment
 
@@ -309,3 +342,9 @@ npm run lint   # ESLint check
 19. **Google Doc export=txt 無 heading** — plain text export 丟失 markdown 結構，需用 numbered section pattern (`\d+\.\s+[A-Z]`) 作為 chunk 分割點
 20. **Flex scroll 需要每層 min-h-0** — 巢狀 flex 容器的每一層都需要 `min-h-0` 才能讓子元素 `overflow-y-auto` 生效
 21. **Smart image sync** — `syncProductImages` 比對 Drive `modifiedTime` vs Storage `last-modified`，Drive 更新才重新下載
+22. **Google Docs markdown export 兩個陷阱** — (a) 標記 escape：`[v1.2]` 變 `\[v1.2\]`，tab-split regex 必須吃 `\\?\[`；(b) 圖片 ref 定義 `[imageN]: <data:image/png;base64,...>` 會把一個空 tab 變成 9MB 內容，`ingest-google-doc.ts` 用 `stripImageRefs()` 過濾
+23. **Supabase PostgREST db-max-rows 1000 硬上限** — client 端的 `.limit(50000)` 會被伺服器端 cap 覆蓋，產出**靜默截斷**（不報錯）。需要用 `.range(page*1000, (page+1)*1000-1)` 分頁迴圈抓完整資料集。`/api/documents` GET 就是這樣抓 2987+ rows
+24. **Vision API `maxOutputTokens` 預設太小** — 2-4 句描述夠用的預設值（300）會把 12 行 LED table 壓成摘要。`vision.ts` 提到 2000，並在 prompt 裡明確要求 tables 輸出完整 markdown
+25. **`text-embedding-3-small` 跨語言 retrieval 偏弱** — 中文 query 抓英文 chunk 時相似度常常低於 threshold。解法是在 `/api/ask/route.ts` 加 literal-match supplementary lookup（model/country regex）+ re-rank，詳見 RAG section
+26. **Gitbook vision LED table dilution** — 原本 LED image 描述混在 page 的大 chunk 裡（跟封面、配件、mounting 圖混在一起），embedding 訊號被稀釋。解法：`ingest-gitbook.ts` 偵測 LED table pattern 後額外輸出一個 focused chunk（`chunk_index ≥ 10000`，含 bilingual header），標題乾淨如 `"ECW536 — LED Behavior"`
+27. **`CitationTooltip` 連結判斷** — `ask-chat.tsx` 判斷 `source_type !== "product_spec" && (source_url.startsWith("http") || (wifi_regulation && source_url.startsWith("/")))`。新增有內部頁面的 source type 時要更新此條件
