@@ -20,10 +20,14 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Get stats per source_type
+  // Get stats per source_type.
+  // Supabase default cap is 1000 rows per query — explicitly raise it so we
+  // never silently truncate the index (which was hiding google_doc rows when
+  // product_spec + gitbook + helpcenter already summed to exactly 1000).
   let query = supabase
     .from("documents" as "products")
-    .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash, metadata");
+    .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash, metadata")
+    .limit(50000);
 
   if (sourceType) {
     query = query.eq("source_type", sourceType);
