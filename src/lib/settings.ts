@@ -30,4 +30,5 @@ export const API_KEY_MAP = {
   anthropic_api_key: "ANTHROPIC_API_KEY",
   openai_api_key: "OPENAI_API_KEY",
   google_ai_api_key: "GOOGLE_AI_API_KEY",
+  wifi_reghub_api_key: "WIFI_REGHUB_API_KEY",
 } as const;

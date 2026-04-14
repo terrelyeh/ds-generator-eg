@@ -4,6 +4,7 @@ import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
+import { ingestWifiRegulations } from "@/lib/rag/ingest-wifi-regulations";
 import { fetchGoogleDoc } from "@/lib/google/docs";
 import { normalizeTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
 
@@ -279,6 +280,23 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, ...result });
+  }
+
+  if (source_type === "wifi_regulation") {
+    const { country_codes } = body as { country_codes?: string[] };
+    try {
+      const result = await ingestWifiRegulations({
+        force,
+        countryCodes: country_codes,
+        taxonomy,
+      });
+      return NextResponse.json({ ok: true, ...result });
+    } catch (err) {
+      return NextResponse.json(
+        { error: `WiFi regulation ingest failed: ${err instanceof Error ? err.message : String(err)}` },
+        { status: 500 }
+      );
+    }
   }
 
   // Future source types: web, file, text_snippet

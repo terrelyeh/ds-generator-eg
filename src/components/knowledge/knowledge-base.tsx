@@ -52,6 +52,7 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "helpcenter", label: "Help Center", icon: "💡", description: "Technical articles from Intercom Help Center — best practices, feature guides", status: "active", canIngest: true },
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
   { id: "google_doc", label: "Google Docs", icon: "📄", description: "Message guides, product briefs, marketing docs from Google Drive", status: "active", canIngest: true },
+  { id: "wifi_regulation", label: "WiFi Regulations", icon: "📡", description: "Per-country WiFi regulation data (bands, channels, power, DFS) from RegHub — applies across all wireless products", status: "active", canIngest: true },
   { id: "web", label: "Web Pages", icon: "🌐", description: "Website content, product pages, landing pages", status: "planned", canIngest: false },
   { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word documents", status: "planned", canIngest: false },
 ];

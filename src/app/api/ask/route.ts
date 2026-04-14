@@ -134,7 +134,49 @@ export async function POST(request: Request) {
   const mentionedModels = [...new Set((question.match(modelMentionRegex) ?? []).map((m) => m.toUpperCase()))];
   const hasModelMention = mentionedModels.length > 0;
 
-  const matchCount = hasTaxonomyFilter || hasModelMention ? 40 : 12;
+  // Detect country mentions (for wifi_regulation). Covers common markets in
+  // English, Chinese, and ISO alpha-2 codes. Same cross-lingual embedding
+  // issue as models — a Chinese query "台灣 5GHz 法規" won't reliably match
+  // the English "Taiwan (TW)" chunk without a literal-match boost.
+  const COUNTRY_ALIASES: Record<string, string[]> = {
+    TW: ["Taiwan", "台灣", "台湾", "TW"],
+    JP: ["Japan", "日本", "JP"],
+    US: ["USA", "United States", "America", "美國", "美国", "US"],
+    GB: ["UK", "United Kingdom", "Britain", "英國", "英国", "GB"],
+    DE: ["Germany", "德國", "德国", "DE"],
+    FR: ["France", "法國", "法国", "FR"],
+    CN: ["China", "中國", "中国", "PRC", "CN"],
+    HK: ["Hong Kong", "香港", "HK"],
+    SG: ["Singapore", "新加坡", "SG"],
+    MY: ["Malaysia", "馬來西亞", "马来西亚", "MY"],
+    TH: ["Thailand", "泰國", "泰国", "TH"],
+    ID: ["Indonesia", "印尼", "ID"],
+    PH: ["Philippines", "菲律賓", "菲律宾", "PH"],
+    VN: ["Vietnam", "越南", "VN"],
+    KR: ["Korea", "South Korea", "韓國", "韩国", "KR"],
+    IN: ["India", "印度", "IN"],
+    AU: ["Australia", "澳洲", "澳大利亞", "澳大利亚", "AU"],
+    CA: ["Canada", "加拿大", "CA"],
+    MX: ["Mexico", "墨西哥", "MX"],
+    BR: ["Brazil", "巴西", "BR"],
+  };
+  const mentionedCountries: string[] = [];
+  for (const [code, aliases] of Object.entries(COUNTRY_ALIASES)) {
+    for (const alias of aliases) {
+      // Use word boundary for English/ISO codes, plain substring for CJK
+      const isCjk = /[\u4e00-\u9fff]/.test(alias);
+      const regex = isCjk
+        ? new RegExp(alias, "i")
+        : new RegExp(`\\b${alias.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
+      if (regex.test(question)) {
+        mentionedCountries.push(code);
+        break;
+      }
+    }
+  }
+  const hasCountryMention = mentionedCountries.length > 0;
+
+  const matchCount = hasTaxonomyFilter || hasModelMention || hasCountryMention ? 40 : 12;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -200,7 +242,12 @@ export async function POST(request: Request) {
         // question names one or more models explicitly, run a direct content
         // ILIKE lookup and merge those chunks into the candidate pool, then
         // re-rank so they float to the top.
-        if (hasModelMention && mentionedModels.length > 0) {
+        // Supplementary literal-match lookups (model + country) plus re-rank.
+        // text-embedding-3-small has weak cross-lingual performance so a
+        // Chinese query may not surface the right English-language chunk via
+        // vector search alone. When the question names a model or a country,
+        // we fetch the matching chunks directly and re-rank them to the top.
+        if (hasModelMention || hasCountryMention) {
           const existingIds = new Set(docs.map((d) => d.id));
           const addUnique = (rows: Omit<MatchedDoc, "similarity">[] | null) => {
             if (!rows) return;
@@ -212,37 +259,67 @@ export async function POST(request: Request) {
             }
           };
 
-          // Pass 1: pull ALL focused-table chunks matching this model (they are
-          // high-signal and we never want them cut off by a low limit).
-          for (const m of mentionedModels) {
-            const { data: focused } = await supabase
+          if (hasModelMention && mentionedModels.length > 0) {
+            // Pass 1: pull ALL focused-table chunks matching this model (they
+            // are high-signal and we never want them cut off by a low limit).
+            for (const m of mentionedModels) {
+              const { data: focused } = await supabase
+                .from("documents" as "products")
+                .select("id, source_type, source_id, source_url, title, content, metadata")
+                .gte("chunk_index", 10000)
+                .or(`content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
+                .limit(10) as { data: Omit<MatchedDoc, "similarity">[] | null };
+              addUnique(focused);
+            }
+
+            // Pass 2: broader content match (product_spec + gitbook).
+            const orClauses = mentionedModels
+              .map((m) => `content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
+              .join(",");
+            const { data: modelMatches } = await supabase
               .from("documents" as "products")
               .select("id, source_type, source_id, source_url, title, content, metadata")
-              .gte("chunk_index", 10000)
-              .or(`content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
-              .limit(10) as { data: Omit<MatchedDoc, "similarity">[] | null };
-            addUnique(focused);
+              .or(orClauses)
+              .limit(30) as { data: Omit<MatchedDoc, "similarity">[] | null };
+            addUnique(modelMatches);
           }
 
-          // Pass 2: broader content match for the model (product_spec + gitbook).
-          const orClauses = mentionedModels
-            .map((m) => `content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
-            .join(",");
-          const { data: modelMatches } = await supabase
-            .from("documents" as "products")
-            .select("id, source_type, source_id, source_url, title, content, metadata")
-            .or(orClauses)
-            .limit(30) as { data: Omit<MatchedDoc, "similarity">[] | null };
-          addUnique(modelMatches);
+          if (hasCountryMention) {
+            // Country-mention supplementary lookup for wifi_regulation chunks.
+            for (const code of mentionedCountries) {
+              const { data: countryChunks } = await supabase
+                .from("documents" as "products")
+                .select("id, source_type, source_id, source_url, title, content, metadata")
+                .eq("source_type", "wifi_regulation")
+                .eq("source_id", code)
+                .limit(3) as { data: Omit<MatchedDoc, "similarity">[] | null };
+              addUnique(countryChunks);
+            }
+          }
 
-          // Re-rank: model-mention literal matches first, then similarity
+          // Unified re-rank: literal model matches + focused LED bonus +
+          // country literal matches + similarity.
           const scored = docs.map((d) => {
             const haystack = `${d.source_id} ${d.title} ${d.content}`.toUpperCase();
-            const literalMatches = mentionedModels.filter((m) => haystack.includes(m)).length;
-            // Bonus for focused LED chunks specifically
+            const modelMatches = hasModelMention
+              ? mentionedModels.filter((m) => haystack.includes(m)).length
+              : 0;
             const isFocusedLed =
               (d.metadata?.chunk_type as string) === "focused_led_table" ? 1 : 0;
-            return { doc: d, score: literalMatches * 10 + isFocusedLed * 5 + d.similarity };
+            const countryMatch =
+              hasCountryMention &&
+              d.source_type === "wifi_regulation" &&
+              mentionedCountries.includes((d.source_id || "").toUpperCase())
+                ? 1
+                : 0;
+            return {
+              doc: d,
+              score:
+                modelMatches * 10 +
+                isFocusedLed * 5 +
+                countryMatch * 20 +
+                d.similarity,
+            };
           });
           scored.sort((a, b) => b.score - a.score);
           docs = scored.map((s) => s.doc);
