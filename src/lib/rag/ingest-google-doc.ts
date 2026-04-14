@@ -10,14 +10,15 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 
-/** Max characters per chunk */
-const MAX_CHUNK_CHARS = 5000;
+/** Max characters per chunk — keep well under 8192 token limit */
+const MAX_CHUNK_CHARS = 3000;
 /** Min characters for a valid chunk */
 const MIN_CHUNK_CHARS = 80;
 /** Embedding batch size */
 const EMBED_BATCH_SIZE = 20;
-/** Max chars for embedding API */
-const MAX_EMBED_CHARS = 21000;
+/** Max chars for embedding API — OpenAI text-embedding-3-small has 8192 token limit.
+ *  Tables/structured content has higher token-per-char ratio, so use conservative limit. */
+const MAX_EMBED_CHARS = 10000;
 
 export interface IngestGoogleDocOptions {
   /** Google Doc ID (from URL) */
@@ -56,8 +57,9 @@ interface DocTab {
  * or the first major section of the document.
  */
 function splitIntoTabs(content: string, docTitle: string): DocTab[] {
-  // Look for tab markers: lines starting with "# [v" which indicate doc tabs
-  const tabPattern = /^# \[v[\d.]+\]\s+(.+)$/gm;
+  // Look for tab markers: lines with "[vX.X]" which indicate doc tabs
+  // Supports both markdown (# [v1.2] Title) and plain text ([v1.2] Title)
+  const tabPattern = /^(?:#\s+)?\[v[\d.]+\]\s+(.+)$/gm;
   const matches: { index: number; title: string }[] = [];
   let match;
 
@@ -111,16 +113,16 @@ interface ChunkResult {
 function chunkByHeadings(content: string, tabName: string): ChunkResult[] {
   const contextPrefix = `[${tabName}]\n\n`;
 
-  // Split on H1/H2/H3 markers
-  const sections = content.split(/\n(?=#{1,3} )/);
+  // Split on H1/H2/H3 markers, numbered sections (1. Title), or bold numbered (**1. Title**)
+  const sections = content.split(/\n(?=#{1,3} |\d+\.\s+[A-Z]|\*\*\d+\.\s+)/);
   const chunks: ChunkResult[] = [];
 
   for (const section of sections) {
     const trimmed = section.trim();
     if (!trimmed || trimmed.length < MIN_CHUNK_CHARS) continue;
 
-    const headingMatch = trimmed.match(/^#{1,3}\s+(.+)/);
-    const sectionTitle = headingMatch ? headingMatch[1].trim() : tabName;
+    const headingMatch = trimmed.match(/^#{1,3}\s+(.+)/) || trimmed.match(/^(\d+\.\s+\S.+)/) || trimmed.match(/^\*\*(\d+\.\s+\S.+)\*\*/);
+    const sectionTitle = headingMatch ? headingMatch[1].replace(/\*\*/g, "").trim() : tabName;
 
     // Clean: remove image placeholders like [imageN]: <>
     const cleaned = trimmed.replace(/\[image\d+\]:\s*<>/g, "").trim();
