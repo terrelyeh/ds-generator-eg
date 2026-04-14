@@ -23,6 +23,7 @@ interface ProductLineRow {
   name: string;
   label: string;
   category: string;
+  solution_id: string;
 }
 
 /**
@@ -119,12 +120,19 @@ export async function ingestProducts(options?: {
     return { processed: 0, skipped: 0, errors: [`Failed to fetch products: ${prodError}`] };
   }
 
-  // Fetch all product lines for metadata
+  // Fetch all product lines for metadata (incl. solution_id for taxonomy)
   const { data: productLines } = await supabase
     .from("product_lines")
-    .select("id, name, label, category") as { data: ProductLineRow[] | null };
+    .select("id, name, label, category, solution_id") as { data: ProductLineRow[] | null };
 
   const plMap = new Map((productLines ?? []).map((pl) => [pl.id, pl]));
+
+  // Fetch solution slugs for taxonomy metadata
+  const { data: solutions } = await supabase
+    .from("solutions")
+    .select("id, slug") as { data: { id: string; slug: string }[] | null };
+
+  const solutionSlugById = new Map((solutions ?? []).map((s) => [s.id, s.slug]));
 
   // Fetch existing document hashes to skip unchanged
   const sourceIds = products.map((p) => p.model_name);
@@ -246,11 +254,16 @@ export async function ingestProducts(options?: {
             content: chunk.content,
             token_count: estimateTokens(chunk.content),
             metadata: {
+              // Legacy fields (kept for backwards compat)
               product_line: chunk.productLine.name,
               product_line_label: chunk.productLine.label,
               category: chunk.productLine.category,
               status: chunk.product.status,
               chunk_type: chunk.chunkIndex === 0 ? "overview" : "specifications",
+              // Unified taxonomy
+              solution: solutionSlugById.get(chunk.productLine.solution_id) ?? null,
+              product_lines: [chunk.productLine.name],
+              models: [chunk.product.model_name],
             },
             embedding: `[${embedding.join(",")}]`,
             content_hash: chunk.hash,

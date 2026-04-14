@@ -30,6 +30,8 @@ const MAX_EMBED_CHARS = 21000;
 /** Concurrency for page fetching */
 const FETCH_CONCURRENCY = 5;
 
+import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
+
 export interface IngestGitbookOptions {
   /** Root URL of the Gitbook space */
   spaceUrl: string;
@@ -39,6 +41,8 @@ export interface IngestGitbookOptions {
   force?: boolean;
   /** Enable image description via Vision API */
   enableVision?: boolean;
+  /** Taxonomy metadata — solution/product_lines/models */
+  taxonomy?: Partial<TaxonomyMeta>;
 }
 
 export interface IngestGitbookResult {
@@ -243,8 +247,9 @@ async function fetchPagesWithConcurrency(
 export async function ingestGitbook(
   options: IngestGitbookOptions
 ): Promise<IngestGitbookResult> {
-  const { spaceUrl, spaceLabel, force = false, enableVision = true } = options;
+  const { spaceUrl, spaceLabel, force = false, enableVision = true, taxonomy } = options;
   const errors: string[] = [];
+  const tax = normalizeTaxonomy(taxonomy);
   let pagesSkipped = 0;
   let imagesDescribed = 0;
 
@@ -350,6 +355,9 @@ export async function ingestGitbook(
           has_images: chunk.images.length > 0,
           images_count: chunk.images.length,
           image_urls: chunk.images.length > 0 ? chunk.images : undefined,
+          solution: tax.solution,
+          product_lines: tax.product_lines,
+          models: tax.models,
         },
       });
     }

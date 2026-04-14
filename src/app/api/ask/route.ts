@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbedding } from "@/lib/rag/embeddings";
 import { getApiKey, API_KEY_MAP } from "@/lib/settings";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
+import { matchesTaxonomyFilter, extractTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
 export const maxDuration = 60;
@@ -16,6 +17,8 @@ interface AskRequest {
   question: string;
   source_type?: string;
   product_line?: string;
+  /** Unified taxonomy filter — scopes retrieval to solution/product_lines/models */
+  taxonomy?: Partial<TaxonomyMeta>;
   provider?: string;
   persona?: string;
   profile?: string;
@@ -115,7 +118,13 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
  */
 export async function POST(request: Request) {
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, provider = "gemini-2.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
+  const { question, source_type, product_line, taxonomy, provider = "gemini-2.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
+
+  // If taxonomy filter is active, we pre-filter post-RPC (pgvector containment
+  // can't express the "empty product_lines = applies to all lines" inheritance
+  // rule), so fetch a larger candidate pool then narrow it.
+  const hasTaxonomyFilter = !!(taxonomy && (taxonomy.solution || (taxonomy.product_lines && taxonomy.product_lines.length > 0) || (taxonomy.models && taxonomy.models.length > 0)));
+  const matchCount = hasTaxonomyFilter ? 40 : 12;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
@@ -151,7 +160,7 @@ export async function POST(request: Request) {
           "match_documents",
           {
             query_embedding: JSON.stringify(queryEmbedding),
-            match_count: 12,
+            match_count: matchCount,
             match_threshold: 0.3,
             filter_source_type: source_type || null,
             filter_metadata: filterMetadata,
@@ -166,7 +175,16 @@ export async function POST(request: Request) {
           return;
         }
 
-        const docs = matches ?? [];
+        let docs = matches ?? [];
+
+        // App-level taxonomy filter — enforces solution-level inheritance rule
+        // (docs with empty product_lines belong to the whole solution so they
+        // should also be included when filtering by a specific product_line).
+        if (hasTaxonomyFilter && taxonomy) {
+          docs = docs.filter((d) => matchesTaxonomyFilter(extractTaxonomy(d.metadata), taxonomy));
+          // Keep only the top 12 after filtering to match original context budget
+          docs = docs.slice(0, 12);
+        }
 
         if (docs.length === 0 && recentHistory.length === 0) {
           sendEvent(JSON.stringify({ type: "chunk", content: "I couldn't find relevant product information to answer your question. Try rephrasing or asking about a specific product model." }));

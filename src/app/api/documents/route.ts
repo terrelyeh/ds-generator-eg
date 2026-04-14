@@ -5,6 +5,7 @@ import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 import { fetchGoogleDoc } from "@/lib/google/docs";
+import { normalizeTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
 
 // Allow up to 300s for Gitbook ingestion (many pages + Vision API)
 export const maxDuration = 300;
@@ -91,6 +92,10 @@ export async function GET(request: Request) {
       collection: (meta?.collection as string) ?? null,
       doc_label: (meta?.doc_label as string) ?? null,
       tab_name: (meta?.tab_name as string) ?? null,
+      // Unified taxonomy fields
+      solution: (meta?.solution as string) ?? null,
+      product_lines: Array.isArray(meta?.product_lines) ? (meta?.product_lines as string[]) : [],
+      models: Array.isArray(meta?.models) ? (meta?.models as string[]) : [],
     };
   });
 
@@ -104,17 +109,27 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { action, source_type, model, product_line_id, force } = body as {
+  const {
+    action,
+    source_type,
+    model,
+    product_line_id,
+    force,
+    taxonomy: taxonomyInput,
+  } = body as {
     action: string;
     source_type: string;
     model?: string;
     product_line_id?: string;
     force?: boolean;
+    taxonomy?: Partial<TaxonomyMeta>;
   };
 
   if (action !== "ingest") {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
   }
+
+  const taxonomy = normalizeTaxonomy(taxonomyInput);
 
   if (source_type === "product_spec") {
     const result = await ingestProducts({
@@ -148,6 +163,7 @@ export async function POST(request: Request) {
       spaceLabel: space_label || space_url,
       force,
       enableVision: enable_vision ?? true,
+      taxonomy,
     });
 
     return NextResponse.json({
@@ -175,6 +191,7 @@ export async function POST(request: Request) {
       articleUrls: article_urls,
       label: hcLabel || "Help Center",
       force,
+      taxonomy,
     });
 
     return NextResponse.json({
@@ -184,12 +201,14 @@ export async function POST(request: Request) {
   }
 
   if (source_type === "google_doc") {
-    let { doc_id, content, doc_title, label: docLabel, doc_url } = body as {
+    const { label: docLabel, doc_url } = body as {
+      label?: string;
+      doc_url?: string;
+    };
+    let { doc_id, content, doc_title } = body as {
       doc_id?: string;
       content?: string;
       doc_title?: string;
-      label?: string;
-      doc_url?: string;
     };
 
     // Extract doc ID from URL if not provided directly
@@ -230,6 +249,7 @@ export async function POST(request: Request) {
       label: docLabel,
       docUrl: doc_url || `https://docs.google.com/document/d/${doc_id}`,
       force,
+      taxonomy,
     });
 
     return NextResponse.json({ ok: true, ...result });
@@ -276,4 +296,67 @@ export async function DELETE(request: Request) {
   }
 
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * PATCH /api/documents
+ * Update taxonomy metadata (solution / product_lines / models) for all chunks
+ * belonging to a given source, without re-running ingestion.
+ * Body: { source_type: string, source_id: string, taxonomy: Partial<TaxonomyMeta> }
+ */
+export async function PATCH(request: Request) {
+  const body = await request.json();
+  const { source_type, source_id, taxonomy: taxonomyInput } = body as {
+    source_type: string;
+    source_id: string;
+    taxonomy?: Partial<TaxonomyMeta>;
+  };
+
+  if (!source_type || !source_id) {
+    return NextResponse.json(
+      { error: "Missing source_type or source_id" },
+      { status: 400 }
+    );
+  }
+
+  const taxonomy = normalizeTaxonomy(taxonomyInput);
+  const supabase = createAdminClient();
+
+  // Fetch existing rows to merge metadata (preserve other keys)
+  const { data: existing, error: fetchErr } = await supabase
+    .from("documents" as "products")
+    .select("id, metadata")
+    .eq("source_type", source_type)
+    .eq("source_id", source_id) as {
+      data: { id: string; metadata: Record<string, unknown> | null }[] | null;
+      error: unknown;
+    };
+
+  if (fetchErr || !existing) {
+    return NextResponse.json({ error: "Failed to fetch existing rows" }, { status: 500 });
+  }
+
+  if (existing.length === 0) {
+    return NextResponse.json({ error: "No matching documents found" }, { status: 404 });
+  }
+
+  // Merge taxonomy fields into each row's metadata
+  let updated = 0;
+  for (const row of existing) {
+    const newMeta = {
+      ...(row.metadata ?? {}),
+      solution: taxonomy.solution,
+      product_lines: taxonomy.product_lines,
+      models: taxonomy.models,
+    };
+
+    const { error: updateErr } = await supabase
+      .from("documents" as "products")
+      .update({ metadata: newMeta, updated_at: new Date().toISOString() } as Record<string, unknown>)
+      .eq("id", row.id);
+
+    if (!updateErr) updated++;
+  }
+
+  return NextResponse.json({ ok: true, updated });
 }

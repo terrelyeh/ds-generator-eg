@@ -4,6 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  TaxonomyPicker,
+  TaxonomyBadges,
+  EMPTY_TAXONOMY_VALUE,
+  GLOBAL_SOLUTION_SLUG,
+  type TaxonomyValue,
+} from "./taxonomy-picker";
 
 interface SourceItem {
   source_type: string;
@@ -17,6 +24,10 @@ interface SourceItem {
   space_url?: string | null;
   doc_label?: string | null;
   tab_name?: string | null;
+  // Unified taxonomy
+  solution?: string | null;
+  product_lines?: string[];
+  models?: string[];
 }
 
 interface SourceTypeStats {
@@ -86,6 +97,11 @@ export function KnowledgeBase() {
   const [googleDocUrl, setGoogleDocUrl] = useState("");
   const [googleDocLabel, setGoogleDocLabel] = useState("");
   const [googleDocIngesting, setGoogleDocIngesting] = useState(false);
+  const [googleDocTaxonomy, setGoogleDocTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
+  const [editTaxonomyTarget, setEditTaxonomyTarget] = useState<SourceItem | null>(null);
+  const [editTaxonomyValue, setEditTaxonomyValue] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
+  const [editTaxonomySaving, setEditTaxonomySaving] = useState(false);
+  const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -253,8 +269,21 @@ export function KnowledgeBase() {
     }
   }
 
+  /** Convert UI TaxonomyValue → API payload (handles Global sentinel) */
+  function taxonomyToPayload(v: TaxonomyValue) {
+    return {
+      solution: v.solution === GLOBAL_SOLUTION_SLUG ? null : v.solution,
+      product_lines: v.product_lines,
+      models: v.models,
+    };
+  }
+
   async function handleGoogleDocIngest() {
     if (!googleDocUrl.trim()) return;
+    if (!googleDocTaxonomy.solution) {
+      toast.error("Please select a Solution");
+      return;
+    }
     setGoogleDocIngesting(true);
     setIngesting("google_doc");
     try {
@@ -267,6 +296,7 @@ export function KnowledgeBase() {
           doc_url: googleDocUrl.trim(),
           label: googleDocLabel.trim() || undefined,
           force: false,
+          taxonomy: taxonomyToPayload(googleDocTaxonomy),
         }),
       });
       const data = await res.json();
@@ -276,6 +306,7 @@ export function KnowledgeBase() {
         setShowGoogleDocDialog(false);
         setGoogleDocUrl("");
         setGoogleDocLabel("");
+        setGoogleDocTaxonomy(EMPTY_TAXONOMY_VALUE);
       } else {
         toast.error(`Failed: ${data.error}`);
       }
@@ -284,6 +315,81 @@ export function KnowledgeBase() {
     } finally {
       setGoogleDocIngesting(false);
       setIngesting(null);
+    }
+  }
+
+  /** Re-fetch and re-index a single Google Doc source (per-row Sync). */
+  async function handleGoogleDocSync(source: SourceItem) {
+    // Extract doc_id from source_id format "docId/tabSlug"
+    const docId = source.source_id.split("/")[0];
+    setSyncingSourceId(source.source_id);
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "google_doc",
+          doc_url: `https://docs.google.com/document/d/${docId}`,
+          label: source.doc_label || undefined,
+          force: false,
+          taxonomy: {
+            solution: source.solution ?? null,
+            product_lines: source.product_lines ?? [],
+            models: source.models ?? [],
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Synced: ${data.processed} updated, ${data.skipped} unchanged`);
+        fetchData();
+      } else {
+        toast.error(`Sync failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncingSourceId(null);
+    }
+  }
+
+  /** Open the Edit Taxonomy dialog for a given source */
+  function openEditTaxonomy(source: SourceItem) {
+    setEditTaxonomyTarget(source);
+    setEditTaxonomyValue({
+      solution: source.solution ?? null,
+      product_lines: source.product_lines ?? [],
+      models: source.models ?? [],
+    });
+  }
+
+  /** Save taxonomy edits via PATCH /api/documents */
+  async function handleSaveTaxonomy() {
+    if (!editTaxonomyTarget) return;
+    setEditTaxonomySaving(true);
+    try {
+      const res = await fetch("/api/documents", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source_type: editTaxonomyTarget.source_type,
+          source_id: editTaxonomyTarget.source_id,
+          taxonomy: taxonomyToPayload(editTaxonomyValue),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Updated taxonomy on ${data.updated} chunk${data.updated === 1 ? "" : "s"}`);
+        fetchData();
+        setEditTaxonomyTarget(null);
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setEditTaxonomySaving(false);
     }
   }
 
@@ -544,7 +650,7 @@ export function KnowledgeBase() {
                       </div>
                     )}
 
-                    {/* Add Article */}
+                    {/* Add Article + Re-index All */}
                     <div className="flex items-center gap-2">
                       <input
                         type="url"
@@ -557,6 +663,16 @@ export function KnowledgeBase() {
                       />
                       <Button size="sm" onClick={handleAddArticle} disabled={!newArticleUrl.trim() || !!ingesting} className="text-xs">
                         {ingesting === "helpcenter" ? "Adding..." : "Add Article"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleHelpcenterIngest(true)}
+                        disabled={!!ingesting}
+                        className="text-xs"
+                        title="Re-fetch and re-index all help center articles"
+                      >
+                        {ingesting === "helpcenter" ? "Re-indexing..." : "Re-index All"}
                       </Button>
                     </div>
                   </CardContent>
@@ -584,24 +700,53 @@ export function KnowledgeBase() {
                             const isGoogleDoc = s.source_type === "google_doc";
                             const sourceLabel = isGoogleDoc ? (s.tab_name || s.source_id) : s.source_id;
                             const titleLabel = isGoogleDoc ? (s.doc_label || s.title) : s.title;
+                            const isSyncing = syncingSourceId === s.source_id;
                             return (
                             <tr key={`${s.source_type}:${s.source_id}`} className="border-t hover:bg-muted/30 transition-colors">
-                              <td className={`px-3 py-2 font-medium text-engenius-blue max-w-[260px] truncate ${isGoogleDoc ? "" : "font-mono"}`} title={s.source_id}>{sourceLabel}</td>
+                              <td className={`px-3 py-2 font-medium text-engenius-blue max-w-[260px] truncate align-top ${isGoogleDoc ? "" : "font-mono"}`} title={s.source_id}>
+                                <div className="truncate">{sourceLabel}</div>
+                                <div className="mt-1">
+                                  <TaxonomyBadges
+                                    solution={s.solution ?? null}
+                                    product_lines={s.product_lines ?? []}
+                                    models={s.models ?? []}
+                                  />
+                                </div>
+                              </td>
                               {config.id === "product_spec" && (
-                                <td className="px-3 py-2 text-muted-foreground">{s.product_line || "—"}</td>
+                                <td className="px-3 py-2 text-muted-foreground align-top">{s.product_line || "—"}</td>
                               )}
-                              <td className="px-3 py-2 text-muted-foreground truncate max-w-[220px]">{titleLabel}</td>
-                              <td className="px-3 py-2 text-center tabular-nums">{s.chunks}</td>
-                              <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{formatTokens(s.total_tokens)}</td>
-                              <td className="px-3 py-2 text-muted-foreground">{formatDate(s.last_updated)}</td>
-                              <td className="px-3 py-2 text-right">
-                                <button
-                                  onClick={() => handleDelete(s.source_type, s.source_id)}
-                                  className="text-xs text-muted-foreground/50 hover:text-red-500 transition-colors"
-                                  title={`Delete ${s.source_id} from index`}
-                                >
-                                  Delete
-                                </button>
+                              <td className="px-3 py-2 text-muted-foreground truncate max-w-[220px] align-top">{titleLabel}</td>
+                              <td className="px-3 py-2 text-center tabular-nums align-top">{s.chunks}</td>
+                              <td className="px-3 py-2 text-center tabular-nums text-muted-foreground align-top">{formatTokens(s.total_tokens)}</td>
+                              <td className="px-3 py-2 text-muted-foreground align-top">{formatDate(s.last_updated)}</td>
+                              <td className="px-3 py-2 text-right align-top">
+                                <div className="flex items-center justify-end gap-2">
+                                  {isGoogleDoc && (
+                                    <button
+                                      onClick={() => handleGoogleDocSync(s)}
+                                      disabled={isSyncing}
+                                      className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors disabled:opacity-40"
+                                      title="Re-fetch from Drive and re-index"
+                                    >
+                                      {isSyncing ? "Syncing…" : "Sync"}
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => openEditTaxonomy(s)}
+                                    className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors"
+                                    title="Edit taxonomy tags"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(s.source_type, s.source_id)}
+                                    className="text-xs text-muted-foreground/50 hover:text-red-500 transition-colors"
+                                    title={`Delete ${s.source_id} from index`}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                             );
@@ -745,7 +890,7 @@ export function KnowledgeBase() {
       {/* Google Doc Dialog */}
       {showGoogleDocDialog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !googleDocIngesting && setShowGoogleDocDialog(false)}>
-          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold">Index Google Doc</h2>
               <button onClick={() => !googleDocIngesting && setShowGoogleDocDialog(false)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={googleDocIngesting}>
@@ -755,12 +900,12 @@ export function KnowledgeBase() {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-muted-foreground mb-1">Google Doc URL</label>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Google Doc URL <span className="text-red-500">*</span></label>
                 <input type="url" value={googleDocUrl} onChange={(e) => setGoogleDocUrl(e.target.value)}
                   placeholder="https://docs.google.com/document/d/..."
                   className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
                   disabled={googleDocIngesting} />
-                <p className="mt-1 text-[11px] text-muted-foreground/50">Doc must be shared with &quot;Anyone with the link&quot;</p>
+                <p className="mt-1 text-[11px] text-muted-foreground/50">Doc must be shared with &quot;Anyone with the link&quot; or with the service account</p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">Label (optional)</label>
@@ -768,6 +913,17 @@ export function KnowledgeBase() {
                   placeholder="e.g., AI Surveillance Message Guide"
                   className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
                   disabled={googleDocIngesting} />
+              </div>
+
+              <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
+                <p className="text-xs font-medium mb-2">Taxonomy — where does this doc belong?</p>
+                <TaxonomyPicker
+                  value={googleDocTaxonomy}
+                  onChange={setGoogleDocTaxonomy}
+                  allowGlobal
+                  required
+                  disabled={googleDocIngesting}
+                />
               </div>
             </div>
 
@@ -782,8 +938,40 @@ export function KnowledgeBase() {
 
             <div className="mt-4 flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => setShowGoogleDocDialog(false)} disabled={googleDocIngesting} className="text-xs">Cancel</Button>
-              <Button size="sm" onClick={handleGoogleDocIngest} disabled={!googleDocUrl.trim() || googleDocIngesting} className="text-xs">
+              <Button size="sm" onClick={handleGoogleDocIngest} disabled={!googleDocUrl.trim() || !googleDocTaxonomy.solution || googleDocIngesting} className="text-xs">
                 {googleDocIngesting ? "Indexing..." : "Start Indexing"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Taxonomy Dialog */}
+      {editTaxonomyTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !editTaxonomySaving && setEditTaxonomyTarget(null)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">Edit Taxonomy</h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{editTaxonomyTarget.tab_name || editTaxonomyTarget.source_id}</p>
+              </div>
+              <button onClick={() => !editTaxonomySaving && setEditTaxonomyTarget(null)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={editTaxonomySaving}>
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+
+            <TaxonomyPicker
+              value={editTaxonomyValue}
+              onChange={setEditTaxonomyValue}
+              allowGlobal
+              required
+              disabled={editTaxonomySaving}
+            />
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setEditTaxonomyTarget(null)} disabled={editTaxonomySaving} className="text-xs">Cancel</Button>
+              <Button size="sm" onClick={handleSaveTaxonomy} disabled={editTaxonomySaving} className="text-xs">
+                {editTaxonomySaving ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>

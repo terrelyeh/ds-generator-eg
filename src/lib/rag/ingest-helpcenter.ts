@@ -13,6 +13,7 @@ import {
   urlToBreadcrumb,
   hasSubstantialContent,
 } from "./gitbook-fetcher";
+import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 
 /** Max characters per chunk */
 const MAX_CHUNK_CHARS = 5000;
@@ -34,6 +35,8 @@ export interface IngestHelpcenterOptions {
   label: string;
   /** Force re-embed even if unchanged */
   force?: boolean;
+  /** Taxonomy metadata — solution/product_lines/models */
+  taxonomy?: Partial<TaxonomyMeta>;
 }
 
 /**
@@ -344,8 +347,9 @@ function chunkArticle(
 export async function ingestHelpcenter(
   options: IngestHelpcenterOptions
 ): Promise<IngestHelpcenterResult> {
-  const { collectionUrls, label, force = false } = options;
+  const { collectionUrls, label, force = false, taxonomy } = options;
   const errors: string[] = [];
+  const tax = normalizeTaxonomy(taxonomy);
   let articlesSkipped = 0;
 
   // Step 1: Discover articles — try direct URLs first, then collection parsing, then known fallback
@@ -471,6 +475,9 @@ export async function ingestHelpcenter(
           has_images: chunk.images.length > 0,
           images_count: chunk.images.length,
           image_urls: chunk.images.length > 0 ? chunk.images : undefined,
+          solution: tax.solution,
+          product_lines: tax.product_lines,
+          models: tax.models,
         },
       });
     }

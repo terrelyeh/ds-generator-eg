@@ -9,6 +9,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 
 /** Max characters per chunk — keep well under 8192 token limit */
 const MAX_CHUNK_CHARS = 3000;
@@ -33,6 +34,8 @@ export interface IngestGoogleDocOptions {
   docUrl?: string;
   /** Force re-embed even if unchanged */
   force?: boolean;
+  /** Taxonomy metadata — solution/product_lines/models */
+  taxonomy?: Partial<TaxonomyMeta>;
 }
 
 export interface IngestGoogleDocResult {
@@ -205,8 +208,9 @@ function chunkByHeadings(content: string, tabName: string): ChunkResult[] {
 export async function ingestGoogleDoc(
   options: IngestGoogleDocOptions
 ): Promise<IngestGoogleDocResult> {
-  const { docId, content: rawContent, docTitle, label, docUrl, force = false } = options;
+  const { docId, content: rawContent, docTitle, label, docUrl, force = false, taxonomy } = options;
   const errors: string[] = [];
+  const tax = normalizeTaxonomy(taxonomy);
 
   // Step 0: Clean up Google Docs markdown export — unescape punctuation and
   // strip heavy image reference definitions (can be MBs of base64 each).
@@ -271,6 +275,9 @@ export async function ingestGoogleDoc(
           doc_title: docTitle,
           tab_name: tab.name,
           doc_label: label || docTitle,
+          solution: tax.solution,
+          product_lines: tax.product_lines,
+          models: tax.models,
         },
       });
     }
