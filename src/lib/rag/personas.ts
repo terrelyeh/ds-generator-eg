@@ -24,18 +24,11 @@ export interface UserProfile {
 export const USER_PROFILES: UserProfile[] = [
   {
     id: "default",
-    label: "一般同事",
-    description: "不加額外調整",
-    prompt: "",  // No additional prompt
-  },
-  {
-    id: "new-hire",
-    label: "新進同仁",
-    description: "對產品線還在學習中，需要更多背景說明",
-    prompt: `對話對象是剛加入公司的新人，對 EnGenius 的產品線還不熟悉。請注意：
-- 遇到產品型號時，簡短補充這是哪個產品線、什麼定位
-- 技術術語第一次出現時附上白話解釋
-- 如果有相關的基礎概念值得了解，可以簡短帶過
+    label: "同事",
+    description: "預設 — 適度補充背景，不預設對方都懂",
+    prompt: `對話對象是公司同事，不預設對方熟悉所有產品線。請注意：
+- 提到產品型號時，簡短補充這是哪個產品線、什麼定位（一句話就好）
+- 技術術語第一次出現時附上簡短白話解釋
 - 不要讓對方覺得問題很蠢，耐心回答`,
   },
   {
