@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
+import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 
 // Allow up to 300s for Gitbook ingestion (many pages + Vision API)
 export const maxDuration = 300;
@@ -87,6 +88,8 @@ export async function GET(request: Request) {
       space_url: (meta?.space_url as string) ?? null,
       helpcenter_label: (meta?.helpcenter_label as string) ?? null,
       collection: (meta?.collection as string) ?? null,
+      doc_label: (meta?.doc_label as string) ?? null,
+      tab_name: (meta?.tab_name as string) ?? null,
     };
   });
 
@@ -179,7 +182,70 @@ export async function POST(request: Request) {
     });
   }
 
-  // Future source types: web, google_doc, file, text_snippet
+  if (source_type === "google_doc") {
+    let { doc_id, content, doc_title, label: docLabel, doc_url } = body as {
+      doc_id?: string;
+      content?: string;
+      doc_title?: string;
+      label?: string;
+      doc_url?: string;
+    };
+
+    // Extract doc ID from URL if not provided directly
+    if (!doc_id && doc_url) {
+      const idMatch = doc_url.match(/\/d\/([a-zA-Z0-9_-]+)/);
+      if (idMatch) doc_id = idMatch[1];
+    }
+
+    if (!doc_id) {
+      return NextResponse.json(
+        { error: "Missing doc_id or doc_url for google_doc ingestion" },
+        { status: 400 }
+      );
+    }
+
+    // If no content provided, try export API (only works for publicly shared docs)
+    if (!content) {
+      try {
+        // Try markdown export first (preserves headings)
+        const exportUrl = `https://docs.google.com/document/d/${doc_id}/export?format=md`;
+        let res = await fetch(exportUrl, { redirect: "follow" });
+        if (!res.ok) {
+          // Fallback to txt export
+          res = await fetch(`https://docs.google.com/document/d/${doc_id}/export?format=txt`, { redirect: "follow" });
+        }
+        if (!res.ok) throw new Error(`Export failed: ${res.status}. Make sure the doc is shared with "Anyone with the link".`);
+        content = await res.text();
+        // Try to get title from first line
+        if (!doc_title) {
+          const firstLine = content.split("\n").find((l) => l.trim());
+          doc_title = firstLine?.replace(/^#+\s*/, "").replace(/^\[.*?\]\s*/, "").trim() || "Untitled";
+        }
+      } catch (err) {
+        return NextResponse.json(
+          { error: `Failed to fetch Google Doc: ${err instanceof Error ? err.message : String(err)}` },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (!content || content.trim().length < 100) {
+      return NextResponse.json({ error: "Document content is empty or too short" }, { status: 400 });
+    }
+
+    const result = await ingestGoogleDoc({
+      docId: doc_id,
+      content,
+      docTitle: doc_title || "Untitled Document",
+      label: docLabel,
+      docUrl: doc_url || `https://docs.google.com/document/d/${doc_id}`,
+      force,
+    });
+
+    return NextResponse.json({ ok: true, ...result });
+  }
+
+  // Future source types: web, file, text_snippet
   return NextResponse.json(
     { error: `Source type "${source_type}" ingestion not yet implemented` },
     { status: 400 }

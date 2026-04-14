@@ -38,7 +38,7 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "gitbook", label: "Gitbook Docs", icon: "📖", description: "Technical documentation from Gitbook pages", status: "active", canIngest: true },
   { id: "helpcenter", label: "Help Center", icon: "💡", description: "Technical articles from Intercom Help Center — best practices, feature guides", status: "active", canIngest: true },
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
-  { id: "google_doc", label: "Google Docs", icon: "📄", description: "Product briefs, marketing docs, internal documents from Google Drive", status: "planned", canIngest: false },
+  { id: "google_doc", label: "Google Docs", icon: "📄", description: "Message guides, product briefs, marketing docs from Google Drive", status: "active", canIngest: true },
   { id: "web", label: "Web Pages", icon: "🌐", description: "Website content, product pages, landing pages", status: "planned", canIngest: false },
   { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word documents", status: "planned", canIngest: false },
 ];
@@ -80,6 +80,10 @@ export function KnowledgeBase() {
   const [gitbookVision, setGitbookVision] = useState(true);
   const [gitbookIngesting, setGitbookIngesting] = useState(false);
   const [newArticleUrl, setNewArticleUrl] = useState("");
+  const [showGoogleDocDialog, setShowGoogleDocDialog] = useState(false);
+  const [googleDocUrl, setGoogleDocUrl] = useState("");
+  const [googleDocLabel, setGoogleDocLabel] = useState("");
+  const [googleDocIngesting, setGoogleDocIngesting] = useState(false);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -247,6 +251,40 @@ export function KnowledgeBase() {
     }
   }
 
+  async function handleGoogleDocIngest() {
+    if (!googleDocUrl.trim()) return;
+    setGoogleDocIngesting(true);
+    setIngesting("google_doc");
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "google_doc",
+          doc_url: googleDocUrl.trim(),
+          label: googleDocLabel.trim() || undefined,
+          force: false,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Google Doc: ${data.processed} chunks indexed, ${data.tabs_found} tabs found`);
+        fetchData();
+        setShowGoogleDocDialog(false);
+        setGoogleDocUrl("");
+        setGoogleDocLabel("");
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setGoogleDocIngesting(false);
+      setIngesting(null);
+    }
+  }
+
   const totalSources = Object.values(stats).reduce((s, v) => s + v.sources, 0);
   const totalTokens = Object.values(stats).reduce((s, v) => s + v.total_tokens, 0);
   const activeTypes = Object.keys(stats).length;
@@ -379,7 +417,12 @@ export function KnowledgeBase() {
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
                       )}
-                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && (
+                      {config.canIngest && config.id === "google_doc" && (
+                        <Button size="sm" onClick={() => setShowGoogleDocDialog(true)} disabled={!!ingesting} className="text-xs">
+                          {isIngesting ? "Indexing..." : "Add Doc"}
+                        </Button>
+                      )}
+                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && (
                         <Button size="sm" onClick={() => handleIngest(config.id)} disabled={!!ingesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
@@ -687,6 +730,53 @@ export function KnowledgeBase() {
                 className="text-xs"
               >
                 {gitbookIngesting ? "Indexing..." : "Start Indexing"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Google Doc Dialog */}
+      {showGoogleDocDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !googleDocIngesting && setShowGoogleDocDialog(false)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Index Google Doc</h2>
+              <button onClick={() => !googleDocIngesting && setShowGoogleDocDialog(false)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={googleDocIngesting}>
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Google Doc URL</label>
+                <input type="url" value={googleDocUrl} onChange={(e) => setGoogleDocUrl(e.target.value)}
+                  placeholder="https://docs.google.com/document/d/..."
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                  disabled={googleDocIngesting} />
+                <p className="mt-1 text-[11px] text-muted-foreground/50">Doc must be shared with &quot;Anyone with the link&quot;</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Label (optional)</label>
+                <input type="text" value={googleDocLabel} onChange={(e) => setGoogleDocLabel(e.target.value)}
+                  placeholder="e.g., AI Surveillance Message Guide"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                  disabled={googleDocIngesting} />
+              </div>
+            </div>
+
+            {googleDocIngesting && (
+              <div className="mt-4 rounded-lg bg-muted/50 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
+                  <span>Fetching document and generating embeddings...</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowGoogleDocDialog(false)} disabled={googleDocIngesting} className="text-xs">Cancel</Button>
+              <Button size="sm" onClick={handleGoogleDocIngest} disabled={!googleDocUrl.trim() || googleDocIngesting} className="text-xs">
+                {googleDocIngesting ? "Indexing..." : "Start Indexing"}
               </Button>
             </div>
           </div>
