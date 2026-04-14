@@ -280,8 +280,8 @@ export function EngenieChat({
 const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
   if (message.role === "user") {
     return (
-      <div className="mb-6 flex justify-end">
-        <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-2.5 text-[15.5px] leading-[1.6] text-engenius-dark">
+      <div className="mb-8 flex justify-end">
+        <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-3 text-[16px] leading-[1.65] text-engenius-dark">
           {message.content}
         </div>
       </div>
@@ -295,19 +295,19 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: Messag
   return (
     <div className="mb-8 w-full">
       <div
-        className={`prose max-w-none text-[15.5px] text-engenius-dark
-          prose-p:my-4 prose-p:leading-[1.75]
-          prose-headings:mb-3 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
-          prose-h1:mt-8 prose-h1:text-[22px]
-          prose-h2:mt-7 prose-h2:text-[19px]
-          prose-h3:mt-6 prose-h3:text-[16px]
+        className={`prose max-w-none text-[16.5px] text-engenius-dark
+          prose-p:my-6 prose-p:leading-[1.85]
+          prose-headings:mb-4 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
+          prose-h1:mt-10 prose-h1:text-[23px]
+          prose-h2:mt-9 prose-h2:text-[20px]
+          prose-h3:mt-7 prose-h3:text-[17.5px]
           prose-strong:font-semibold prose-strong:text-engenius-dark
-          prose-ul:my-4 prose-ul:pl-5 prose-ol:my-4 prose-ol:pl-5 prose-li:my-1.5 prose-li:leading-[1.7] prose-li:marker:text-engenius-dark/40
-          prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[13px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
-          prose-pre:bg-black/[0.04] prose-pre:text-[13px] prose-pre:border prose-pre:border-black/[0.06]
+          prose-ul:my-6 prose-ul:pl-5 prose-ol:my-6 prose-ol:pl-5 prose-li:my-2.5 prose-li:leading-[1.8] prose-li:marker:text-engenius-dark/40
+          prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[14px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
+          prose-pre:bg-black/[0.04] prose-pre:text-[13.5px] prose-pre:border prose-pre:border-black/[0.06]
           prose-blockquote:border-l-2 prose-blockquote:border-engenius-blue/40 prose-blockquote:pl-4 prose-blockquote:text-engenius-dark/80 prose-blockquote:font-normal prose-blockquote:not-italic
-          prose-hr:my-6 prose-hr:border-black/[0.08]
-          prose-table:text-[13.5px] prose-th:bg-black/[0.03] prose-th:py-2 prose-th:px-3 prose-td:py-2 prose-td:px-3 prose-td:align-top
+          prose-hr:my-8 prose-hr:border-black/[0.08]
+          prose-table:text-[14px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
           ${message.isStreaming && message.content ? cursor : ""}`}
       >
         {message.content ? (
@@ -318,40 +318,72 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: Messag
           <ThinkingOrb />
         ) : null}
       </div>
-      {message.sources && message.sources.length > 0 && !message.isStreaming && (
-        <ReferenceList sources={message.sources} />
+      {!message.isStreaming && message.content && (
+        <ActionBar content={message.content} sources={message.sources} />
       )}
     </div>
   );
 });
 
-function ReferenceList({ sources }: { sources: Source[] }) {
-  const [open, setOpen] = useState(false);
-  const unique = dedupe(sources);
-  if (unique.length === 0) return null;
+function ActionBar({ content, sources }: { content: string; sources?: Source[] }) {
+  const [copied, setCopied] = useState(false);
+  const [refOpen, setRefOpen] = useState(false);
+  const unique = sources ? dedupe(sources) : [];
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1800);
+    } catch {
+      /* ignore */
+    }
+  }
+
   return (
-    <div className="mt-5">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 text-[12px] text-engenius-gray transition-colors hover:text-engenius-dark"
-      >
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={`transition-transform duration-200 ${open ? "rotate-90" : ""}`}
+    <div className="mt-6">
+      <div className="flex items-center gap-5 text-[13.5px] font-medium text-engenius-dark/55">
+        <button
+          onClick={handleCopy}
+          className="inline-flex items-center gap-1.5 transition-colors hover:text-engenius-dark"
         >
-          <polyline points="9 18 15 12 9 6" />
-        </svg>
-        <span>{unique.length} references</span>
-      </button>
-      {open && (
-        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {copied ? (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+          )}
+          <span>{copied ? "Copied" : "Copy"}</span>
+        </button>
+
+        {unique.length > 0 && (
+          <button
+            onClick={() => setRefOpen((v) => !v)}
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-engenius-dark"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform duration-200 ${refOpen ? "rotate-90" : ""}`}
+            >
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            <span>{unique.length} references</span>
+          </button>
+        )}
+      </div>
+      {refOpen && unique.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-2">
           {unique.slice(0, 8).map((s, i) => (
             <SourceChip key={i} source={s} />
           ))}
@@ -363,11 +395,16 @@ function ReferenceList({ sources }: { sources: Source[] }) {
 
 function ThinkingOrb() {
   return (
-    <div className="flex items-center gap-2.5 py-1">
-      <span className="relative inline-flex h-2.5 w-2.5">
-        <span className="absolute inset-0 animate-ping rounded-full bg-engenius-blue/40" />
-        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-engenius-blue/70" />
-      </span>
+    <div className="py-1">
+      <div style={{ animation: "engenieThink 1.6s ease-in-out infinite", transformOrigin: "center", display: "inline-block" }}>
+        <EngenieMark size={32} />
+      </div>
+      <style>{`
+        @keyframes engenieThink {
+          0%, 100% { transform: scale(0.88); opacity: 0.7; }
+          50% { transform: scale(1.08); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
@@ -388,8 +425,8 @@ function dedupe(sources: Source[]): Source[] {
 
 function SourceChip({ source }: { source: Source }) {
   const content = (
-    <span className="inline-flex max-w-[200px] items-center gap-1 rounded-full border border-black/[0.08] bg-white px-2.5 py-1 text-[11px] text-engenius-gray transition-colors hover:border-engenius-blue/40 hover:text-engenius-dark">
-      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <span className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full border border-black/[0.14] bg-white px-3 py-1.5 text-[13px] font-medium text-engenius-dark/75 transition-colors hover:border-engenius-blue/50 hover:text-engenius-dark">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
       </svg>

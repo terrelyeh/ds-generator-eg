@@ -121,14 +121,14 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
           <Section title="Model">
             <button
               onClick={() => setModelExpanded((v) => !v)}
-              className="flex w-full items-center justify-between rounded-2xl border border-black/[0.06] bg-white px-3.5 py-3 text-left transition-all hover:border-engenius-blue/30"
+              className="flex w-full items-center justify-between rounded-2xl border border-black/[0.08] bg-white px-3.5 py-3.5 text-left transition-all hover:border-engenius-blue/30"
             >
               <div className="min-w-0 flex-1">
-                <div className="text-[14px] font-medium text-engenius-dark">
+                <div className="text-[15px] font-semibold tracking-tight text-engenius-dark">
                   {currentModel?.label ?? "Select model"}
                 </div>
                 {currentModel && (
-                  <div className="mt-0.5 text-[12px] text-engenius-gray">
+                  <div className="mt-0.5 text-[12.5px] font-medium text-engenius-dark/50">
                     {currentModel.groupLabel} · {currentModel.tier}
                   </div>
                 )}
@@ -150,10 +150,10 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
               </svg>
             </button>
             {modelExpanded && (
-              <div className="mt-2 space-y-3 rounded-2xl border border-black/[0.04] bg-white/50 p-3">
+              <div className="mt-2 space-y-4 rounded-2xl border border-black/[0.06] bg-white/60 p-3.5">
                 {MODEL_GROUPS.map((group) => (
                   <div key={group.label}>
-                    <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-engenius-gray/80">
+                    <div className="mb-1.5 font-heading text-[10.5px] font-extrabold uppercase tracking-[0.18em] text-engenius-dark/55">
                       {group.label}
                     </div>
                     <div className="space-y-1">
@@ -171,8 +171,8 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
                           }`}
                         >
                           <div className="flex items-baseline gap-2">
-                            <span className="text-[13px] font-medium">{m.label}</span>
-                            <span className="text-[11px] text-engenius-gray">{m.tier}</span>
+                            <span className="text-[14px] font-semibold tracking-tight">{m.label}</span>
+                            <span className="text-[11.5px] font-medium text-engenius-dark/45">{m.tier}</span>
                           </div>
                           {props.provider === m.id && (
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#03a9f4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
@@ -223,9 +223,9 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-border/40 px-5 py-4 text-[11px] text-engenius-gray/70">
+        <div className="flex items-center justify-between border-t border-black/[0.06] px-5 py-4 font-heading text-[11.5px] font-semibold tracking-wide text-engenius-dark/45">
           <span>EnGenie · Demo</span>
-          <span>Powered by EnGenius SpecHub</span>
+          <span>Powered by SpecHub</span>
         </div>
       </aside>
     </>
@@ -235,7 +235,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mt-2">
-      <h3 className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-engenius-dark/60">
+      <h3 className="mb-3 font-heading text-[11.5px] font-extrabold uppercase tracking-[0.16em] text-engenius-dark/75">
         {title}
       </h3>
       {children}
@@ -259,16 +259,16 @@ function RadioCard({
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3 text-left transition-all ${
+      className={`flex w-full items-start gap-3 rounded-2xl border px-3.5 py-3.5 text-left transition-all ${
         selected
           ? "border-engenius-blue/50 bg-engenius-blue/[0.06]"
-          : "border-black/[0.06] bg-white hover:border-engenius-blue/30"
+          : "border-black/[0.08] bg-white hover:border-engenius-blue/30"
       }`}
     >
-      {icon && <span className="text-[18px] leading-none">{icon}</span>}
+      {icon && <span className="text-[19px] leading-none">{icon}</span>}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className={`text-[14px] font-medium ${selected ? "text-engenius-dark" : "text-engenius-dark/90"}`}>
+          <span className="text-[15px] font-semibold tracking-tight text-engenius-dark">
             {title}
           </span>
           {selected && (
@@ -278,7 +278,7 @@ function RadioCard({
           )}
         </div>
         {subtitle && (
-          <div className="mt-0.5 text-[12px] leading-snug text-engenius-gray">
+          <div className="mt-1 text-[12.5px] font-medium leading-snug text-engenius-dark/55">
             {subtitle}
           </div>
         )}
