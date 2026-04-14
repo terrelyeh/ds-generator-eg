@@ -15,6 +15,8 @@ interface SourceItem {
   product_line?: string | null;
   space_label?: string | null;
   space_url?: string | null;
+  doc_label?: string | null;
+  tab_name?: string | null;
 }
 
 interface SourceTypeStats {
@@ -578,13 +580,17 @@ export function KnowledgeBase() {
                           </tr>
                         </thead>
                         <tbody>
-                          {typeSources.map((s) => (
+                          {typeSources.map((s) => {
+                            const isGoogleDoc = s.source_type === "google_doc";
+                            const sourceLabel = isGoogleDoc ? (s.tab_name || s.source_id) : s.source_id;
+                            const titleLabel = isGoogleDoc ? (s.doc_label || s.title) : s.title;
+                            return (
                             <tr key={`${s.source_type}:${s.source_id}`} className="border-t hover:bg-muted/30 transition-colors">
-                              <td className="px-3 py-2 font-mono font-medium text-engenius-blue max-w-[200px] truncate" title={s.source_id}>{s.source_id}</td>
+                              <td className={`px-3 py-2 font-medium text-engenius-blue max-w-[260px] truncate ${isGoogleDoc ? "" : "font-mono"}`} title={s.source_id}>{sourceLabel}</td>
                               {config.id === "product_spec" && (
                                 <td className="px-3 py-2 text-muted-foreground">{s.product_line || "—"}</td>
                               )}
-                              <td className="px-3 py-2 text-muted-foreground truncate max-w-[200px]">{s.title}</td>
+                              <td className="px-3 py-2 text-muted-foreground truncate max-w-[220px]">{titleLabel}</td>
                               <td className="px-3 py-2 text-center tabular-nums">{s.chunks}</td>
                               <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{formatTokens(s.total_tokens)}</td>
                               <td className="px-3 py-2 text-muted-foreground">{formatDate(s.last_updated)}</td>
@@ -598,7 +604,8 @@ export function KnowledgeBase() {
                                 </button>
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>

@@ -57,6 +57,26 @@ function unescapeGoogleMarkdown(md: string): string {
   return md.replace(/\\([.\-\[\]#*_()!+=])/g, "$1");
 }
 
+/**
+ * Strip image reference definitions from Google Docs markdown export.
+ *
+ * Drive API export emits reference-style image defs like:
+ *   [image1]: <data:image/png;base64,iVBORw0KGgo...>   ← can be MB-sized
+ *   [image2]: <>                                        ← empty placeholder
+ *
+ * These inflate chunk sizes, pollute embeddings, and make "empty" tabs look
+ * huge (9MB for a tab that's visually empty). Strip them before measuring
+ * content length or chunking.
+ */
+function stripImageRefs(md: string): string {
+  // Match `[imageN]: <...>` — non-greedy content inside angle brackets.
+  // `[^>]*` handles multi-line base64 blobs since base64 has no `>` chars.
+  return md.replace(/^\[image\d+\]:\s*<[^>]*>\s*$/gm, "").replace(/\n{3,}/g, "\n\n");
+}
+
+/** Minimum content chars (after stripping images/whitespace) for a tab to be worth indexing. */
+const MIN_TAB_CONTENT_CHARS = 200;
+
 // ─── Tab Splitting ──────────────────────────────────────────────────────────
 
 /**
@@ -95,9 +115,10 @@ function splitIntoTabs(content: string, docTitle: string): DocTab[] {
   for (let i = 0; i < matches.length; i++) {
     const start = matches[i].index;
     const end = i + 1 < matches.length ? matches[i + 1].index : content.length;
-    const tabContent = content.slice(start, end).trim();
+    // Strip image refs first — a tab with only image placeholders has no real content
+    const tabContent = stripImageRefs(content.slice(start, end)).trim();
 
-    if (tabContent.length < MIN_CHUNK_CHARS) continue;
+    if (tabContent.length < MIN_TAB_CONTENT_CHARS) continue;
 
     tabs.push({
       name: matches[i].title,
@@ -187,8 +208,9 @@ export async function ingestGoogleDoc(
   const { docId, content: rawContent, docTitle, label, docUrl, force = false } = options;
   const errors: string[] = [];
 
-  // Step 0: Clean up Google Docs markdown escapes before splitting
-  const content = unescapeGoogleMarkdown(rawContent);
+  // Step 0: Clean up Google Docs markdown export — unescape punctuation and
+  // strip heavy image reference definitions (can be MBs of base64 each).
+  const content = stripImageRefs(unescapeGoogleMarkdown(rawContent));
 
   // Step 1: Split into tabs
   const tabs = splitIntoTabs(content, docTitle);
