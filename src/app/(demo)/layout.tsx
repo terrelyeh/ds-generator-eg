@@ -19,5 +19,15 @@ export default function DemoLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className="min-h-[100dvh] bg-[#faf9f5]">{children}</div>;
+  return (
+    <div
+      className="min-h-[100dvh] bg-[#faf9f5]"
+      style={{
+        fontFamily:
+          "var(--font-inter), ui-sans-serif, system-ui, -apple-system, 'Helvetica Neue', Arial, 'PingFang TC', 'Microsoft JhengHei', sans-serif",
+      }}
+    >
+      {children}
+    </div>
+  );
 }

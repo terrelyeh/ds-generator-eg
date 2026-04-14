@@ -1,9 +1,21 @@
 "use client";
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { EngenieMark } from "./engenie-mark";
+
+const markdownComponents: Components = {
+  // Wrap tables in a horizontal-scroll container so wide comparison
+  // tables don't blow out the mobile viewport.
+  table: ({ children, ...props }) => (
+    <div className="my-5 -mx-5 overflow-x-auto px-5">
+      <table {...props} className="min-w-max border-collapse">
+        {children}
+      </table>
+    </div>
+  ),
+};
 
 interface Source {
   title: string;
@@ -17,6 +29,7 @@ interface Message {
   role: "user" | "assistant";
   content: string;
   sources?: Source[];
+  followUps?: string[];
   isStreaming?: boolean;
 }
 
@@ -167,15 +180,15 @@ export function EngenieChat({
         rafIdRef.current = null;
       }
 
-      const sepIdx = fullContent.lastIndexOf("\n---\n");
-      const finalContent = sepIdx >= 0 ? fullContent.slice(0, sepIdx).trimEnd() : fullContent;
+      const { answer, followUps } = parseFollowUps(fullContent);
 
       setMessages([
         ...history,
         {
           role: "assistant",
-          content: finalContent,
+          content: answer,
           sources: streamSources,
+          followUps,
           isStreaming: false,
         },
       ]);
@@ -209,8 +222,11 @@ export function EngenieChat({
           <div className="flex h-full flex-col items-center justify-center px-6 pb-8">
             <EngenieMark size={56} />
             <h2
-              className="mt-7 text-center text-[30px] font-normal leading-[1.2] tracking-[-0.01em] text-engenius-dark"
-              style={{ fontFamily: "ui-serif, Georgia, 'Times New Roman', serif" }}
+              className="mt-7 text-center text-[30px] font-normal leading-[1.2] tracking-[-0.015em] text-engenius-dark"
+              style={{
+                fontFamily:
+                  "var(--font-serif-display), ui-serif, Georgia, 'Times New Roman', serif",
+              }}
             >
               {welcomeSubtitle || "How can I help you today?"}
             </h2>
@@ -233,9 +249,19 @@ export function EngenieChat({
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[720px] px-5 pt-6 pb-8">
-            {messages.map((m, i) => (
-              <MessageBubble key={i} message={m} />
-            ))}
+            {messages.map((m, i) => {
+              const isLastAssistant =
+                m.role === "assistant" &&
+                i === messages.length - 1 &&
+                !m.isStreaming;
+              return (
+                <MessageBubble
+                  key={i}
+                  message={m}
+                  onFollowUp={isLastAssistant ? handleSubmit : undefined}
+                />
+              );
+            })}
           </div>
         )}
       </div>
@@ -258,7 +284,8 @@ export function EngenieChat({
             onKeyDown={handleKeyDown}
             placeholder="Ask EnGenie..."
             disabled={loading}
-            className="flex-1 resize-none bg-transparent py-2 text-[15px] leading-relaxed text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
+            className="flex-1 resize-none bg-transparent py-2 leading-[1.5] text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
+            style={{ fontFamily: "inherit", fontSize: "16px" }}
           />
           <button
             onClick={() => handleSubmit()}
@@ -277,7 +304,13 @@ export function EngenieChat({
 }
 
 /* ─── Message bubble (memoized to prevent re-render of prior messages during streaming) ─── */
-const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
+const MessageBubble = memo(function MessageBubble({
+  message,
+  onFollowUp,
+}: {
+  message: Message;
+  onFollowUp?: (q: string) => void;
+}) {
   if (message.role === "user") {
     return (
       <div className="mb-8 flex justify-end">
@@ -311,7 +344,7 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: Messag
           ${message.isStreaming && message.content ? cursor : ""}`}
       >
         {message.content ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {stripCitations(message.content)}
           </ReactMarkdown>
         ) : message.isStreaming ? (
@@ -319,11 +352,76 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: Messag
         ) : null}
       </div>
       {!message.isStreaming && message.content && (
-        <ActionBar content={message.content} sources={message.sources} />
+        <>
+          <ActionBar content={message.content} sources={message.sources} />
+          {onFollowUp && message.followUps && message.followUps.length > 0 && (
+            <FollowUpList questions={message.followUps} onClick={onFollowUp} />
+          )}
+        </>
       )}
     </div>
   );
 });
+
+function FollowUpList({
+  questions,
+  onClick,
+}: {
+  questions: string[];
+  onClick: (q: string) => void;
+}) {
+  return (
+    <div className="mt-6 border-t border-black/[0.06] pt-5">
+      <div className="mb-3 font-heading text-[11px] font-extrabold uppercase tracking-[0.16em] text-engenius-dark/55">
+        Suggested follow-ups
+      </div>
+      <div className="flex flex-col gap-2">
+        {questions.slice(0, 3).map((q, i) => (
+          <button
+            key={i}
+            onClick={() => onClick(q)}
+            className="group flex items-center justify-between gap-3 rounded-2xl border border-black/[0.08] bg-white px-4 py-3 text-left transition-all hover:border-engenius-blue/40 hover:bg-engenius-blue/[0.03]"
+          >
+            <span className="text-[14px] font-medium leading-snug text-engenius-dark/85">
+              {q}
+            </span>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="flex-shrink-0 text-engenius-dark/30 transition-all group-hover:translate-x-0.5 group-hover:text-engenius-blue"
+            >
+              <line x1="5" y1="12" x2="19" y2="12" />
+              <polyline points="12 5 19 12 12 19" />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function parseFollowUps(text: string): { answer: string; followUps: string[] } {
+  const sepIdx = text.lastIndexOf("\n---\n");
+  if (sepIdx === -1) return { answer: text, followUps: [] };
+  const answerPart = text.slice(0, sepIdx).replace(/\n+$/, "");
+  const afterSeparator = text.slice(sepIdx + 5).trim();
+  const lines = afterSeparator.split("\n").map((l) => l.trim()).filter(Boolean);
+  const followUps: string[] = [];
+  for (const line of lines) {
+    const cleaned = line
+      .replace(/^[\d]+[.)]\s*/, "")
+      .replace(/^[-*]\s*/, "")
+      .trim();
+    if (cleaned.length > 5 && cleaned.length < 200) followUps.push(cleaned);
+  }
+  return { answer: answerPart, followUps: followUps.slice(0, 3) };
+}
 
 function ActionBar({ content, sources }: { content: string; sources?: Source[] }) {
   const [copied, setCopied] = useState(false);

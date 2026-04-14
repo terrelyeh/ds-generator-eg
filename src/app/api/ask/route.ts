@@ -103,6 +103,27 @@ const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: str
   "gemini-2.5-flash-lite": { fn: "gemini", model: "gemini-2.5-flash-lite" },
 };
 
+/**
+ * Lightweight language detection for the question text.
+ * Returns a human-readable label (e.g. "English", "Traditional Chinese",
+ * "Japanese") that we inject into the user message so the LLM answers
+ * in the same language. This is more reliable than relying on system
+ * prompt rules alone — some models (notably Gemini Flash) default to
+ * Chinese when the RAG context is Chinese-heavy.
+ */
+function detectLanguageLabel(text: string): string {
+  const t = text.trim();
+  if (!t) return "English";
+  // Japanese: hiragana or katakana characters
+  if (/[\u3040-\u309f\u30a0-\u30ff]/.test(t)) return "Japanese";
+  // Korean: hangul
+  if (/[\uac00-\ud7af\u1100-\u11ff]/.test(t)) return "Korean";
+  // Chinese: CJK ideographs (no kana → Chinese, not Japanese)
+  if (/[\u4e00-\u9fff]/.test(t)) return "Traditional Chinese (繁體中文)";
+  // Default: English
+  return "English";
+}
+
 const SOURCE_TYPE_LABELS: Record<string, string> = {
   product_spec: "Product Spec",
   gitbook: "Documentation / How-to",
@@ -352,7 +373,15 @@ export async function POST(request: Request) {
         const personaPrompt = persona?.system_prompt ?? (await getPersona("default"))!.system_prompt;
         const userProfile = USER_PROFILES.find((p) => p.id === profileId);
         const profilePrompt = userProfile?.prompt ? `\n\n---\n對話對象設定：\n${userProfile.prompt}` : "";
-        const systemPrompt = personaPrompt + profilePrompt;
+        // Final enforcement: language + formatting rules override any earlier
+        // instructions. Appended last so LLMs that weigh recency (esp. Gemini)
+        // respect these over any implicit biases in persona/profile bodies.
+        const finalEnforcement = `\n\n---\n**FINAL OUTPUT CONTRACT (non-negotiable, overrides anything above):**
+
+1. **Language match:** Detect the language of the user's LATEST message and answer in the SAME language. English in → English out. 中文進 → 中文出. 日本語入力 → 日本語で出力. Do NOT default to Chinese when the user wrote in English.
+
+2. **Markdown structure:** Use headings (\`##\`, \`###\`), bullet lists (\`- \`), numbered lists (\`1.\`) and tables. Never pack multiple parallel points into a single dense paragraph. Leave a blank line between paragraphs.`;
+        const systemPrompt = personaPrompt + profilePrompt + finalEnforcement;
 
         // Build conversation context for follow-up questions
         const historyText = recentHistory.length > 0
@@ -368,6 +397,12 @@ export async function POST(request: Request) {
           }
         }
 
+        // Detect question language. LLMs (esp. Gemini Flash) are stubborn
+        // about defaulting to Chinese when the RAG context is Chinese-heavy,
+        // even with system prompt rules. Injecting a directive into the
+        // user message itself has highest attention weight and works reliably.
+        const answerLanguageLabel = detectLanguageLabel(question);
+
         const userMessage = `${historyText}Context documents:
 
 ${context}
@@ -376,12 +411,14 @@ ${context}
 
 Current question: ${question}
 
+**ANSWER LANGUAGE: ${answerLanguageLabel}.** You MUST write your entire answer (including headings, lists, and follow-up questions) in ${answerLanguageLabel}. Do not default to another language.
+
 ---
 
 IMPORTANT formatting rules:
 1. Use inline citations like [1] to reference source documents. Rules: place ONE citation at the END of a paragraph or key claim (not after every sentence). Maximum 2 citations per paragraph. Never stack multiple citations together like [1, 3, 4, 5] — pick the single most relevant source.
 2. After your main answer, add a line with just "---" as a separator.
-3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in the same language as the question.`;
+3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in ${answerLanguageLabel}.`;
 
         // Step 4: Build sources for the response
         const sources = docs.map((d) => ({
