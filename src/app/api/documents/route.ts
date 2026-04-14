@@ -4,6 +4,7 @@ import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
+import { fetchGoogleDoc } from "@/lib/google/docs";
 
 // Allow up to 300s for Gitbook ingestion (many pages + Vision API)
 export const maxDuration = 300;
@@ -204,23 +205,12 @@ export async function POST(request: Request) {
       );
     }
 
-    // If no content provided, try export API (only works for publicly shared docs)
+    // If no content provided, fetch via Drive API (service account → public export fallback)
     if (!content) {
       try {
-        // Try markdown export first (preserves headings)
-        const exportUrl = `https://docs.google.com/document/d/${doc_id}/export?format=md`;
-        let res = await fetch(exportUrl, { redirect: "follow" });
-        if (!res.ok) {
-          // Fallback to txt export
-          res = await fetch(`https://docs.google.com/document/d/${doc_id}/export?format=txt`, { redirect: "follow" });
-        }
-        if (!res.ok) throw new Error(`Export failed: ${res.status}. Make sure the doc is shared with "Anyone with the link".`);
-        content = await res.text();
-        // Try to get title from first line
-        if (!doc_title) {
-          const firstLine = content.split("\n").find((l) => l.trim());
-          doc_title = firstLine?.replace(/^#+\s*/, "").replace(/^\[.*?\]\s*/, "").trim() || "Untitled";
-        }
+        const fetched = await fetchGoogleDoc(doc_id);
+        content = fetched.content;
+        if (!doc_title) doc_title = fetched.title;
       } catch (err) {
         return NextResponse.json(
           { error: `Failed to fetch Google Doc: ${err instanceof Error ? err.message : String(err)}` },

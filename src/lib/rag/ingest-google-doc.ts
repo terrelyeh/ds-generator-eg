@@ -48,6 +48,15 @@ interface DocTab {
   content: string;
 }
 
+/**
+ * Google Docs markdown export over-escapes punctuation: `\.`, `\-`, `\[`, `\]`, `\#`, etc.
+ * These hurt embedding quality and downstream search. Strip them before chunking.
+ */
+function unescapeGoogleMarkdown(md: string): string {
+  // Unescape common punctuation: \. \- \[ \] \# \* \_ \( \) \! \+ \=
+  return md.replace(/\\([.\-\[\]#*_()!+=])/g, "$1");
+}
+
 // ─── Tab Splitting ──────────────────────────────────────────────────────────
 
 /**
@@ -57,14 +66,20 @@ interface DocTab {
  * or the first major section of the document.
  */
 function splitIntoTabs(content: string, docTitle: string): DocTab[] {
-  // Look for tab markers: lines with "[vX.X]" which indicate doc tabs
-  // Supports both markdown (# [v1.2] Title) and plain text ([v1.2] Title)
-  const tabPattern = /^(?:#\s+)?\[v[\d.]+\]\s+(.+)$/gm;
+  // Look for tab markers: lines with "[vX.X]" which indicate doc tabs.
+  // Google Docs markdown export escapes brackets as `\[v1.2\]`, so we match both.
+  // Supports: "# [v1.2] Title", "# \[v1.2\] Title", "[v1.2] Title", "\[v1.2\] Title"
+  const tabPattern = /^(?:#+\s+)?\\?\[v[\d.]+\\?\]\s+(.+)$/gm;
   const matches: { index: number; title: string }[] = [];
   let match;
 
   while ((match = tabPattern.exec(content)) !== null) {
-    matches.push({ index: match.index, title: match[0].replace(/^# /, "").trim() });
+    // Strip leading #s and unescape brackets for a clean title
+    const cleanTitle = match[0]
+      .replace(/^#+\s+/, "")
+      .replace(/\\(\[|\])/g, "$1")
+      .trim();
+    matches.push({ index: match.index, title: cleanTitle });
   }
 
   if (matches.length === 0) {
@@ -169,8 +184,11 @@ function chunkByHeadings(content: string, tabName: string): ChunkResult[] {
 export async function ingestGoogleDoc(
   options: IngestGoogleDocOptions
 ): Promise<IngestGoogleDocResult> {
-  const { docId, content, docTitle, label, docUrl, force = false } = options;
+  const { docId, content: rawContent, docTitle, label, docUrl, force = false } = options;
   const errors: string[] = [];
+
+  // Step 0: Clean up Google Docs markdown escapes before splitting
+  const content = unescapeGoogleMarkdown(rawContent);
 
   // Step 1: Split into tabs
   const tabs = splitIntoTabs(content, docTitle);
