@@ -12,6 +12,7 @@ import {
   loadComparison,
   loadCloudComparison,
 } from "@/lib/google/sheets-extra";
+import { ingestProducts } from "@/lib/rag/ingest-products";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
 import type { ProductLine } from "@/types/database";
@@ -475,11 +476,42 @@ export async function POST(request: Request) {
     }
   }
 
+  // Auto re-index RAG embeddings for products that changed.
+  // ingestProducts uses content_hash to skip unchanged chunks so even a
+  // full re-ingest is cheap — we just narrow to changed models for speed.
+  let reindexResult: { processed: number; skipped: number; errors: number } | null = null;
+  if (allChanges.length > 0) {
+    try {
+      const changedModels = [...new Set(allChanges.map((c) => c.product_name))];
+      let processed = 0;
+      let skipped = 0;
+      const reindexErrors: string[] = [];
+      for (const modelName of changedModels) {
+        const r = await ingestProducts({ modelName, force: false });
+        processed += r.processed;
+        skipped += r.skipped;
+        reindexErrors.push(...r.errors);
+      }
+      reindexResult = {
+        processed,
+        skipped,
+        errors: reindexErrors.length,
+      };
+      if (reindexErrors.length > 0) {
+        console.warn("RAG re-index errors:", reindexErrors);
+      }
+    } catch (err) {
+      // Re-index failure should not break the sync response
+      console.warn("RAG re-index failed:", err);
+    }
+  }
+
   return NextResponse.json({
     ok: true,
     timestamp: new Date().toISOString(),
     results,
     notifications: notifyResult,
+    reindex: reindexResult,
   });
 }
 

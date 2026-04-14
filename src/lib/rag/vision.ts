@@ -10,15 +10,25 @@ const VISION_MODEL = "gemini-2.5-flash";
 const DESCRIPTION_PROMPT = `You are describing an image from EnGenius networking product documentation.
 Your description will be embedded into a vector database for semantic search.
 
-Rules:
-- Describe what the image shows in 2-4 sentences
-- If it's a UI screenshot, describe the key elements, settings, and workflow shown
-- If it's a diagram/architecture, describe the components and their relationships
-- If it's a table/chart, describe the data structure and key values
-- Include any text visible in the image that would be useful for search
-- Be factual and specific — mention product names, feature names, menu paths if visible
-- Write in English for consistent embedding quality
-- Do NOT start with "This image shows" — just describe directly`;
+CRITICAL — table handling:
+- If the image contains ANY table (LED status table, spec table, comparison table, pin-out, etc.),
+  extract the ENTIRE table as a Markdown table. Do NOT summarize. Every row, every column.
+- Preserve cell text exactly: LED color names (PWR Orange, LAN Blue, 2.4GHz Blue, 5GHz Green, Mesh Blue),
+  behavior labels (Solid On, Flashing, Fast Flashing, Flashing 0.5 Sec, 1.5 sec on -> 0.5 sec off),
+  and status meanings (Connecting to Cloud, Cloud Connected, LAN Connected, LAN Transmitting,
+  Firmware Upgrading, Reset to Default, AP Locating Mode, Mesh Connection, Mesh Auto Pairing, etc.).
+- After the table, add ONE sentence naming the product context if visible (e.g., "LED behavior table for ECW536 Cloud Access Point.").
+
+For non-table images:
+- UI screenshot → 2-4 sentences describing key elements, settings, menu paths, workflow.
+- Diagram/architecture → 2-4 sentences on components and relationships.
+- Photo of product/hardware → describe physical features, ports, indicators.
+
+General rules:
+- Be factual and specific — mention product names, feature names, menu paths when visible.
+- Include any visible text that would help search.
+- Write in English for consistent embedding quality.
+- Do NOT start with "This image shows" — just describe or extract directly.`;
 
 /**
  * Generate a text description of an image using Gemini Vision.
@@ -67,7 +77,9 @@ export async function describeImage(imageUrl: string): Promise<string | null> {
             },
           ],
           generationConfig: {
-            maxOutputTokens: 300,
+            // Large tables (e.g. 12-row LED behavior table) need room;
+            // bumped from 300 so full table extraction fits.
+            maxOutputTokens: 2000,
             temperature: 0.2,
           },
         }),
