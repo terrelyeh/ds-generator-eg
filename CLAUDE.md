@@ -1,6 +1,6 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-04-13
+> Last updated: 2026-04-14
 
 ## Project Overview
 
@@ -225,21 +225,32 @@ Key tables:
 
 ## Ask SpecHub (RAG System)
 
-完整架構、API、三維度 Prompt、Chunking、Roadmap 請參考 [`docs/rag-system.md`](docs/rag-system.md)。
-說明文件網頁版：`/docs/rag-system.html`（與 Drive 文件同風格，繁中）。
+完整架構詳見 [`docs/rag-system.md`](docs/rag-system.md)（需更新以反映以下變動）。
 
-**三維度 Prompt 架構**：
-- **維度 1（回答角度 / Persona）**：4 內建 + 自訂，存 `app_settings`（`persona_{id}`）
-- **維度 2（對話對象 / User Profile）**：6 個 profile（一般同事/新人/業務/Channel/PM/客戶），定義在 `personas.ts` 的 `USER_PROFILES`，prompt 附加到 persona 後面
-- **維度 3（產出格式）**：規劃中（簡報/比較表/Email/提案）
-- 三維度在 `callLLM()` 前組裝：`systemPrompt = personaPrompt + profilePrompt`
+### UX 架構（2026-04-14 大改版）
+- **Slide Panel**：Navbar Ask 按鈕 → 右側 panel 滑出（600px / 42vw），不離開當前頁面
+- **SSE Streaming**：`/api/ask` POST 回傳 `text/event-stream`，逐字輸出。三家 LLM 都用 streaming（streamClaude/streamOpenAI/streamGemini）
+- **Inline Citations**：LLM 回答用 `[1]` `[2]` 標記，前端 `CitationTooltip` hover 顯示來源 + 圖片縮圖。外部來源（gitbook/helpcenter）可點擊跳轉原文
+- **UI Path Styling**：`**Configure > Gateway > VPN**` 自動渲染為 breadcrumb pill 樣式
+- **Welcome Screen**：可自訂（`app_settings`: `ask_welcome_subtitle`, `ask_welcome_description`, `ask_example_questions`），Settings > Ask Welcome 有 UI
+- **AI Avatar**：每則回覆左側有 network-node icon
 
-**核心流程**：問題(+history) → Embed → pgvector 搜尋 → 組裝 prompt(Persona+Profile+Context) → LLM → 回答+延伸問題+來源
-**資料表**：`documents`（向量索引）、`chat_sessions`（對話持久化，messages 直接存 JSONB array 不要 stringify）
-**Model 選擇**：3 家 provider × 3 tier，`callLLM()` 內 `MODEL_MAP` 統一映射。Gemini 回應用 `res.text()` 再 parse JSON（處理 thinking parts）
-**Concurrency**：PDF 生成有 DB lock（`pdf_lock_{model}_{lang}`，5 分鐘 auto-expire）；Settings 有 optimistic locking（`updated_at` 比對）
-**頁面寬度**：Dashboard/Compare/Translations/Typography/Ask/Product = `1400px`，其餘 = `1100px`
-**最小字體**：全站消滅 `text-[10px]`，最小為 `text-[11px]`（11px）
+### Persona & Profile（精簡版）
+- **3 Personas**：Product Specialist（預設）、Sales Assistant、Technical Support
+- **4 Profiles**：同事（預設，帶基本白話解釋）、業務/Channel、產品經理、終端客戶
+- **核心原則**：禁止客套開場白、Feature-Benefit 原則、站在對方立場、寧多勿少
+- Persona prompt 在 `personas.ts` 的 `DEFAULT_PERSONAS`；Profile 在 `USER_PROFILES`
+
+### 知識庫 Source Types（2026-04-14）
+| Type | Pipeline | 已索引 | 備註 |
+|---|---|---|---|
+| `product_spec` | `ingest-products.ts` | 66 products | 從 Supabase DB 建 chunk |
+| `gitbook` | `ingest-gitbook.ts` | 4 spaces (~900 chunks) | sitemap → fetch → chunk。有 `/ingest-gitbook` Skill |
+| `helpcenter` | `ingest-helpcenter.ts` | 41 articles (~235 chunks) | Intercom SPA，用 `KNOWN_ARTICLES` fallback。有 `/ingest-helpcenter` Skill |
+| `google_doc` | `ingest-google-doc.ts` | 1 doc (70 chunks) | Drive API / export → tab split → chunk。UI 支援 Add Doc |
+
+**核心流程**：問題(+history) → Embed → pgvector 搜尋(top 12) → 組裝 prompt(Persona+Profile+Context with source_type labels) → SSE Stream LLM → 回答+citations+follow-ups
+**資料表**：`documents`（向量索引，chunk-level image_urls in metadata）、`chat_sessions`（對話持久化）
 
 ## Current Status
 
@@ -247,22 +258,20 @@ Key tables:
 
 ### 🔜 Next Steps
 
-**RAG 擴充**（詳見 [`docs/rag-system.md`](docs/rag-system.md) Roadmap）：
-1. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較），最快能產生價值的擴充
-2. **Auto re-index after Sync** — Sync 完成後自動觸發 re-embed 有變動的產品
-3. **Gitbook ingestion** — 技術文件索引
-4. **Streaming response (SSE)** — 回答即時顯示，改善等待體驗
+**RAG**：
+1. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較）
+2. **Auto re-index after Sync** — Sync 完成後自動觸發 re-embed
+3. **QSG 批次 Vision** — 100+ model 的 LED table 截圖轉文字
+4. **更新 `docs/rag-system.md`** — 反映 SSE/citations/panel/source types 變動
 
 **Datasheet 系統**：
 5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
 6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
-7. **產品照片補齊** — Cloud VPN FW 優先（4 models 全缺圖）
-8. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
+7. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
 
 **系統**：
-9. **Supabase Auth + email 白名單** — 控制存取權限，chat_sessions 綁定 user_id
-10. **NVS 命名不一致** — Drive "NVS" vs 系統 "EVS"
-11. **Extender/Unmgd SW 的 ds_prefix** — 實際 PDF 用 `DS_Unmanaged_Switch_`，但 ds_prefix 設為 `DS_Unmanaged`
+8. **Supabase Auth + email 白名單** — 控制存取權限
+9. **Smart Image Sync** — 已實作 Drive modifiedTime 比對，但需觀察 production 穩定性
 
 ## Deployment
 
@@ -292,5 +301,11 @@ npm run lint   # ESLint check
 11. **zh-TW locale 在 Drive 用 zh** — `getLocaleSuffix("zh-TW")` 回傳 `"zh"`，資料夾命名和 PDF 檔名用 `_zh` 不用 `_zh-TW`
 12. **Gemini API model 名稱** — 翻譯用 `gemini-2.5-pro`（加 `responseMimeType: "application/json"` 穩定 JSON 輸出）。Ask RAG 用 `gemini-2.5-flash`（預設）或 `gemini-2.5-pro`。注意：`-latest` suffix 已棄用
 13. **Preview CSS 動態化** — per-locale 的字級/字重/顏色不再 hardcode 在 CSS，而是從 `app_settings` 讀 `typography_${lang}` JSON，fallback 到 `TYPOGRAPHY_DEFAULTS[lang]`
-14. **Gemini 回應解析** — Ask RAG 的 `callGemini()` 必須用 `res.text()` 再 `JSON.parse()`（不能直接 `res.json()`，大回應會失敗）。2.5 Pro 可能回傳 thinking parts，要取最後一個 text part
-15. **chat_sessions messages 格式** — 存入時直接傳 raw array 給 Supabase JSONB，**不要** `JSON.stringify()`，否則會 double-encode 成字串。讀取時用 `parseMessages()` 安全處理兩種格式
+14. **Gemini 回應解析** — streaming 模式下用 `streamGenerateContent?alt=sse` endpoint，parse SSE events，skip thinking parts
+15. **chat_sessions messages 格式** — 存入時直接傳 raw array 給 Supabase JSONB，**不要** `JSON.stringify()`
+16. **Cloud Switch spec 不解析** — Sheet 的 Detail Specs 沒有標準 category header，parser 需要 fallback "General" category。已修
+17. **Gitbook HTML→text 噪音** — Gitbook chatbot widget、banner、SVG icon alt text "hashtag" 會汙染 chunk。htmlToText 已加清理
+18. **Gitbook 圖片 URL** — proxy URL（`/~gitbook/image?url=...&sign=...`）server-side fetch 會 400。需提取原始 `files.gitbook.io` URL，且保持 `%2F` encoding 不被 double-decode
+19. **Google Doc export=txt 無 heading** — plain text export 丟失 markdown 結構，需用 numbered section pattern (`\d+\.\s+[A-Z]`) 作為 chunk 分割點
+20. **Flex scroll 需要每層 min-h-0** — 巢狀 flex 容器的每一層都需要 `min-h-0` 才能讓子元素 `overflow-y-auto` 生效
+21. **Smart image sync** — `syncProductImages` 比對 Drive `modifiedTime` vs Storage `last-modified`，Drive 更新才重新下載
