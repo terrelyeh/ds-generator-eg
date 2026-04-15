@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { uploadImageToDrive } from "@/lib/google/drive-images";
+import { resolveLocaleDsImagesFolder, uploadImageToDrive } from "@/lib/google/drive-images";
 import { getLocaleSuffix } from "@/lib/google/drive-versions";
 
 /**
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
 
   const { data: productLine } = await supabase
     .from("product_lines")
-    .select("ds_images_folder_id")
+    .select("ds_images_folder_id, name")
     .eq("id", product.product_line_id)
     .single();
 
@@ -158,13 +158,26 @@ export async function POST(request: Request) {
     }
   }
 
-  // 3. Upload to Google Drive DS Images folder (non-blocking)
+  // 3. Upload to Google Drive DS Images folder (non-blocking).
+  //
+  // For localized uploads, resolve the <lineName>_<locale>/DS Images/
+  // sibling folder via resolveLocaleDsImagesFolder — auto-creates the
+  // DS Images subfolder if it doesn't exist yet. For English, use the
+  // product line's ds_images_folder_id directly.
   let driveFileId: string | null = null;
-  const dsFolderId = productLine?.ds_images_folder_id;
-  if (dsFolderId) {
+  const enDsFolderId = productLine?.ds_images_folder_id;
+  const lineName = productLine?.name;
+  if (enDsFolderId) {
     try {
+      const targetFolderId = locale && lineName
+        ? await resolveLocaleDsImagesFolder({
+            enDsImagesFolderId: enDsFolderId,
+            lineName,
+            locale,
+          })
+        : enDsFolderId;
       driveFileId = await uploadImageToDrive(
-        dsFolderId,
+        targetFolderId,
         fileName,
         buffer,
         file.type

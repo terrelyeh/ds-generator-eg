@@ -5,7 +5,7 @@ import {
   loadProductFromSheets,
   getSheetMetadata,
 } from "@/lib/google/sheets";
-import { syncProductImages } from "@/lib/google/drive-images";
+import { syncProductImages, syncLocalizedHardwareImage } from "@/lib/google/drive-images";
 import { sendNotifications } from "@/lib/notifications";
 import {
   loadRevisionLogs,
@@ -128,7 +128,7 @@ export async function POST(request: Request) {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
             .from("products")
-            .select("id, subtitle, full_name, headline, overview, features, status, product_image, hardware_image")
+            .select("id, subtitle, full_name, headline, overview, features, status, product_image, hardware_image, current_versions")
             .eq("model_name", modelName)
             .single();
 
@@ -242,6 +242,28 @@ export async function POST(request: Request) {
               .from("products")
               .update(updateFields)
               .eq("id", existing.id);
+
+            // Sync localized hardware images (one per enabled locale).
+            // Reads each sibling "<ProductLine>_<locale>/DS Images" folder
+            // and writes product_translations.hardware_image.
+            if (pl.ds_images_folder_id && pl.name) {
+              const enabledLocales = Object.keys(
+                (existing.current_versions as Record<string, string> | null) ?? {},
+              ).filter((l) => l && l !== "en");
+              for (const locale of enabledLocales) {
+                try {
+                  await syncLocalizedHardwareImage({
+                    modelName,
+                    productId: existing.id,
+                    locale,
+                    lineName: pl.name,
+                    enDsImagesFolderId: pl.ds_images_folder_id,
+                    supabase,
+                  });
+                } catch { /* non-fatal */ }
+              }
+            }
+
             lineResult.synced.push(modelName);
             continue;
           }
@@ -302,6 +324,28 @@ export async function POST(request: Request) {
             }
           } catch {
             // Image sync is optional — continue without images
+          }
+
+          // Sync localized hardware images for each enabled locale.
+          // Writes product_translations.hardware_image per locale.
+          try {
+            if (pl.ds_images_folder_id && pl.name) {
+              const enabledLocales = Object.keys(
+                (existing?.current_versions as Record<string, string> | null) ?? {},
+              ).filter((l) => l && l !== "en");
+              for (const locale of enabledLocales) {
+                await syncLocalizedHardwareImage({
+                  modelName,
+                  productId: product.id,
+                  locale,
+                  lineName: pl.name,
+                  enDsImagesFolderId: pl.ds_images_folder_id,
+                  supabase,
+                });
+              }
+            }
+          } catch {
+            // Localized image sync is optional — continue
           }
 
           // Replace spec sections + items
