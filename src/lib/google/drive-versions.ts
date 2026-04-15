@@ -319,58 +319,45 @@ export async function uploadPdfToDrive(
 
   let targetFolderId: string;
 
-  if (locale) {
-    // Locale-specific folder: DS_Cloud_ECC100_ja/
-    const localeFolderName = `${dsPrefix}_${modelName}_${getLocaleSuffix(locale)}`;
+  // Resolve target folder by name. Always search first (reuse if it already
+  // exists) before creating — avoids accumulating duplicate same-name folders
+  // every time a PDF is generated. Drive allows duplicate folder names so
+  // `files.create` without a prior lookup is a footgun.
+  //
+  // Folder naming:
+  //   - English:  DS_Cloud_ECC100
+  //   - Locale:   DS_Cloud_ECC100_ja
+  const targetFolderName = locale
+    ? `${dsPrefix}_${modelName}_${getLocaleSuffix(locale)}`
+    : `${dsPrefix}_${modelName}`;
 
-    // Search for existing locale folder
-    const localeFolderRes = await drive.files.list({
-      q: `'${driveFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${localeFolderName}' and trashed = false`,
-      fields: "files(id)",
-      supportsAllDrives: true,
-      includeItemsFromAllDrives: true,
-      pageSize: 1,
-    });
+  const existingFolderRes = await drive.files.list({
+    q: `'${driveFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${targetFolderName}' and trashed = false`,
+    fields: "files(id)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    pageSize: 1,
+  });
 
-    const existing = localeFolderRes.data.files?.[0];
-    if (existing?.id) {
-      targetFolderId = existing.id;
-    } else {
-      // Create locale folder
-      const folderRes = await drive.files.create({
-        requestBody: {
-          name: localeFolderName,
-          mimeType: "application/vnd.google-apps.folder",
-          parents: [driveFolderId],
-        },
-        supportsAllDrives: true,
-        fields: "id",
-      });
-      targetFolderId = folderRes.data.id!;
-    }
-  } else if (existingVersion) {
-    const folderHasVersion = parseVersion(existingVersion.folderName) !== null;
+  const existingFolder = existingFolderRes.data.files?.[0];
 
-    if (folderHasVersion) {
-      // Old format folder (e.g. DS_Cloud_ECW526_v1.4/) — upload to same folder
-      targetFolderId = existingVersion.folderId;
-    } else {
-      // New format folder (e.g. DS_Cloud_ECW526/) — upload into it
-      targetFolderId = existingVersion.folderId;
-    }
+  if (existingFolder?.id) {
+    targetFolderId = existingFolder.id;
+  } else if (!locale && existingVersion) {
+    // Back-compat: caller discovered an old-format folder like
+    // DS_Cloud_ECW526_v1.4/ via version detection — reuse it instead of
+    // creating a brand-new DS_Cloud_ECW526/ alongside it.
+    targetFolderId = existingVersion.folderId;
   } else {
-    // No existing folder — create new one (new format, no version in name)
-    const newFolderName = `${dsPrefix}_${modelName}`;
     const folderRes = await drive.files.create({
       requestBody: {
-        name: newFolderName,
+        name: targetFolderName,
         mimeType: "application/vnd.google-apps.folder",
         parents: [driveFolderId],
       },
       supportsAllDrives: true,
       fields: "id",
     });
-
     targetFolderId = folderRes.data.id!;
   }
 
