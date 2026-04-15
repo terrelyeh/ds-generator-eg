@@ -360,7 +360,8 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
         window.open(data.pdfUrl, "_blank");
         router.refresh();
       } else {
-        alert(`PDF generation failed: ${data.error || "Unknown error"}`);
+        const detail = data.details ? `\n\n${data.details}` : "";
+        alert(`PDF generation failed: ${data.error || "Unknown error"}${detail}`);
       }
     } catch (err) {
       alert(

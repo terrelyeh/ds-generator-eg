@@ -9,9 +9,12 @@ import {
 } from "@/lib/google/drive-versions";
 import type { ProductLine } from "@/types/database";
 
-// Chromium binary URL for @sparticuz/chromium-min (downloaded at runtime)
+// Chromium binary URL for @sparticuz/chromium-min (downloaded at runtime).
+// Must match the @sparticuz/chromium-min version in package.json — Vercel is
+// x64 Lambda. Previous URL pointed at a deleted third-party mirror, causing
+// PDF generation to 404 on every run.
 const CHROMIUM_URL =
-  "https://github.com/nichochar/chromium-brotli/releases/download/v133.0.0/chromium-v133.0.0-pack.tar";
+  "https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar";
 
 // Allow up to 60s for PDF generation
 export const maxDuration = 60;

@@ -31,7 +31,8 @@ export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en"
       if (data.ok && data.pdfUrl) {
         window.open(data.pdfUrl, "_blank");
       } else {
-        alert(`PDF generation failed: ${data.error || "Unknown error"}`);
+        const detail = data.details ? `\n\n${data.details}` : "";
+        alert(`PDF generation failed: ${data.error || "Unknown error"}${detail}`);
       }
     } catch (err) {
       alert(`PDF generation failed: ${err instanceof Error ? err.message : String(err)}`);
