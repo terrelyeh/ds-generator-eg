@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { uploadImageToDrive } from "@/lib/google/drive-images";
+import { getLocaleSuffix } from "@/lib/google/drive-versions";
 
 /**
  * POST /api/upload-image
@@ -11,6 +12,11 @@ import { uploadImageToDrive } from "@/lib/google/drive-images";
  *   - model: model name (e.g. "ECC100")
  *   - type: "product" | "hardware" | "radio_pattern"
  *   - label: (radio_pattern only) e.g. "2.4G H-plane"
+ *   - locale: (optional) translation locale e.g. "zh-TW", "ja". When set and
+ *     non-English, the file is stored under a locale-suffixed filename
+ *     (ECC100_hardware_zh.png) and products.hardware_image is NOT touched —
+ *     the caller is expected to save the returned URL into
+ *     product_translations.hardware_image via the translations API.
  */
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -18,6 +24,11 @@ export async function POST(request: Request) {
   const model = formData.get("model") as string | null;
   const imageType = formData.get("type") as string | null;
   const label = formData.get("label") as string | null;
+  const localeRaw = formData.get("locale") as string | null;
+  // Treat empty string / "en" as "no locale" so the English path is
+  // unchanged. Any other value is considered a localized upload.
+  const locale = localeRaw && localeRaw !== "en" ? localeRaw : null;
+  const localeSuffix = locale ? `_${getLocaleSuffix(locale)}` : "";
 
   if (!file || !model || !imageType) {
     return NextResponse.json(
@@ -65,17 +76,20 @@ export async function POST(request: Request) {
   const buffer = Buffer.from(await file.arrayBuffer());
   const ext = file.name.split(".").pop() || "png";
 
-  // Build file name based on type
-  // product → ECW526_product.png
-  // hardware → ECW526_hardware.png
-  // radio_pattern → ECW526_2.4G_H-plane.png
+  // Build file name based on type and optional locale suffix.
+  // English (no locale):
+  //   product        → ECW526_product.png
+  //   hardware       → ECW526_hardware.png
+  //   radio_pattern  → ECW526_2.4G_H-plane.png
+  // Localized (locale=zh-TW → _zh):
+  //   hardware       → ECW526_hardware_zh.png
   let fileName: string;
   if (imageType === "radio_pattern" && label) {
     // label format: "2.4G H-plane" → "2.4G_H-plane"
     const labelSlug = label.replace(/\s+/g, "_");
-    fileName = `${model}_${labelSlug}.${ext}`;
+    fileName = `${model}_${labelSlug}${localeSuffix}.${ext}`;
   } else {
-    fileName = `${model}_${imageType}.${ext}`;
+    fileName = `${model}_${imageType}${localeSuffix}.${ext}`;
   }
 
   const storagePath = `images/${model}/${fileName}`;
@@ -102,8 +116,17 @@ export async function POST(request: Request) {
 
   const publicUrl = urlData.publicUrl;
 
-  // 2. Update records
-  if (imageType === "product" || imageType === "hardware") {
+  // 2. Update records.
+  //
+  // For English uploads, write the URL into products.product_image /
+  // products.hardware_image (the canonical English fields).
+  //
+  // For localized uploads (locale set), DO NOT touch the products row — the
+  // caller (translation editor) will save the returned URL into
+  // product_translations.hardware_image via /api/translations/product.
+  // Writing to products here would silently overwrite the English URL
+  // whenever a translator uploads a locale-specific hardware image.
+  if (!locale && (imageType === "product" || imageType === "hardware")) {
     const field = imageType === "product" ? "product_image" : "hardware_image";
     await supabase
       .from("products")
