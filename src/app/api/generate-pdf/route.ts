@@ -256,10 +256,23 @@ export async function POST(request: Request) {
 
     const page = await browser.newPage();
 
-    const baseUrl =
-      process.env.VERCEL_URL
-        ? `https://${process.env.VERCEL_URL}`
-        : `http://localhost:${process.env.PORT || 3000}`;
+    // Attach Vercel Deployment Protection bypass header if configured.
+    // Without this, Puppeteer fetching our own URL may hit the "Log in to
+    // Vercel" gate and print that page instead of the datasheet.
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    if (bypassSecret) {
+      await page.setExtraHTTPHeaders({
+        "x-vercel-protection-bypass": bypassSecret,
+        "x-vercel-set-bypass-cookie": "true",
+      });
+    }
+
+    // Prefer the stable production alias over the per-deployment hash URL.
+    // VERCEL_URL returns the unique deployment hash, which is more likely
+    // to be gated by Deployment Protection than the production alias.
+    const baseUrl = process.env.VERCEL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL}`
+      : `http://localhost:${process.env.PORT || 3000}`;
 
     // Pass lang and mode to the preview page
     const translationMode = isLocalized ? "full" : "light"; // Default to full for localized PDFs
