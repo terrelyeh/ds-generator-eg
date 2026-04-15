@@ -297,6 +297,18 @@ export async function POST(request: Request) {
       timeout: 30000,
     });
 
+    // Guard: if Vercel Deployment Protection (or any other gate) intercepted
+    // the request, the page will be Vercel's OAuth login. Detect by title
+    // and fail loudly with diagnostics instead of printing the login page.
+    const pageTitle = await page.title();
+    const finalUrl = page.url();
+    if (/log in to vercel|authentication required/i.test(pageTitle)) {
+      await browser.close();
+      throw new Error(
+        `Preview page hit Vercel auth gate. pageTitle="${pageTitle}" finalUrl="${finalUrl}" baseUrl="${baseUrl}" previewUrl="${previewUrl}" hasBypassSecret=${!!bypassSecret}`
+      );
+    }
+
     const pdfBuffer = Buffer.from(
       await page.pdf({
         format: "Letter",
