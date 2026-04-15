@@ -267,12 +267,24 @@ export async function POST(request: Request) {
       });
     }
 
-    // Prefer the stable production alias over the per-deployment hash URL.
-    // VERCEL_URL returns the unique deployment hash, which is more likely
-    // to be gated by Deployment Protection than the production alias.
-    const baseUrl = process.env.VERCEL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL}`
-      : `http://localhost:${process.env.PORT || 3000}`;
+    // Resolve the base URL for the preview page.
+    //
+    // Priority:
+    //   1. PDF_PREVIEW_BASE_URL — explicit override, e.g. the stable
+    //      production alias `https://ds-generator-eg.vercel.app`. Set this
+    //      to avoid the Vercel Deployment Protection login gate that
+    //      sometimes intercepts the per-deployment hash URL from within
+    //      serverless functions.
+    //   2. VERCEL_PROJECT_PRODUCTION_URL — Vercel-provided stable alias.
+    //   3. VERCEL_URL — the per-deployment hash (may be gated).
+    //   4. localhost fallback for dev.
+    const baseUrl =
+      process.env.PDF_PREVIEW_BASE_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : `http://localhost:${process.env.PORT || 3000}`);
 
     // Pass lang and mode to the preview page
     const translationMode = isLocalized ? "full" : "light"; // Default to full for localized PDFs
