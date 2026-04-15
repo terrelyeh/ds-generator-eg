@@ -1,6 +1,8 @@
 # Product SpecHub — Google Drive 資料夾結構與命名規則
 
-> 版本: 2026-04-08 | 維護者: Terrel Yeh
+> 版本: 2026-04-15 | 維護者: Terrel Yeh
+
+> **2026-04-15 更新**: 圖片多語言資料夾結構對齊。每個語言的 hardware 圖現在存放在對應語言產品線底下的 `DS Images/`（如 `Cloud Camera_ja/DS Images/`），不再放在英文 `DS Images/` 裡。所有 Drive 上的日文後綴也從 `_jp` / `_JP` 統一為 `_ja`。
 
 ---
 
@@ -26,45 +28,55 @@
 
 ### 2.1 總體架構
 
-每個產品線在 Google Drive 上有 **兩個重要的資料夾**：
+每個產品線在 Google Drive 上是一個獨立的資料夾，裡面同時存放 Datasheet PDF 和產品圖片。多語言版本是**獨立的 top-level 兄弟資料夾**，用 `_ja` / `_zh` 後綴區分：
 
 ```
-Google Drive
-├── Cloud AP/                          ← DS 資料夾 (drive_folder_id)
-│   ├── DS_Cloud_ECW526/               ← 各型號的 DS 子資料夾
+Model Datasheet/
+├── Cloud AP/                          ← 🇺🇸 英文產品線 (drive_folder_id)
+│   ├── DS Images/                     ← 產品圖片 (ds_images_folder_id)
+│   │   ├── ECW526_product.png
+│   │   ├── ECW526_hardware.png
+│   │   └── ECW526_2.4G_H-plane.png
+│   ├── DS_Cloud_ECW526/               ← PDF 子資料夾
 │   │   ├── DS_Cloud_ECW526_v1.3.pdf
 │   │   └── DS_Cloud_ECW526_v1.4.pdf
 │   └── ...
 │
-├── DS Images/                         ← 圖片資料夾
-│   ├── Cloud AP/                      ← ds_images_folder_id (各產品線)
-│   │   ├── ECW526_product.png
-│   │   ├── ECW526_hardware.png
-│   │   └── ...
-│   ├── Cloud Switch/
-│   ├── Cloud Camera/
-│   └── ...
+├── Cloud AP_ja/                       ← 🇯🇵 日文產品線
+│   ├── DS Images/                     ← 日文 hardware 圖
+│   │   └── ECW526_hardware_ja.png
+│   └── DS_Cloud_ECW526_ja/
+│       └── DS_Cloud_ECW526_v1.0_ja.pdf
+│
+├── Cloud AP_zh/                       ← 🇹🇼 繁中產品線
+│   ├── DS Images/
+│   │   └── ECW526_hardware_zh.png
+│   └── DS_Cloud_ECW526_zh/
 │
 ├── Cloud Switch/
 ├── Cloud Camera/
-├── Cloud AI NVS/
-├── Cloud VPN Firewall/
+├── Cloud Camera_ja/
+├── Cloud Camera_zh/
 └── ...
 ```
 
+**重點**：產品圖片的 `DS Images/` 是每個產品線資料夾**裡面的子資料夾**，不是 top-level 資料夾。若語言版本的產品線下還沒有 `DS Images/` 子資料夾，系統首次上傳或同步時會**自動建立**。
+
 ### 2.2 共用資料夾
 
-> **注意**: Extender 和 Unmanaged Switch 因為型號較少，與 Cloud Switch 共用同一個 DS 資料夾和 DS Images 資料夾。
+> **注意**: Extender 和 Unmanaged Switch 因為型號較少，與 Cloud Switch 共用同一個產品線資料夾（包含其中的 DS Images）。
 
-| 產品線 | DS 資料夾 | DS Images 資料夾 |
-|--------|----------|-----------------|
-| Cloud AP | Cloud AP/ | DS Images/Cloud AP/ |
-| Cloud Switch | Cloud Switch/ | DS Images/Cloud Switch/ |
-| Cloud Camera | Cloud Camera/ | DS Images/Cloud Camera/ |
-| Cloud AI-NVS | Cloud AI NVS/ | DS Images/Cloud AI NVS/ |
-| Cloud VPN Firewall | Cloud VPN Firewall/ | DS Images/Cloud VPN Firewall/ |
-| **Extender** | **Cloud Switch/** (共用) | **DS Images/Cloud Switch/** (共用) |
-| **Unmanaged Switch** | **Cloud Switch/** (共用) | **DS Images/Cloud Switch/** (共用) |
+| 產品線 | 英文版資料夾 | 日文版 | 繁中版 |
+|--------|------------|--------|--------|
+| Cloud AP | `Cloud AP/` | `Cloud AP_ja/` | `Cloud AP_zh/` |
+| Cloud Switch | `Cloud Switch/` | `Cloud Switch_ja/` | `Cloud Switch_zh/` |
+| Cloud Camera | `Cloud Camera/` | `Cloud Camera_ja/` | `Cloud Camera_zh/` |
+| Cloud AI-NVS | `Cloud NVS/` | `Cloud NVS_ja/` | `Cloud NVS_zh/` |
+| Cloud VPN Firewall | `Cloud VPN FW/` | `Cloud VPN FW_ja/` | `Cloud VPN FW_zh/` |
+| **Extender** | **Cloud Switch/** 系列共用 | — | — |
+| **Unmanaged Switch** | **Cloud Switch/** 系列共用 | — | — |
+
+每個產品線資料夾裡面都有一個命名固定的 `DS Images/` 子資料夾。系統查找語言版本資料夾時，會從 EN 資料夾 walk up 到 `Model Datasheet/` 根目錄，再往下找 `<lineName>_<locale>` 的兄弟資料夾。
 
 ---
 
@@ -123,14 +135,21 @@ Google Drive
 ### 4.1 檔案命名格式
 
 ```
-{Model}_{type}.{ext}
+{Model}_{type}.{ext}                      ← 英文版
+{Model}_{type}_{locale}.{ext}             ← 多語言版（僅 hardware）
 ```
 
 | 圖片類型 | type 名稱 | 說明 | 範例 |
 |----------|----------|------|------|
-| 產品照 | `product` | 產品正面照（白底去背） | `ECW526_product.png` |
-| 硬體標示圖 | `hardware` | 標示各介面/LED 位置 | `ECW526_hardware.png` |
-| Radio Pattern | `H-plane` / `E-plane` | AP 專用，天線輻射圖 | `ECW526_2.4G_H-plane.png` |
+| 產品照 | `product` | 跨語言共用 | `ECW526_product.png` |
+| 硬體標示圖 (英文) | `hardware` | 英文標註 | `ECW526_hardware.png` |
+| 硬體標示圖 (日文) | `hardware_ja` | 日文標註 | `ECW526_hardware_ja.png` |
+| 硬體標示圖 (繁中) | `hardware_zh` | 繁中標註 | `ECW526_hardware_zh.png` |
+| Radio Pattern | `{Band}_{Plane}` | AP 專用，跨語言共用 | `ECW526_2.4G_H-plane.png` |
+
+**跨語言共用 vs 各語言獨立**：
+- **Product 圖**和 **Radio Pattern** 只有一份（英文版），跨語言共用，放在英文產品線的 `DS Images/`
+- **Hardware 圖**可以每個語言獨立（因為圖上的 LED / Port 標註文字不同），放在對應語言產品線的 `DS Images/`
 
 ### 4.2 支援的副檔名
 
@@ -154,26 +173,38 @@ AP 產品需要提供各頻段的天線輻射圖：
 ### 4.4 完整範例
 
 ```
-DS Images/Cloud AP/
-├── ECW526_product.png        ← 產品照
-├── ECW526_hardware.png       ← 硬體標示圖
-├── ECW526_2.4G_H-plane.png   ← 2.4G H-plane 輻射圖
-├── ECW526_2.4G_E-plane.png   ← 2.4G E-plane 輻射圖
-├── ECW526_5G_H-plane.png     ← 5G H-plane 輻射圖
-├── ECW526_5G_E-plane.png     ← 5G E-plane 輻射圖
-├── ECW536_product.png
-├── ECW536_hardware.png
+Cloud AP/DS Images/                  ← 🇺🇸 英文版產品線底下
+├── ECW526_product.png               ← 產品照（跨語言共用）
+├── ECW526_hardware.png              ← 英文硬體圖
+├── ECW526_2.4G_H-plane.png          ← Radio Pattern（跨語言共用）
+├── ECW526_2.4G_E-plane.png
+├── ECW526_5G_H-plane.png
 └── ...
 
-DS Images/Cloud Switch/
+Cloud AP_ja/DS Images/               ← 🇯🇵 日文版產品線底下
+└── ECW526_hardware_ja.png           ← 日文硬體圖（檔名帶 _ja 後綴）
+
+Cloud AP_zh/DS Images/               ← 🇹🇼 繁中版產品線底下
+└── ECW526_hardware_zh.png           ← 繁中硬體圖
+
+Cloud Switch/DS Images/
 ├── ECS5512FP_product.png
 ├── ECS5512FP_hardware.png
-├── EXT1106_product.png       ← Extender 也放在這裡
+├── EXT1106_product.png              ← Extender 也放在這裡
 ├── EXT1106_hardware.png
-├── ES105_product.png         ← Unmanaged 也放在這裡
+├── ES105_product.png                ← Unmanaged 也放在這裡
 ├── ES105_hardware.png
 └── ...
 ```
+
+### 4.5 為什麼檔名還要帶 `_ja` / `_zh` 後綴？
+
+雖然語言版的 hardware 圖已經放在對應語言的 `DS Images/` 裡，檔名後綴仍然保留是為了：
+
+1. 避免 Supabase Storage 路徑撞車（Storage 是 flat key，沒有 locale 目錄）
+2. 檔案被下載或轉寄時仍能自我識別
+3. 跟 PDF 檔名 `DS_Cloud_ECW526_v1.0_ja.pdf` 的命名慣例對齊
+4. 防呆：如果誤把 `_ja` 檔放到 `_zh` 資料夾，sync 可以偵測錯誤
 
 ---
 
@@ -320,10 +351,11 @@ DS Images/Cloud Switch/
 
 ### 同步流程
 1. 讀取 Google Sheet (Web Overview + Detail Specs) → 更新產品資料 + 規格
-2. 掃描 DS Images 資料夾 → 同步產品圖片到 Supabase Storage
-3. 掃描 DS 資料夾 → 偵測最新 Datasheet 版本號
-4. 比對現有資料 → 偵測變更 → 記錄 Change Log
-5. 有變更時 → 發送 Telegram 通知
+2. 掃描英文 `{ProductLine}/DS Images/` → 同步 product / hardware / radio pattern 圖到 Supabase Storage，更新 `products` 表
+3. 對每個已啟用的語言，掃描 `{ProductLine}_{locale}/DS Images/` → 同步 hardware 圖，更新 `product_translations.hardware_image`
+4. 掃描各語言的 DS 資料夾 → 偵測最新 Datasheet 版本號
+5. 比對現有資料 → 偵測變更 → 記錄 Change Log
+6. 有變更時 → 發送 Telegram 通知
 
 ### 變更通知
 - 系統會自動偵測所有欄位的變更 (含 Status 變更)
@@ -337,8 +369,9 @@ DS Images/Cloud Switch/
 
 - [ ] Google Sheet Web Overview 填寫完整 (Model Name, Model Number, Status, Headline, Single Overview, Key Feature Lists)
 - [ ] Google Sheet Detail Specs 填寫完整
-- [ ] DS Images 資料夾放入 `{Model}_product.png`
-- [ ] DS Images 資料夾放入 `{Model}_hardware.png`
-- [ ] (AP only) DS Images 放入 Radio Pattern 圖片
+- [ ] 英文產品線 `{ProductLine}/DS Images/` 放入 `{Model}_product.png`
+- [ ] 英文產品線 `{ProductLine}/DS Images/` 放入 `{Model}_hardware.png`
+- [ ] (AP only) `{ProductLine}/DS Images/` 放入 Radio Pattern 圖片
+- [ ] (多語言) 對應語言產品線 `{ProductLine}_{locale}/DS Images/` 放入 `{Model}_hardware_{locale}.png`
 - [ ] 確認 Status 欄位正確 (Active / Upcoming / Pending)
 - [ ] 執行一次 Sync 確認資料正確匯入

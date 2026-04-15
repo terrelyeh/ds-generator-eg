@@ -134,16 +134,24 @@ Dashboard 預設只顯示 Active，有 Active/All toggle。
 - `sheet_last_editor` fallback 到 Drive API `displayName`（Service Account 看不到 email）
 - **Auto re-index after sync**：sync 完成後，對 `allChanges` 中的每個 `product_name` 呼叫 `ingestProducts({ modelName })`，自動更新 RAG 向量。`content_hash` 去重確保未變更的 chunks 被 skip。失敗隔離不中斷 sync 回應，`response.reindex` 顯示 `{processed, skipped, errors}`
 
-### Image 雙向同步
+### Image 雙向同步 (locale-aware)
 
 ```
-Google Drive DS Images/ ──(Sync)──→ Supabase Storage
-                                        ↑
-Product Page 手動上傳 ──→ Supabase Storage + Google Drive DS Images/
+Drive 真源 (authoritative)          Supabase (快取)          前端
+─────────────────────────            ────────────           ─────
+Cloud AP/DS Images/    ──(sync)──▶  images/<model>/...  ──▶  products.product_image
+                       ──(sync)──▶                      ──▶  products.hardware_image
+Cloud AP_ja/DS Images/ ──(sync)──▶  images/<model>/..._ja ▶  product_translations.hardware_image (locale=ja)
+Cloud AP_zh/DS Images/ ──(sync)──▶  images/<model>/..._zh ▶  product_translations.hardware_image (locale=zh-TW)
+
+MKT web upload (任一語言) ──write-through──▶ Supabase + 對應語言的 Drive DS Images
 ```
 
-- 上傳時自動重新命名：`{Model}_{type}.{ext}` / `{Model}_{Band}_{Plane}.{ext}`
-- 支援 product、hardware、radio_pattern 三種類型
+- **檔名**：英文 `{Model}_{type}.{ext}`；語言版 `{Model}_hardware_{locale}.{ext}`（只有 hardware 有語言變體；product 圖和 Radio Pattern 跨語言共用）
+- **Drive 資料夾**：每個 product line 有對應的 `<lineName>_<locale>` 兄弟資料夾。語言版的 `DS Images/` 子資料夾如果缺失，`resolveLocaleDsImagesFolder()` 會自動建立。語言版的 product line 資料夾必須 PM 事先建好（`Cloud AP_ja`），不會自動建
+- **寫入路徑**：`/api/upload-image` 收到 locale 參數 → `resolveLocaleDsImagesFolder` walk up EN 資料夾 → Model Datasheet root → 找 `<line>_<locale>` → 找 / 建 `DS Images/` 子資料夾 → 上傳
+- **同步路徑**：`syncLocalizedHardwareImage()` 在 sync cron 針對每個啟用的 locale 各跑一次，寫入 `product_translations.hardware_image`
+- **Locale 代碼**：`ja` 和 `zh`（zh-TW 簡寫），統一用 ISO 639-1 語言代碼。舊的 `_jp` / `_JP` 已在 2026-04-15 透過 `scripts/rename-jp-to-ja.mjs` 全面改名
 - Drive 上傳失敗不影響 Supabase（non-blocking）
 
 ### PDF Generation
@@ -164,7 +172,7 @@ Product Page 手動上傳 ──→ Supabase Storage + Google Drive DS Images/
 - 兩種模式：**Light**（只翻標題+內容）vs **Full**（+規格表 label）
 - **Draft / Confirmed 流程**：Enable → 翻譯 → Preview（auto-save but stays Draft）→ Save & Confirm → Generate PDF
 - 版本獨立：`products.current_versions` JSONB 存各語言版本（`{"en":"1.1","ja":"1.0"}`）
-- Drive 資料夾：`DS_Cloud_ECC100_ja/`、`DS_Cloud_ECC100_zh/`（zh-TW → zh 映射在 `getLocaleSuffix()`）
+- Drive 資料夾：PDF 在 `<lineName>_<locale>/DS_Cloud_<model>_<locale>/`，圖片在 `<lineName>_<locale>/DS Images/{model}_hardware_<locale>.ext`（`getLocaleSuffix()` 負責 zh-TW → zh 映射；日文統一用 `ja`，舊的 `_jp` 命名已於 2026-04-15 全部改掉）
 - Headline 支援 `**粗體**` markdown → 渲染為 `<strong>`（`parseHeadlineMarkup()` in preview）
 - CJK 排版：shared base（禁則處理+justify）+ per-locale CSS 動態從 DB 讀取（`typography_${lang}` in `app_settings`）
 - **Typography Settings**（`/settings/typography`）：字型選擇（Google Fonts）+ 字級/字重/顏色 per-locale，split layout 左設定右 preview

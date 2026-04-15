@@ -300,7 +300,11 @@
 <div class="main-content">
 
 <h1>Product SpecHub</h1>
-<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-11</p>
+<p class="subtitle">Google Drive 資料夾結構與命名規則 &mdash; 2026-04-15</p>
+
+<div class="callout">
+  <strong>2026-04-15 更新 — 圖片多語言資料夾:</strong> 現在每個語言版本的 hardware 圖存在對應語言產品線底下的 <code>DS Images/</code>（例如 <code>Cloud Camera_ja/DS Images/ECC500Z_hardware_ja.png</code>），不再放在英文 <code>DS Images/</code> 中。詳見 <a href="#s2">第 2 節</a>、<a href="#s4">第 4 節</a>、<a href="#s9">第 9.6 節</a>。另：所有 Drive 上的日文檔名 / 資料夾後綴已從 <code>_jp</code> / <code>_JP</code> 統一為 <code>_ja</code>（ISO 639-1 語言代碼）。
+</div>
 
 <!-- ========== 1 ========== -->
 <h2 id="s1"><span class="num">1</span>產品線總覽</h2>
@@ -330,50 +334,67 @@
 <h2 id="s2"><span class="num">2</span>Google Drive 資料夾結構</h2>
 
 <h3>2.1 總體架構</h3>
-<p>每個產品線在 Google Drive 上有 <strong>兩個重要的資料夾</strong>：</p>
+<p>每個產品線在 Google Drive 上是一個獨立的資料夾，裡面同時存放 <strong>Datasheet PDF</strong> 和 <strong>產品圖片</strong>：</p>
 
 <pre>
-Google Drive
-├── <span class="folder">Cloud AP/</span>                          <span class="comment">&larr; DS 資料夾 (Datasheet PDF)</span>
-│   ├── <span class="folder">DS_Cloud_ECW526/</span>               <span class="comment">&larr; 各型號的子資料夾</span>
+Model Datasheet/
+├── <span class="folder">Cloud AP/</span>                            <span class="comment">&larr; 🇺🇸 英文產品線資料夾 (drive_folder_id)</span>
+│   ├── <span class="folder">DS Images/</span>                       <span class="comment">&larr; 產品圖片 (ds_images_folder_id)</span>
+│   │   ├── <span class="file">ECW526_product.png</span>
+│   │   ├── <span class="file">ECW526_hardware.png</span>
+│   │   ├── <span class="file">ECW526_2.4G_H-plane.png</span>
+│   │   └── ...
+│   ├── <span class="folder">DS_Cloud_ECW526/</span>                 <span class="comment">&larr; 型號的 PDF 子資料夾</span>
 │   │   ├── <span class="file">DS_Cloud_ECW526_v1.3.pdf</span>
 │   │   └── <span class="file">DS_Cloud_ECW526_v1.4.pdf</span>
 │   └── ...
 │
-├── <span class="folder">DS Images/</span>                         <span class="comment">&larr; 產品圖片資料夾</span>
-│   ├── <span class="folder">Cloud AP/</span>
-│   │   ├── <span class="file">ECW526_product.png</span>
-│   │   ├── <span class="file">ECW526_hardware.png</span>
-│   │   └── ...
-│   ├── <span class="folder">Cloud Switch/</span>
-│   ├── <span class="folder">Cloud Camera/</span>
-│   └── ...
+├── <span class="folder">Cloud AP_ja/</span>                         <span class="comment">&larr; 🇯🇵 日文產品線（多語言專用）</span>
+│   ├── <span class="folder">DS Images/</span>                       <span class="comment">&larr; 日文 hardware 圖</span>
+│   │   └── <span class="file">ECW526_hardware_ja.png</span>
+│   └── <span class="folder">DS_Cloud_ECW526_ja/</span>
+│       └── <span class="file">DS_Cloud_ECW526_v1.0_ja.pdf</span>
+│
+├── <span class="folder">Cloud AP_zh/</span>                         <span class="comment">&larr; 🇹🇼 繁中產品線</span>
+│   ├── <span class="folder">DS Images/</span>
+│   │   └── <span class="file">ECW526_hardware_zh.png</span>
+│   └── <span class="folder">DS_Cloud_ECW526_zh/</span>
 │
 ├── <span class="folder">Cloud Switch/</span>
 ├── <span class="folder">Cloud Camera/</span>
+├── <span class="folder">Cloud Camera_ja/</span>
+├── <span class="folder">Cloud Camera_zh/</span>
 ├── <span class="folder">Cloud AI NVS/</span>
 ├── <span class="folder">Cloud VPN Firewall/</span>
 └── ...
 </pre>
 
+<div class="callout">
+  <strong>重點:</strong> 每個語言版本在 Drive 上都是<strong>獨立的 top-level 產品線資料夾</strong>，用 <code>_ja</code> / <code>_zh</code> 後綴表示。產品圖片 <code>DS Images/</code> 是每個產品線資料夾<strong>裡面</strong>的子資料夾，不是 top-level 資料夾。多語言 hardware 圖放在對應語言的產品線底下的 <code>DS Images/</code>。
+</div>
+
 <h3>2.2 共用資料夾</h3>
 
 <div class="callout callout-warn">
-  <strong>注意:</strong> Extender 和 Unmanaged Switch 因為型號較少，與 Cloud Switch 共用同一個 DS 資料夾和 DS Images 資料夾。
+  <strong>注意:</strong> Extender 和 Unmanaged Switch 因為型號較少，與 Cloud Switch 共用同一個產品線資料夾（包含其中的 DS Images）。
 </div>
 
 <table>
-  <thead><tr><th>產品線</th><th>DS 資料夾</th><th>DS Images 資料夾</th></tr></thead>
+  <thead><tr><th>產品線</th><th>英文版資料夾</th><th>日文版</th><th>繁中版</th></tr></thead>
   <tbody>
-    <tr><td>Cloud AP</td><td>Cloud AP/</td><td>DS Images/Cloud AP/</td></tr>
-    <tr><td>Cloud Switch</td><td>Cloud Switch/</td><td>DS Images/Cloud Switch/</td></tr>
-    <tr><td>Cloud Camera</td><td>Cloud Camera/</td><td>DS Images/Cloud Camera/</td></tr>
-    <tr><td>Cloud AI-NVS</td><td>Cloud AI NVS/</td><td>DS Images/Cloud AI NVS/</td></tr>
-    <tr><td>Cloud VPN Firewall</td><td>Cloud VPN Firewall/</td><td>DS Images/Cloud VPN Firewall/</td></tr>
-    <tr><td><strong>Extender</strong></td><td><strong>Cloud Switch/</strong> (共用)</td><td><strong>DS Images/Cloud Switch/</strong> (共用)</td></tr>
-    <tr><td><strong>Unmanaged Switch</strong></td><td><strong>Cloud Switch/</strong> (共用)</td><td><strong>DS Images/Cloud Switch/</strong> (共用)</td></tr>
+    <tr><td>Cloud AP</td><td><code>Cloud AP/</code></td><td><code>Cloud AP_ja/</code></td><td><code>Cloud AP_zh/</code></td></tr>
+    <tr><td>Cloud Switch</td><td><code>Cloud Switch/</code></td><td><code>Cloud Switch_ja/</code></td><td><code>Cloud Switch_zh/</code></td></tr>
+    <tr><td>Cloud Camera</td><td><code>Cloud Camera/</code></td><td><code>Cloud Camera_ja/</code></td><td><code>Cloud Camera_zh/</code></td></tr>
+    <tr><td>Cloud AI-NVS</td><td><code>Cloud NVS/</code></td><td><code>Cloud NVS_ja/</code></td><td><code>Cloud NVS_zh/</code></td></tr>
+    <tr><td>Cloud VPN Firewall</td><td><code>Cloud VPN FW/</code></td><td><code>Cloud VPN FW_ja/</code></td><td><code>Cloud VPN FW_zh/</code></td></tr>
+    <tr><td><strong>Extender</strong></td><td colspan="3"><strong>Cloud Switch/</strong> 系列共用</td></tr>
+    <tr><td><strong>Unmanaged Switch</strong></td><td colspan="3"><strong>Cloud Switch/</strong> 系列共用</td></tr>
   </tbody>
 </table>
+
+<p style="font-size:14px; color:var(--gray-light); margin-top:8px;">
+  每個產品線資料夾裡面都有一個 <code>DS Images/</code> 子資料夾，命名固定不變。系統查找語言版本資料夾時會從 EN 資料夾 walk up 到 <code>Model Datasheet/</code> 根目錄，再往下找 <code>&lt;lineName&gt;_&lt;locale&gt;</code> 的兄弟資料夾。若該語言產品線下尚未有 <code>DS Images/</code> 子資料夾，系統會在首次上傳或同步時<strong>自動建立</strong>。
+</p>
 
 <!-- ========== 3 ========== -->
 <h2 id="s3"><span class="num">3</span>Datasheet PDF 命名規則</h2>
@@ -434,18 +455,29 @@ Google Drive
 <h2 id="s4"><span class="num">4</span>產品圖片命名規則 (DS Images)</h2>
 
 <h3>4.1 檔案命名格式</h3>
-<pre><span class="highlight">{Model}_{type}.{ext}</span></pre>
+<pre><span class="highlight">{Model}_{type}.{ext}</span>                      <span class="comment">&larr; 英文版</span>
+<span class="highlight">{Model}_{type}_{locale}.{ext}</span>             <span class="comment">&larr; 多語言版（僅 hardware）</span></pre>
 
 <table>
   <thead><tr><th>圖片類型</th><th>type 名稱</th><th>說明</th><th>範例</th></tr></thead>
   <tbody>
-    <tr><td>產品照</td><td><code>product</code></td><td>產品正面照 (白底去背)</td><td><code>ECW526_product.png</code></td></tr>
-    <tr><td>硬體標示圖</td><td><code>hardware</code></td><td>標示各介面/LED 位置</td><td><code>ECW526_hardware.png</code></td></tr>
-    <tr><td>Radio Pattern</td><td><code>H-plane</code> / <code>E-plane</code></td><td>AP 專用，天線輻射圖</td><td><code>ECW526_2.4G_H-plane.png</code></td></tr>
+    <tr><td>產品照</td><td><code>product</code></td><td>產品正面照 (白底去背)，跨語言共用</td><td><code>ECW526_product.png</code></td></tr>
+    <tr><td>硬體標示圖 (英文)</td><td><code>hardware</code></td><td>標示各介面/LED 位置</td><td><code>ECW526_hardware.png</code></td></tr>
+    <tr><td>硬體標示圖 (日文)</td><td><code>hardware_ja</code></td><td>日文標註版本</td><td><code>ECW526_hardware_ja.png</code></td></tr>
+    <tr><td>硬體標示圖 (繁中)</td><td><code>hardware_zh</code></td><td>繁中標註版本</td><td><code>ECW526_hardware_zh.png</code></td></tr>
+    <tr><td>Radio Pattern</td><td><code>H-plane</code> / <code>E-plane</code></td><td>AP 專用，跨語言共用</td><td><code>ECW526_2.4G_H-plane.png</code></td></tr>
   </tbody>
 </table>
 
 <p>系統同時搜尋 <code>.png</code> 和 <code>.jpg</code>，優先使用 <code>.png</code>。</p>
+
+<div class="callout">
+  <strong>跨語言共用 vs 各語言獨立:</strong>
+  <ul style="margin:8px 0 0; padding-left:20px;">
+    <li><strong>Product 圖</strong>和 <strong>Radio Pattern</strong> 只有一份（英文版），跨語言共用，放在英文產品線的 <code>DS Images/</code> 內</li>
+    <li><strong>Hardware 圖</strong>可以每個語言獨立（因為圖上的 LED / Port 標註文字不同），放在對應語言產品線的 <code>DS Images/</code> 內</li>
+  </ul>
+</div>
 
 <h3>4.2 Radio Pattern (僅 AP 產品線)</h3>
 <pre><span class="highlight">{Model}_{Band}_{Plane}.png</span></pre>
@@ -459,16 +491,22 @@ Google Drive
 
 <h3>4.3 完整範例</h3>
 <pre>
-<span class="folder">DS Images/Cloud AP/</span>
-├── <span class="file">ECW526_product.png</span>        <span class="comment">&larr; 產品照</span>
-├── <span class="file">ECW526_hardware.png</span>       <span class="comment">&larr; 硬體標示圖</span>
-├── <span class="file">ECW526_2.4G_H-plane.png</span>   <span class="comment">&larr; 2.4G H-plane</span>
-├── <span class="file">ECW526_2.4G_E-plane.png</span>   <span class="comment">&larr; 2.4G E-plane</span>
-├── <span class="file">ECW526_5G_H-plane.png</span>     <span class="comment">&larr; 5G H-plane</span>
-├── <span class="file">ECW526_5G_E-plane.png</span>     <span class="comment">&larr; 5G E-plane</span>
+<span class="folder">Cloud AP/DS Images/</span>                  <span class="comment">&larr; 🇺🇸 英文版產品線底下的圖片資料夾</span>
+├── <span class="file">ECW526_product.png</span>        <span class="comment">&larr; 產品照（跨語言共用）</span>
+├── <span class="file">ECW526_hardware.png</span>       <span class="comment">&larr; 英文硬體圖</span>
+├── <span class="file">ECW526_2.4G_H-plane.png</span>   <span class="comment">&larr; Radio Pattern（跨語言共用）</span>
+├── <span class="file">ECW526_2.4G_E-plane.png</span>
+├── <span class="file">ECW526_5G_H-plane.png</span>
+├── <span class="file">ECW526_5G_E-plane.png</span>
 └── ...
 
-<span class="folder">DS Images/Cloud Switch/</span>
+<span class="folder">Cloud AP_ja/DS Images/</span>              <span class="comment">&larr; 🇯🇵 日文版產品線底下的圖片資料夾</span>
+└── <span class="file">ECW526_hardware_ja.png</span>    <span class="comment">&larr; 日文硬體圖（檔名帶 _ja 後綴）</span>
+
+<span class="folder">Cloud AP_zh/DS Images/</span>              <span class="comment">&larr; 🇹🇼 繁中版產品線底下的圖片資料夾</span>
+└── <span class="file">ECW526_hardware_zh.png</span>    <span class="comment">&larr; 繁中硬體圖</span>
+
+<span class="folder">Cloud Switch/DS Images/</span>
 ├── <span class="file">ECS5512FP_product.png</span>
 ├── <span class="file">ECS5512FP_hardware.png</span>
 ├── <span class="file">EXT1106_product.png</span>       <span class="comment">&larr; Extender 也放在這裡</span>
@@ -477,6 +515,17 @@ Google Drive
 ├── <span class="file">ES105_hardware.png</span>
 └── ...
 </pre>
+
+<div class="callout callout-warn">
+  <strong>檔名為什麼還要帶 <code>_ja</code> / <code>_zh</code> 後綴？</strong><br>
+  雖然語言版的 hardware 圖已經放在對應語言的 <code>DS Images/</code> 裡，檔名後綴仍然保留是為了：
+  <ol style="margin:8px 0 0; padding-left:20px;">
+    <li>避免 Supabase Storage 路徑撞車（Storage 是 flat key，沒有 locale 目錄）</li>
+    <li>檔案被下載或轉寄時仍能自我識別</li>
+    <li>跟 PDF 檔名 <code>DS_Cloud_ECW526_v1.0_ja.pdf</code> 的命名慣例對齊</li>
+    <li>防呆：如果誤把 <code>_ja</code> 檔放到 <code>_zh</code> 資料夾，sync 可以偵測錯誤</li>
+  </ol>
+</div>
 
 <!-- ========== 5 ========== -->
 <h2 id="s5"><span class="num">5</span>Google Sheets 規格表結構</h2>
@@ -686,9 +735,10 @@ Google Drive
 <ul class="checklist">
   <li>Google Sheet <strong>Web Overview</strong> 填寫完整 (Model Name, Model Number, Status, Headline, Single Overview, Key Feature Lists)</li>
   <li>Google Sheet <strong>Detail Specs</strong> 填寫完整</li>
-  <li>DS Images 資料夾放入 <code>{Model}_product.png</code></li>
-  <li>DS Images 資料夾放入 <code>{Model}_hardware.png</code></li>
-  <li>(AP only) DS Images 放入 Radio Pattern 圖片</li>
+  <li>英文產品線 <code>{ProductLine}/DS Images/</code> 放入 <code>{Model}_product.png</code></li>
+  <li>英文產品線 <code>{ProductLine}/DS Images/</code> 放入 <code>{Model}_hardware.png</code></li>
+  <li>(AP only) <code>{ProductLine}/DS Images/</code> 放入 Radio Pattern 圖片</li>
+  <li>(多語言) 對應語言產品線 <code>{ProductLine}_{locale}/DS Images/</code> 放入 <code>{Model}_hardware_{locale}.png</code></li>
   <li>確認 <strong>Status</strong> 欄位正確 (Active / Upcoming / Pending)</li>
   <li>執行一次 Sync 確認資料正確匯入</li>
 </ul>
@@ -796,13 +846,76 @@ Google Drive
   </tbody>
 </table>
 
-<h3>9.6 Hardware 圖片</h3>
-<p>Hardware Overview 頁面的圖片可以依語言不同而使用不同版本（如標註文字為日文）。</p>
+<h3>9.6 Hardware 圖片多語言</h3>
+<p>Hardware Overview 頁面的圖片可以依語言不同使用不同版本（因為 LED / Port 標註文字不同）。產品照和 Radio Pattern 永遠跨語言共用。</p>
+
+<h4>9.6.1 Drive 資料夾位置</h4>
+<p>語言版本的 hardware 圖存放在<strong>對應語言產品線</strong>底下的 <code>DS Images/</code>：</p>
+<pre>
+<span class="folder">Model Datasheet/</span>
+├── <span class="folder">Cloud Camera/</span>
+│   └── <span class="folder">DS Images/</span>
+│       └── <span class="file">ECC500Z_hardware.png</span>       <span class="comment">&larr; 英文版（products.hardware_image）</span>
+│
+├── <span class="folder">Cloud Camera_ja/</span>
+│   └── <span class="folder">DS Images/</span>
+│       └── <span class="file">ECC500Z_hardware_ja.png</span>    <span class="comment">&larr; 日文版</span>
+│
+└── <span class="folder">Cloud Camera_zh/</span>
+    └── <span class="folder">DS Images/</span>
+        └── <span class="file">ECC500Z_hardware_zh.png</span>    <span class="comment">&larr; 繁中版</span>
+</pre>
+
+<div class="callout">
+  <strong>自動建立子資料夾:</strong> 若 <code>Cloud Camera_ja/</code> 下面還沒有 <code>DS Images/</code> 子資料夾，系統首次上傳或同步時會自動建立。但上層的 <code>Cloud Camera_ja/</code> 必須事先存在（這是 PM 決定新增語言支援時手動建立的）。
+</div>
+
+<h4>9.6.2 檔名規則</h4>
+<pre><span class="highlight">{Model}_hardware_{locale}.{ext}</span></pre>
 <ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
-  <li>在翻譯頁面上傳語言專屬的 Hardware Image</li>
-  <li>有上傳 → 使用該語言版本的圖片</li>
-  <li>未上傳 → fallback 使用英文版的 Hardware Image</li>
+  <li>日文: <code>ECC500Z_hardware_ja.png</code></li>
+  <li>繁中: <code>ECC500Z_hardware_zh.png</code>（<code>zh-TW</code> locale 在檔名中縮寫為 <code>zh</code>）</li>
 </ul>
+
+<h4>9.6.3 兩種上傳路徑</h4>
+<table>
+  <thead><tr><th>情境</th><th>操作</th><th>流程</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>MKT 在網頁上傳</td>
+      <td>翻譯編輯器 → Hardware Image → 選檔案</td>
+      <td>
+        <ol style="margin:0; padding-left:18px;">
+          <li>寫入 Supabase Storage（<code>images/{model}/{model}_hardware_{locale}.ext</code>）</li>
+          <li>同步寫入 <code>{line}_{locale}/DS Images/</code>（自動 walk up 解析資料夾）</li>
+          <li>更新 <code>product_translations.hardware_image</code></li>
+        </ol>
+      </td>
+    </tr>
+    <tr>
+      <td>PM 直接丟 Drive</td>
+      <td>把 <code>{model}_hardware_{locale}.png</code> 拖進對應語言的 <code>DS Images/</code></td>
+      <td>
+        <ol style="margin:0; padding-left:18px;">
+          <li>下次 Sync Cron 自動掃描所有語言的 <code>DS Images/</code></li>
+          <li>拉進 Supabase Storage</li>
+          <li>更新 <code>product_translations.hardware_image</code></li>
+        </ol>
+      </td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>9.6.4 前端顯示邏輯</h4>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li>Preview 頁面讀取 <code>product_translations.hardware_image</code>（per-locale）</li>
+  <li>該語言有上傳 → 使用語言版本</li>
+  <li>該語言未上傳 → fallback 使用英文版的 <code>products.hardware_image</code></li>
+</ul>
+
+<div class="callout callout-warn">
+  <strong>真源 & 快取:</strong> Google Drive 是圖片的 authoritative source，Supabase Storage 是快取（給前端快速讀取）。無論是 UI 上傳或 Drive 直接丟，Drive 那份永遠是真實狀態；Supabase 會被 Sync Cron 自動對齊（包含刪除）。
+</div>
 
 <h3>9.7 翻譯工作流程</h3>
 <ol style="font-size:15px; padding-left:20px; margin-bottom:16px; line-height:2;">
