@@ -95,6 +95,28 @@ function ImageUploadButton({
     }
   }
 
+  const [deleting, setDeleting] = useState(false);
+  async function handleDelete() {
+    if (!confirm(`Delete ${imageType} image for ${modelName}? This removes it from Supabase and Drive (Drive trash, recoverable 30 days).`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/upload-image?model=${encodeURIComponent(modelName)}&type=${imageType}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Delete failed: ${data.error || "Unknown error"}${data.details ? `\n\n${data.details}` : ""}`);
+      }
+    } catch (err) {
+      alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   const label = imageType === "product" ? "Product Image" : "Hardware Image";
   const hasImage = currentUrl && !currentUrl.startsWith("cache/");
 
@@ -142,6 +164,25 @@ function ImageUploadButton({
               disabled={uploading}
             />
           </label>
+          {hasImage && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="inline-flex h-8 items-center rounded-md border border-red-200 bg-background px-2.5 text-xs font-medium text-red-600 shadow-xs hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+              title="Delete image (removes from Supabase + Drive)"
+            >
+              {deleting ? (
+                "..."
+              ) : (
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                </svg>
+              )}
+            </button>
+          )}
         </div>
       </div>
 
@@ -208,6 +249,8 @@ function RadioPatternSlot({
   const [uploading, setUploading] = useState(false);
   const [lightbox, setLightbox] = useState(false);
 
+  const [deleting, setDeleting] = useState(false);
+
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -233,6 +276,27 @@ function RadioPatternSlot({
     }
   }
 
+  async function handleDelete() {
+    if (!confirm(`Delete ${label} radio pattern for ${modelName}?`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/upload-image?model=${encodeURIComponent(modelName)}&type=radio_pattern&label=${encodeURIComponent(label)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Delete failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <>
     <div
@@ -255,18 +319,33 @@ function RadioPatternSlot({
       <span className={`text-xs font-medium ${hasImage ? "text-green-700" : "text-gray-400"}`}>
         {band} {plane}
       </span>
-      <label>
-        <span className="inline-flex h-6 cursor-pointer items-center rounded border border-input bg-background px-2 text-[11px] font-medium shadow-xs hover:bg-accent transition-colors">
-          {uploading ? "..." : hasImage ? "Replace" : "Upload"}
-        </span>
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleUpload}
-          disabled={uploading}
-        />
-      </label>
+      <div className="flex items-center gap-1">
+        <label>
+          <span className="inline-flex h-6 cursor-pointer items-center rounded border border-input bg-background px-2 text-[11px] font-medium shadow-xs hover:bg-accent transition-colors">
+            {uploading ? "..." : hasImage ? "Replace" : "Upload"}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUpload}
+            disabled={uploading}
+          />
+        </label>
+        {hasImage && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="inline-flex h-6 items-center rounded border border-red-200 bg-background px-1.5 text-red-600 shadow-xs hover:bg-red-50 transition-colors disabled:opacity-50"
+            title="Delete"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+            </svg>
+          </button>
+        )}
+      </div>
     </div>
 
     {/* Lightbox */}
@@ -291,9 +370,34 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
   const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
 
   const [showGenMenu, setShowGenMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+
+  async function handleResyncImages() {
+    setResyncing(true);
+    try {
+      const res = await fetch(
+        `/api/resync-product?model=${encodeURIComponent(product.model_name)}`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        const cleared = data.english?.cleared ?? [];
+        if (cleared.length > 0) {
+          alert(`Resync complete. Cleared (deleted in Drive): ${cleared.join(", ")}`);
+        }
+        router.refresh();
+      } else {
+        alert(`Resync failed: ${data.error || "Unknown error"}${data.details ? `\n\n${data.details}` : ""}`);
+      }
+    } catch (err) {
+      alert(`Resync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setResyncing(false);
+    }
+  }
 
   const currentVer = product.current_version || "0.0";
   const hasExistingVersion = currentVer !== "0.0";
@@ -409,6 +513,15 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
             </span>
           </div>
         <div className="flex flex-shrink-0 gap-3">
+          <Button
+            variant="outline"
+            size="default"
+            onClick={handleResyncImages}
+            disabled={resyncing}
+            title="Re-fetch this product's images from Google Drive (also propagates deletes)"
+          >
+            {resyncing ? "Syncing..." : "Resync Images"}
+          </Button>
           <Link href={`/preview/${product.model_name}`} target="_blank">
             <Button variant="outline" size="default">
               Preview Datasheet

@@ -147,6 +147,7 @@ export function ProductTranslationEditor({
   );
   const [hwImage, setHwImage] = useState(existing?.hardware_image ?? "");
   const [hwUploading, setHwUploading] = useState(false);
+  const [hwDeleting, setHwDeleting] = useState(false);
   const [qrLabel, setQrLabel] = useState(existing?.qr_label ?? "");
   const [qrUrl, setQrUrl] = useState(existing?.qr_url ?? "");
 
@@ -818,10 +819,32 @@ export function ProductTranslationEditor({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={hwImage} alt="Hardware" className="h-24 w-auto rounded border object-contain" />
                 <button
-                  onClick={() => { setHwImage(""); setDirty(true); }}
-                  className="text-xs text-red-500 hover:text-red-700"
+                  disabled={hwDeleting}
+                  onClick={async () => {
+                    if (!confirm(`Delete ${activeLocale} hardware image for ${modelName}? This removes the file from Supabase + Drive.`)) return;
+                    setHwDeleting(true);
+                    try {
+                      const res = await fetch(
+                        `/api/upload-image?model=${encodeURIComponent(modelName)}&type=hardware&locale=${encodeURIComponent(activeLocale)}`,
+                        { method: "DELETE" },
+                      );
+                      const data = await res.json();
+                      if (data.ok) {
+                        setHwImage("");
+                        setDirty(true);
+                        toast.success("Hardware image deleted");
+                      } else {
+                        toast.error(`Delete failed: ${data.error || "Unknown error"}`);
+                      }
+                    } catch (err) {
+                      toast.error(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+                    } finally {
+                      setHwDeleting(false);
+                    }
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50"
                 >
-                  Remove
+                  {hwDeleting ? "Deleting..." : "Delete"}
                 </button>
               </div>
             ) : (

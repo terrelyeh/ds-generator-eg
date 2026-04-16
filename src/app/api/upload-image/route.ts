@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { resolveLocaleDsImagesFolder, uploadImageToDrive } from "@/lib/google/drive-images";
+import {
+  deleteDriveFilesByPrefix,
+  resolveLocaleDsImagesFolder,
+  uploadImageToDrive,
+} from "@/lib/google/drive-images";
 import { getLocaleSuffix } from "@/lib/google/drive-versions";
 
 /**
@@ -196,5 +200,163 @@ export async function POST(request: Request) {
     fileName,
     driveFileId,
     driveUploaded: !!driveFileId,
+  });
+}
+
+/**
+ * DELETE /api/upload-image?model=ECC500Z&type=hardware[&locale=zh-TW][&label=2.4G_H-plane]
+ *
+ * Deletes a product image across all stores:
+ *   - Supabase Storage file (images/<model>/<filename>)
+ *   - Matching Drive file (trashed, recoverable for 30 days)
+ *   - DB field: products.product_image / products.hardware_image (EN) or
+ *     product_translations.hardware_image (localized)
+ *
+ * For radio_pattern, also removes the corresponding image_assets row.
+ */
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const model = searchParams.get("model");
+  const imageType = searchParams.get("type");
+  const label = searchParams.get("label");
+  const localeRaw = searchParams.get("locale");
+  const locale = localeRaw && localeRaw !== "en" ? localeRaw : null;
+  const localeSuffix = locale ? `_${getLocaleSuffix(locale)}` : "";
+
+  if (!model || !imageType) {
+    return NextResponse.json(
+      { error: "Missing ?model= or ?type=" },
+      { status: 400 },
+    );
+  }
+  if (!["product", "hardware", "radio_pattern"].includes(imageType)) {
+    return NextResponse.json(
+      { error: "type must be 'product', 'hardware', or 'radio_pattern'" },
+      { status: 400 },
+    );
+  }
+  if (imageType === "radio_pattern" && !label) {
+    return NextResponse.json(
+      { error: "label is required for radio_pattern" },
+      { status: 400 },
+    );
+  }
+  // product and radio_pattern are shared across locales — refuse locale
+  // delete for those types (only hardware has per-locale variants).
+  if (locale && imageType !== "hardware") {
+    return NextResponse.json(
+      { error: "Only hardware supports locale-specific deletion" },
+      { status: 400 },
+    );
+  }
+
+  const supabase = createAdminClient();
+
+  const { data: product } = await supabase
+    .from("products")
+    .select("id, product_line_id")
+    .eq("model_name", model)
+    .single();
+
+  if (!product) {
+    return NextResponse.json(
+      { error: `Product "${model}" not found` },
+      { status: 404 },
+    );
+  }
+
+  const { data: productLine } = await supabase
+    .from("product_lines")
+    .select("ds_images_folder_id, name")
+    .eq("id", product.product_line_id)
+    .single();
+
+  // Compute the filename prefix we'll use for Drive + Storage lookups.
+  // For product/hardware: "<model>_<type>[_<locale>]"
+  // For radio_pattern:    "<model>_<labelSlug>"
+  let filePrefix: string;
+  if (imageType === "radio_pattern" && label) {
+    const labelSlug = label.replace(/\s+/g, "_");
+    filePrefix = `${model}_${labelSlug}`;
+  } else {
+    filePrefix = `${model}_${imageType}${localeSuffix}`;
+  }
+
+  // 1. Delete all matching files in Supabase Storage under images/<model>/
+  const { data: storageList } = await supabase.storage
+    .from("datasheets")
+    .list(`images/${model}`);
+
+  const storagePathsToDelete = (storageList ?? [])
+    .filter((f) => f.name.toLowerCase().startsWith(filePrefix.toLowerCase() + "."))
+    .map((f) => `images/${model}/${f.name}`);
+
+  if (storagePathsToDelete.length > 0) {
+    const { error: deleteErr } = await supabase.storage
+      .from("datasheets")
+      .remove(storagePathsToDelete);
+    if (deleteErr) {
+      console.error(`Supabase Storage delete failed:`, deleteErr.message);
+    }
+  }
+
+  // 2. Delete from Drive (trashed — recoverable)
+  let driveTrashed = 0;
+  const enDsFolderId = productLine?.ds_images_folder_id;
+  if (enDsFolderId) {
+    try {
+      const targetFolderId = locale && productLine?.name
+        ? await resolveLocaleDsImagesFolder({
+            enDsImagesFolderId: enDsFolderId,
+            lineName: productLine.name,
+            locale,
+          })
+        : enDsFolderId;
+      driveTrashed = await deleteDriveFilesByPrefix(targetFolderId, filePrefix);
+    } catch (err) {
+      console.error(
+        `Drive delete failed for ${filePrefix}:`,
+        err instanceof Error ? err.message : String(err),
+      );
+    }
+  }
+
+  // 3. Clear DB field
+  if (imageType === "product") {
+    await supabase
+      .from("products")
+      .update({ product_image: null })
+      .eq("id", product.id);
+  } else if (imageType === "hardware") {
+    if (locale) {
+      // Clear product_translations.hardware_image for this locale only
+      await supabase
+        .from("product_translations" as "products")
+        .update({ hardware_image: null })
+        .eq("product_id", product.id)
+        .eq("locale", locale);
+    } else {
+      await supabase
+        .from("products")
+        .update({ hardware_image: null })
+        .eq("id", product.id);
+    }
+  } else if (imageType === "radio_pattern" && label) {
+    await supabase
+      .from("image_assets")
+      .delete()
+      .eq("product_id", product.id)
+      .eq("image_type", "radio_pattern")
+      .eq("label", label);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    model,
+    type: imageType,
+    locale,
+    label,
+    storageDeleted: storagePathsToDelete.length,
+    driveTrashed,
   });
 }

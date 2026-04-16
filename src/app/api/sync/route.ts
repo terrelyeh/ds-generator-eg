@@ -234,8 +234,17 @@ export async function POST(request: Request) {
                   hardware_image: existing.hardware_image || undefined,
                 },
               });
-              if (imgResult.product_image_url) updateFields.product_image = imgResult.product_image_url;
-              if (imgResult.hardware_image_url) updateFields.hardware_image = imgResult.hardware_image_url;
+              if (imgResult.product_image_url) {
+                updateFields.product_image = imgResult.product_image_url;
+              } else if (imgResult.folder_listed && existing.product_image) {
+                // Drive confirmed the file no longer exists → clear DB
+                updateFields.product_image = null;
+              }
+              if (imgResult.hardware_image_url) {
+                updateFields.hardware_image = imgResult.hardware_image_url;
+              } else if (imgResult.folder_listed && existing.hardware_image) {
+                updateFields.hardware_image = null;
+              }
             } catch { /* image sync failure is non-fatal */ }
 
             await supabase
@@ -309,17 +318,21 @@ export async function POST(request: Request) {
                 hardware_image: existing.hardware_image || undefined,
               } : undefined,
             });
-            if (images.product_image_url || images.hardware_image_url) {
+            const imageUpdate: Record<string, string | null> = {};
+            if (images.product_image_url) {
+              imageUpdate.product_image = images.product_image_url;
+            } else if (images.folder_listed && existing?.product_image) {
+              imageUpdate.product_image = null;
+            }
+            if (images.hardware_image_url) {
+              imageUpdate.hardware_image = images.hardware_image_url;
+            } else if (images.folder_listed && existing?.hardware_image) {
+              imageUpdate.hardware_image = null;
+            }
+            if (Object.keys(imageUpdate).length > 0) {
               await supabase
                 .from("products")
-                .update({
-                  ...(images.product_image_url && {
-                    product_image: images.product_image_url,
-                  }),
-                  ...(images.hardware_image_url && {
-                    hardware_image: images.hardware_image_url,
-                  }),
-                })
+                .update(imageUpdate)
                 .eq("id", product.id);
             }
           } catch {
