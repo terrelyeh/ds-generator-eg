@@ -66,10 +66,10 @@ export default async function PreviewPage({
   searchParams,
 }: {
   params: Promise<{ model: string }>;
-  searchParams: Promise<{ lang?: string; mode?: string; toolbar?: string }>;
+  searchParams: Promise<{ lang?: string; mode?: string; toolbar?: string; version?: string }>;
 }) {
   const { model } = await params;
-  const { lang = "en", mode = "light", toolbar } = await searchParams;
+  const { lang = "en", mode = "light", toolbar, version: versionOverride } = await searchParams;
   const showToolbar = toolbar !== "false";
 
   const dict = getDict(lang);
@@ -165,8 +165,11 @@ export default async function PreviewPage({
   const subtitle = (isTranslated && translatedSubtitle) ? translatedSubtitle : product.subtitle;
   const midpoint = Math.ceil(features.length / 2);
 
+  // versionOverride is passed by /api/generate-pdf so the footer prints the
+  // correct version being generated, rather than the stale DB value which
+  // hasn't been updated yet at render time.
   const currentVersions = product.current_versions as Record<string, string> | null;
-  const version = currentVersions?.[lang] || product.current_version || "1.0";
+  const version = versionOverride || currentVersions?.[lang] || product.current_version || "1.0";
   const today = new Date().toLocaleDateString(dict.dateLocale, {
     month: "2-digit",
     day: "2-digit",
@@ -228,7 +231,7 @@ export default async function PreviewPage({
       {showToolbar && (
         <PrintToolbar
           model={product.model_name}
-          currentVersion={product.current_version || "0.0"}
+          currentVersion={version}
           canGenerate={
             !!product.product_image && !product.product_image.startsWith("cache/") &&
             !!product.hardware_image && !product.hardware_image.startsWith("cache/") &&

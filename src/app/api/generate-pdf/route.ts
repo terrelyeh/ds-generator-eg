@@ -228,12 +228,14 @@ export async function POST(request: Request) {
       } else {
         newVersion = driveVersion
           ? bumpVersion(driveVersion)
-          : (() => {
-              const parts = currentVer.split(".");
-              const major = parseInt(parts[0]) || 1;
-              const minor = (parseInt(parts[1]) || 0) + 1;
-              return `${major}.${minor}`;
-            })();
+          : currentVer === "0.0"
+            ? "1.0"  // Brand-new product, first version ever
+            : (() => {
+                const parts = currentVer.split(".");
+                const major = parseInt(parts[0]) || 1;
+                const minor = (parseInt(parts[1]) || 0) + 1;
+                return `${major}.${minor}`;
+              })();
       }
     }
 
@@ -287,10 +289,15 @@ export async function POST(request: Request) {
           : `http://localhost:${process.env.PORT || 3000}`);
 
     // Pass lang and mode to the preview page
+    // Pass the resolved version to the preview page so the footer renders
+    // the correct version — otherwise the preview reads current_version
+    // from DB which hasn't been updated yet at this point (updated AFTER
+    // the PDF is generated), resulting in "v0.0" in the footer.
     const translationMode = isLocalized ? "full" : "light"; // Default to full for localized PDFs
+    const versionParam = `&version=${encodeURIComponent(newVersion)}`;
     const previewUrl = isLocalized
-      ? `${baseUrl}/preview/${model}?lang=${lang}&mode=${translationMode}`
-      : `${baseUrl}/preview/${model}`;
+      ? `${baseUrl}/preview/${model}?lang=${lang}&mode=${translationMode}${versionParam}`
+      : `${baseUrl}/preview/${model}?toolbar=false${versionParam}`;
 
     await page.goto(previewUrl, {
       waitUntil: "networkidle0",
