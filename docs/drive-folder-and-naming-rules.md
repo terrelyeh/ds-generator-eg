@@ -343,19 +343,46 @@ Cloud Switch/DS Images/
 
 ---
 
-## 7. 自動同步機制
+## 7. 同步機制與圖片管理
 
-### 同步排程
-- **自動**: 每天 09:00 (台灣時間) 透過 Vercel Cron 觸發
-- **手動**: Dashboard 右上角「Sync」按鈕
+### 7.1 真源 & 快取原則
 
-### 同步流程
+> **核心原則**: Google Drive 是所有資料的 **authoritative source (真源)**。Supabase 上的檔案（Storage）和 URL（DB 欄位）都是**快取副本**，用於讓前端快速讀取。
+
+| 儲存位置 | 角色 | 誰寫入 | 誰讀取 |
+|---|---|---|---|
+| Google Drive `DS Images/` | **真源** | PM 手動 + Web UI write-through | Sync 拉進 Supabase |
+| Supabase Storage `images/` | 快取 (CDN) | UI upload + Sync | 前端 |
+| Supabase DB `products.*_image` | URL 指標 | UI upload + Sync | 前端 |
+
+### 7.2 同步排程
+- **自動**: 每天 09:00 (台灣時間) Vercel Cron 觸發
+- **手動 (全部)**: Dashboard 右上角「Sync」按鈕
+- **手動 (單產品)**: Product Detail 頁面 **Resync Images** 按鈕（只同步圖片，不碰 Sheets）
+
+### 7.3 同步流程
 1. 讀取 Google Sheet (Web Overview + Detail Specs) → 更新產品資料 + 規格
 2. 掃描英文 `{ProductLine}/DS Images/` → 同步 product / hardware / radio pattern 圖到 Supabase Storage，更新 `products` 表
 3. 對每個已啟用的語言，掃描 `{ProductLine}_{locale}/DS Images/` → 同步 hardware 圖，更新 `product_translations.hardware_image`
 4. 掃描各語言的 DS 資料夾 → 偵測最新 Datasheet 版本號
 5. 比對現有資料 → 偵測變更 → 記錄 Change Log
 6. 有變更時 → 發送 Telegram 通知
+
+### 7.4 刪除傳播
+
+PM 在 Drive 刪除圖片後，Sync 會偵測並清除 DB 欄位：
+- Sync 列出 DS Images 資料夾成功 (`folder_listed = true`) + 預期檔案不在清單 → 清除 `products.product_image` / `products.hardware_image` / `product_translations.hardware_image`
+- Sync 列資料夾失敗 → **不做任何事**（防止網路毛刺誤刪）
+- Sync 不會自動刪 Supabase Storage 的檔案本身（保守策略），只清 DB URL 指標
+
+### 7.5 UI 刪除功能
+
+MKT 也可直接在網頁介面刪除圖片：
+- **Product Detail → Product Images** — 紅色垃圾桶按鈕 → 同時刪 Supabase Storage + Drive (trash) + 清 DB
+- **Product Detail → Radio Pattern** — 垃圾桶按鈕 → 同上 + 刪 `image_assets` 記錄
+- **Translations → Hardware Image** — Delete 連結 → 刪該語言版的 hardware 圖
+
+> **Drive 刪除可復原**: 所有 Drive 刪除都是 trash，30 天內可從垃圾桶恢復。
 
 ### 變更通知
 - 系統會自動偵測所有欄位的變更 (含 Status 變更)

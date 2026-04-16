@@ -290,7 +290,7 @@
     <li><a href="#s4">圖片命名規則</a></li>
     <li><a href="#s5">Sheets 規格表結構</a></li>
     <li><a href="#s6">產品型號一覽</a></li>
-    <li><a href="#s7">自動同步機制</a></li>
+    <li><a href="#s7">同步機制與圖片管理</a></li>
     <li><a href="#s8">快速檢查清單</a></li>
     <li><a href="#s9">多國語言 Datasheet</a></li>
   </ol>
@@ -707,25 +707,91 @@ Model Datasheet/
 </div>
 
 <!-- ========== 7 ========== -->
-<h2 id="s7"><span class="num">7</span>自動同步機制</h2>
+<h2 id="s7"><span class="num">7</span>同步機制與圖片管理</h2>
 
-<h3>同步排程</h3>
+<h3>7.1 真源 &amp; 快取原則</h3>
+
+<div class="callout">
+  <strong>核心原則:</strong> Google Drive 是所有資料的 <strong>authoritative source (真源)</strong>。Supabase 上的檔案（Storage）和 URL（DB 欄位）都是 <strong>快取副本</strong>，用於讓前端快速讀取。無論是 UI 上傳或 Drive 直接丟，Drive 那份永遠代表真實狀態；Supabase 會透過 Sync 自動對齊。
+</div>
+
+<table>
+  <thead><tr><th>儲存位置</th><th>角色</th><th>誰寫入</th><th>誰讀取</th></tr></thead>
+  <tbody>
+    <tr><td>Google Drive <code>DS Images/</code></td><td><strong>真源</strong></td><td>PM 手動 + Web UI write-through + Sync (建子資料夾)</td><td>Sync 拉進 Supabase</td></tr>
+    <tr><td>Supabase Storage <code>images/</code></td><td>快取 (CDN)</td><td>UI upload + Sync</td><td>前端 preview / dashboard</td></tr>
+    <tr><td>Supabase DB <code>products.*_image</code></td><td>URL 指標</td><td>UI upload + Sync</td><td>前端</td></tr>
+  </tbody>
+</table>
+
+<h3>7.2 同步排程</h3>
 <table>
   <thead><tr><th>方式</th><th>觸發時間</th><th>說明</th></tr></thead>
   <tbody>
     <tr><td>自動</td><td>每天 09:00 (台灣時間)</td><td>Vercel Cron 自動觸發，僅同步有變更的產品線</td></tr>
-    <tr><td>手動</td><td>隨時</td><td>Dashboard 右上角「Sync」按鈕，強制同步所有產品線</td></tr>
+    <tr><td>手動 (全部)</td><td>隨時</td><td>Dashboard 右上角「Sync」按鈕，強制同步所有產品線</td></tr>
+    <tr><td><strong>手動 (單產品)</strong></td><td>隨時</td><td>Product Detail 頁面 <strong>Resync Images</strong> 按鈕，只重新同步該產品的圖片（不碰 Sheets / 文字規格）</td></tr>
   </tbody>
 </table>
 
-<h3>同步流程</h3>
+<h3>7.3 同步流程</h3>
 <ol style="font-size:15px; padding-left:20px; margin-bottom:16px; line-height:2;">
   <li>讀取 Google Sheet (Web Overview + Detail Specs) &rarr; 更新產品資料 + 規格</li>
-  <li>掃描 DS Images 資料夾 &rarr; 同步產品圖片到 Supabase Storage</li>
-  <li>掃描 DS 資料夾 &rarr; 偵測最新 Datasheet 版本號</li>
+  <li>掃描英文 <code>{ProductLine}/DS Images/</code> &rarr; 同步 product / hardware 圖到 Supabase Storage，更新 <code>products</code> 表</li>
+  <li>對每個已啟用的語言，掃描 <code>{ProductLine}_{locale}/DS Images/</code> &rarr; 同步 hardware 圖，更新 <code>product_translations.hardware_image</code></li>
+  <li>掃描各語言的 DS 資料夾 &rarr; 偵測最新 Datasheet 版本號</li>
   <li>比對現有資料 &rarr; 偵測變更 &rarr; 記錄 Change Log</li>
   <li>有變更時 &rarr; 發送 Telegram 通知</li>
 </ol>
+
+<h3>7.4 刪除傳播</h3>
+<p>當 PM 從 Drive 刪除一張圖片（或拖進垃圾桶），系統會在下次同步時偵測並清除對應的 DB 欄位：</p>
+
+<table>
+  <thead><tr><th>偵測方式</th><th>行為</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Sync 列出 DS Images 資料夾 (<code>folder_listed = true</code>)，但預期檔案不在清單中</td>
+      <td>清除 <code>products.product_image</code> / <code>products.hardware_image</code> / <code>product_translations.hardware_image</code></td>
+    </tr>
+    <tr>
+      <td>Sync 列資料夾失敗（Drive API 錯誤）→ <code>folder_listed = false</code></td>
+      <td><strong>不做任何事</strong>（保守策略，防止網路毛刺導致誤刪）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-warn">
+  <strong>注意:</strong> Sync 只清 DB 欄位（URL 指標），<strong>不會</strong>自動刪除 Supabase Storage 上的檔案本身。Storage 上的檔案會變成孤兒（不被引用），但不會顯示在前端。
+</div>
+
+<h3>7.5 UI 刪除功能</h3>
+<p>除了 Drive 端的自然刪除 + Sync 傳播外，MKT 可以直接在網頁介面刪除圖片：</p>
+
+<table>
+  <thead><tr><th>位置</th><th>操作</th><th>影響</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Product Detail → Product Images</td>
+      <td>各圖片右下角的紅色垃圾桶按鈕</td>
+      <td>同時刪除 Supabase Storage 檔案 + Drive 檔案 (trash) + 清 DB 欄位</td>
+    </tr>
+    <tr>
+      <td>Product Detail → Radio Pattern</td>
+      <td>各 slot 的垃圾桶按鈕</td>
+      <td>同上 + 刪除 <code>image_assets</code> 記錄</td>
+    </tr>
+    <tr>
+      <td>Translations → Hardware Image</td>
+      <td><strong>Delete</strong> 連結</td>
+      <td>刪除該語言版本的 hardware 圖（Supabase + Drive + <code>product_translations.hardware_image</code>）</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Drive 刪除可復原:</strong> 所有透過 UI 執行的 Drive 刪除都是「移到垃圾桶」(trash)，不是永久刪除。30 天內可以從 Drive 垃圾桶中恢復。
+</div>
 
 <!-- ========== 8 ========== -->
 <h2 id="s8"><span class="num">8</span>快速檢查清單</h2>
