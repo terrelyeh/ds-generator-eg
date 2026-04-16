@@ -96,12 +96,20 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
     if (!label) continue;
 
     if (SPEC_CATEGORIES.has(label)) {
-      if (currentCategory && currentItems.length > 0) {
-        sections.push({ category: currentCategory, items: currentItems });
+      // Only treat as a section header when the model column is empty.
+      // Some sheets (e.g. Cloud Camera) put "Certifications" as a spec
+      // item with a value ("CE, FCC, UL AVE") on the SAME row, rather
+      // than using it as a section header with items underneath. When a
+      // value IS present, fall through and add it as a regular spec item.
+      if (!value || value === "-") {
+        if (currentCategory && currentItems.length > 0) {
+          sections.push({ category: currentCategory, items: currentItems });
+        }
+        currentCategory = label;
+        currentItems = [];
+        continue;
       }
-      currentCategory = label;
-      currentItems = [];
-      continue;
+      // Has value → treat as spec item, fall through
     }
 
     if (!value || value === "-") continue;
