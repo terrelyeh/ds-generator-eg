@@ -125,6 +125,13 @@ export async function deleteDriveFilesByPrefix(
  * For English (locale === "en" or falsy) this short-circuits and returns
  * enDsImagesFolderId directly.
  */
+// In-memory cache for resolved locale DS Images folder IDs. Keyed by
+// `${enDsImagesFolderId}:${locale}`. Persists within a single serverless
+// invocation (one sync run) and is discarded after. This eliminates
+// redundant Drive API lookups when syncing multiple products that share
+// the same product line + locale.
+const _localeFolderCache = new Map<string, string>();
+
 export async function resolveLocaleDsImagesFolder(params: {
   enDsImagesFolderId: string;
   lineName: string;
@@ -136,6 +143,13 @@ export async function resolveLocaleDsImagesFolder(params: {
 
   const suffix = getLocaleSuffix(locale);
   if (!suffix || suffix === "en") return enDsImagesFolderId;
+
+  // Check cache first — same product line + locale always resolves to
+  // the same folder, so within a single sync run we only need to look
+  // it up once.
+  const cacheKey = `${enDsImagesFolderId}:${locale}`;
+  const cached = _localeFolderCache.get(cacheKey);
+  if (cached) return cached;
 
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
@@ -192,7 +206,10 @@ export async function resolveLocaleDsImagesFolder(params: {
   });
 
   const existingDsImagesId = imagesSearchRes.data.files?.[0]?.id;
-  if (existingDsImagesId) return existingDsImagesId;
+  if (existingDsImagesId) {
+    _localeFolderCache.set(cacheKey, existingDsImagesId);
+    return existingDsImagesId;
+  }
 
   // Auto-create DS Images subfolder
   console.log(`[resolveLocaleDsImagesFolder] Creating "${DS_IMAGES_FOLDER_NAME}" inside "${localeLineName}"`);
@@ -209,6 +226,7 @@ export async function resolveLocaleDsImagesFolder(params: {
   if (!newId) {
     throw new Error(`Failed to create DS Images folder in ${localeLineName}`);
   }
+  _localeFolderCache.set(cacheKey, newId);
   return newId;
 }
 
