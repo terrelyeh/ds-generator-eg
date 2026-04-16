@@ -17,6 +17,10 @@ import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
 import type { ProductLine } from "@/types/database";
 
+// Full sync spans 7 product lines × ~65 products, each with Sheet reads +
+// Drive image listing + locale-aware hardware sync. 60s is not enough.
+export const maxDuration = 300;
+
 /**
  * POST /api/sync
  *
