@@ -278,10 +278,17 @@ export function DashboardContent({
     if (!activeLine) return;
     setSyncing(true);
     try {
+      // Client-side timeout safety net: if Vercel function exceeds
+      // maxDuration (60s on Hobby plan) and the HTTP connection hangs,
+      // this ensures the UI recovers after 90s instead of spinning
+      // forever with no feedback.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90_000);
       const res = await fetch(
         `/api/sync?force=true&line=${encodeURIComponent(activeLine.name)}`,
-        { method: "POST" }
+        { method: "POST", signal: controller.signal }
       );
+      clearTimeout(timeoutId);
       const data = await res.json();
       if (data.ok) {
         const result = data.results?.[0];
@@ -303,7 +310,11 @@ export function DashboardContent({
         toast.error(`Sync failed: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
-      toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+      if (err instanceof DOMException && err.name === "AbortError") {
+        toast.error("Sync timed out — the server took too long. Try again or check Vercel logs.", { duration: 10000 });
+      } else {
+        toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     } finally {
       setSyncing(false);
     }
