@@ -1066,6 +1066,75 @@ Model Datasheet/
   <strong>自訂 QR:</strong> QR 標籤和連結可以在每個產品的翻譯頁面中個別覆寫。留空則使用上表中的語言預設值。
 </div>
 
+<h3>9.12 QR Code 產生規則</h3>
+
+<h4>9.12.1 三層優先順序</h4>
+<p>PDF footer 的 QR Code 內容遵循以下優先順序，由高到低：</p>
+
+<table>
+  <thead><tr><th>優先順序</th><th>來源</th><th>設定位置</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>1. 個別產品覆寫</strong></td>
+      <td><code>product_translations.qr_label</code> / <code>qr_url</code></td>
+      <td>Translations tab → QR Code 區塊</td>
+      <td>每個產品 × 每個語言可以設定自訂的 QR 標籤和連結</td>
+    </tr>
+    <tr>
+      <td><strong>2. 語言預設值</strong></td>
+      <td><code>src/lib/datasheet/locales/{lang}.ts</code></td>
+      <td>程式碼</td>
+      <td>當個別產品未設定時 fallback 到語言預設值（見 §9.11 表格）</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>9.12.2 各語言 QR 預設行為</h4>
+<table>
+  <thead><tr><th>語言</th><th>QR Label</th><th>QR URL Pattern</th><th>說明</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>🇺🇸 English</td>
+      <td><code>Quick Start Guide</code></td>
+      <td><code>https://qr.engenius.ai/qsg/<strong>{model}</strong></code></td>
+      <td><code>{model}</code> 自動替換為型號小寫（如 <code>ecc500z</code>）</td>
+    </tr>
+    <tr>
+      <td>🇯🇵 Japanese</td>
+      <td><code>Contact Us</code></td>
+      <td><code>https://www.engenius.co.jp/contact</code></td>
+      <td>固定連結，不帶 model</td>
+    </tr>
+    <tr>
+      <td>🇹🇼 Traditional Chinese</td>
+      <td><code>Contact Us</code></td>
+      <td><code>https://www.engenius.com.tw/contact</code></td>
+      <td>固定連結，不帶 model</td>
+    </tr>
+  </tbody>
+</table>
+
+<h4>9.12.3 QR 圖片生成方式</h4>
+<ul style="font-size:15px; padding-left:20px; margin-bottom:16px;">
+  <li><strong>即時生成</strong>：使用第三方 API <code>api.qrserver.com</code>，不預存圖檔</li>
+  <li><strong>API 格式</strong>：<code>https://api.qrserver.com/v1/create-qr-code/?size=150x150&amp;data={encoded_url}</code></li>
+  <li><strong>PDF 顯示尺寸</strong>：41pt × 41pt</li>
+  <li>每次 Preview / Generate PDF 時即時呼叫 API 產生，確保 QR 內容永遠是最新的</li>
+</ul>
+
+<h4>9.12.4 覆寫方式</h4>
+<ol style="font-size:15px; padding-left:20px; margin-bottom:16px; line-height:2;">
+  <li>進入產品的 <strong>Translations</strong> tab</li>
+  <li>選擇語言（或 English 也可以覆寫）</li>
+  <li>找到 <strong>QR Code (Footer)</strong> 區塊</li>
+  <li>填入自訂的 <strong>QR Label</strong>（如 <code>Setup Guide</code>）和 <strong>QR URL</strong>（如 <code>https://custom.url/ecw526</code>）</li>
+  <li><strong>Save & Confirm</strong></li>
+</ol>
+
+<div class="callout">
+  <strong>注意:</strong> 英文版的 QR URL 使用 <code>{model}</code> 佔位符（如 <code>qr.engenius.ai/qsg/{model}</code>），系統會自動替換為該產品的型號小寫。日文和繁中版預設使用固定的聯絡頁連結。如果需要為特定產品的特定語言指向不同的 URL，在翻譯頁面覆寫即可。
+</div>
+
 </div><!-- /main-content -->
 </div><!-- /page-layout -->
 

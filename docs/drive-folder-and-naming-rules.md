@@ -402,3 +402,39 @@ MKT 也可直接在網頁介面刪除圖片：
 - [ ] (多語言) 對應語言產品線 `{ProductLine}_{locale}/DS Images/` 放入 `{Model}_hardware_{locale}.png`
 - [ ] 確認 Status 欄位正確 (Active / Upcoming / Pending)
 - [ ] 執行一次 Sync 確認資料正確匯入
+
+---
+
+## 9. QR Code 產生規則
+
+### 9.1 三層優先順序
+
+PDF footer 的 QR Code 遵循以下優先順序（由高到低）：
+
+| 優先順序 | 來源 | 設定位置 |
+|---|---|---|
+| **1. 個別產品覆寫** | `product_translations.qr_label` / `qr_url` | Translations tab → QR Code 區塊 |
+| **2. 語言預設值** | `src/lib/datasheet/locales/{lang}.ts` | 程式碼 |
+
+### 9.2 各語言 QR 預設行為
+
+| 語言 | QR Label | QR URL Pattern | 說明 |
+|---|---|---|---|
+| 🇺🇸 English | `Quick Start Guide` | `https://qr.engenius.ai/qsg/{model}` | `{model}` 自動替換為型號小寫 |
+| 🇯🇵 Japanese | `Contact Us` | `https://www.engenius.co.jp/contact` | 固定連結 |
+| 🇹🇼 Traditional Chinese | `Contact Us` | `https://www.engenius.com.tw/contact` | 固定連結 |
+
+### 9.3 QR 圖片生成方式
+
+- **即時生成**：使用 `api.qrserver.com` 第三方 API，不預存圖檔
+- **API 格式**：`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={encoded_url}`
+- **PDF 顯示尺寸**：41pt × 41pt
+- 每次 Preview / Generate PDF 即時呼叫
+
+### 9.4 覆寫方式
+
+1. Translations tab → 選擇語言
+2. QR Code (Footer) 區塊 → 填入自訂 QR Label / QR URL
+3. Save & Confirm
+
+> **注意**: 英文版 QR URL 使用 `{model}` 佔位符，系統自動替換為型號小寫。日文和繁中預設使用固定聯絡頁連結。
