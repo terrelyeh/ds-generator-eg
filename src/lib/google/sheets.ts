@@ -2,21 +2,21 @@ import { google } from "googleapis";
 import { getGoogleAuth } from "./auth";
 
 /**
- * Known spec category headers — rows where column A is a category name.
- * Matches the Python SPEC_CATEGORIES set from the old project.
+ * Category detection rule (pattern-based, no hardcoded list):
+ *
+ *   A row is a CATEGORY HEADER if column A has text AND every cell from
+ *   column B onwards is empty or just "-". Otherwise it's a SPEC ITEM
+ *   row (label + at least one model has a value).
+ *
+ * Replaces the old hardcoded SPEC_CATEGORIES whitelist, which silently
+ * lost categories the PM hadn't named exactly like the Python port
+ * (e.g. "Environmental & Physical", "Device Dimensions & Weight", and
+ * almost every AP sheet's categories).
+ *
+ * PM rule: to introduce a new category, put its name in column A and
+ * leave ALL model columns empty on that row. Don't put spaces or dashes
+ * in the model cells.
  */
-const SPEC_CATEGORIES = new Set([
-  "Optics", "Video", "Audio", "Advanced AI Analytics",
-  "Storage", "System", "Mechanical", "Management Software",
-  "General", "Physical", "Interface", "Networking", "Network",
-  "Wireless", "Radio", "Performance", "Power", "Environment",
-  "Environmental", "Software", "Security", "Layer 2 Features",
-  "Layer 3 Features", "Management", "Standards", "Certifications",
-  "PoE", "Switching", "Ports", "Port", "LED",
-  // Cloud Switch specific categories
-  "Physical Interface", "L2 Software Features", "L3 Software Features",
-  "Network Management",
-]);
 
 export interface SheetSpecItem {
   label: string;
@@ -75,6 +75,27 @@ function findRowByLabel(rows: unknown[][], label: string): number | null {
 // Parse spec sections from Detail Specs tab
 // ---------------------------------------------------------------------------
 
+/**
+ * True if column A is the ONLY cell with content in this row. Used to
+ * detect category header rows — "Environmental & Physical" with every
+ * model column completely empty.
+ *
+ * STRICT: "-" counts as a value (per the project convention it means
+ * "not applicable" — still a meaningful marker). Only a totally empty
+ * string makes a cell count as empty. This matters because some PMs
+ * leave PoE rows blank for L3 switches; those rows would otherwise be
+ * mistakenly treated as category headers. The PM fix is to put "-" in
+ * not-applicable cells, or delete the row entirely.
+ */
+function isRowOnlyLabel(row: unknown[] | undefined): boolean {
+  if (!row || row.length <= 1) return true;
+  for (let c = 1; c < row.length; c++) {
+    const v = String(row[c] ?? "").trim();
+    if (v) return false; // any content (including "-") → row has values
+  }
+  return true;
+}
+
 function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[] {
   const sections: SheetSpecSection[] = [];
   let currentCategory: string | null = null;
@@ -95,27 +116,24 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
 
     if (!label) continue;
 
-    if (SPEC_CATEGORIES.has(label)) {
-      // Only treat as a section header when the model column is empty.
-      // Some sheets (e.g. Cloud Camera) put "Certifications" as a spec
-      // item with a value ("CE, FCC, UL AVE") on the SAME row, rather
-      // than using it as a section header with items underneath. When a
-      // value IS present, fall through and add it as a regular spec item.
-      if (!value || value === "-") {
-        if (currentCategory && currentItems.length > 0) {
-          sections.push({ category: currentCategory, items: currentItems });
-        }
-        currentCategory = label;
-        currentItems = [];
-        continue;
+    // Pattern-based category detection: column A has text, all other
+    // cells empty → category header. Works across all product lines
+    // without maintaining a hardcoded whitelist.
+    if (isRowOnlyLabel(rows[i])) {
+      if (currentCategory && currentItems.length > 0) {
+        sections.push({ category: currentCategory, items: currentItems });
       }
-      // Has value → treat as spec item, fall through
+      currentCategory = label;
+      currentItems = [];
+      continue;
     }
 
+    // Spec item rows: skip if this particular model has no value for it
     if (!value || value === "-") continue;
 
-    // Fallback: if no category has been set yet, create a "General" category
-    // This handles sheets where spec items start immediately after "Technical Specifications"
+    // Fallback: if no category has been set yet, create a "General" category.
+    // This handles sheets where spec items start immediately after
+    // "Technical Specifications" without a category header first.
     if (!currentCategory) {
       currentCategory = "General";
     }
