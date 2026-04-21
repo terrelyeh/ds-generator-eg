@@ -146,6 +146,7 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
 
   const pages: SpecPage[] = [];
   const queue: Section[] = [...sections];
+  let splitOccurred = false;
 
   // Safety cap: large spec sheets with many continuations shouldn't balloon
   // into thousands of pages. If we exceed this, there's a bug; bail out.
@@ -176,7 +177,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
           leftH += estimateSectionHeight(fitted);
         }
         queue.shift();
-        if (cont) queue.unshift(cont);
+        if (cont) {
+          queue.unshift(cont);
+          splitOccurred = true;
+        }
       } else {
         // Column has content + won't fit next section → try partial split
         const { fitted, remaining: cont } = fitSection(nextSection, remaining);
@@ -209,7 +213,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
           rightH += estimateSectionHeight(fitted);
         }
         queue.shift();
-        if (cont) queue.unshift(cont);
+        if (cont) {
+          queue.unshift(cont);
+          splitOccurred = true;
+        }
       } else {
         const { fitted, remaining: cont } = fitSection(nextSection, remaining);
         if (fitted && fitted.items.length > 0) {
@@ -226,8 +233,11 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
     pages.push({ left, right });
   }
 
-  // If only one page, balance columns evenly
-  if (pages.length === 1) {
+  // If only one page AND no section had to be split, rebalance for
+  // aesthetic symmetry between the two columns. If a split did occur,
+  // keep the fitSection-driven layout — rebalancing would blow the
+  // column heights.
+  if (pages.length === 1 && !splitOccurred) {
     return [balanceColumns(sections)];
   }
 
