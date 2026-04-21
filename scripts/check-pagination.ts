@@ -1,6 +1,6 @@
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
-import { splitIntoPages } from "../src/lib/datasheet/pagination";
+import { splitIntoPages, estimateItemHeight, AVAILABLE_HEIGHT, CATEGORY_HEADER_HEIGHT } from "../src/lib/datasheet/pagination";
 config({ path: ".env.local" });
 
 async function main() {
@@ -28,19 +28,28 @@ async function main() {
   const pages = splitIntoPages(sections);
 
   console.log(`\nModel: ${p.model_name}`);
-  console.log(`Pages: ${pages.length}`);
+  console.log(`AVAILABLE_HEIGHT per column: ${AVAILABLE_HEIGHT}pt`);
+  console.log(`Pages: ${pages.length}\n`);
+
   pages.forEach((page, pi) => {
-    console.log(`\n─── Page ${pi + 1} ───`);
+    console.log(`─── Page ${pi + 1} ───`);
     (["left", "right"] as const).forEach((col) => {
+      let colH = 0;
       console.log(`  ${col.toUpperCase()}:`);
       for (const sec of page[col]) {
-        const hdr = sec.isContinuation ? "[no header — continuation]" : `"${sec.category}"`;
+        if (!sec.isContinuation) colH += CATEGORY_HEADER_HEIGHT;
+        const hdr = sec.isContinuation ? "[no header]" : `"${sec.category}"`;
         console.log(`    ${hdr}  (${sec.items.length} items)`);
         for (const it of sec.items) {
-          const previewValue = it.value.length > 40 ? it.value.slice(0, 40) + "…" : it.value;
-          console.log(`      • ${it.label}: ${previewValue}`);
+          const itH = estimateItemHeight(it.value);
+          colH += itH;
+          const previewValue = it.value.length > 35 ? it.value.replace(/\n/g, "⏎").slice(0, 35) + "…" : it.value.replace(/\n/g, "⏎");
+          console.log(`      • [${itH}pt] ${it.label}: ${previewValue}`);
         }
       }
+      const pct = Math.round((colH / AVAILABLE_HEIGHT) * 100);
+      const unused = AVAILABLE_HEIGHT - colH;
+      console.log(`    === Column total: ${colH}pt / ${AVAILABLE_HEIGHT}pt (${pct}%, ${unused}pt unused) ===\n`);
     });
   });
 }

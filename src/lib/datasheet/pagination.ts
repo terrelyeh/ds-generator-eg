@@ -155,6 +155,16 @@ function balanceColumns(sections: Section[]): SpecPage {
 function fitSection(
   section: Section,
   availableHeight: number,
+  /**
+   * Only force-fit an item (overshoot rather than return empty) when the
+   * destination column is EMPTY. Without this guard, a continuation
+   * section whose first item is 40pt would get force-pushed into a
+   * column that only has 5pt left, causing the column to overshoot the
+   * page budget and orphan the REAL next items to an almost-empty page.
+   * See ECS1528P: Warranty was being pushed to page 2 because Package
+   * Contents had been force-fit into a nearly-full right column.
+   */
+  allowForceFit = false,
 ): { fitted: Section | null; remaining: Section | null } {
   // Continuation sections skip the header row — only deduct header height
   // for the first (non-continuation) appearance of a section.
@@ -199,10 +209,11 @@ function fitSection(
       }
     }
 
-    // Couldn't split cleanly. If we haven't fit anything yet, force this
-    // item in so we don't loop forever. Otherwise break and let it flow
-    // to next column intact.
-    if (fittedItems.length === 0) {
+    // Couldn't split cleanly. Force-fit ONLY if caller says it's OK
+    // (empty destination column) — otherwise break and let the item
+    // flow naturally to the next column/page without overshooting this
+    // one. See `allowForceFit` doc for why this guard matters.
+    if (fittedItems.length === 0 && allowForceFit) {
       fittedItems.push(item);
       h += itemH;
       i++;
@@ -271,8 +282,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
         leftH += sectionH;
         queue.shift();
       } else if (left.length === 0) {
-        // Column empty but section too tall → try to fit what we can
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        // Column empty but section too tall → try to fit what we can.
+        // Force-fit at least one item so we don't infinite-loop on a
+        // giant first item.
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, true);
         if (fitted) {
           left.push(fitted);
           leftH += estimateSectionHeight(fitted);
@@ -283,8 +296,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
           splitOccurred = true;
         }
       } else {
-        // Column has content + won't fit next section → try partial split
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        // Column has content + won't fit next section → try partial split.
+        // DON'T force-fit here — we'd rather break and send the item to
+        // the next column than overshoot this one and orphan later items.
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false);
         if (fitted && fitted.items.length > 0) {
           left.push(fitted);
           leftH += estimateSectionHeight(fitted);
@@ -308,7 +323,9 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
         rightH += sectionH;
         queue.shift();
       } else if (right.length === 0) {
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        // Empty column → allow force-fit (prevents infinite loop on
+        // oversized sections that don't fit any column).
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, true);
         if (fitted) {
           right.push(fitted);
           rightH += estimateSectionHeight(fitted);
@@ -319,7 +336,8 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
           splitOccurred = true;
         }
       } else {
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        // Has content → no force-fit; let the rest flow to next page.
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false);
         if (fitted && fitted.items.length > 0) {
           right.push(fitted);
           rightH += estimateSectionHeight(fitted);
