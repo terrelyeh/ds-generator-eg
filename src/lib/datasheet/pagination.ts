@@ -1,6 +1,8 @@
 /**
  * Spec page pagination & column balancing logic.
- * Ported from the Python pdf_generator.py.
+ * Ported from the Python pdf_generator.py, enhanced with per-item height
+ * estimation so long values that wrap to multiple lines don't blow the
+ * page budget.
  */
 
 interface Section {
@@ -14,18 +16,53 @@ interface SpecPage {
 }
 
 // Height estimates (in pt) for page layout
-const PAGE_HEIGHT = 792;
-const TOP_BAR_HEIGHT = 21;
-const SPEC_TITLE_HEIGHT = 42; // title + margin
-const BOTTOM_MARGIN = 40; // page number + safety margin
-const AVAILABLE_HEIGHT =
+export const PAGE_HEIGHT = 792;
+export const TOP_BAR_HEIGHT = 21;
+export const SPEC_TITLE_HEIGHT = 42; // title + margin
+export const BOTTOM_MARGIN = 40; // page number + safety margin
+export const AVAILABLE_HEIGHT =
   PAGE_HEIGHT - TOP_BAR_HEIGHT - SPEC_TITLE_HEIGHT - BOTTOM_MARGIN;
 
-const CATEGORY_HEADER_HEIGHT = 18;
-const SPEC_ROW_HEIGHT = 18;
+export const CATEGORY_HEADER_HEIGHT = 18;
+
+// A single unwrapped spec row: label (7pt) on top + value (7pt) underneath
+// + border-bottom + 2pt vertical padding ≈ 18pt.
+// Each additional wrapped line of value ≈ 9pt (7pt text * 1.3 leading).
+export const SPEC_BASE_ROW_HEIGHT = 18;
+export const SPEC_LINE_EXTRA = 9;
+
+// Approx chars that fit on one line in a half-column (595/2 - gutter ≈ 280pt
+// wide × 7pt font ≈ ~60-70 chars for Latin text). CJK chars are ~2x wider,
+// so CJK-heavy values wrap more aggressively — we normalise roughly by
+// counting each CJK char as 2 "slots".
+const COL_WIDTH_CHARS = 62;
+
+function countWrappedLines(value: string): number {
+  if (!value) return 1;
+  const lines = value.split(/\n+/);
+  let total = 0;
+  for (const line of lines) {
+    // Count CJK codepoints as 2 for width purposes
+    let width = 0;
+    for (const ch of line) {
+      width += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 2 : 1;
+    }
+    total += Math.max(1, Math.ceil(width / COL_WIDTH_CHARS));
+  }
+  return Math.max(1, total);
+}
+
+export function estimateItemHeight(value: string): number {
+  const lines = countWrappedLines(value);
+  return SPEC_BASE_ROW_HEIGHT + (lines - 1) * SPEC_LINE_EXTRA;
+}
 
 function estimateSectionHeight(section: Section): number {
-  return CATEGORY_HEADER_HEIGHT + section.items.length * SPEC_ROW_HEIGHT;
+  let h = CATEGORY_HEADER_HEIGHT;
+  for (const item of section.items) {
+    h += estimateItemHeight(item.value);
+  }
+  return h;
 }
 
 function balanceColumns(sections: Section[]): SpecPage {

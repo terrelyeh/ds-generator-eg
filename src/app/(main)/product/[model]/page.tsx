@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProductDetail } from "@/components/product/product-detail";
+import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import type {
   ProductWithSpecs,
   Product,
@@ -77,12 +78,23 @@ export default async function ProductPage({
     .select("*")
     .eq("product_id", model)) as { data: ProductTranslation[] | null };
 
+  // Pre-compute layout overflow estimate — surfaces as a banner in the UI
+  const layoutReport = checkProductLayout({
+    overview: productWithSpecs.overview,
+    features: productWithSpecs.features as string[] | null,
+    spec_sections: productWithSpecs.spec_sections.map((s) => ({
+      category: s.category,
+      items: s.items.map((it) => ({ label: it.label, value: it.value })),
+    })),
+  });
+
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
       <ProductDetail
         product={productWithSpecs}
         versions={versionData ?? []}
         translations={translationData ?? []}
+        layoutReport={layoutReport}
       />
     </div>
   );

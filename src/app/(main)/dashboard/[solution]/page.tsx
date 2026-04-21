@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
+import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import type { ProductLine } from "@/types/database";
 
 interface ProductRow {
@@ -109,20 +110,49 @@ export default async function SolutionDashboardPage({
       })
     : { data: [] as ChangeLogRow[] };
 
-  // Fetch spec_sections count per product (for SP readiness indicator)
-  const { data: specCounts } = productIds.length
+  // Fetch spec_sections + their items per product. Used both for SP
+  // readiness and for layout-overflow pre-checking.
+  const { data: specSectionRows } = productIds.length
     ? ((await supabase
         .from("spec_sections")
-        .select("product_id, id")
+        .select("id, product_id, category, sort_order, spec_items (label, value, sort_order)")
         .in("product_id", productIds)) as {
-        data: { product_id: string; id: string }[] | null;
+        data:
+          | {
+              id: string;
+              product_id: string;
+              category: string;
+              sort_order: number;
+              spec_items: { label: string; value: string; sort_order: number }[];
+            }[]
+          | null;
       })
-    : { data: [] as { product_id: string; id: string }[] };
+    : { data: [] };
 
-  // Build map: product_id → has specs
+  // Build map: product_id → sorted spec sections (for layout estimation)
+  const specMap = new Map<
+    string,
+    { sort_order: number; category: string; items: { label: string; value: string }[] }[]
+  >();
+  for (const sec of specSectionRows ?? []) {
+    if (!specMap.has(sec.product_id)) specMap.set(sec.product_id, []);
+    specMap.get(sec.product_id)!.push({
+      sort_order: sec.sort_order,
+      category: sec.category,
+      items: (sec.spec_items ?? [])
+        .slice()
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((it) => ({ label: it.label, value: it.value })),
+    });
+  }
+  for (const sections of specMap.values()) {
+    sections.sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  // Build specCount fallback for readiness
   const specCountMap = new Map<string, number>();
-  for (const sc of specCounts ?? []) {
-    specCountMap.set(sc.product_id, (specCountMap.get(sc.product_id) || 0) + 1);
+  for (const [pid, sections] of specMap.entries()) {
+    specCountMap.set(pid, sections.length);
   }
 
   // Fetch translation locales per product (model_name based)
@@ -187,6 +217,15 @@ export default async function SolutionDashboardPage({
     const hasHardwareImage =
       !!p.hardware_image && !p.hardware_image.startsWith("cache/");
 
+    // Layout overflow pre-check (uses conservative heuristics — see
+    // lib/datasheet/layout-check.ts). Surfaces as a colored badge so the
+    // user can spot content-too-long issues before generating the PDF.
+    const layout = checkProductLayout({
+      overview: p.overview,
+      features: p.features as string[] | null,
+      spec_sections: specMap.get(p.id) ?? [],
+    });
+
     const radioPatterns: {
       band: string;
       h_plane: boolean;
@@ -222,6 +261,8 @@ export default async function SolutionDashboardPage({
       product_line_id: p.product_line_id,
       product_line: p.product_lines,
       translation_locales: translationLocalesMap.get(p.model_name) ?? [],
+      layout_status: layout.status,
+      layout_reasons: [...layout.cover.reasons, ...layout.spec.reasons],
     };
   });
 

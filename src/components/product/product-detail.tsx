@@ -19,10 +19,48 @@ import { ProductTranslationEditor } from "@/components/translations/product-tran
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
 
+interface LayoutReport {
+  status: "ok" | "warn" | "overflow";
+  cover: { status: "ok" | "warn" | "overflow"; reasons: string[]; metrics: { overview_chars: number; features_count: number; max_feature_chars: number } };
+  spec: { status: "ok" | "warn" | "overflow"; reasons: string[]; metrics: { pages: number; max_column_fill_pct: number } };
+}
+
 interface ProductDetailProps {
   product: ProductWithSpecs;
   versions: Version[];
   translations?: ProductTranslation[];
+  layoutReport?: LayoutReport;
+}
+
+function LayoutWarningBanner({ report }: { report: LayoutReport }) {
+  const isOverflow = report.status === "overflow";
+  const Icon = isOverflow ? "⚠️" : "💡";
+  const title = isOverflow
+    ? "PDF Layout Overflow — 內容超過版面容納範圍"
+    : "PDF Layout Warning — 內容偏多，可能排版緊繃";
+  const bg = isOverflow ? "bg-red-50 border-red-300 text-red-900" : "bg-amber-50 border-amber-300 text-amber-900";
+  const reasons = [...report.cover.reasons, ...report.spec.reasons];
+
+  return (
+    <div className={`mb-4 rounded-lg border px-4 py-3 ${bg}`}>
+      <div className="flex items-start gap-3">
+        <span className="text-lg leading-tight">{Icon}</span>
+        <div className="min-w-0 flex-1">
+          <div className="font-semibold">{title}</div>
+          {reasons.length > 0 && (
+            <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed">
+              {reasons.map((r, i) => (
+                <li key={i}>{r}</li>
+              ))}
+            </ul>
+          )}
+          <div className="mt-2 text-xs text-current/70">
+            建議縮短 Overview、減少 Features 數量，或縮短過長的 spec 值。生成 PDF 時可能會出現內容重疊或被截斷。
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function formatDate(dateStr: string | null) {
@@ -366,7 +404,7 @@ function RadioPatternSlot({
   );
 }
 
-export function ProductDetail({ product, versions, translations = [] }: ProductDetailProps) {
+export function ProductDetail({ product, versions, translations = [], layoutReport }: ProductDetailProps) {
   const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -491,6 +529,11 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
           {product.model_name}
         </span>
       </nav>
+
+      {/* Layout overflow warning banner */}
+      {layoutReport && layoutReport.status !== "ok" && (
+        <LayoutWarningBanner report={layoutReport} />
+      )}
 
       {/* Sticky Header */}
       <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
@@ -826,9 +869,24 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
 
       {/* Overview & Features */}
       {(product.overview || product.features?.length > 0) && (
-        <Card className="shadow-sm">
+        <Card className={`shadow-sm ${
+          layoutReport?.cover.status === "overflow" ? "ring-2 ring-red-400/60" :
+          layoutReport?.cover.status === "warn" ? "ring-2 ring-amber-300/60" : ""
+        }`}>
           <CardHeader>
-            <CardTitle className="text-base">Overview & Features</CardTitle>
+            <CardTitle className="text-base flex items-center gap-2">
+              Overview & Features
+              {layoutReport?.cover.status === "overflow" && (
+                <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded px-1.5 py-0.5">
+                  Overflow
+                </span>
+              )}
+              {layoutReport?.cover.status === "warn" && (
+                <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5">
+                  Warn
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-5">
             {/* Overview */}
@@ -865,9 +923,24 @@ export function ProductDetail({ product, versions, translations = [] }: ProductD
       )}
 
       {/* Specifications */}
-      <Card className="shadow-sm">
+      <Card className={`shadow-sm ${
+        layoutReport?.spec.status === "overflow" ? "ring-2 ring-red-400/60" :
+        layoutReport?.spec.status === "warn" ? "ring-2 ring-amber-300/60" : ""
+      }`}>
         <CardHeader>
-          <CardTitle className="text-base">Specifications</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            Specifications
+            {layoutReport?.spec.status === "overflow" && (
+              <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded px-1.5 py-0.5">
+                Overflow ({layoutReport.spec.metrics.max_column_fill_pct}%)
+              </span>
+            )}
+            {layoutReport?.spec.status === "warn" && (
+              <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5">
+                Warn ({layoutReport.spec.metrics.max_column_fill_pct}%)
+              </span>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
           {product.spec_sections.map((section) => (

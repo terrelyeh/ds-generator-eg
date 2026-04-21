@@ -35,6 +35,8 @@ interface ProductSummary {
   product_line_id: string;
   product_line: { name: string; label: string; category: string };
   translation_locales: string[];
+  layout_status: "ok" | "warn" | "overflow";
+  layout_reasons: string[];
 }
 
 interface DashboardContentProps {
@@ -120,6 +122,7 @@ function ProductTable({
           <TableHead className="w-28">Model #</TableHead>
           <TableHead className="w-56">Model Name</TableHead>
           <TableHead className="w-16 text-center">Version</TableHead>
+          <TableHead className="w-16 text-center" title="PDF layout overflow estimate">Layout</TableHead>
           <TableHead className="w-20">Lang</TableHead>
           <TableHead className="w-24">Last Changed</TableHead>
           <TableHead className="w-14 text-center">OV</TableHead>
@@ -169,6 +172,12 @@ function ProductTable({
                   ? `v${product.current_version}`
                   : "—"}
               </Badge>
+            </TableCell>
+            <TableCell className="text-center">
+              <LayoutStatusBadge
+                status={product.layout_status}
+                reasons={product.layout_reasons}
+              />
             </TableCell>
             <TableCell>
               <div className="flex gap-1">
@@ -238,6 +247,31 @@ function StatusBadge({ status }: { status: string }) {
 
   return (
     <Badge variant="outline" className={`text-[11px] px-1.5 py-0 ${config.className}`}>
+      {config.label}
+    </Badge>
+  );
+}
+
+/** PDF layout overflow status badge */
+function LayoutStatusBadge({
+  status,
+  reasons,
+}: {
+  status: "ok" | "warn" | "overflow";
+  reasons: string[];
+}) {
+  const config = {
+    ok: { label: "OK", className: "border-green-200 text-green-700 bg-green-50" },
+    warn: { label: "Warn", className: "border-amber-300 text-amber-700 bg-amber-50" },
+    overflow: { label: "Overflow", className: "border-red-300 text-red-700 bg-red-50" },
+  }[status];
+  const title = reasons.length > 0 ? reasons.join(" · ") : "Content fits the PDF layout";
+  return (
+    <Badge
+      variant="outline"
+      className={`text-[11px] px-1.5 py-0 ${config.className}`}
+      title={title}
+    >
       {config.label}
     </Badge>
   );
