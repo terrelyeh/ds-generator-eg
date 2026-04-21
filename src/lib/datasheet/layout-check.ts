@@ -8,25 +8,45 @@
 import {
   AVAILABLE_HEIGHT,
   CATEGORY_HEADER_HEIGHT,
+  SPEC_BASE_ROW_HEIGHT,
+  SPEC_LINE_EXTRA,
   estimateItemHeight,
   splitIntoPages,
 } from "./pagination";
 
+/**
+ * Binary status model: only "ok" (green, will fit) or "overflow" (red, will
+ * break the PDF layout and needs PM action). The "warn" amber state was
+ * removed because it caused decision paralysis — users couldn't tell if
+ * they needed to act. With auto-split pagination handling long specs, the
+ * only truly-breaking cases are on the absolute-positioned cover page.
+ *
+ * "warn" kept in the type for backward compat with older UI code but is
+ * no longer emitted by this module.
+ */
 export type LayoutStatus = "ok" | "warn" | "overflow";
 
-// ─── Thresholds ────────────────────────────────────────────────────────────
+// ─── Thresholds (red = definitely breaks the PDF) ─────────────────────────
 
-export const OVERVIEW_SAFE_CHARS = 500;  // comfortably fits ~5 lines
-export const OVERVIEW_WARN_CHARS = 650;  // anything above this will overlap Features
+// Overview sits in a fixed-height slot above the absolute-positioned
+// Features box. Beyond ~700 chars (≈6.5 lines at 11pt) the text starts
+// overlapping the Features section below.
+export const OVERVIEW_OVERFLOW_CHARS = 700;
 
-export const FEATURES_SAFE_COUNT = 8;    // 4 per column × 2 columns
-export const FEATURES_WARN_COUNT = 10;
+// Features container is ~200pt tall with 2 columns. 10 items of normal
+// length fit; 11+ gets clipped. Individual items > 150 chars wrap to 3+
+// lines and break the 2-column balance so later items get pushed out.
+export const FEATURES_OVERFLOW_COUNT = 10;
+export const FEATURE_ITEM_OVERFLOW_CHARS = 150;
 
-export const FEATURE_ITEM_SAFE_CHARS = 90;    // 2 lines comfortably
-export const FEATURE_ITEM_WARN_CHARS = 130;
+// Spec threshold kept for reporting long_items but NEVER triggers
+// overflow — auto-split pagination handles all lengths by flowing to
+// additional columns/pages.
+export const SPEC_VALUE_LONG_CHARS = 100;
 
-export const SPEC_VALUE_SAFE_CHARS = 60;   // 1 line at 7pt in half-column
-export const SPEC_VALUE_WARN_CHARS = 100;  // 2 lines OK; beyond = wraps 3+
+// Truly excessive content: more than 6 spec pages means the product has
+// way too many spec rows, not a layout bug per se but worth flagging.
+export const SPEC_EXCESSIVE_PAGES = 6;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
@@ -68,43 +88,40 @@ export function checkCoverLayout(params: {
 
   const reasons: string[] = [];
 
-  // Overview status
+  // Overview: red only if it will definitely overlap Features section below
   let overview_status: LayoutStatus = "ok";
-  if (overviewChars > OVERVIEW_WARN_CHARS) {
+  if (overviewChars > OVERVIEW_OVERFLOW_CHARS) {
     overview_status = "overflow";
-    const excess = overviewChars - OVERVIEW_SAFE_CHARS;
-    reasons.push(`Overview 過長 (${overviewChars} 字 / 建議 ≤ ${OVERVIEW_SAFE_CHARS})，需刪 ~${excess} 字`);
-  } else if (overviewChars > OVERVIEW_SAFE_CHARS) {
-    overview_status = "warn";
-    const excess = overviewChars - OVERVIEW_SAFE_CHARS;
-    reasons.push(`Overview 偏長 (${overviewChars} 字 / 建議 ≤ ${OVERVIEW_SAFE_CHARS})，再刪 ~${excess} 字更安全`);
+    const excess = overviewChars - OVERVIEW_OVERFLOW_CHARS;
+    reasons.push(
+      `Overview 過長 (${overviewChars} 字 / 上限 ${OVERVIEW_OVERFLOW_CHARS})，會蓋到下方 Features — 需刪 ~${excess} 字`,
+    );
   }
 
-  // Features status
+  // Features: red if count exceeds fixed-height container OR any single
+  // item is so long it breaks the 2-column balance
   let features_status: LayoutStatus = "ok";
   const long_features: LongFeature[] = [];
 
-  if (features.length > FEATURES_WARN_COUNT) {
+  if (features.length > FEATURES_OVERFLOW_COUNT) {
     features_status = "overflow";
-    reasons.push(`Features 項目過多 (${features.length} / 建議 ≤ ${FEATURES_SAFE_COUNT})，需刪 ${features.length - FEATURES_SAFE_COUNT} 項`);
-  } else if (features.length > FEATURES_SAFE_COUNT) {
-    features_status = worst(features_status, "warn");
-    reasons.push(`Features 項目偏多 (${features.length} / 建議 ≤ ${FEATURES_SAFE_COUNT})，再減 ${features.length - FEATURES_SAFE_COUNT} 項更安全`);
+    reasons.push(
+      `Features 項目過多 (${features.length} / 上限 ${FEATURES_OVERFLOW_COUNT})，最後幾項會被切掉 — 需刪 ${features.length - FEATURES_OVERFLOW_COUNT} 項`,
+    );
   }
 
   features.forEach((f, i) => {
-    if (f.length > FEATURE_ITEM_WARN_CHARS) {
+    if (f.length > FEATURE_ITEM_OVERFLOW_CHARS) {
       features_status = "overflow";
-      long_features.push({ index: i + 1, chars: f.length, preview: f.slice(0, 40) });
-    } else if (f.length > FEATURE_ITEM_SAFE_CHARS) {
-      features_status = worst(features_status, "warn");
       long_features.push({ index: i + 1, chars: f.length, preview: f.slice(0, 40) });
     }
   });
 
   if (long_features.length > 0) {
     const maxChars = Math.max(...long_features.map((f) => f.chars));
-    reasons.push(`${long_features.length} 項 Feature 偏長 (最長 ${maxChars} 字 / 建議 ≤ ${FEATURE_ITEM_SAFE_CHARS})`);
+    reasons.push(
+      `${long_features.length} 項 Feature 過長 (最長 ${maxChars} 字 / 上限 ${FEATURE_ITEM_OVERFLOW_CHARS})，會破壞雙欄排版`,
+    );
   }
 
   const maxFeatureChars = features.reduce((m, f) => Math.max(m, f.length), 0);
@@ -173,16 +190,18 @@ export function checkSpecLayout(
     }
   }
 
-  // Collect specific long items (warn threshold)
+  // Collect long items for reporting (informational — spec never goes red
+  // from these because auto-split + mid-item splitting handles all lengths)
   const long_items: LongSpecItem[] = [];
   for (const section of sections) {
     for (const item of section.items) {
       const chars = item.value.length;
-      if (chars > SPEC_VALUE_SAFE_CHARS) {
-        // estimate lines: base 1 line + extras from estimateItemHeight
+      if (chars > SPEC_VALUE_LONG_CHARS) {
         const itemH = estimateItemHeight(item.value);
-        // base row is 18pt (1 line); each extra line is 9pt
-        const estimated_lines = Math.max(1, 1 + Math.round((itemH - 18) / 9));
+        const estimated_lines = Math.max(
+          1,
+          1 + Math.round((itemH - SPEC_BASE_ROW_HEIGHT) / SPEC_LINE_EXTRA),
+        );
         long_items.push({
           section: section.category,
           label: item.label,
@@ -194,33 +213,21 @@ export function checkSpecLayout(
     }
   }
 
-  // Sort by char count desc so worst offenders are first
   long_items.sort((a, b) => b.chars - a.chars);
 
   const reasons: string[] = [];
   let status: LayoutStatus = "ok";
 
-  // NOTE: with the auto-split pagination (fitSection in pagination.ts),
-  // long sections now flow to additional pages automatically. So fill%
-  // is informational only — we only hard-flag spec as "overflow" when a
-  // SINGLE spec value is so long it would dominate a page by itself.
-  const hasVeryLongValue = long_items.some((it) => it.chars > SPEC_VALUE_WARN_CHARS * 2);
-  if (hasVeryLongValue) {
+  // With auto-split pagination + mid-item value splitting (see
+  // fitSection + splitValueAtLines in pagination.ts), long specs NEVER
+  // break layout — they just flow to more columns/pages. The only thing
+  // worth flagging red is absurdly excessive content that balloons page
+  // count beyond a reasonable datasheet length.
+  if (pages.length > SPEC_EXCESSIVE_PAGES) {
     status = "overflow";
-    reasons.push(`有 spec value 極長 (超過 ${SPEC_VALUE_WARN_CHARS * 2} 字)，可能單獨佔一整欄`);
-  } else if (long_items.some((it) => it.chars > SPEC_VALUE_WARN_CHARS)) {
-    status = "warn";
-  }
-
-  if (long_items.length > 0) {
-    const worstChars = long_items[0].chars;
-    reasons.push(`${long_items.length} 個 spec value 偏長 (最長 ${worstChars} 字 / 建議 ≤ ${SPEC_VALUE_SAFE_CHARS})，pagination 會自動多開頁但視覺上可能不理想`);
-  }
-
-  if (pages.length > 3) {
-    // Too many pages = content is truly excessive
-    if (status !== "overflow") status = "warn";
-    reasons.push(`Spec 預估需要 ${pages.length} 頁 — 考慮精簡以減少頁數`);
+    reasons.push(
+      `Spec 內容過多 (預估 ${pages.length} 頁 / 上限 ${SPEC_EXCESSIVE_PAGES}) — 考慮精簡`,
+    );
   }
 
   return {

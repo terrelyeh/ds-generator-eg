@@ -29,27 +29,30 @@ export const AVAILABLE_HEIGHT =
 export const CATEGORY_HEADER_HEIGHT = 18;
 
 // A single unwrapped spec row: label (7pt) on top + value (7pt) underneath
-// + border-bottom + 2pt vertical padding ≈ 18pt.
-// Each additional wrapped line of value ≈ 9pt (7pt text * 1.3 leading).
-export const SPEC_BASE_ROW_HEIGHT = 18;
-export const SPEC_LINE_EXTRA = 9;
+// + border-bottom + vertical padding. Bumped 18→20pt to absorb per-row
+// rendering variance (padding/border accumulate over 30+ rows).
+// Each additional wrapped line of value ≈ 10pt (7pt text * ~1.4 leading).
+export const SPEC_BASE_ROW_HEIGHT = 20;
+export const SPEC_LINE_EXTRA = 10;
 
-// Approx chars that fit on one line in a half-column (595/2 - gutter ≈ 280pt
-// wide × 7pt font ≈ ~60-70 chars for Latin text). CJK chars are ~2x wider,
-// so CJK-heavy values wrap more aggressively — we normalise roughly by
-// counting each CJK char as 2 "slots".
-const COL_WIDTH_CHARS = 62;
+// Approx chars that fit on one line in a half-column. Reduced 62→52 after
+// ECW515 showed actual rendering wraps more aggressively than estimated
+// (em-dashes, slash-separated tokens, proportional font rendering).
+// Under-estimating lines causes fitSection to pack rows that won't render
+// within the column — so err on the conservative side.
+const COL_WIDTH_CHARS = 52;
+
+function charWidth(ch: string): number {
+  return /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 2 : 1;
+}
 
 function countWrappedLines(value: string): number {
   if (!value) return 1;
   const lines = value.split(/\n+/);
   let total = 0;
   for (const line of lines) {
-    // Count CJK codepoints as 2 for width purposes
     let width = 0;
-    for (const ch of line) {
-      width += /[\u3000-\u9fff\uff00-\uffef]/.test(ch) ? 2 : 1;
-    }
+    for (const ch of line) width += charWidth(ch);
     total += Math.max(1, Math.ceil(width / COL_WIDTH_CHARS));
   }
   return Math.max(1, total);
@@ -58,6 +61,39 @@ function countWrappedLines(value: string): number {
 export function estimateItemHeight(value: string): number {
   const lines = countWrappedLines(value);
   return SPEC_BASE_ROW_HEIGHT + (lines - 1) * SPEC_LINE_EXTRA;
+}
+
+/**
+ * Split a value string so the head occupies approximately `linesToKeep`
+ * wrapped lines; the tail gets the remainder. Prefers to break at a
+ * whitespace boundary so words aren't chopped mid-character. Returns
+ * [head, tail] — both trimmed. If no clean split is found, returns
+ * [value, ""] (whole thing stays together).
+ */
+function splitValueAtLines(
+  value: string,
+  linesToKeep: number,
+): [string, string] {
+  if (linesToKeep < 1) return ["", value];
+  const targetWidth = linesToKeep * COL_WIDTH_CHARS;
+  let accWidth = 0;
+  let lastSpaceIdx = -1;
+  let splitIdx = value.length;
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    const w = charWidth(ch);
+    if (accWidth + w > targetWidth) {
+      // Prefer breaking at last whitespace within the head portion
+      splitIdx = lastSpaceIdx > 0 ? lastSpaceIdx : i;
+      break;
+    }
+    accWidth += w;
+    if (/\s/.test(ch)) lastSpaceIdx = i;
+  }
+  const head = value.slice(0, splitIdx).trim();
+  const tail = value.slice(splitIdx).trim();
+  if (!head || !tail) return [value, ""];
+  return [head, tail];
 }
 
 function estimateSectionHeight(section: Section): number {
@@ -95,6 +131,13 @@ function balanceColumns(sections: Section[]): SpecPage {
  * If the section doesn't fit entirely, split its items — what fits goes now,
  * the rest is returned as a new section labelled "<name> (cont.)".
  *
+ * Mid-item splitting: if a single item's value is too tall to fit in the
+ * remaining space, we split the value text at a line boundary. The head
+ * portion fits in the current column under its original label; the tail
+ * becomes a continuation item with label "<label> (cont.)" in the next
+ * column. This avoids wasted whitespace when a long value straddles
+ * column/page boundaries.
+ *
  * Guarantees at least one item per call (even if it's technically too tall
  * — better to let one item overflow slightly than to loop forever).
  */
@@ -112,34 +155,65 @@ function fitSection(
   let h = headerH;
   const fittedItems: typeof section.items = [];
   let i = 0;
+  let midItemTail: { label: string; value: string } | null = null;
+
   for (; i < section.items.length; i++) {
-    const itemH = estimateItemHeight(section.items[i].value);
-    if (h + itemH > availableHeight) {
-      // Can't fit this item — but we must fit at least one so
-      // we don't infinite-loop on a giant first item.
-      if (fittedItems.length === 0) {
-        fittedItems.push(section.items[i]);
-        h += itemH;
-        i++;
-      }
-      break;
+    const item = section.items[i];
+    const itemH = estimateItemHeight(item.value);
+
+    if (h + itemH <= availableHeight) {
+      fittedItems.push(item);
+      h += itemH;
+      continue;
     }
-    fittedItems.push(section.items[i]);
-    h += itemH;
+
+    // Doesn't fit whole — try to split the value across the column break.
+    // Need room for base row (1 line) + at least 1 extra wrap line to make
+    // the split worthwhile (otherwise just push the whole item to next col).
+    const roomLeft = availableHeight - h;
+    const linesThatFit = Math.floor(
+      (roomLeft - SPEC_BASE_ROW_HEIGHT) / SPEC_LINE_EXTRA,
+    ) + 1;
+    const totalLines = countWrappedLines(item.value);
+
+    if (linesThatFit >= 2 && linesThatFit < totalLines) {
+      const [head, tail] = splitValueAtLines(item.value, linesThatFit);
+      if (head && tail) {
+        fittedItems.push({ label: item.label, value: head });
+        midItemTail = { label: `${item.label} (cont.)`, value: tail };
+        i++;
+        break;
+      }
+    }
+
+    // Couldn't split cleanly. If we haven't fit anything yet, force this
+    // item in so we don't loop forever. Otherwise break and let it flow
+    // to next column intact.
+    if (fittedItems.length === 0) {
+      fittedItems.push(item);
+      h += itemH;
+      i++;
+    }
+    break;
   }
 
-  if (fittedItems.length === 0) {
+  if (fittedItems.length === 0 && !midItemTail) {
     return { fitted: null, remaining: section };
   }
 
   const fitted: Section = { category: section.category, items: fittedItems };
-  const remaining: Section | null =
-    i < section.items.length
-      ? {
-          category: `${section.category} (cont.)`,
-          items: section.items.slice(i),
-        }
-      : null;
+
+  // Build remaining: midItemTail (if any) + leftover items after index i
+  const leftoverItems = section.items.slice(i);
+  const hasRemaining = midItemTail !== null || leftoverItems.length > 0;
+  const remaining: Section | null = hasRemaining
+    ? {
+        category: `${section.category} (cont.)`,
+        items: midItemTail
+          ? [midItemTail, ...leftoverItems]
+          : leftoverItems,
+      }
+    : null;
 
   return { fitted, remaining };
 }
