@@ -28,12 +28,18 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Sticky header + pinned Category/Spec 欄位
 
 ### Datasheet PDF
-- Cover page：產品圖、Overview、Features
-- Technical Specifications（自動分頁）
+- Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
+- Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
 - Hardware Overview + QR Code footer
 - **Cloud 藍色 / Unmanaged 灰色** 雙主題
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
+
+### Layout Overflow Detection
+- **跑版預警** — Dashboard 和 Product Detail 自動偵測 overview/features/spec 會不會超過版面容納範圍，紅燈提示 PM 要精簡
+- **逐語言檢查** — 英/日/繁中各自用該語言的字級、行高、每行字數估算（CJK 字比較大，同樣內容更可能跑版）
+- **Mark as Reviewed OK** — PM 目視確認 PDF 沒問題後可以把紅燈壓綠，確認會和當下內容綁定；之後內容一改確認自動失效、紅燈回來
+- **Undo** — 隨時可以取消確認恢復紅燈
 
 ### Multi-Language Datasheet
 - **日文 / 繁體中文** 翻譯支援（可擴展更多語言）
