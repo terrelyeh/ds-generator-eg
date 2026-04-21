@@ -43,12 +43,16 @@ export const LINE_HEIGHT_PT = 15;          // 11pt font × ~1.35 leading
 export const ITEM_MARGIN_PT = 8;           // margin-bottom per feature item
 
 // Column widths (in "char slots" — CJK chars count as 2). Calibrated
-// against reference PDFs (ECS1528P, ECS2528FP etc): the manual designer's
-// layouts are our ground truth for "this fits". Under-counting chars/line
-// causes false-red on designs that actually render fine; over-counting
-// risks missing real overflow. These numbers match real render:
-export const OVERVIEW_WIDTH_CHARS = 44;    // overview is 270pt wide at 11pt
-export const FEATURE_COL_WIDTH_CHARS = 42; // each feature col ~228pt wide at 11pt
+// from real feedback on auto-generated PDFs:
+//   ECC500 (728 chars overview) → fits 224pt space ≈ 13 lines actual
+//   ECS1528P (459 chars) → fits 186pt space ≈ 8 lines actual
+//   ECW201L-AC (740 chars) → 小超標 201pt space (needs ~13 lines)
+// Roboto is narrower than typical proportional fonts; real wrap ≈ 60
+// Latin chars per line in a 270pt column. Features column (~228pt) gets
+// ~42 chars/line from observed ESG output where estimate matched reality
+// (349pt wanted vs 320pt cap = 29pt over = "小跑版").
+export const OVERVIEW_WIDTH_CHARS = 60;
+export const FEATURE_COL_WIDTH_CHARS = 42;
 
 // ─── Helpers ────────────────────────────────────────────────────────
 function charWidth(ch: string): number {
@@ -117,7 +121,8 @@ export function estimateCoverLayout(params: {
   const overviewSpaceAvailable = COVER_ZONE_HEIGHT - featuresHeight - COVER_GAP;
 
   const overviewLines = countLines(overview, OVERVIEW_WIDTH_CHARS);
-  const overviewWantedHeight = overviewLines * LINE_HEIGHT_PT + 30; // +30 = section-title
+  // +25 = section-title height: 14pt font × ~1.2 line-height + 8pt margin
+  const overviewWantedHeight = overviewLines * LINE_HEIGHT_PT + 25;
   const overviewOverflow = overviewWantedHeight > overviewSpaceAvailable;
 
   return {
