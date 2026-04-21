@@ -13,6 +13,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import type { ProductLine } from "@/types/database";
 
 interface ProductSummary {
@@ -319,7 +325,10 @@ export function DashboardContent({
 }: DashboardContentProps & { initialLineId?: string }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [showAll, setShowAll] = useState(false);
+  // Default to "All" — matches PM expectation that the dashboard starts
+  // as a full overview; they opt into "Active only" when they want to
+  // hide Upcoming / Pending noise.
+  const [showAll, setShowAll] = useState(true);
 
   const visibleProducts = showAll
     ? products
@@ -428,55 +437,79 @@ export function DashboardContent({
         })}
       </div>
 
-      {/* Row 2: Actions */}
-      <div className="flex items-center gap-1.5">
-        <button
-          onClick={() => setShowAll(!showAll)}
-          className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-            showAll
-              ? "bg-engenius-blue/10 text-engenius-blue"
-              : "text-muted-foreground hover:text-foreground hover:bg-muted"
-          }`}
-        >
-          {showAll ? "All" : "Active"}
-        </button>
-        <span className="text-border">|</span>
-        <Link
-          href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
-          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          Compare
-        </Link>
-        <Link
-          href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
-          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          Changelog
-        </Link>
-        <Link
-          href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
-          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-        >
-          Translations
-        </Link>
-        <span className="text-border">|</span>
-        <button
-          onClick={handleSync}
-          disabled={syncing}
-          className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <svg
-            className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`}
-            viewBox="0 0 16 16"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
+      {/* Row 2: Actions — split into two semantic groups.
+          Left: view navigation (Compare / Changelog / Translations).
+          Right: data operations (Status filter + Sync). */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Left group: navigation links (flat ghost buttons) */}
+        <div className="flex items-center gap-1">
+          <Link
+            href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
-            <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
-            <path d="M14 1v4h-4M2 15v-4h4" />
-          </svg>
-          {syncing ? "Syncing..." : "Sync"}
-        </button>
+            Compare
+          </Link>
+          <Link
+            href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Changelog
+          </Link>
+          <Link
+            href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            Translations
+          </Link>
+        </div>
+
+        {/* Right group: status filter (chip with border) + Sync */}
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              aria-label="Filter products by status"
+            >
+              {/* Filter icon so it visually reads as a filter, not just a button */}
+              <svg className="h-3 w-3 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M1.5 2.5h13l-5 6v5l-3-1.5v-3.5l-5-6z" />
+              </svg>
+              <span className="text-muted-foreground">Status:</span>
+              <span>{showAll ? "All" : "Active only"}</span>
+              <svg className="h-3 w-3 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuItem onClick={() => setShowAll(true)} className="text-xs">
+                <span className={showAll ? "font-medium" : ""}>All</span>
+                {showAll && <span className="ml-auto text-engenius-blue">✓</span>}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowAll(false)} className="text-xs">
+                <span className={!showAll ? "font-medium" : ""}>Active only</span>
+                {!showAll && <span className="ml-auto text-engenius-blue">✓</span>}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button
+            onClick={handleSync}
+            disabled={syncing}
+            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <svg
+              className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`}
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+              <path d="M14 1v4h-4M2 15v-4h4" />
+            </svg>
+            {syncing ? "Syncing..." : "Sync"}
+          </button>
+        </div>
       </div>
 
       {/* Product table */}
