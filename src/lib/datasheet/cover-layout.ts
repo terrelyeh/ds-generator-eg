@@ -43,15 +43,16 @@ export const LINE_HEIGHT_PT = 15;          // 11pt font × ~1.35 leading
 export const ITEM_MARGIN_PT = 8;           // margin-bottom per feature item
 
 // Column widths (in "char slots" — CJK chars count as 2). Calibrated
-// from real feedback on auto-generated PDFs:
-//   ECC500 (728 chars overview) → fits 224pt space ≈ 13 lines actual
-//   ECS1528P (459 chars) → fits 186pt space ≈ 8 lines actual
-//   ECW201L-AC (740 chars) → 小超標 201pt space (needs ~13 lines)
-// Roboto is narrower than typical proportional fonts; real wrap ≈ 60
-// Latin chars per line in a 270pt column. Features column (~228pt) gets
-// ~42 chars/line from observed ESG output where estimate matched reality
-// (349pt wanted vs 320pt cap = 29pt over = "小跑版").
-export const OVERVIEW_WIDTH_CHARS = 60;
+// from visual verification of auto-generated PDFs:
+//   ECW201L-AC (600-char overview) visually overflows at 201pt available
+//     → needs 12 lines × 15pt + 25pt title = 205pt → ~54 chars/line
+//   ECS2528FP (430-char overview) fits at 148pt available
+//     → needs 8 lines = 145pt → ~54 chars/line confirms
+//   ECC500 (728-char overview) fits at 269pt available
+//     → needs 14 lines = 235pt → consistent
+// Earlier 60 chars/line over-estimated; 54 matches what Roboto 11pt
+// actually wraps to in a 270pt column.
+export const OVERVIEW_WIDTH_CHARS = 54;
 export const FEATURE_COL_WIDTH_CHARS = 42;
 
 // ─── Helpers ────────────────────────────────────────────────────────
@@ -95,6 +96,40 @@ export interface CoverLayoutEstimate {
   featuresWantedHeight: number;
 }
 
+/**
+ * Distribute features across two columns by estimated HEIGHT rather than
+ * by item count. A naive ceil(n/2) split puts 6 items left / 5 right, but
+ * when item 4 is a 3-liner and items 5-6 are 1-liners, the left column
+ * ends up much taller visually — exactly the ECW560 imbalance issue.
+ *
+ * Greedy bin-packing: walk items in order, assign each to whichever
+ * column is currently shorter. Preserves reading order within each
+ * column (but items may interleave across columns).
+ */
+export function balanceFeatureColumns(features: string[]): {
+  left: string[];
+  right: string[];
+} {
+  const left: string[] = [];
+  const right: string[] = [];
+  let leftH = 0;
+  let rightH = 0;
+
+  for (const f of features) {
+    const lines = countLines(f, FEATURE_COL_WIDTH_CHARS);
+    const itemH = lines * LINE_HEIGHT_PT + ITEM_MARGIN_PT;
+    if (leftH <= rightH) {
+      left.push(f);
+      leftH += itemH;
+    } else {
+      right.push(f);
+      rightH += itemH;
+    }
+  }
+
+  return { left, right };
+}
+
 export function estimateCoverLayout(params: {
   overview: string | null | undefined;
   features: string[] | null | undefined;
@@ -102,15 +137,21 @@ export function estimateCoverLayout(params: {
   const overview = params.overview ?? "";
   const features = (params.features ?? []) as string[];
 
-  // Features: estimate total wrap lines, split roughly evenly across 2 cols.
-  // Per-column height is what determines box height (taller col wins).
+  // Features: estimate per-column height using the same height-balancing
+  // that the renderer now uses. Box height = taller of the two cols.
   const perItemLines = features.map((f) => countLines(f, FEATURE_COL_WIDTH_CHARS));
   const featuresTotalLines = perItemLines.reduce((s, n) => s + n, 0);
-  const featuresPerColLines = Math.ceil(featuresTotalLines / 2);
-  const featuresPerColItems = Math.ceil(features.length / 2);
 
-  const featuresContentHeight =
-    featuresPerColLines * LINE_HEIGHT_PT + featuresPerColItems * ITEM_MARGIN_PT;
+  const { left: leftItems, right: rightItems } = balanceFeatureColumns(features);
+  const heightOf = (items: string[]) =>
+    items.reduce(
+      (h, f) => h + countLines(f, FEATURE_COL_WIDTH_CHARS) * LINE_HEIGHT_PT + ITEM_MARGIN_PT,
+      0,
+    );
+  const leftH = heightOf(leftItems);
+  const rightH = heightOf(rightItems);
+  const featuresContentHeight = Math.max(leftH, rightH);
+  const featuresPerColLines = Math.ceil(featuresContentHeight / LINE_HEIGHT_PT);
   const featuresWantedHeight =
     features.length > 0 ? featuresContentHeight + FEATURES_CHROME : 0;
   const featuresHeight = Math.min(featuresWantedHeight, FEATURES_MAX_HEIGHT);

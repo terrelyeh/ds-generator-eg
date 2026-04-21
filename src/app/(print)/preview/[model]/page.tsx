@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { splitIntoPages } from "@/lib/datasheet/pagination";
-import { estimateCoverLayout, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
+import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
 import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
@@ -164,7 +164,11 @@ export default async function PreviewPage({
   const features = (isTranslated && translatedFeatures) ? translatedFeatures : (product.features ?? []);
   const headline = (isTranslated && translatedHeadline) ? translatedHeadline : (product.headline || product.full_name);
   const subtitle = (isTranslated && translatedSubtitle) ? translatedSubtitle : product.subtitle;
-  const midpoint = Math.ceil(features.length / 2);
+  // Height-balanced feature columns — previously split at ceil(n/2) which
+  // gave visual imbalance when some items wrapped to 3+ lines while others
+  // were short (ECW560 had left-col 90pt taller than right). Now each item
+  // goes to whichever column is currently shorter.
+  const { left: leftFeatures, right: rightFeatures } = balanceFeatureColumns(features);
 
   // Dynamic cover layout — mirrors the manual designer's workflow of
   // sizing features first, then flowing overview into remaining space.
@@ -590,7 +594,7 @@ ${typo ? `
             <div className="features-box">
               <div className="features-columns">
                 <div className="features-col">
-                  {features.slice(0, midpoint).map((f, i) => (
+                  {leftFeatures.map((f, i) => (
                     <div key={i} className="feature-item">
                       <span className="feature-bullet">{dict.bullet}</span>
                       <span className="feature-text">{f}</span>
@@ -598,7 +602,7 @@ ${typo ? `
                   ))}
                 </div>
                 <div className="features-col">
-                  {features.slice(midpoint).map((f, i) => (
+                  {rightFeatures.map((f, i) => (
                     <div key={i} className="feature-item">
                       <span className="feature-bullet">{dict.bullet}</span>
                       <span className="feature-text">{f}</span>
