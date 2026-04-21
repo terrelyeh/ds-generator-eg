@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -60,25 +61,86 @@ interface ProductDetailProps {
   versions: Version[];
   translations?: ProductTranslation[];
   layoutReport?: LayoutReport;
+  /** Per-locale layout reports — one entry per enabled translation.
+   *  Each has the same shape as layoutReport but evaluates against that
+   *  locale's typography metrics (CJK fonts are larger with taller
+   *  line-height). Surfaces locale-specific warnings so PMs know
+   *  exactly which language needs shortening. */
+  localizedLayoutReports?: { locale: string; report: LayoutReport }[];
 }
 
-function LayoutWarningBanner({ report }: { report: LayoutReport }) {
+function LayoutWarningBanner({
+  report,
+  locale,
+  modelName,
+  onAcked,
+}: {
+  report: LayoutReport;
+  /** Locale tag shown in the banner title. Omit for English (default). */
+  locale?: string;
+  /** Needed for the "Mark as reviewed OK" action to hit the API. */
+  modelName: string;
+  /** Callback after a successful ack — lets the parent refresh or hide. */
+  onAcked?: () => void;
+}) {
+  const [acking, setAcking] = useState(false);
+  const ackLocale = locale ?? "en";
   const isOverflow = report.status === "overflow";
   const Icon = isOverflow ? "⚠️" : "💡";
+  const localeTag = locale
+    ? ` [${locale === "zh-TW" ? "繁中" : locale === "ja" ? "日文" : locale.toUpperCase()}]`
+    : "";
   const title = isOverflow
-    ? "PDF Layout Overflow — 內容超過版面容納範圍"
-    : "PDF Layout Warning — 內容偏多，可能排版緊繃";
+    ? `PDF Layout Overflow${localeTag} — 內容超過版面容納範圍`
+    : `PDF Layout Warning${localeTag} — 內容偏多，可能排版緊繃`;
   const bg = isOverflow
     ? "bg-red-50 border-red-300"
     : "bg-amber-50 border-amber-300";
   const textColor = isOverflow ? "text-red-900" : "text-amber-900";
+
+  async function markReviewed() {
+    setAcking(true);
+    try {
+      const res = await fetch(
+        `/api/products/${encodeURIComponent(modelName)}/layout-ack`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ locale: ackLocale, ack: true }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        toast.error(`Failed to mark as reviewed: ${err.error ?? res.statusText}`);
+        return;
+      }
+      toast.success(`${ackLocale.toUpperCase()} layout marked as reviewed OK`);
+      onAcked?.();
+    } finally {
+      setAcking(false);
+    }
+  }
 
   return (
     <div className={`mb-4 rounded-lg border px-5 py-4 ${bg} ${textColor}`}>
       <div className="flex items-start gap-3">
         <span className="text-xl leading-none pt-0.5">{Icon}</span>
         <div className="min-w-0 flex-1 space-y-3">
-          <div className="font-semibold text-base">{title}</div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-semibold text-base">{title}</div>
+            <button
+              onClick={markReviewed}
+              disabled={acking}
+              className={`flex-shrink-0 inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                isOverflow
+                  ? "border-red-300 bg-white text-red-700 hover:bg-red-100"
+                  : "border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+              }`}
+              title="目視驗證 PDF 沒問題後，點這個把紅燈壓成綠燈。Dashboard 會記住此確認。"
+            >
+              {acking ? "Saving…" : "✓ Mark as Reviewed OK"}
+            </button>
+          </div>
 
           {/* Overview */}
           {report.cover.overview_status !== "ok" && (
@@ -539,7 +601,7 @@ function RadioPatternSlot({
   );
 }
 
-export function ProductDetail({ product, versions, translations = [], layoutReport }: ProductDetailProps) {
+export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [] }: ProductDetailProps) {
   const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -665,10 +727,29 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
         </span>
       </nav>
 
-      {/* Layout overflow warning banner */}
+      {/* Layout overflow warning banners — one per language that has
+          an issue. Shown at the top regardless of active tab so PMs
+          see all locales' warnings in one place and can act on each.
+          Each banner has a "Mark as Reviewed OK" button that calls the
+          layout-ack API so the dashboard red flag goes away. */}
       {layoutReport && layoutReport.status !== "ok" && (
-        <LayoutWarningBanner report={layoutReport} />
+        <LayoutWarningBanner
+          report={layoutReport}
+          modelName={product.model_name}
+          onAcked={() => router.refresh()}
+        />
       )}
+      {localizedLayoutReports
+        .filter(({ report }) => report.status !== "ok")
+        .map(({ locale, report }) => (
+          <LayoutWarningBanner
+            key={locale}
+            report={report}
+            locale={locale}
+            modelName={product.model_name}
+            onAcked={() => router.refresh()}
+          />
+        ))}
 
       {/* Sticky Header */}
       <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">

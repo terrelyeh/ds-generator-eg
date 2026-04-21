@@ -78,15 +78,44 @@ export default async function ProductPage({
     .select("*")
     .eq("product_id", model)) as { data: ProductTranslation[] | null };
 
-  // Pre-compute layout overflow estimate — surfaces as a banner in the UI
-  const layoutReport = checkProductLayout({
+  // Pre-compute layout overflow estimate for English + every enabled
+  // translation locale. Each locale uses its own typography metrics
+  // (CJK fonts are bigger with taller line-height), so a model that
+  // fits in English may overflow in Japanese / Chinese.
+  const specSectionsForCheck = productWithSpecs.spec_sections.map((s) => ({
+    category: s.category,
+    items: s.items.map((it) => ({ label: it.label, value: it.value })),
+  }));
+
+  const layoutReportRaw = checkProductLayout({
     overview: productWithSpecs.overview,
     features: productWithSpecs.features as string[] | null,
-    spec_sections: productWithSpecs.spec_sections.map((s) => ({
-      category: s.category,
-      items: s.items.map((it) => ({ label: it.label, value: it.value })),
-    })),
+    spec_sections: specSectionsForCheck,
   });
+
+  // Respect per-locale manual acknowledgements. When ack[locale] is
+  // true (PM clicked "Mark as Reviewed OK" after visual verification),
+  // we suppress the warning banner for that locale. Stored in
+  // products.layout_ack JSONB.
+  const ack = (product.layout_ack as Record<string, boolean> | null) ?? {};
+  const layoutReport = ack.en ? null : layoutReportRaw;
+
+  // Per-locale reports keyed by locale. Skip any locale the PM has
+  // already acknowledged — banner disappears until they un-ack or the
+  // content changes significantly.
+  const localizedReports: { locale: string; report: typeof layoutReportRaw }[] = [];
+  for (const t of translationData ?? []) {
+    if (ack[t.locale]) continue;
+    localizedReports.push({
+      locale: t.locale,
+      report: checkProductLayout({
+        overview: t.overview ?? productWithSpecs.overview,
+        features: (t.features ?? productWithSpecs.features) as string[] | null,
+        spec_sections: specSectionsForCheck,
+        locale: t.locale,
+      }),
+    });
+  }
 
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
@@ -94,7 +123,8 @@ export default async function ProductPage({
         product={productWithSpecs}
         versions={versionData ?? []}
         translations={translationData ?? []}
-        layoutReport={layoutReport}
+        layoutReport={layoutReport ?? undefined}
+        localizedLayoutReports={localizedReports}
       />
     </div>
   );

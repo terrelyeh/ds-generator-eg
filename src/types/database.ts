@@ -85,6 +85,9 @@ export interface Database {
           status: string;
           sheet_last_modified: string | null;
           sheet_last_editor: string | null;
+          /** Per-locale manual layout-overflow acknowledgements — see
+           *  migration 00011. `{ en?: boolean, ja?: boolean, ... }`. */
+          layout_ack: Record<string, boolean>;
           created_at: string;
           updated_at: string;
         };

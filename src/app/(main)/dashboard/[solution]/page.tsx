@@ -18,6 +18,11 @@ interface ProductRow {
   updated_at: string;
   product_line_id: string;
   product_lines: { name: string; label: string; category: string };
+  /** Per-locale manual overrides: { en?: boolean, ja?: boolean, "zh-TW"?: boolean }.
+   *  When true for a locale, the dashboard treats that locale as OK
+   *  even if the heuristic would flag overflow. Set via the "Mark as
+   *  Reviewed OK" button on the product detail page. */
+  layout_ack: Record<string, boolean> | null;
 }
 
 interface RadioPatternAsset {
@@ -31,6 +36,23 @@ interface ChangeLogRow {
   edited_at: string | null;
   edited_by: string | null;
   changes_summary: string;
+}
+
+/** Return a shallow-copied LayoutReport with every status forced to "ok".
+ *  Used when the PM has manually acknowledged this locale's overflow —
+ *  heuristics were flagging it red but the PM says the rendered PDF is
+ *  visually acceptable. */
+function forceOk<T extends {
+  status: "ok" | "warn" | "overflow";
+  cover: { status: "ok" | "warn" | "overflow"; overview_status: "ok" | "warn" | "overflow"; features_status: "ok" | "warn" | "overflow"; reasons: string[] };
+  spec: { status: "ok" | "warn" | "overflow"; reasons: string[] };
+}>(report: T): T {
+  return {
+    ...report,
+    status: "ok",
+    cover: { ...report.cover, status: "ok", overview_status: "ok", features_status: "ok", reasons: [] },
+    spec: { ...report.spec, status: "ok", reasons: [] },
+  };
 }
 
 export default async function SolutionDashboardPage({
@@ -81,8 +103,9 @@ export default async function SolutionDashboardPage({
         hardware_image,
         updated_at,
         product_line_id,
+        layout_ack,
         product_lines (name, label, category)
-      `
+`
         )
         .in("product_line_id", productLineIds)
         .order("model_name")) as { data: ProductRow[] | null })
@@ -246,24 +269,29 @@ export default async function SolutionDashboardPage({
     // line-height is taller), so a model that fits in English might
     // overflow in Japanese or Chinese. Aggregate: any locale overflow
     // → red flag; reasons are prefixed with the locale tag.
-    const englishLayout = checkProductLayout({
+    // Per-locale manual override map. When ack[locale] is true the
+    // dashboard treats that locale as OK even if the heuristic says
+    // overflow — lets PMs compress via typography adjustments and then
+    // clear the red flag themselves without a code change.
+    const ack = (p.layout_ack ?? {}) as Record<string, boolean>;
+
+    const englishLayoutRaw = checkProductLayout({
       overview: p.overview,
       features: p.features as string[] | null,
       spec_sections: specMap.get(p.id) ?? [],
     });
+    const englishLayout = ack.en ? forceOk(englishLayoutRaw) : englishLayoutRaw;
 
     const enabledLocales = translationLocalesMap.get(p.model_name) ?? [];
     const localizedReports = enabledLocales.map((locale) => {
       const content = translationContentMap.get(`${p.model_name}|${locale}`);
-      return {
+      const raw = checkProductLayout({
+        overview: content?.overview ?? p.overview,
+        features: (content?.features ?? p.features) as string[] | null,
+        spec_sections: specMap.get(p.id) ?? [],
         locale,
-        report: checkProductLayout({
-          overview: content?.overview ?? p.overview,
-          features: (content?.features ?? p.features) as string[] | null,
-          spec_sections: specMap.get(p.id) ?? [],
-          locale,
-        }),
-      };
+      });
+      return { locale, report: ack[locale] ? forceOk(raw) : raw };
     });
 
     // Aggregate per-field: worst status across EN + all locales.
