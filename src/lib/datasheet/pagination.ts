@@ -19,7 +19,10 @@ interface SpecPage {
 export const PAGE_HEIGHT = 792;
 export const TOP_BAR_HEIGHT = 21;
 export const SPEC_TITLE_HEIGHT = 42; // title + margin
-export const BOTTOM_MARGIN = 40; // page number + safety margin
+// Bottom safety margin. Bumped from 40→72pt (1 inch) because per-row height
+// estimates accumulate small errors over 30+ rows — a generous footer buffer
+// triggers earlier column/page breaks so content never hugs the page edge.
+export const BOTTOM_MARGIN = 72;
 export const AVAILABLE_HEIGHT =
   PAGE_HEIGHT - TOP_BAR_HEIGHT - SPEC_TITLE_HEIGHT - BOTTOM_MARGIN;
 
