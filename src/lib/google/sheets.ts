@@ -55,6 +55,92 @@ function getCell(row: unknown[] | undefined, colIdx: number): string {
   return String(val).trim();
 }
 
+/**
+ * Extract a cell's displayed text with strikethrough runs STRIPPED.
+ *
+ * PMs sometimes strike through parts of a spec value or feature bullet
+ * to mark content that's been deprecated but not yet deleted (e.g.
+ * "1x Ground Screw Set" with strikethrough in Package Contents). That
+ * text should NOT appear in the generated PDF. Google Sheets API returns
+ * per-cell `textFormatRuns` — an array of {startIndex, format} entries
+ * defining formatting runs across the cell text. We walk the runs and
+ * drop any segment whose format.strikethrough === true.
+ *
+ * If no runs are present, the whole cell shares one format (from
+ * `effectiveFormat.textFormat`). Runs always cover the full cell text
+ * starting at index 0 per the Sheets API contract.
+ */
+interface SheetCell {
+  formattedValue?: string | null;
+  effectiveFormat?: {
+    textFormat?: { strikethrough?: boolean | null } | null;
+  } | null;
+  textFormatRuns?: Array<{
+    startIndex?: number | null;
+    format?: { strikethrough?: boolean | null } | null;
+  }> | null;
+  userEnteredValue?: { numberValue?: number | null; stringValue?: string | null } | null;
+}
+
+function cellToCleanValue(cell: SheetCell | undefined | null): string | number | "" {
+  if (!cell) return "";
+
+  // Prefer raw numeric when present (matches UNFORMATTED_VALUE semantics
+  // callers used to rely on — revision log dates, numeric spec values, etc).
+  const numVal = cell.userEnteredValue?.numberValue;
+  if (typeof numVal === "number" && (!cell.formattedValue || cell.formattedValue === String(numVal))) {
+    return numVal;
+  }
+
+  const text = cell.formattedValue ?? "";
+  if (!text) return "";
+
+  const runs = cell.textFormatRuns;
+  const defaultStrike = cell.effectiveFormat?.textFormat?.strikethrough === true;
+
+  if (!runs || runs.length === 0) {
+    return defaultStrike ? "" : text;
+  }
+
+  // Walk runs and keep only non-strikethrough segments
+  let result = "";
+  for (let i = 0; i < runs.length; i++) {
+    const start = runs[i].startIndex ?? 0;
+    const end = i + 1 < runs.length ? (runs[i + 1].startIndex ?? text.length) : text.length;
+    const isStrike = runs[i].format?.strikethrough === true;
+    if (!isStrike) result += text.slice(start, end);
+  }
+  return result;
+}
+
+/**
+ * Fetch a tab's rows with strikethrough text filtered out. Replaces
+ * the simpler `spreadsheets.values.get` call when we need the PDF to
+ * reflect what the PM visually sees minus strikethrough content.
+ * Returns rows in the same `unknown[][]` shape so existing parsers
+ * don't need to change.
+ */
+async function fetchTabRowsFiltered(
+  sheets: ReturnType<typeof google.sheets>,
+  spreadsheetId: string,
+  tabName: string,
+): Promise<unknown[][]> {
+  const res = await sheets.spreadsheets.get({
+    spreadsheetId,
+    ranges: [`'${tabName}'`],
+    includeGridData: true,
+    // Keep response size small: only formatting fields we actually use
+    fields:
+      "sheets(data(rowData(values(formattedValue,userEnteredValue,effectiveFormat.textFormat.strikethrough,textFormatRuns))))",
+  });
+
+  const rowData = res.data.sheets?.[0]?.data?.[0]?.rowData ?? [];
+  return rowData.map((row) => {
+    const cells = row.values ?? [];
+    return cells.map((c) => cellToCleanValue(c as SheetCell));
+  });
+}
+
 function findModelColumn(rows: unknown[][], modelNumber: string): number | null {
   for (let r = 0; r < Math.min(rows.length, 5); r++) {
     for (let c = 0; c < rows[r].length; c++) {
@@ -279,13 +365,7 @@ export async function listModelsFromSheet(
   );
   const sheetName = targetSheet?.properties?.title ?? "Detail Specs";
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: sheetId,
-    range: `'${sheetName}'`,
-    valueRenderOption: "UNFORMATTED_VALUE",
-  });
-
-  const rows = (res.data.values ?? []) as unknown[][];
+  const rows = await fetchTabRowsFiltered(sheets, sheetId, sheetName);
   if (rows.length < 2) return [];
 
   // Find "Model #" row and "Model Name" row
@@ -336,22 +416,12 @@ export async function loadProductFromSheets(
   const detailName = detailSheet?.properties?.title ?? "Detail Specs";
   const overviewName = overviewSheet?.properties?.title ?? "Web Overview";
 
-  // Fetch both tabs in parallel
-  const [detailRes, overviewRes] = await Promise.all([
-    sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${detailName}'`,
-      valueRenderOption: "UNFORMATTED_VALUE",
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${overviewName}'`,
-      valueRenderOption: "UNFORMATTED_VALUE",
-    }),
+  // Fetch both tabs in parallel. Using the strikethrough-filtering helper
+  // so deprecated text ruled out by the PM doesn't leak into the PDF.
+  const [detailRows, overviewRows] = await Promise.all([
+    fetchTabRowsFiltered(sheets, sheetId, detailName),
+    fetchTabRowsFiltered(sheets, sheetId, overviewName),
   ]);
-
-  const detailRows = (detailRes.data.values ?? []) as unknown[][];
-  const overviewRows = (overviewRes.data.values ?? []) as unknown[][];
 
   // Find model column in detail tab
   const detailCol = findModelColumn(detailRows, modelNumber);
@@ -414,22 +484,12 @@ export async function loadAllProductsFromSheet(
   const detailName = detailSheet?.properties?.title ?? "Detail Specs";
   const overviewName = overviewSheet?.properties?.title ?? "Web Overview";
 
-  // 2 API calls: fetch both tabs in parallel
-  const [detailRes, overviewRes] = await Promise.all([
-    sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${detailName}'`,
-      valueRenderOption: "UNFORMATTED_VALUE",
-    }),
-    sheets.spreadsheets.values.get({
-      spreadsheetId: sheetId,
-      range: `'${overviewName}'`,
-      valueRenderOption: "UNFORMATTED_VALUE",
-    }),
+  // 2 API calls: fetch both tabs in parallel. Strikethrough-filtering
+  // helper ensures PM-deprecated text never reaches the PDF.
+  const [detailRows, overviewRows] = await Promise.all([
+    fetchTabRowsFiltered(sheets, sheetId, detailName),
+    fetchTabRowsFiltered(sheets, sheetId, overviewName),
   ]);
-
-  const detailRows = (detailRes.data.values ?? []) as unknown[][];
-  const overviewRows = (overviewRes.data.values ?? []) as unknown[][];
 
   // Find "Model #" row to enumerate all model columns
   const numRowIdx = findRowByLabel(detailRows, "Model #") ?? 2;

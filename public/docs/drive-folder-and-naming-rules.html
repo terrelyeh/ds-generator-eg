@@ -213,6 +213,17 @@
     .badge-red { background: var(--red-bg); color: var(--red); border: 1px solid #fecaca; }
     .badge-green { background: var(--green-bg); color: var(--green); }
 
+    kbd {
+      background: #f5f6f8;
+      border: 1px solid var(--border);
+      border-bottom-width: 2px;
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: ui-monospace, "SF Mono", Menlo, Monaco, monospace;
+      font-size: 13px;
+      color: var(--gray-dark);
+    }
+
     .callout {
       background: rgba(3,169,244,0.06);
       border-left: 4px solid var(--blue);
@@ -583,6 +594,88 @@ Model Datasheet/
 <div class="callout">
   <strong>篩選:</strong> Dashboard 預設只顯示 <strong>Active</strong> 產品，點右上角「Active / All」按鈕可切換顯示全部。
 </div>
+
+<h3>5.3 Detail Specs 填表規則 <span style="color: var(--red); font-size: 14px;">(重要)</span></h3>
+
+<p>Detail Specs 分頁的每一行有兩種類型：<strong>Category Header</strong>（分類標題）或 <strong>Spec Item</strong>（規格項目）。系統用「<strong>Model 欄位是否為空</strong>」自動判斷。</p>
+
+<table>
+  <thead>
+    <tr><th>行類型</th><th>Column A</th><th>所有 Model 欄位</th><th>範例</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Category Header</strong></td>
+      <td>分類名稱</td>
+      <td><span class="badge badge-green">完全空白</span></td>
+      <td><code>Environmental &amp; Physical</code></td>
+    </tr>
+    <tr>
+      <td><strong>Spec Item</strong></td>
+      <td>規格名稱</td>
+      <td><span class="badge badge-amber">至少一個 model 有值</span></td>
+      <td><code>Temperature Range</code> → <code>32°F to 104°F</code></td>
+    </tr>
+    <tr>
+      <td><strong>不適用的 spec</strong></td>
+      <td>規格名稱</td>
+      <td>填 <code>-</code>（破折號，算一個值）</td>
+      <td>L3 switch 沒 PoE → Total PoE Budget 欄位填 <code>-</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout callout-red" style="background: var(--red-bg); border-left: 4px solid var(--red); padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+  <strong>❌ 絕對不要：</strong><br>
+  1. Category header 那行在 model 欄位填空格、<code>—</code>（全形破折號）、<code>N/A</code>、<code>-</code> 等任何字元 — 會被誤判成 spec item<br>
+  2. Spec item 那行 model 欄位全部留空（即使某些產品真的不適用） — 會被誤判成 category header
+</div>
+
+<div class="callout" style="background: var(--green-bg); border-left: 4px solid var(--green); padding: 12px 16px; margin: 16px 0; border-radius: 4px;">
+  <strong>✅ 建議：</strong><br>
+  如果某個 spec 真的所有產品都不適用（例如整條產品線都沒 PoE），<strong>整行刪除</strong>最乾淨。<br>
+  如果只有部分產品不適用，有該規格的填值、沒有的填 <code>-</code>。
+</div>
+
+<h3>5.4 刪除線文字自動濾除</h3>
+
+<p>PM 在 Google Sheet 裡用 <strong>刪除線</strong> 標記「已棄用但還沒刪掉」的文字，同步到 DB / PDF 時會<strong>自動被濾掉</strong>，不會出現在最終文件。適用於：</p>
+
+<ul>
+  <li>Spec value 裡某段淘汰的規格數字</li>
+  <li>Features 列表裡已刪除的功能項目</li>
+  <li>Overview 裡舊版本的描述</li>
+  <li>Package Contents 裡不再附贈的配件（例：<s>1x Ground Screw Set</s>）</li>
+</ul>
+
+<div class="callout">
+  <strong>技術細節：</strong> 系統用 Google Sheets API 的 <code>textFormatRuns</code> 偵測，可精細到同一個 cell 內「部分文字刪除線、部分正常」。<strong>只有文字畫刪除線</strong>（Format → Text → Strikethrough，快捷鍵 <code>⌘ + Shift + X</code>）才會被過濾，單純刪除字、改顏色、改字體都不影響。
+</div>
+
+<h3>5.5 常見問題排查</h3>
+
+<table>
+  <thead>
+    <tr><th>症狀</th><th>可能原因</th><th>修正方法</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Dashboard 的某個型號只有一個 <code>General</code> category</td>
+      <td>所有 category header 那行的 model 欄位可能有不可見字元（空格、tab、零寬字符）</td>
+      <td>全選 model 欄位 → <kbd>Delete</kbd> 清空</td>
+    </tr>
+    <tr>
+      <td>某個 spec 項目不見了</td>
+      <td>該行 model 欄位全部留空 → 被判成 category header 了</td>
+      <td>填上值，或該產品不適用的話填 <code>-</code></td>
+    </tr>
+    <tr>
+      <td>PDF 還是看到刪除線的舊文字</td>
+      <td>可能改完 sheet 後還沒同步；或不是真的 strikethrough 格式（只是 hyphen 寫在字中間）</td>
+      <td>確認是用 Format → Text → Strikethrough 套用，然後按 Dashboard 右上的 Sync 按鈕</td>
+    </tr>
+  </tbody>
+</table>
 
 <!-- ========== 6 ========== -->
 <h2 id="s6"><span class="num">6</span>目前所有產品型號一覽</h2>
