@@ -87,45 +87,143 @@ function balanceColumns(sections: Section[]): SpecPage {
   return { left, right };
 }
 
+/**
+ * Try to fit a whole section into a column with `availableHeight` pt remaining.
+ * If the section doesn't fit entirely, split its items — what fits goes now,
+ * the rest is returned as a new section labelled "<name> (cont.)".
+ *
+ * Guarantees at least one item per call (even if it's technically too tall
+ * — better to let one item overflow slightly than to loop forever).
+ */
+function fitSection(
+  section: Section,
+  availableHeight: number,
+): { fitted: Section | null; remaining: Section | null } {
+  const headerH = CATEGORY_HEADER_HEIGHT;
+
+  // Header alone doesn't fit → whole section goes to next column
+  if (headerH >= availableHeight) {
+    return { fitted: null, remaining: section };
+  }
+
+  let h = headerH;
+  const fittedItems: typeof section.items = [];
+  let i = 0;
+  for (; i < section.items.length; i++) {
+    const itemH = estimateItemHeight(section.items[i].value);
+    if (h + itemH > availableHeight) {
+      // Can't fit this item — but we must fit at least one so
+      // we don't infinite-loop on a giant first item.
+      if (fittedItems.length === 0) {
+        fittedItems.push(section.items[i]);
+        h += itemH;
+        i++;
+      }
+      break;
+    }
+    fittedItems.push(section.items[i]);
+    h += itemH;
+  }
+
+  if (fittedItems.length === 0) {
+    return { fitted: null, remaining: section };
+  }
+
+  const fitted: Section = { category: section.category, items: fittedItems };
+  const remaining: Section | null =
+    i < section.items.length
+      ? {
+          category: `${section.category} (cont.)`,
+          items: section.items.slice(i),
+        }
+      : null;
+
+  return { fitted, remaining };
+}
+
 export function splitIntoPages(sections: Section[]): SpecPage[] {
   if (!sections.length) return [{ left: [], right: [] }];
 
   const pages: SpecPage[] = [];
-  const remaining = [...sections];
+  const queue: Section[] = [...sections];
 
-  while (remaining.length > 0) {
+  // Safety cap: large spec sheets with many continuations shouldn't balloon
+  // into thousands of pages. If we exceed this, there's a bug; bail out.
+  const MAX_PAGES = 20;
+
+  while (queue.length > 0 && pages.length < MAX_PAGES) {
     const left: Section[] = [];
     const right: Section[] = [];
     let leftH = 0;
     let rightH = 0;
-    let i = 0;
 
-    // Fill left column
-    while (i < remaining.length) {
-      const sh = estimateSectionHeight(remaining[i]);
-      if (leftH + sh <= AVAILABLE_HEIGHT || left.length === 0) {
-        left.push(remaining[i]);
-        leftH += sh;
-        i++;
+    // Fill left column — split sections that don't fit
+    while (queue.length > 0) {
+      const remaining = AVAILABLE_HEIGHT - leftH;
+      const nextSection = queue[0];
+      const sectionH = estimateSectionHeight(nextSection);
+
+      if (sectionH <= remaining) {
+        // Whole section fits
+        left.push(nextSection);
+        leftH += sectionH;
+        queue.shift();
+      } else if (left.length === 0) {
+        // Column empty but section too tall → try to fit what we can
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        if (fitted) {
+          left.push(fitted);
+          leftH += estimateSectionHeight(fitted);
+        }
+        queue.shift();
+        if (cont) queue.unshift(cont);
       } else {
-        break;
+        // Column has content + won't fit next section → try partial split
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        if (fitted && fitted.items.length > 0) {
+          left.push(fitted);
+          leftH += estimateSectionHeight(fitted);
+          queue.shift();
+          if (cont) queue.unshift(cont);
+        } else {
+          // Can't fit even one more item → move to right column
+          break;
+        }
       }
     }
 
-    // Fill right column
-    while (i < remaining.length) {
-      const sh = estimateSectionHeight(remaining[i]);
-      if (rightH + sh <= AVAILABLE_HEIGHT || right.length === 0) {
-        right.push(remaining[i]);
-        rightH += sh;
-        i++;
+    // Fill right column — same logic
+    while (queue.length > 0) {
+      const remaining = AVAILABLE_HEIGHT - rightH;
+      const nextSection = queue[0];
+      const sectionH = estimateSectionHeight(nextSection);
+
+      if (sectionH <= remaining) {
+        right.push(nextSection);
+        rightH += sectionH;
+        queue.shift();
+      } else if (right.length === 0) {
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        if (fitted) {
+          right.push(fitted);
+          rightH += estimateSectionHeight(fitted);
+        }
+        queue.shift();
+        if (cont) queue.unshift(cont);
       } else {
-        break;
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining);
+        if (fitted && fitted.items.length > 0) {
+          right.push(fitted);
+          rightH += estimateSectionHeight(fitted);
+          queue.shift();
+          if (cont) queue.unshift(cont);
+        } else {
+          break;
+        }
       }
     }
 
     pages.push({ left, right });
-    remaining.splice(0, i);
   }
 
   // If only one page, balance columns evenly

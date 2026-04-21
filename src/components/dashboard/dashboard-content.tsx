@@ -35,7 +35,9 @@ interface ProductSummary {
   product_line_id: string;
   product_line: { name: string; label: string; category: string };
   translation_locales: string[];
-  layout_status: "ok" | "warn" | "overflow";
+  overview_layout_status: "ok" | "warn" | "overflow";
+  features_layout_status: "ok" | "warn" | "overflow";
+  spec_layout_status: "ok" | "warn" | "overflow";
   layout_reasons: string[];
 }
 
@@ -59,6 +61,43 @@ function ImgStatus({ ok }: { ok: boolean }) {
     <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
   ) : (
     <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25" />
+  );
+}
+
+/**
+ * Content status dot: combines "has content" presence with PDF layout fit.
+ *   Missing  → grey ring (no content)
+ *   OK       → green (content present, fits PDF)
+ *   Warn     → amber (content present, nearly full — might break layout)
+ *   Overflow → red (content present, will definitely overflow PDF)
+ * Hover tooltip explains the specific reason.
+ */
+function ContentStatus({
+  present,
+  layout,
+  hoverText,
+}: {
+  present: boolean;
+  layout: "ok" | "warn" | "overflow";
+  hoverText?: string;
+}) {
+  if (!present) {
+    return (
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25"
+        title={hoverText ?? "No content"}
+      />
+    );
+  }
+  const color =
+    layout === "overflow" ? "bg-red-500" :
+    layout === "warn"     ? "bg-amber-500" :
+                            "bg-emerald-500";
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ${color}`}
+      title={hoverText ?? (layout === "ok" ? "Fits PDF layout" : layout === "warn" ? "Layout warning" : "Will overflow PDF")}
+    />
   );
 }
 
@@ -122,7 +161,6 @@ function ProductTable({
           <TableHead className="w-28">Model #</TableHead>
           <TableHead className="w-56">Model Name</TableHead>
           <TableHead className="w-16 text-center">Version</TableHead>
-          <TableHead className="w-16 text-center" title="PDF layout overflow estimate">Layout</TableHead>
           <TableHead className="w-20">Lang</TableHead>
           <TableHead className="w-24">Last Changed</TableHead>
           <TableHead className="w-14 text-center">OV</TableHead>
@@ -173,12 +211,6 @@ function ProductTable({
                   : "—"}
               </Badge>
             </TableCell>
-            <TableCell className="text-center">
-              <LayoutStatusBadge
-                status={product.layout_status}
-                reasons={product.layout_reasons}
-              />
-            </TableCell>
             <TableCell>
               <div className="flex gap-1">
                 <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">EN</span>
@@ -199,13 +231,40 @@ function ProductTable({
               {formatDate(product.last_content_changed)}
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_overview} />
+              <ContentStatus
+                present={product.has_overview}
+                layout={product.overview_layout_status}
+                hoverText={
+                  !product.has_overview ? "Overview missing" :
+                  product.overview_layout_status === "overflow" ? "Overview 過長 — PDF 會超出版面，需縮短" :
+                  product.overview_layout_status === "warn" ? "Overview 偏長 — 建議縮短" :
+                  "Overview fits PDF layout"
+                }
+              />
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_features} />
+              <ContentStatus
+                present={product.has_features}
+                layout={product.features_layout_status}
+                hoverText={
+                  !product.has_features ? "Features missing" :
+                  product.features_layout_status === "overflow" ? "Features 過多或過長 — PDF 會超出版面" :
+                  product.features_layout_status === "warn" ? "Features 偏多或偏長 — 建議精簡" :
+                  "Features fits PDF layout"
+                }
+              />
             </TableCell>
             <TableCell className="text-center">
-              <ImgStatus ok={product.has_specs} />
+              <ContentStatus
+                present={product.has_specs}
+                layout={product.spec_layout_status}
+                hoverText={
+                  !product.has_specs ? "Specs missing" :
+                  product.spec_layout_status === "overflow" ? "Specs 過長 — 某些 value 會換行太多導致跑版" :
+                  product.spec_layout_status === "warn" ? "Specs 接近頁面上限或有長 value — 建議精簡" :
+                  "Specs fits PDF layout"
+                }
+              />
             </TableCell>
             <TableCell className="text-center">
               <ImgStatus ok={product.has_product_image} />
@@ -252,30 +311,6 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-/** PDF layout overflow status badge */
-function LayoutStatusBadge({
-  status,
-  reasons,
-}: {
-  status: "ok" | "warn" | "overflow";
-  reasons: string[];
-}) {
-  const config = {
-    ok: { label: "OK", className: "border-green-200 text-green-700 bg-green-50" },
-    warn: { label: "Warn", className: "border-amber-300 text-amber-700 bg-amber-50" },
-    overflow: { label: "Overflow", className: "border-red-300 text-red-700 bg-red-50" },
-  }[status];
-  const title = reasons.length > 0 ? reasons.join(" · ") : "Content fits the PDF layout";
-  return (
-    <Badge
-      variant="outline"
-      className={`text-[11px] px-1.5 py-0 ${config.className}`}
-      title={title}
-    >
-      {config.label}
-    </Badge>
-  );
-}
 
 export function DashboardContent({
   productLines,

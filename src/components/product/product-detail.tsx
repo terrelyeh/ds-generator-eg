@@ -19,10 +19,40 @@ import { ProductTranslationEditor } from "@/components/translations/product-tran
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
 
+interface LongFeature {
+  index: number;
+  chars: number;
+  preview: string;
+}
+
+interface LongSpecItem {
+  section: string;
+  label: string;
+  preview: string;
+  chars: number;
+  estimated_lines: number;
+}
+
 interface LayoutReport {
   status: "ok" | "warn" | "overflow";
-  cover: { status: "ok" | "warn" | "overflow"; reasons: string[]; metrics: { overview_chars: number; features_count: number; max_feature_chars: number } };
-  spec: { status: "ok" | "warn" | "overflow"; reasons: string[]; metrics: { pages: number; max_column_fill_pct: number } };
+  cover: {
+    status: "ok" | "warn" | "overflow";
+    overview_status: "ok" | "warn" | "overflow";
+    features_status: "ok" | "warn" | "overflow";
+    reasons: string[];
+    metrics: {
+      overview_chars: number;
+      features_count: number;
+      max_feature_chars: number;
+    };
+    long_features: LongFeature[];
+  };
+  spec: {
+    status: "ok" | "warn" | "overflow";
+    reasons: string[];
+    metrics: { pages: number; max_column_fill_pct: number };
+    long_items: LongSpecItem[];
+  };
 }
 
 interface ProductDetailProps {
@@ -38,26 +68,131 @@ function LayoutWarningBanner({ report }: { report: LayoutReport }) {
   const title = isOverflow
     ? "PDF Layout Overflow — 內容超過版面容納範圍"
     : "PDF Layout Warning — 內容偏多，可能排版緊繃";
-  const bg = isOverflow ? "bg-red-50 border-red-300 text-red-900" : "bg-amber-50 border-amber-300 text-amber-900";
-  const reasons = [...report.cover.reasons, ...report.spec.reasons];
+  const bg = isOverflow
+    ? "bg-red-50 border-red-300"
+    : "bg-amber-50 border-amber-300";
+  const textColor = isOverflow ? "text-red-900" : "text-amber-900";
 
   return (
-    <div className={`mb-4 rounded-lg border px-4 py-3 ${bg}`}>
+    <div className={`mb-4 rounded-lg border px-5 py-4 ${bg} ${textColor}`}>
       <div className="flex items-start gap-3">
-        <span className="text-lg leading-tight">{Icon}</span>
-        <div className="min-w-0 flex-1">
-          <div className="font-semibold">{title}</div>
-          {reasons.length > 0 && (
-            <ul className="mt-1 list-disc pl-5 text-sm leading-relaxed">
-              {reasons.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
+        <span className="text-xl leading-none pt-0.5">{Icon}</span>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="font-semibold text-base">{title}</div>
+
+          {/* Overview */}
+          {report.cover.overview_status !== "ok" && (
+            <LayoutIssueBlock
+              title="Overview"
+              status={report.cover.overview_status}
+              detail={
+                <>
+                  目前 <strong className="tabular-nums">{report.cover.metrics.overview_chars}</strong> 字，
+                  建議 ≤ <strong>500</strong>（上限 650）。
+                  {report.cover.metrics.overview_chars > 500 && (
+                    <> 建議刪去 <strong className="tabular-nums">{report.cover.metrics.overview_chars - 500}</strong> 字。</>
+                  )}
+                </>
+              }
+              action="去 Google Sheet 的 Web Overview 頁籤 → 「Single Overview」欄位精簡內容。"
+            />
           )}
-          <div className="mt-2 text-xs text-current/70">
-            建議縮短 Overview、減少 Features 數量，或縮短過長的 spec 值。生成 PDF 時可能會出現內容重疊或被截斷。
-          </div>
+
+          {/* Features */}
+          {report.cover.features_status !== "ok" && (
+            <LayoutIssueBlock
+              title="Features & Benefits"
+              status={report.cover.features_status}
+              detail={
+                <>
+                  目前 <strong className="tabular-nums">{report.cover.metrics.features_count}</strong> 項，
+                  建議 ≤ <strong>8</strong>（上限 10）。
+                  {report.cover.metrics.features_count > 8 && (
+                    <> 建議刪去 <strong className="tabular-nums">{report.cover.metrics.features_count - 8}</strong> 項。</>
+                  )}
+                  {report.cover.long_features.length > 0 && (
+                    <>
+                      <br />
+                      <span className="text-xs">以下 {report.cover.long_features.length} 項偏長（建議 ≤ 90 字）：</span>
+                      <ul className="mt-1 ml-2 list-decimal list-inside text-xs">
+                        {report.cover.long_features.slice(0, 5).map((f) => (
+                          <li key={f.index}>
+                            第 {f.index} 項 (<span className="tabular-nums">{f.chars}</span> 字)：
+                            <span className="text-current/70">「{f.preview}…」</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              }
+              action="去 Google Sheet → Web Overview → Key Feature Lists：精簡敘述，或移除不關鍵的項目。"
+            />
+          )}
+
+          {/* Specs */}
+          {report.spec.status !== "ok" && (
+            <LayoutIssueBlock
+              title="Technical Specifications"
+              status={report.spec.status}
+              detail={
+                <>
+                  Spec 頁面最寬欄位填滿率 <strong className="tabular-nums">{report.spec.metrics.max_column_fill_pct}%</strong>
+                  {report.spec.metrics.max_column_fill_pct > 100 && (
+                    <> — 超過 100% 會導致跑版或截斷。</>
+                  )}
+                  {report.spec.long_items.length > 0 && (
+                    <>
+                      <br />
+                      <span className="text-xs">以下 {report.spec.long_items.length} 個 value 偏長（建議 ≤ 60 字，超過會換行到 2+ 行）：</span>
+                      <ul className="mt-1 ml-2 text-xs">
+                        {report.spec.long_items.slice(0, 5).map((item, i) => (
+                          <li key={i} className="mb-1">
+                            <strong>{item.section} ›</strong> {item.label}
+                            {" "}
+                            <span className="tabular-nums">({item.chars} 字，估 {item.estimated_lines} 行)</span>
+                            <br />
+                            <span className="text-current/70">「{item.preview}…」</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              }
+              action="去 Google Sheet → Detail Specs：精簡長 value（縮寫、分行、移除非必要資訊）。"
+            />
+          )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LayoutIssueBlock({
+  title,
+  status,
+  detail,
+  action,
+}: {
+  title: string;
+  status: "warn" | "overflow";
+  detail: React.ReactNode;
+  action: string;
+}) {
+  const statusLabel = status === "overflow" ? "Overflow" : "Warn";
+  const statusBg = status === "overflow" ? "bg-red-200/70 text-red-900" : "bg-amber-200/70 text-amber-900";
+  return (
+    <div className="rounded-md bg-white/60 px-3 py-2 text-sm">
+      <div className="flex items-center gap-2 font-semibold">
+        <span className={`inline-block rounded text-[10px] font-bold uppercase px-1.5 py-0.5 ${statusBg}`}>
+          {statusLabel}
+        </span>
+        {title}
+      </div>
+      <div className="mt-1 leading-relaxed">{detail}</div>
+      <div className="mt-1.5 text-xs text-current/70">
+        <strong>💡 Action:</strong> {action}
       </div>
     </div>
   );

@@ -261,7 +261,11 @@ export default async function SolutionDashboardPage({
       product_line_id: p.product_line_id,
       product_line: p.product_lines,
       translation_locales: translationLocalesMap.get(p.model_name) ?? [],
-      layout_status: layout.status,
+      // Per-section layout status so the OV / FT / SP columns can reflect
+      // not just presence but whether the content will fit the PDF.
+      overview_layout_status: layout.cover.overview_status,
+      features_layout_status: layout.cover.features_status,
+      spec_layout_status: layout.spec.status,
       layout_reasons: [...layout.cover.reasons, ...layout.spec.reasons],
     };
   });
