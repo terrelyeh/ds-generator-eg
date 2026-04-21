@@ -283,16 +283,26 @@ export default async function SolutionDashboardPage({
     const englishLayout = ack.en ? forceOk(englishLayoutRaw) : englishLayoutRaw;
 
     const enabledLocales = translationLocalesMap.get(p.model_name) ?? [];
-    const localizedReports = enabledLocales.map((locale) => {
-      const content = translationContentMap.get(`${p.model_name}|${locale}`);
-      const raw = checkProductLayout({
-        overview: content?.overview ?? p.overview,
-        features: (content?.features ?? p.features) as string[] | null,
-        spec_sections: specMap.get(p.id) ?? [],
-        locale,
-      });
-      return { locale, report: ack[locale] ? forceOk(raw) : raw };
-    });
+    const localizedReports = enabledLocales
+      .map((locale) => {
+        const content = translationContentMap.get(`${p.model_name}|${locale}`);
+        // Skip locales that have no translated content yet — measuring
+        // English text with CJK metrics would falsely red-flag. The
+        // warning is only meaningful once there's something localized
+        // that will actually render in CJK typography.
+        const hasAnyTranslation =
+          (content?.overview && content.overview.trim().length > 0) ||
+          (content?.features && content.features.length > 0);
+        if (!hasAnyTranslation) return null;
+        const raw = checkProductLayout({
+          overview: content?.overview ?? p.overview,
+          features: (content?.features ?? p.features) as string[] | null,
+          spec_sections: specMap.get(p.id) ?? [],
+          locale,
+        });
+        return { locale, report: ack[locale] ? forceOk(raw) : raw };
+      })
+      .filter((r): r is { locale: string; report: ReturnType<typeof checkProductLayout> } => r !== null);
 
     // Aggregate per-field: worst status across EN + all locales.
     // Tag each non-ok reason with its locale so the UI can tell the user

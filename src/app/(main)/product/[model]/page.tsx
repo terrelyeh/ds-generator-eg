@@ -106,6 +106,13 @@ export default async function ProductPage({
   const localizedReports: { locale: string; report: typeof layoutReportRaw }[] = [];
   for (const t of translationData ?? []) {
     if (ack[t.locale]) continue;
+    // Skip if nothing has been translated yet. Measuring English text
+    // with CJK metrics would falsely red-flag the locale before the
+    // PM has done any work.
+    const hasAnyTranslation =
+      (t.overview && t.overview.trim().length > 0) ||
+      (t.features && t.features.length > 0);
+    if (!hasAnyTranslation) continue;
     localizedReports.push({
       locale: t.locale,
       report: checkProductLayout({
