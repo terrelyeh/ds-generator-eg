@@ -168,13 +168,17 @@ export default async function PreviewPage({
   // gave visual imbalance when some items wrapped to 3+ lines while others
   // were short (ECW560 had left-col 90pt taller than right). Now each item
   // goes to whichever column is currently shorter.
-  const { left: leftFeatures, right: rightFeatures } = balanceFeatureColumns(features);
+  // Locale-aware column balance: Japanese/Chinese fonts are slightly
+  // larger and line-height is taller, so the per-item height estimate
+  // (used to decide which column an item goes into) must use the
+  // correct metrics or CJK columns end up visually imbalanced.
+  const { left: leftFeatures, right: rightFeatures } = balanceFeatureColumns(features, lang);
 
   // Dynamic cover layout — mirrors the manual designer's workflow of
   // sizing features first, then flowing overview into remaining space.
   // Healthy datasheets (features ≤ 260pt content) render almost identically
   // to before; oversized content gets clipped (flagged red via layout-check).
-  const coverLayout = estimateCoverLayout({ overview, features });
+  const coverLayout = estimateCoverLayout({ overview, features, locale: lang });
 
   // versionOverride is passed by /api/generate-pdf so the footer prints the
   // correct version being generated, rather than the stale DB value which

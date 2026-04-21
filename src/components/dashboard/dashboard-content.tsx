@@ -417,7 +417,7 @@ export function DashboardContent({
             <button
               key={pl.id}
               onClick={() => handleTabChange(pl.id)}
-              className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+              className={`cursor-pointer rounded-md px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-all ${
                 activeTab === pl.id
                   ? "bg-engenius-blue text-white shadow-sm"
                   : "text-muted-foreground hover:text-foreground hover:bg-background"

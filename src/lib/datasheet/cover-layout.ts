@@ -42,18 +42,39 @@ export const FEATURES_MAX_HEIGHT = 320;    // hard cap — beyond this, it looks
 export const LINE_HEIGHT_PT = 15;          // 11pt font × ~1.35 leading
 export const ITEM_MARGIN_PT = 8;           // margin-bottom per feature item
 
-// Column widths (in "char slots" — CJK chars count as 2). Calibrated
-// from visual verification of auto-generated PDFs:
-//   ECW201L-AC (600-char overview) visually overflows at 201pt available
-//     → needs 12 lines × 15pt + 25pt title = 205pt → ~54 chars/line
-//   ECS2528FP (430-char overview) fits at 148pt available
-//     → needs 8 lines = 145pt → ~54 chars/line confirms
-//   ECC500 (728-char overview) fits at 269pt available
-//     → needs 14 lines = 235pt → consistent
-// Earlier 60 chars/line over-estimated; 54 matches what Roboto 11pt
-// actually wraps to in a 270pt column.
-export const OVERVIEW_WIDTH_CHARS = 54;
+// Column widths (in "char slots" — CJK chars count as 2) calibrated
+// per-locale against visual verification. Japanese and Chinese use a
+// slightly larger font (11.5pt / 12pt for overview vs English 11pt)
+// and line-height is typically 1.5× for CJK vs 1.35× for Latin.
+//
+// English calibration points:
+//   ECW201L-AC (600 char overview) overflows 201pt → needs 12 lines × 15pt + 25pt title = 205pt
+//   ECS2528FP (430 char) fits 148pt → 8 lines × 15 = 145pt
+//   ECC500 (728 char) fits 269pt → 14 lines × 15 = 235pt
+//
+// CJK estimates derived from typography (11.5pt JA / 12pt zh) in a
+// 270pt overview column:
+//   ja: 270/11.5 ≈ 23 CJK chars per line → 46 slots/line; line ≈ 17pt
+//   zh-TW: 270/12 ≈ 22 CJK chars per line → 44 slots/line; line ≈ 18pt
+export const OVERVIEW_WIDTH_CHARS = 54; // default (English)
 export const FEATURE_COL_WIDTH_CHARS = 42;
+
+export interface LocaleMetrics {
+  overviewCharsPerLine: number;
+  featureCharsPerLine: number;
+  lineHeightPt: number;
+  itemMarginPt: number;
+}
+
+export const LOCALE_METRICS: Record<string, LocaleMetrics> = {
+  default: { overviewCharsPerLine: 54, featureCharsPerLine: 42, lineHeightPt: 15, itemMarginPt: 8 },
+  ja: { overviewCharsPerLine: 46, featureCharsPerLine: 38, lineHeightPt: 17, itemMarginPt: 9 },
+  "zh-TW": { overviewCharsPerLine: 44, featureCharsPerLine: 34, lineHeightPt: 18, itemMarginPt: 10 },
+};
+
+function metricsFor(locale: string | undefined): LocaleMetrics {
+  return LOCALE_METRICS[locale ?? "default"] ?? LOCALE_METRICS.default;
+}
 
 // ─── Helpers ────────────────────────────────────────────────────────
 function charWidth(ch: string): number {
@@ -106,18 +127,22 @@ export interface CoverLayoutEstimate {
  * column is currently shorter. Preserves reading order within each
  * column (but items may interleave across columns).
  */
-export function balanceFeatureColumns(features: string[]): {
+export function balanceFeatureColumns(
+  features: string[],
+  locale?: string,
+): {
   left: string[];
   right: string[];
 } {
+  const m = metricsFor(locale);
   const left: string[] = [];
   const right: string[] = [];
   let leftH = 0;
   let rightH = 0;
 
   for (const f of features) {
-    const lines = countLines(f, FEATURE_COL_WIDTH_CHARS);
-    const itemH = lines * LINE_HEIGHT_PT + ITEM_MARGIN_PT;
+    const lines = countLines(f, m.featureCharsPerLine);
+    const itemH = lines * m.lineHeightPt + m.itemMarginPt;
     if (leftH <= rightH) {
       left.push(f);
       leftH += itemH;
@@ -133,25 +158,30 @@ export function balanceFeatureColumns(features: string[]): {
 export function estimateCoverLayout(params: {
   overview: string | null | undefined;
   features: string[] | null | undefined;
+  /** Target locale for rendering — picks per-locale metrics (font
+   *  size, line-height, chars-per-line) to match what the translated
+   *  preview will actually render. Defaults to English. */
+  locale?: string;
 }): CoverLayoutEstimate {
   const overview = params.overview ?? "";
   const features = (params.features ?? []) as string[];
+  const m = metricsFor(params.locale);
 
   // Features: estimate per-column height using the same height-balancing
   // that the renderer now uses. Box height = taller of the two cols.
-  const perItemLines = features.map((f) => countLines(f, FEATURE_COL_WIDTH_CHARS));
+  const perItemLines = features.map((f) => countLines(f, m.featureCharsPerLine));
   const featuresTotalLines = perItemLines.reduce((s, n) => s + n, 0);
 
-  const { left: leftItems, right: rightItems } = balanceFeatureColumns(features);
+  const { left: leftItems, right: rightItems } = balanceFeatureColumns(features, params.locale);
   const heightOf = (items: string[]) =>
     items.reduce(
-      (h, f) => h + countLines(f, FEATURE_COL_WIDTH_CHARS) * LINE_HEIGHT_PT + ITEM_MARGIN_PT,
+      (h, f) => h + countLines(f, m.featureCharsPerLine) * m.lineHeightPt + m.itemMarginPt,
       0,
     );
   const leftH = heightOf(leftItems);
   const rightH = heightOf(rightItems);
   const featuresContentHeight = Math.max(leftH, rightH);
-  const featuresPerColLines = Math.ceil(featuresContentHeight / LINE_HEIGHT_PT);
+  const featuresPerColLines = Math.ceil(featuresContentHeight / m.lineHeightPt);
   const featuresWantedHeight =
     features.length > 0 ? featuresContentHeight + FEATURES_CHROME : 0;
   const featuresHeight = Math.min(featuresWantedHeight, FEATURES_MAX_HEIGHT);
@@ -161,9 +191,9 @@ export function estimateCoverLayout(params: {
   const overviewBottom = COVER_FOOTER_MARGIN + featuresHeight + COVER_GAP;
   const overviewSpaceAvailable = COVER_ZONE_HEIGHT - featuresHeight - COVER_GAP;
 
-  const overviewLines = countLines(overview, OVERVIEW_WIDTH_CHARS);
+  const overviewLines = countLines(overview, m.overviewCharsPerLine);
   // +25 = section-title height: 14pt font × ~1.2 line-height + 8pt margin
-  const overviewWantedHeight = overviewLines * LINE_HEIGHT_PT + 25;
+  const overviewWantedHeight = overviewLines * m.lineHeightPt + 25;
   const overviewOverflow = overviewWantedHeight > overviewSpaceAvailable;
 
   return {

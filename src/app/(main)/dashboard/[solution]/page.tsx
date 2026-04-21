@@ -155,23 +155,43 @@ export default async function SolutionDashboardPage({
     specCountMap.set(pid, sections.length);
   }
 
-  // Fetch translation locales per product (model_name based)
+  // Fetch translation locales per product (model_name based).
+  // Also pulls overview + features per locale so the layout red/green
+  // check can run against CJK content, not just English.
   const productModelNames = (products ?? []).map((p) => p.model_name);
   const { data: translationRows } = productModelNames.length
     ? ((await supabase
         .from("product_translations" as "products")
-        .select("product_id, locale")
+        .select("product_id, locale, overview, features")
         .in("product_id", productModelNames)) as {
-        data: { product_id: string; locale: string }[] | null;
+        data:
+          | { product_id: string; locale: string; overview: string | null; features: string[] | null }[]
+          | null;
       })
-    : { data: [] as { product_id: string; locale: string }[] };
+    : {
+        data: [] as {
+          product_id: string;
+          locale: string;
+          overview: string | null;
+          features: string[] | null;
+        }[],
+      };
 
   // Build map: model_name → locales[]
   const translationLocalesMap = new Map<string, string[]>();
+  // Build map: (model_name, locale) → { overview, features } for layout checking
+  const translationContentMap = new Map<
+    string,
+    { overview: string | null; features: string[] | null }
+  >();
   for (const t of translationRows ?? []) {
     const existing = translationLocalesMap.get(t.product_id) ?? [];
     existing.push(t.locale);
     translationLocalesMap.set(t.product_id, existing);
+    translationContentMap.set(`${t.product_id}|${t.locale}`, {
+      overview: t.overview,
+      features: t.features,
+    });
   }
 
   // Build map: product_id → latest change_log
@@ -220,11 +240,70 @@ export default async function SolutionDashboardPage({
     // Layout overflow pre-check (uses conservative heuristics — see
     // lib/datasheet/layout-check.ts). Surfaces as a colored badge so the
     // user can spot content-too-long issues before generating the PDF.
-    const layout = checkProductLayout({
+    //
+    // Multi-locale: check English + every enabled translation locale.
+    // Cover constraints differ per-locale (CJK fonts are larger and
+    // line-height is taller), so a model that fits in English might
+    // overflow in Japanese or Chinese. Aggregate: any locale overflow
+    // → red flag; reasons are prefixed with the locale tag.
+    const englishLayout = checkProductLayout({
       overview: p.overview,
       features: p.features as string[] | null,
       spec_sections: specMap.get(p.id) ?? [],
     });
+
+    const enabledLocales = translationLocalesMap.get(p.model_name) ?? [];
+    const localizedReports = enabledLocales.map((locale) => {
+      const content = translationContentMap.get(`${p.model_name}|${locale}`);
+      return {
+        locale,
+        report: checkProductLayout({
+          overview: content?.overview ?? p.overview,
+          features: (content?.features ?? p.features) as string[] | null,
+          spec_sections: specMap.get(p.id) ?? [],
+          locale,
+        }),
+      };
+    });
+
+    // Aggregate per-field: worst status across EN + all locales.
+    // Tag each non-ok reason with its locale so the UI can tell the user
+    // which language is overflowing.
+    const statusRank = { ok: 0, warn: 1, overflow: 2 } as const;
+    const worstField = (
+      fieldOf: (r: typeof englishLayout) => { status: "ok" | "warn" | "overflow" },
+    ) => {
+      let worst: "ok" | "warn" | "overflow" = fieldOf(englishLayout).status;
+      for (const { report } of localizedReports) {
+        const s = fieldOf(report).status;
+        if (statusRank[s] > statusRank[worst]) worst = s;
+      }
+      return worst;
+    };
+
+    const aggregatedReasons: string[] = [];
+    if (englishLayout.cover.reasons.length || englishLayout.spec.reasons.length) {
+      for (const r of [...englishLayout.cover.reasons, ...englishLayout.spec.reasons]) {
+        aggregatedReasons.push(`[EN] ${r}`);
+      }
+    }
+    for (const { locale, report } of localizedReports) {
+      for (const r of [...report.cover.reasons, ...report.spec.reasons]) {
+        aggregatedReasons.push(`[${locale.toUpperCase()}] ${r}`);
+      }
+    }
+
+    const layout = {
+      cover: {
+        overview_status: worstField((r) => r.cover.overview_status === undefined ? { status: "ok" as const } : { status: r.cover.overview_status }),
+        features_status: worstField((r) => ({ status: r.cover.features_status ?? "ok" })),
+        reasons: aggregatedReasons.filter((x) => x.includes("Overview") || x.includes("Feature")),
+      },
+      spec: {
+        status: worstField((r) => ({ status: r.spec.status })),
+        reasons: aggregatedReasons.filter((x) => x.includes("Spec") || x.includes("spec")),
+      },
+    };
 
     const radioPatterns: {
       band: string;

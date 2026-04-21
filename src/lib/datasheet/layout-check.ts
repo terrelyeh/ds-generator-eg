@@ -74,6 +74,10 @@ export interface CoverLayoutReport {
 export function checkCoverLayout(params: {
   overview: string | null | undefined;
   features: string[] | null | undefined;
+  /** Locale to estimate against — defaults to English. Pass "ja" or
+   *  "zh-TW" when checking translated content so the red-flag rule
+   *  accounts for the larger CJK font + taller line-height. */
+  locale?: string;
 }): CoverLayoutReport {
   const overview = params.overview ?? "";
   const features = params.features ?? [];
@@ -84,8 +88,8 @@ export function checkCoverLayout(params: {
 
   // Dynamic layout estimate — same algorithm the PDF cover uses.
   // Red fires only when even after dynamic resizing, content would get
-  // clipped on the page.
-  const layout = estimateCoverLayout({ overview, features });
+  // clipped on the page. Locale affects chars/line and line-height.
+  const layout = estimateCoverLayout({ overview, features, locale: params.locale });
 
   let overview_status: LayoutStatus = "ok";
   let features_status: LayoutStatus = "ok";
@@ -253,8 +257,15 @@ export function checkProductLayout(params: {
   overview: string | null | undefined;
   features: string[] | null | undefined;
   spec_sections: { category: string; items: { label: string; value: string }[] }[];
+  /** Locale to evaluate against. Pass "ja" / "zh-TW" to check translated
+   *  content with CJK typography metrics. Defaults to English. */
+  locale?: string;
 }): LayoutReport {
-  const cover = checkCoverLayout(params);
+  const cover = checkCoverLayout({
+    overview: params.overview,
+    features: params.features,
+    locale: params.locale,
+  });
   const spec = checkSpecLayout(params.spec_sections);
   return {
     status: worst(cover.status, spec.status),
