@@ -13,39 +13,32 @@ import {
   estimateItemHeight,
   splitIntoPages,
 } from "./pagination";
+import { estimateCoverLayout, FEATURES_MAX_HEIGHT } from "./cover-layout";
 
 /**
- * Binary status model: only "ok" (green, will fit) or "overflow" (red, will
- * break the PDF layout and needs PM action). The "warn" amber state was
- * removed because it caused decision paralysis — users couldn't tell if
- * they needed to act. With auto-split pagination handling long specs, the
- * only truly-breaking cases are on the absolute-positioned cover page.
+ * Binary status model: only "ok" (green, will fit) or "overflow" (red,
+ * will break the PDF layout and needs PM action). The amber "warn" state
+ * was removed — users couldn't tell if action was required.
  *
- * "warn" kept in the type for backward compat with older UI code but is
- * no longer emitted by this module.
+ * With dynamic cover layout (see cover-layout.ts) matching the manual
+ * designer's workflow, red only fires when content exceeds the physical
+ * page zone even after dynamic resizing.
  */
 export type LayoutStatus = "ok" | "warn" | "overflow";
 
-// ─── Thresholds (red = definitely breaks the PDF) ─────────────────────────
+// ─── Thresholds ────────────────────────────────────────────────────────────
 
-// Overview sits in a fixed-height slot above the absolute-positioned
-// Features box. Beyond ~700 chars (≈6.5 lines at 11pt) the text starts
-// overlapping the Features section below.
-export const OVERVIEW_OVERFLOW_CHARS = 700;
+// Per-feature visual-break threshold: a single feature > 180 chars wraps
+// to 4+ lines at 11pt, which breaks the 2-column balance even if total
+// height is within limits. Separate from the combined-height check.
+export const FEATURE_ITEM_OVERFLOW_CHARS = 180;
 
-// Features container is ~200pt tall with 2 columns. 10 items of normal
-// length fit; 11+ gets clipped. Individual items > 150 chars wrap to 3+
-// lines and break the 2-column balance so later items get pushed out.
-export const FEATURES_OVERFLOW_COUNT = 10;
-export const FEATURE_ITEM_OVERFLOW_CHARS = 150;
-
-// Spec threshold kept for reporting long_items but NEVER triggers
-// overflow — auto-split pagination handles all lengths by flowing to
-// additional columns/pages.
+// Spec threshold kept for reporting long_items (informational only).
+// Auto-split pagination handles any length by flowing to more pages.
 export const SPEC_VALUE_LONG_CHARS = 100;
 
-// Truly excessive content: more than 6 spec pages means the product has
-// way too many spec rows, not a layout bug per se but worth flagging.
+// Truly excessive spec content: beyond this many pages it's a data
+// problem, not a layout bug.
 export const SPEC_EXCESSIVE_PAGES = 6;
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
@@ -87,29 +80,36 @@ export function checkCoverLayout(params: {
   const overviewChars = overview.length;
 
   const reasons: string[] = [];
-
-  // Overview: red only if it will definitely overlap Features section below
-  let overview_status: LayoutStatus = "ok";
-  if (overviewChars > OVERVIEW_OVERFLOW_CHARS) {
-    overview_status = "overflow";
-    const excess = overviewChars - OVERVIEW_OVERFLOW_CHARS;
-    reasons.push(
-      `Overview 過長 (${overviewChars} 字 / 上限 ${OVERVIEW_OVERFLOW_CHARS})，會蓋到下方 Features — 需刪 ~${excess} 字`,
-    );
-  }
-
-  // Features: red if count exceeds fixed-height container OR any single
-  // item is so long it breaks the 2-column balance
-  let features_status: LayoutStatus = "ok";
   const long_features: LongFeature[] = [];
 
-  if (features.length > FEATURES_OVERFLOW_COUNT) {
+  // Dynamic layout estimate — same algorithm the PDF cover uses.
+  // Red fires only when even after dynamic resizing, content would get
+  // clipped on the page.
+  const layout = estimateCoverLayout({ overview, features });
+
+  let overview_status: LayoutStatus = "ok";
+  let features_status: LayoutStatus = "ok";
+
+  if (layout.featuresCapped) {
     features_status = "overflow";
+    const excessPt = layout.featuresWantedHeight - FEATURES_MAX_HEIGHT;
+    const approxItemsToCut = Math.ceil(excessPt / 25); // ~25pt per single-line item
     reasons.push(
-      `Features 項目過多 (${features.length} / 上限 ${FEATURES_OVERFLOW_COUNT})，最後幾項會被切掉 — 需刪 ${features.length - FEATURES_OVERFLOW_COUNT} 項`,
+      `Features 超過版面上限 (需 ${layout.featuresWantedHeight}pt / 上限 ${FEATURES_MAX_HEIGHT}pt) — 建議刪 ~${approxItemsToCut} 項或縮短文字`,
     );
   }
 
+  if (layout.overviewOverflow) {
+    overview_status = "overflow";
+    const excessPt = layout.overviewWantedHeight - layout.overviewSpaceAvailable;
+    const approxCharsToCut = Math.ceil((excessPt / 15) * 38); // ~38 chars/line
+    reasons.push(
+      `Overview 擠不進剩餘空間 (需 ${layout.overviewWantedHeight}pt / 剩 ${layout.overviewSpaceAvailable}pt — 因為 Features 佔用 ${layout.featuresHeight}pt) — 建議刪 ~${approxCharsToCut} 字`,
+    );
+  }
+
+  // Per-item visual-break rule (independent of total height): a single
+  // feature that wraps to 4+ lines looks wrong even if total fits.
   features.forEach((f, i) => {
     if (f.length > FEATURE_ITEM_OVERFLOW_CHARS) {
       features_status = "overflow";

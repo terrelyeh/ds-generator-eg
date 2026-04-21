@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { splitIntoPages } from "@/lib/datasheet/pagination";
+import { estimateCoverLayout, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
 import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
@@ -164,6 +165,12 @@ export default async function PreviewPage({
   const headline = (isTranslated && translatedHeadline) ? translatedHeadline : (product.headline || product.full_name);
   const subtitle = (isTranslated && translatedSubtitle) ? translatedSubtitle : product.subtitle;
   const midpoint = Math.ceil(features.length / 2);
+
+  // Dynamic cover layout — mirrors the manual designer's workflow of
+  // sizing features first, then flowing overview into remaining space.
+  // Healthy datasheets (features ≤ 260pt content) render almost identically
+  // to before; oversized content gets clipped (flagged red via layout-check).
+  const coverLayout = estimateCoverLayout({ overview, features });
 
   // versionOverride is passed by /api/generate-pdf so the footer prints the
   // correct version being generated, rather than the stale DB value which
@@ -362,6 +369,11 @@ body {
 }
 .overview-section {
   position: absolute; left: 36pt; top: 270pt; width: 270pt;
+  /* 'bottom' is set inline from coverLayout.overviewBottom so overview
+     reserves space for the features wrapper below. overflow: hidden is a
+     safety net — if content over-estimates slightly, clip rather than
+     overlap features. */
+  overflow: hidden;
 }
 .overview-text {
   font-weight: 400; font-size: 11pt; color: #6f6f6f; line-height: 1.35;
@@ -369,6 +381,11 @@ body {
 
 .features-wrapper {
   position: absolute; left: 36pt; right: 36pt; bottom: 36pt;
+  /* Hard cap to match the designer's implicit limit — beyond this,
+     features become cramped and visually break. Content that exceeds
+     this cap gets clipped and is flagged red by layout-check. */
+  max-height: ${FEATURES_MAX_HEIGHT}pt;
+  overflow: hidden;
 }
 .features-title {
   font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle}; margin-bottom: 10pt;
@@ -559,7 +576,10 @@ ${typo ? `
           </div>
         )}
 
-        <div className="overview-section">
+        <div
+          className="overview-section"
+          style={{ bottom: `${coverLayout.overviewBottom}pt` }}
+        >
           <div className="section-title">{dict.overview}</div>
           <div className="overview-text">{overview}</div>
         </div>
