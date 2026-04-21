@@ -2,6 +2,12 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
+import {
+  computeContentHash,
+  isAckValid,
+  type LayoutAckMap,
+  type LayoutAckValue,
+} from "@/lib/datasheet/layout-ack";
 import type { ProductLine } from "@/types/database";
 
 interface ProductRow {
@@ -22,7 +28,7 @@ interface ProductRow {
    *  When true for a locale, the dashboard treats that locale as OK
    *  even if the heuristic would flag overflow. Set via the "Mark as
    *  Reviewed OK" button on the product detail page. */
-  layout_ack: Record<string, boolean> | null;
+  layout_ack: Record<string, LayoutAckValue | undefined> | null;
 }
 
 interface RadioPatternAsset {
@@ -269,18 +275,21 @@ export default async function SolutionDashboardPage({
     // line-height is taller), so a model that fits in English might
     // overflow in Japanese or Chinese. Aggregate: any locale overflow
     // → red flag; reasons are prefixed with the locale tag.
-    // Per-locale manual override map. When ack[locale] is true the
-    // dashboard treats that locale as OK even if the heuristic says
-    // overflow — lets PMs compress via typography adjustments and then
-    // clear the red flag themselves without a code change.
-    const ack = (p.layout_ack ?? {}) as Record<string, boolean>;
+    // Per-locale manual override map. When ack is valid (content
+    // hash matches what was acked), dashboard treats that locale as
+    // OK. If content has changed since ack, the hash mismatches and
+    // the ack silently falls back to "not acked" → warning re-appears.
+    const ack = (p.layout_ack ?? {}) as LayoutAckMap;
 
     const englishLayoutRaw = checkProductLayout({
       overview: p.overview,
       features: p.features as string[] | null,
       spec_sections: specMap.get(p.id) ?? [],
     });
-    const englishLayout = ack.en ? forceOk(englishLayoutRaw) : englishLayoutRaw;
+    const enHash = computeContentHash(p.overview, p.features as string[] | null);
+    const englishLayout = isAckValid(ack.en, enHash)
+      ? forceOk(englishLayoutRaw)
+      : englishLayoutRaw;
 
     const enabledLocales = translationLocalesMap.get(p.model_name) ?? [];
     const localizedReports = enabledLocales
@@ -294,13 +303,19 @@ export default async function SolutionDashboardPage({
           (content?.overview && content.overview.trim().length > 0) ||
           (content?.features && content.features.length > 0);
         if (!hasAnyTranslation) return null;
+        const overview = content?.overview ?? p.overview;
+        const features = (content?.features ?? p.features) as string[] | null;
         const raw = checkProductLayout({
-          overview: content?.overview ?? p.overview,
-          features: (content?.features ?? p.features) as string[] | null,
+          overview,
+          features,
           spec_sections: specMap.get(p.id) ?? [],
           locale,
         });
-        return { locale, report: ack[locale] ? forceOk(raw) : raw };
+        const localeHash = computeContentHash(overview, features);
+        return {
+          locale,
+          report: isAckValid(ack[locale], localeHash) ? forceOk(raw) : raw,
+        };
       })
       .filter((r): r is { locale: string; report: ReturnType<typeof checkProductLayout> } => r !== null);
 

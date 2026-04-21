@@ -65,8 +65,18 @@ interface ProductDetailProps {
    *  Each has the same shape as layoutReport but evaluates against that
    *  locale's typography metrics (CJK fonts are larger with taller
    *  line-height). Surfaces locale-specific warnings so PMs know
-   *  exactly which language needs shortening. */
-  localizedLayoutReports?: { locale: string; report: LayoutReport }[];
+   *  exactly which language needs shortening.
+   *  `acked` = true means the PM already clicked "Mark as Reviewed OK"
+   *  for this locale AND the content hash still matches → warning is
+   *  suppressed, show an Undo affordance instead. */
+  localizedLayoutReports?: {
+    locale: string;
+    report: LayoutReport;
+    acked: boolean;
+  }[];
+  /** English: the layout has an issue but the PM acked it and the ack
+   *  is still valid. Show the Undo affordance. */
+  englishAcked?: boolean;
 }
 
 function LayoutWarningBanner({
@@ -227,6 +237,69 @@ function LayoutWarningBanner({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Low-key inline notice shown in place of the warning banner when a
+ * locale has been manually acked AND the ack is still valid. Gives
+ * the PM a way to see "this was reviewed" and undo if desired.
+ */
+function LayoutAckedNotice({
+  locale,
+  modelName,
+  onUnacked,
+}: {
+  locale?: string;
+  modelName: string;
+  onUnacked?: () => void;
+}) {
+  const [unacking, setUnacking] = useState(false);
+  const ackLocale = locale ?? "en";
+  const localeTag = locale
+    ? ` [${locale === "zh-TW" ? "繁中" : locale === "ja" ? "日文" : locale.toUpperCase()}]`
+    : "";
+
+  async function undoAck() {
+    setUnacking(true);
+    try {
+      const res = await fetch(
+        `/api/products/${encodeURIComponent(modelName)}/layout-ack`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ locale: ackLocale, ack: false }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        toast.error(`Failed to undo: ${err.error ?? res.statusText}`);
+        return;
+      }
+      toast.success(`Reverted ${ackLocale.toUpperCase()} — warning will reappear if overflow still exists`);
+      onUnacked?.();
+    } finally {
+      setUnacking(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 flex items-center justify-between rounded-md border border-green-200 bg-green-50/60 px-4 py-2 text-sm text-green-800">
+      <div className="flex items-center gap-2">
+        <span className="text-green-600">✓</span>
+        <span>
+          Layout reviewed{localeTag} — warning suppressed by your confirmation.
+        </span>
+      </div>
+      <button
+        onClick={undoAck}
+        disabled={unacking}
+        className="rounded border border-green-300 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+        title="Remove this confirmation — the warning banner will come back if overflow still exists."
+      >
+        {unacking ? "…" : "Undo"}
+      </button>
     </div>
   );
 }
@@ -601,7 +674,7 @@ function RadioPatternSlot({
   );
 }
 
-export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [] }: ProductDetailProps) {
+export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false }: ProductDetailProps) {
   const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -731,7 +804,15 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
           an issue. Shown at the top regardless of active tab so PMs
           see all locales' warnings in one place and can act on each.
           Each banner has a "Mark as Reviewed OK" button that calls the
-          layout-ack API so the dashboard red flag goes away. */}
+          layout-ack API so the dashboard red flag goes away.
+          If a locale is already acked (and the ack is still valid),
+          we show a subtle green notice with an Undo button instead. */}
+      {englishAcked && (
+        <LayoutAckedNotice
+          modelName={product.model_name}
+          onUnacked={() => router.refresh()}
+        />
+      )}
       {layoutReport && layoutReport.status !== "ok" && (
         <LayoutWarningBanner
           report={layoutReport}
@@ -739,9 +820,24 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
           onAcked={() => router.refresh()}
         />
       )}
-      {localizedLayoutReports
-        .filter(({ report }) => report.status !== "ok")
-        .map(({ locale, report }) => (
+      {localizedLayoutReports.map(({ locale, report, acked }) => {
+        if (acked) {
+          // Suppressed by a valid ack — show Undo affordance instead
+          // of the warning. We only show this when the underlying
+          // report actually has an issue (no point telling the PM
+          // "reviewed OK" when nothing was wrong).
+          if (report.status === "ok") return null;
+          return (
+            <LayoutAckedNotice
+              key={locale}
+              locale={locale}
+              modelName={product.model_name}
+              onUnacked={() => router.refresh()}
+            />
+          );
+        }
+        if (report.status === "ok") return null;
+        return (
           <LayoutWarningBanner
             key={locale}
             report={report}
@@ -749,7 +845,8 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
             modelName={product.model_name}
             onAcked={() => router.refresh()}
           />
-        ))}
+        );
+      })}
 
       {/* Sticky Header */}
       <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">

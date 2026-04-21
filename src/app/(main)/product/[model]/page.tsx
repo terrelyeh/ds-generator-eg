@@ -2,6 +2,11 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProductDetail } from "@/components/product/product-detail";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
+import {
+  computeContentHash,
+  isAckValid,
+  type LayoutAckMap,
+} from "@/lib/datasheet/layout-ack";
 import type {
   ProductWithSpecs,
   Product,
@@ -93,19 +98,29 @@ export default async function ProductPage({
     spec_sections: specSectionsForCheck,
   });
 
-  // Respect per-locale manual acknowledgements. When ack[locale] is
-  // true (PM clicked "Mark as Reviewed OK" after visual verification),
-  // we suppress the warning banner for that locale. Stored in
-  // products.layout_ack JSONB.
-  const ack = (product.layout_ack as Record<string, boolean> | null) ?? {};
-  const layoutReport = ack.en ? null : layoutReportRaw;
+  // Respect per-locale manual acknowledgements, but only while the
+  // content hash matches what was acked. If overview/features have
+  // been edited since, the ack silently invalidates and the warning
+  // re-appears. Stored in products.layout_ack JSONB.
+  const ack = (product.layout_ack ?? {}) as LayoutAckMap;
+  const enHash = computeContentHash(
+    productWithSpecs.overview,
+    productWithSpecs.features as string[] | null,
+  );
+  const enAckValid = isAckValid(ack.en, enHash);
+  const layoutReport = enAckValid ? null : layoutReportRaw;
 
   // Per-locale reports keyed by locale. Skip any locale the PM has
-  // already acknowledged — banner disappears until they un-ack or the
-  // content changes significantly.
-  const localizedReports: { locale: string; report: typeof layoutReportRaw }[] = [];
+  // already acknowledged (and the ack is still valid) — banner
+  // disappears until they un-ack or the content changes significantly.
+  // For each locale we also surface acked=true/false so the child
+  // component can render an Undo affordance.
+  const localizedReports: {
+    locale: string;
+    report: typeof layoutReportRaw;
+    acked: boolean;
+  }[] = [];
   for (const t of translationData ?? []) {
-    if (ack[t.locale]) continue;
     // Skip if nothing has been translated yet. Measuring English text
     // with CJK metrics would falsely red-flag the locale before the
     // PM has done any work.
@@ -113,14 +128,21 @@ export default async function ProductPage({
       (t.overview && t.overview.trim().length > 0) ||
       (t.features && t.features.length > 0);
     if (!hasAnyTranslation) continue;
+
+    const overview = t.overview ?? productWithSpecs.overview;
+    const features = (t.features ?? productWithSpecs.features) as string[] | null;
+    const localeHash = computeContentHash(overview, features);
+    const localeAckValid = isAckValid(ack[t.locale], localeHash);
+    const report = checkProductLayout({
+      overview,
+      features,
+      spec_sections: specSectionsForCheck,
+      locale: t.locale,
+    });
     localizedReports.push({
       locale: t.locale,
-      report: checkProductLayout({
-        overview: t.overview ?? productWithSpecs.overview,
-        features: (t.features ?? productWithSpecs.features) as string[] | null,
-        spec_sections: specSectionsForCheck,
-        locale: t.locale,
-      }),
+      report,
+      acked: localeAckValid,
     });
   }
 
@@ -132,6 +154,7 @@ export default async function ProductPage({
         translations={translationData ?? []}
         layoutReport={layoutReport ?? undefined}
         localizedLayoutReports={localizedReports}
+        englishAcked={enAckValid && layoutReportRaw.status !== "ok"}
       />
     </div>
   );

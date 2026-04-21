@@ -86,8 +86,12 @@ export interface Database {
           sheet_last_modified: string | null;
           sheet_last_editor: string | null;
           /** Per-locale manual layout-overflow acknowledgements — see
-           *  migration 00011. `{ en?: boolean, ja?: boolean, ... }`. */
-          layout_ack: Record<string, boolean>;
+           *  migration 00011. Values can be:
+           *    - legacy `true` (backward compat, always valid)
+           *    - `{ acked: true, hash: "..." }` (content-bound, auto
+           *       invalidated when overview/features change)
+           *  See `lib/datasheet/layout-ack.ts` for the helpers. */
+          layout_ack: Record<string, true | { acked: true; hash: string }>;
           created_at: string;
           updated_at: string;
         };
