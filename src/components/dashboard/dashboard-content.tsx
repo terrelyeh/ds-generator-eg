@@ -19,6 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Columns2, History, Languages } from "lucide-react";
 import type { ProductLine } from "@/types/database";
 
 interface ProductSummary {
@@ -441,24 +442,30 @@ export function DashboardContent({
           Left: view navigation (Compare / Changelog / Translations).
           Right: data operations (Status filter + Sync). */}
       <div className="flex items-center justify-between gap-4">
-        {/* Left group: navigation links (flat ghost buttons) */}
+        {/* Left group: navigation links (flat ghost buttons with icons
+            to improve scannability — each link has a glyph that hints
+            at its destination: side-by-side columns for Compare, clock
+            for history/Changelog, language script for Translations). */}
         <div className="flex items-center gap-1">
           <Link
             href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
+            <Columns2 className="h-3.5 w-3.5" />
             Compare
           </Link>
           <Link
             href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
+            <History className="h-3.5 w-3.5" />
             Changelog
           </Link>
           <Link
             href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
+            <Languages className="h-3.5 w-3.5" />
             Translations
           </Link>
         </div>
