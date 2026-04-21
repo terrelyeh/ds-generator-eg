@@ -627,9 +627,14 @@ ${typo ? `
               <div className="spec-col">
                 {page.left.map((section, si) => (
                   <div key={si}>
-                    <div className="spec-category-header">
-                      {section.category}
-                    </div>
+                    {/* Skip category header on continuation sections —
+                        avoids "L2 Software Features (cont.) (cont.)"
+                        repeating at every column/page break. */}
+                    {!section.isContinuation && (
+                      <div className="spec-category-header">
+                        {section.category}
+                      </div>
+                    )}
                     {section.items.map((item, ii) => (
                       <div key={ii} className="spec-row">
                         <div className="spec-label">{item.label}</div>
@@ -642,9 +647,11 @@ ${typo ? `
               <div className="spec-col">
                 {page.right.map((section, si) => (
                   <div key={si}>
-                    <div className="spec-category-header">
-                      {section.category}
-                    </div>
+                    {!section.isContinuation && (
+                      <div className="spec-category-header">
+                        {section.category}
+                      </div>
+                    )}
                     {section.items.map((item, ii) => (
                       <div key={ii} className="spec-row">
                         <div className="spec-label">{item.label}</div>

@@ -5,9 +5,17 @@
  * page budget.
  */
 
-interface Section {
+export interface Section {
   category: string;
   items: { label: string; value: string }[];
+  /**
+   * True when this section is a continuation of one that started in the
+   * previous column or page. The renderer uses this flag to SKIP the
+   * grey category-header row — readers don't need "L2 Software Features
+   * (cont.)" repeated; the items just flow naturally. Replaces the old
+   * string-concatenation approach which stacked up "(cont.) (cont.) (cont.)".
+   */
+  isContinuation?: boolean;
 }
 
 interface SpecPage {
@@ -97,7 +105,8 @@ function splitValueAtLines(
 }
 
 function estimateSectionHeight(section: Section): number {
-  let h = CATEGORY_HEADER_HEIGHT;
+  // Continuation sections don't re-render the category header
+  let h = section.isContinuation ? 0 : CATEGORY_HEADER_HEIGHT;
   for (const item of section.items) {
     h += estimateItemHeight(item.value);
   }
@@ -129,14 +138,16 @@ function balanceColumns(sections: Section[]): SpecPage {
 /**
  * Try to fit a whole section into a column with `availableHeight` pt remaining.
  * If the section doesn't fit entirely, split its items — what fits goes now,
- * the rest is returned as a new section labelled "<name> (cont.)".
+ * the rest is returned as a new section with `isContinuation: true` so the
+ * renderer knows to SUPPRESS the category header (avoids repeated
+ * "L2 Software Features (cont.) (cont.)" at every column/page break).
  *
  * Mid-item splitting: if a single item's value is too tall to fit in the
  * remaining space, we split the value text at a line boundary. The head
  * portion fits in the current column under its original label; the tail
  * becomes a continuation item with label "<label> (cont.)" in the next
- * column. This avoids wasted whitespace when a long value straddles
- * column/page boundaries.
+ * column. This "(cont.)" stays because the item label visually makes
+ * sense to repeat (otherwise the tail value has no label at all).
  *
  * Guarantees at least one item per call (even if it's technically too tall
  * — better to let one item overflow slightly than to loop forever).
@@ -145,7 +156,9 @@ function fitSection(
   section: Section,
   availableHeight: number,
 ): { fitted: Section | null; remaining: Section | null } {
-  const headerH = CATEGORY_HEADER_HEIGHT;
+  // Continuation sections skip the header row — only deduct header height
+  // for the first (non-continuation) appearance of a section.
+  const headerH = section.isContinuation ? 0 : CATEGORY_HEADER_HEIGHT;
 
   // Header alone doesn't fit → whole section goes to next column
   if (headerH >= availableHeight) {
@@ -201,14 +214,25 @@ function fitSection(
     return { fitted: null, remaining: section };
   }
 
-  const fitted: Section = { category: section.category, items: fittedItems };
+  // Preserve the incoming isContinuation flag on the `fitted` piece too —
+  // if the section was already a continuation (e.g. carried over from the
+  // previous column), the fitted portion shouldn't re-show the header.
+  const fitted: Section = {
+    category: section.category,
+    items: fittedItems,
+    isContinuation: section.isContinuation,
+  };
 
-  // Build remaining: midItemTail (if any) + leftover items after index i
+  // Build remaining: midItemTail (if any) + leftover items after index i.
+  // The remainder is always a continuation — the header already appeared
+  // (or was already suppressed) on the fitted portion, so the next column
+  // should just flow the items without re-introducing the grey header bar.
   const leftoverItems = section.items.slice(i);
   const hasRemaining = midItemTail !== null || leftoverItems.length > 0;
   const remaining: Section | null = hasRemaining
     ? {
-        category: `${section.category} (cont.)`,
+        category: section.category,
+        isContinuation: true,
         items: midItemTail
           ? [midItemTail, ...leftoverItems]
           : leftoverItems,
