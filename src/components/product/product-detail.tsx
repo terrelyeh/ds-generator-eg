@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
+import { looksLikeUnseparatedList } from "@/lib/datasheet/pagination";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
 
 interface LongFeature {
@@ -1385,7 +1386,9 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
                   <col />
                 </colgroup>
                 <tbody>
-                  {section.items.map((item, idx) => (
+                  {section.items.map((item, idx) => {
+                    const unseparated = looksLikeUnseparatedList(item.value);
+                    return (
                     <tr
                       key={item.id}
                       className={`border-b border-border/50 last:border-b-0 ${
@@ -1396,10 +1399,21 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
                         {item.label}
                       </td>
                       <td className="py-2 px-4 align-top text-sm leading-relaxed break-words whitespace-pre-line">
-                        {item.value}
+                        <div className="flex items-start gap-2">
+                          <span className="min-w-0 flex-1">{item.value}</span>
+                          {unseparated && (
+                            <span
+                              className="flex-shrink-0 inline-flex items-center gap-0.5 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                              title={`這個值看起來是多項但沒有分隔符。PDF 會渲染成一整句。建議去 Google Sheet 的 Detail Specs 把「${item.value.trim()}」改成逗號分隔（${item.value.trim().split(/\s+/).join(", ")}）或每項一行。`}
+                            >
+                              ⚠️ 多項建議加分隔符
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

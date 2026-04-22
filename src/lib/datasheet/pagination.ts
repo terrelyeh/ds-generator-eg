@@ -67,6 +67,48 @@ export function filterRenderableSections<
     .filter((s) => s.items.length > 0);
 }
 
+/**
+ * Does a spec value look like multiple short items run together without
+ * separators? Flags cases like "FCC CE IC JP UKCA" where the PM forgot
+ * to put commas or newlines between certifications / standards /
+ * bands. Rendered as-is, these become a single unreadable blob in the
+ * PDF. Used to surface a ⚠️ hint next to the value in the product
+ * detail page so the PM can fix it in the Sheet.
+ *
+ * Intentionally conservative — must satisfy ALL conditions so real
+ * single-item values (`2 x 2.4 GHz: 5 dBi`, `External Omni-Directional`,
+ * `IEEE 802.11ax`) never false-positive:
+ *
+ *   1. No `\n` and no `,` anywhere in the value
+ *   2. Length > 10 chars (too short isn't worth flagging)
+ *   3. No colons / parens / slashes / em-dashes / decimals (suggest single compound value)
+ *   4. No unit-qualified numbers (GHz, Mbps, dBi, °C, …)
+ *   5. No CJK chars (rule is tuned for Latin token lists)
+ *   6. ≥ 3 space-separated tokens
+ *   7. Every token ≤ 6 characters (longer tokens usually part of a phrase)
+ */
+export function looksLikeUnseparatedList(value: string): boolean {
+  const v = value.trim();
+  if (!v || v.includes("\n") || v.includes(",")) return false;
+  if (v.length <= 10) return false;
+  if (/[():/–—]/.test(v)) return false;
+  if (/\d+\.\d/.test(v)) return false;
+  if (
+    /\b\d+\s*(GHz|MHz|Hz|Mbps|Gbps|Kbps|dBi|dBm|mW|W|A|V|°C|°F|%|pt|nm|mm|cm|m|kg|g|in|inch|lb|lbs|ft|oz|sec|ms|hrs?|days?)\b/i.test(
+      v,
+    )
+  ) {
+    return false;
+  }
+  if (/[\u3000-\u9fff\uff00-\uffef]/.test(v)) return false;
+  const tokens = v.split(/\s+/);
+  if (tokens.length < 3) return false;
+  for (const t of tokens) {
+    if (t.length > 6) return false;
+  }
+  return true;
+}
+
 // A single unwrapped spec row: label (7pt) on top + value (7pt) underneath
 // + border-bottom + vertical padding. Bumped 18→20pt to absorb per-row
 // rendering variance (padding/border accumulate over 30+ rows).
