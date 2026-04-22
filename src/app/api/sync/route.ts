@@ -60,8 +60,26 @@ export async function POST(request: Request) {
     );
   }
 
-  const linesToSync = filterLine
-    ? productLines.filter((pl) => pl.name === filterLine)
+  // When only `?model=X` is given, look up which product line owns
+  // that model so we don't iterate all 7 lines doing pointless Sheet
+  // reads — each probe costs ~3 API calls and on Hobby's 60s budget
+  // that 6× overhead is the difference between pass and 504 timeout.
+  let narrowedByModel: string | null = null;
+  if (filterModel && !filterLine) {
+    const { data: ownerRow } = await supabase
+      .from("products")
+      .select("product_lines!inner(name)")
+      .eq("model_name", filterModel)
+      .maybeSingle() as {
+        data: { product_lines: { name: string } | { name: string }[] } | null;
+      };
+    const pl = ownerRow?.product_lines;
+    narrowedByModel = Array.isArray(pl) ? pl[0]?.name ?? null : pl?.name ?? null;
+  }
+
+  const effectiveLine = filterLine ?? narrowedByModel;
+  const linesToSync = effectiveLine
+    ? productLines.filter((pl) => pl.name === effectiveLine)
     : productLines;
 
   const results: {
@@ -404,8 +422,16 @@ export async function POST(request: Request) {
       );
     }
 
-      // Sync extra tabs: Revision Log, Comparison, Cloud Comparison
+      // Sync extra tabs: Revision Log, Comparison, Cloud Comparison.
+      // Skip when scoping to a single model — these are line-level
+      // datasets (hundreds of rows for Cloud AP) and a per-model
+      // resync has no business rewriting them. This is the main
+      // reason /api/sync?model=X was hitting Vercel's 60s limit.
       try {
+      if (filterModel) {
+        // Only the product row itself was re-read; skip line-scoped
+        // tables. Cron (daily) and full line syncs still refresh them.
+      } else {
         // Revision Log
         if (pl.revision_log_gid) {
           const revLogs = await loadRevisionLogs(pl.sheet_id, pl.revision_log_gid);
@@ -506,6 +532,7 @@ export async function POST(request: Request) {
             await supabase.from("cloud_comparisons").insert(batch);
           }
         }
+      }
       } catch (err) {
         lineResult.errors.push(
           `Extra tabs: ${err instanceof Error ? err.message : String(err)}`

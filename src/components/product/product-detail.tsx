@@ -720,8 +720,12 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
     setResyncing(true);
     setShowResyncMenu(false);
     try {
+      // Pass BOTH line and model so the backend scopes to a single
+      // product line right away. Without line=, old backend builds
+      // would iterate all 7 lines probing for the model — 6x wasted
+      // Sheet API calls that pushed us past Hobby's 60s limit.
       const res = await fetch(
-        `/api/sync?force=true&model=${encodeURIComponent(product.model_name)}`,
+        `/api/sync?force=true&line=${encodeURIComponent(product.product_line.name)}&model=${encodeURIComponent(product.model_name)}`,
         { method: "POST" },
       );
       const rawText = await res.text();
