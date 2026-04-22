@@ -682,9 +682,11 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
 
   const [showGenMenu, setShowGenMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
+  const [showResyncMenu, setShowResyncMenu] = useState(false);
 
   async function handleResyncImages() {
     setResyncing(true);
+    setShowResyncMenu(false);
     try {
       const res = await fetch(
         `/api/resync-product?model=${encodeURIComponent(product.model_name)}`,
@@ -699,6 +701,55 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
         router.refresh();
       } else {
         alert(`Resync failed: ${data.error || "Unknown error"}${data.details ? `\n\n${data.details}` : ""}`);
+      }
+    } catch (err) {
+      alert(`Resync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setResyncing(false);
+    }
+  }
+
+  /**
+   * Full content + images resync for a single model. Unlike the
+   * dashboard's per-line sync which hits Vercel's 60s limit on AP
+   * (25 models), one model completes in a few seconds. Uses the
+   * existing /api/sync route with ?model= filter which already
+   * re-reads Sheets, syncs images, and re-indexes RAG.
+   */
+  async function handleResyncContent() {
+    setResyncing(true);
+    setShowResyncMenu(false);
+    try {
+      const res = await fetch(
+        `/api/sync?force=true&model=${encodeURIComponent(product.model_name)}`,
+        { method: "POST" },
+      );
+      const rawText = await res.text();
+      let data: { ok?: boolean; error?: string; results?: Array<{ synced?: string[]; errors?: string[] }> } | null = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+      if (!res.ok || !data) {
+        const preview = rawText.slice(0, 160).replace(/\s+/g, " ").trim();
+        alert(`Resync failed (HTTP ${res.status})${preview ? `\n\n${preview}` : ""}`);
+        return;
+      }
+      if (data.ok) {
+        const synced = data.results?.[0]?.synced ?? [];
+        const errors = data.results?.[0]?.errors ?? [];
+        if (errors.length > 0) {
+          alert(`Resync completed with errors:\n${errors.join("\n")}`);
+        }
+        router.refresh();
+        if (synced.length > 0) {
+          toast.success(`${product.model_name} re-synced (content + images)`);
+        } else {
+          toast.success(`${product.model_name} is already up to date`);
+        }
+      } else {
+        alert(`Resync failed: ${data.error || "Unknown error"}`);
       }
     } catch (err) {
       alert(`Resync failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -869,15 +920,71 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
             </span>
           </div>
         <div className="flex flex-shrink-0 gap-3">
-          <Button
-            variant="outline"
-            size="default"
-            onClick={handleResyncImages}
-            disabled={resyncing}
-            title="Re-fetch this product's images from Google Drive (also propagates deletes)"
-          >
-            {resyncing ? "Syncing..." : "Resync Images"}
-          </Button>
+          {/* Split button: main = images only (fast, no Sheet re-read).
+              Dropdown reveals full Content + Images sync for this one
+              model — safer than dashboard's per-line sync because a
+              single model never gets near the 60s Vercel limit. */}
+          <div className="relative flex">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleResyncImages}
+              disabled={resyncing}
+              className="rounded-r-none"
+              title="Re-fetch this product's images from Google Drive (also propagates deletes)"
+            >
+              {resyncing ? "Syncing..." : "Resync Images"}
+            </Button>
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => setShowResyncMenu(!showResyncMenu)}
+              disabled={resyncing}
+              className="rounded-l-none border-l-0 px-2"
+              aria-label="Resync options"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 5l3 3 3-3" />
+              </svg>
+            </Button>
+            {showResyncMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border bg-popover p-1 shadow-md">
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+                  onClick={handleResyncImages}
+                  disabled={resyncing}
+                >
+                  <svg className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="1.5" y="3" width="13" height="10" rx="1" />
+                    <path d="M4 10l2.5-2.5L9 10l2-2 3 3" />
+                    <circle cx="5" cy="6" r="0.8" fill="currentColor" />
+                  </svg>
+                  <div>
+                    <div className="font-medium">Images only</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Re-fetch images from Drive. Fast.
+                    </div>
+                  </div>
+                </button>
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+                  onClick={handleResyncContent}
+                  disabled={resyncing}
+                >
+                  <svg className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+                    <path d="M14 1v4h-4M2 15v-4h4" />
+                  </svg>
+                  <div>
+                    <div className="font-medium">Content + Images</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Re-read Sheet (overview, features, specs) and images.
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
           <Link href={`/preview/${product.model_name}`} target="_blank">
             <Button variant="outline" size="default">
               Preview Datasheet

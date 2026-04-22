@@ -352,10 +352,20 @@ export function DashboardContent({
   }
 
   const [syncing, setSyncing] = useState(false);
+  const [showSyncMenu, setShowSyncMenu] = useState(false);
 
-  async function handleSync() {
+  /**
+   * Smart sync by default: only pulls lines whose Drive modifiedTime
+   * has advanced since last_synced_at. For Hobby plan's 60s function
+   * limit this is critical — a full force-sync of 25 Cloud APs can
+   * take 60s+ and 504 timeout. Force mode stays available via the
+   * dropdown for the rare case PMs genuinely want to re-pull
+   * everything (e.g. suspected RAG index drift).
+   */
+  async function handleSync(force = false) {
     if (!activeLine) return;
     setSyncing(true);
+    setShowSyncMenu(false);
     try {
       // Client-side timeout safety net: if Vercel function exceeds
       // maxDuration (60s on Hobby plan) and the HTTP connection hangs,
@@ -363,8 +373,9 @@ export function DashboardContent({
       // forever with no feedback.
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 90_000);
+      const forceParam = force ? "force=true&" : "";
       const res = await fetch(
-        `/api/sync?force=true&line=${encodeURIComponent(activeLine.name)}`,
+        `/api/sync?${forceParam}line=${encodeURIComponent(activeLine.name)}`,
         { method: "POST", signal: controller.signal }
       );
       clearTimeout(timeoutId);
@@ -532,23 +543,70 @@ export function DashboardContent({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <button
-            onClick={handleSync}
-            disabled={syncing}
-            className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <svg
-              className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`}
-              viewBox="0 0 16 16"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
+          {/* Split button: main click does smart sync (skips unchanged
+              lines via Drive modifiedTime). Dropdown arrow reveals
+              "Force full re-sync" for the rare case — warns about
+              Hobby plan's 60s timeout since a full AP sync is tight. */}
+          <div className="relative flex items-center">
+            <button
+              onClick={() => handleSync(false)}
+              disabled={syncing}
+              className="inline-flex items-center gap-1 rounded-l-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Smart sync — only pulls product lines Drive says have changed since last sync"
             >
-              <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
-              <path d="M14 1v4h-4M2 15v-4h4" />
-            </svg>
-            {syncing ? "Syncing..." : "Sync"}
-          </button>
+              <svg
+                className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+                <path d="M14 1v4h-4M2 15v-4h4" />
+              </svg>
+              {syncing ? "Syncing..." : "Sync"}
+            </button>
+            <button
+              onClick={() => setShowSyncMenu((v) => !v)}
+              disabled={syncing}
+              className="inline-flex items-center rounded-r-md border-l border-transparent px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Sync options"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+            </button>
+            {showSyncMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border bg-popover p-1 shadow-md">
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+                  onClick={() => handleSync(false)}
+                  disabled={syncing}
+                >
+                  <span className="mt-0.5">⚡</span>
+                  <div>
+                    <div className="font-medium">Smart sync</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Only re-sync if Drive says the sheet changed. Fast.
+                    </div>
+                  </div>
+                </button>
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+                  onClick={() => handleSync(true)}
+                  disabled={syncing}
+                >
+                  <span className="mt-0.5">🔄</span>
+                  <div>
+                    <div className="font-medium">Force full re-sync</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Re-pull everything. ⚠️ Cloud AP (25 models) may exceed the 60s Vercel limit.
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
