@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
-import { looksLikeUnseparatedList } from "@/lib/datasheet/pagination";
+import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
 
 interface LongFeature {
@@ -1402,6 +1402,10 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
                 </li>
                 <li className="flex gap-2">
                   <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>TBD 佔位</strong>：填 <code className="rounded bg-muted px-1 text-xs">TBD</code> 標記尚未決定的規格，本頁會用灰底顯示提醒你補上，但 PDF 還是會印出 TBD（如果你已生 PDF，記得最後實測後回來更新）。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
                   <span><strong>Category header</strong>：整列只有 column A 有文字、其他 model 欄位全空時，該列會被當成分類標題。<code className="rounded bg-muted px-1 text-xs">-</code> 也算有值，會變成一般 spec 列。</span>
                 </li>
               </ul>
@@ -1441,19 +1445,37 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
                 <tbody>
                   {section.items.map((item, idx) => {
                     const unseparated = looksLikeUnseparatedList(item.value);
+                    const tbd = isTBD(item.value);
+                    // TBD wins visually — the whole row gets a slate
+                    // tint so PMs can quickly scan for unfinished
+                    // specs. Stays muted so it doesn't fight the
+                    // overflow/warn red/amber ring at the card level.
+                    const rowBg = tbd
+                      ? "bg-slate-200/60"
+                      : idx % 2 === 1
+                        ? "bg-muted/30"
+                        : "";
                     return (
                     <tr
                       key={item.id}
-                      className={`border-b border-border/50 last:border-b-0 ${
-                        idx % 2 === 1 ? "bg-muted/30" : ""
-                      }`}
+                      className={`border-b border-border/50 last:border-b-0 ${rowBg}`}
                     >
                       <td className="py-2 px-4 align-top text-sm font-medium text-muted-foreground">
                         {item.label}
                       </td>
                       <td className="py-2 px-4 align-top text-sm leading-relaxed break-words whitespace-pre-line">
                         <div className="flex items-start gap-2">
-                          <span className="min-w-0 flex-1">{item.value}</span>
+                          <span className={`min-w-0 flex-1 ${tbd ? "text-slate-500 italic" : ""}`}>
+                            {item.value}
+                          </span>
+                          {tbd && (
+                            <span
+                              className="flex-shrink-0 inline-flex items-center gap-0.5 rounded border border-slate-400 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700"
+                              title="PM 尚未填入最終數值。建議在 Google Sheet 的 Detail Specs 補上實際值後再 Generate PDF。"
+                            >
+                              TBD
+                            </span>
+                          )}
                           {unseparated && (
                             <span
                               className="flex-shrink-0 inline-flex items-center gap-0.5 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"

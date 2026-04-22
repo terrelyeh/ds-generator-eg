@@ -68,6 +68,19 @@ export function filterRenderableSections<
 }
 
 /**
+ * Is a spec value a "to be determined" placeholder? PMs use this for
+ * specs that haven't been finalized yet (e.g. `TBD` for Maximum Power
+ * Consumption before final testing). The value still renders in the
+ * PDF as-is — this helper just lets the UI tag such rows so the PM
+ * can quickly scan for unfinished specs before generating the PDF.
+ */
+export function isTBD(value: string | null | undefined): boolean {
+  if (!value) return false;
+  const v = value.trim();
+  return /^(tbd|t\.b\.d\.?|to\s+be\s+determined)$/i.test(v);
+}
+
+/**
  * Does a spec value look like multiple short items run together without
  * separators? Flags cases like "FCC CE IC JP UKCA" where the PM forgot
  * to put commas or newlines between certifications / standards /
