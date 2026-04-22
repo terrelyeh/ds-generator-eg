@@ -107,7 +107,7 @@ export default async function PreviewPage({
   if (isTranslated) {
     // Per-product translation (overview + features)
     const { data: pt } = await supabase
-      .from("product_translations" as "products")
+      .from("product_translations")
       .select("overview, features, translation_mode, headline, subtitle, hardware_image, qr_label, qr_url")
       .eq("product_id", model)
       .eq("locale", lang)
@@ -126,7 +126,7 @@ export default async function PreviewPage({
     // Per-product-line spec label translations (only if full mode)
     if (mode === "full") {
       const { data: slt } = await supabase
-        .from("spec_label_translations" as "products")
+        .from("spec_label_translations")
         .select("original_label, translated_label, label_type")
         .eq("product_line_id", product.product_line_id)
         .eq("locale", lang) as { data: { original_label: string; translated_label: string | null; label_type: string }[] | null };
@@ -213,7 +213,7 @@ export default async function PreviewPage({
     const defaults = TYPOGRAPHY_DEFAULTS[lang] ?? TYPOGRAPHY_DEFAULTS["ja"];
     try {
       const { data: typoData } = await supabase
-        .from("app_settings" as "products")
+        .from("app_settings")
         .select("value")
         .eq("key", `typography_${lang}`)
         .single() as { data: { value: string } | null };

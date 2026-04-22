@@ -17,6 +17,11 @@ interface SpecLabelTranslationsEditorProps {
   sectionNames: string[];
   sectionLabelsMap: Record<string, string[]>;
   initialTranslations: Record<string, string>; // "spec:label" or "section:label" → translated
+  /** A representative model in this product line used for the "Preview
+   *  in context" link. Saved translations here apply to every product
+   *  in the line, but the preview page needs a specific model to render.
+   *  Prefer an Active model; null if none exist yet. */
+  sampleModel?: string | null;
 }
 
 export function SpecLabelTranslationsEditor({
@@ -26,6 +31,7 @@ export function SpecLabelTranslationsEditor({
   sectionNames,
   sectionLabelsMap,
   initialTranslations,
+  sampleModel = null,
 }: SpecLabelTranslationsEditorProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -243,6 +249,35 @@ export function SpecLabelTranslationsEditor({
               )}
             </Button>
           </div>
+
+          {sampleModel && (
+            <Link
+              href={`/preview/${encodeURIComponent(sampleModel)}?lang=${locale}&mode=full`}
+              target="_blank"
+              className={`inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs transition-colors ${
+                dirty
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-accent"
+              }`}
+              title={
+                dirty
+                  ? "You have unsaved changes. Save first, then preview."
+                  : `Preview translated Datasheet using ${sampleModel} as a sample`
+              }
+              onClick={(e) => {
+                if (dirty) {
+                  e.preventDefault();
+                  toast.info("Save your changes first — preview shows saved translations only.");
+                }
+              }}
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
+                <circle cx="8" cy="8" r="2" />
+              </svg>
+              Preview in {sampleModel}
+            </Link>
+          )}
 
           <Link
             href={`/settings/glossary?locale=${locale}`}

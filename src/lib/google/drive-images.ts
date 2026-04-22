@@ -212,7 +212,7 @@ export async function resolveLocaleDsImagesFolder(params: {
   }
 
   // Auto-create DS Images subfolder
-  console.log(`[resolveLocaleDsImagesFolder] Creating "${DS_IMAGES_FOLDER_NAME}" inside "${localeLineName}"`);
+  console.info(`[resolveLocaleDsImagesFolder] Creating "${DS_IMAGES_FOLDER_NAME}" inside "${localeLineName}"`);
   const createRes = await drive.files.create({
     requestBody: {
       name: DS_IMAGES_FOLDER_NAME,
@@ -401,7 +401,7 @@ export async function syncLocalizedHardwareImage(params: {
   } catch (err) {
     // Locale product line folder missing → nothing to sync yet (do NOT
     // treat this as a delete signal)
-    console.log(
+    console.info(
       `[syncLocalizedHardwareImage] Skipping ${modelName} ${locale}: ${err instanceof Error ? err.message : String(err)}`,
     );
     return { url: null, folder_listed: false };
@@ -552,7 +552,7 @@ export async function syncProductImages(
               continue;
             }
             // Drive is newer — fall through to re-download
-            console.log(`${fileName}: Drive updated (${file.modifiedTime}), re-syncing...`);
+            console.info(`${fileName}: Drive updated (${file.modifiedTime}), re-syncing...`);
           }
         } catch {
           // HEAD request failed — fall through to re-download

@@ -136,7 +136,7 @@ export function CompareTable({ models, categories }: CompareTableProps) {
           const val = getValue<string>();
           if (!val) return <span className="text-muted-foreground/25">—</span>;
           return (
-            <span className="break-words">
+            <span className="break-words whitespace-pre-line">
               <HighlightText text={val} query={globalFilter} />
             </span>
           );

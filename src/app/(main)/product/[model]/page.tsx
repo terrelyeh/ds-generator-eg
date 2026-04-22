@@ -84,7 +84,7 @@ export default async function ProductPage({
 
   // Fetch existing translations for this product
   const { data: translationData } = (await supabase
-    .from("product_translations" as "products")
+    .from("product_translations")
     .select("*")
     .eq("product_id", model)) as { data: ProductTranslation[] | null };
 

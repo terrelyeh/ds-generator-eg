@@ -33,10 +33,18 @@ export default async function TranslationsPage({
   // Get all unique spec section categories + spec item labels from products in this line
   const { data: products } = (await supabase
     .from("products")
-    .select("id")
-    .eq("product_line_id", productLine.id)) as { data: { id: string }[] | null };
+    .select("id, model_name, status")
+    .eq("product_line_id", productLine.id)
+    .order("model_name")) as { data: { id: string; model_name: string; status: string }[] | null };
 
   const productIds = (products ?? []).map((p) => p.id);
+  // Pick a sample model for the "Preview in context" link — prefer an
+  // Active model (PMs usually want to see it render on something real)
+  // and fall back to any if no active exists.
+  const sampleModel =
+    (products ?? []).find((p) => p.status === "active")?.model_name ??
+    (products ?? [])[0]?.model_name ??
+    null;
 
   // Get all spec sections for this product line
   const { data: sections } = productIds.length
@@ -71,7 +79,7 @@ export default async function TranslationsPage({
 
   // Get existing translations for this locale
   const { data: existingTranslations } = (await supabase
-    .from("spec_label_translations" as "products")
+    .from("spec_label_translations")
     .select("original_label, translated_label, label_type")
     .eq("product_line_id", productLine.id)
     .eq("locale", locale)) as { data: SpecLabelRow[] | null };
@@ -118,6 +126,7 @@ export default async function TranslationsPage({
         sectionNames={[...sectionNames]}
         sectionLabelsMap={sectionLabelsMap}
         initialTranslations={translationMap}
+        sampleModel={sampleModel}
       />
     </div>
   );

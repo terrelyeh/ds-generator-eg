@@ -401,7 +401,7 @@ export function DashboardContent({
         const preview = rawText.slice(0, 160).replace(/\s+/g, " ").trim();
         if (res.status === 504 || /timed? ?out/i.test(preview)) {
           toast.error(
-            `Sync timed out — Cloud AP has many models and may exceed Vercel's 60s limit. Try again, or run per-model sync via CLI.`,
+            `Sync timed out — ${activeLine.label} has too many models to finish within Vercel's 60s limit. Tip: open a specific product and use "Resync ▾ → Content + Images" for single-model sync.`,
             { duration: 10000 },
           );
         } else {
