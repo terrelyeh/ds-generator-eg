@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { splitIntoPages } from "@/lib/datasheet/pagination";
+import { splitIntoPages, filterRenderableSections } from "@/lib/datasheet/pagination";
 import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
 import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
@@ -145,17 +145,22 @@ export default async function PreviewPage({
   }
 
   // --- Build spec sections (with optional label translation) ---
-  const specSections = (product.spec_sections ?? [])
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .map((s) => ({
-      category: sectionLabelMap[s.category] ?? s.category,
-      items: (s.spec_items ?? [])
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((i) => ({
-          label: specLabelMap[i.label] ?? i.label,
-          value: i.value,
-        })),
-    }));
+  // Drop rows whose value is N/A / blank — they just add noise to the
+  // PDF. Applied BEFORE pagination so the layout budget isn't wasted
+  // on invisible rows.
+  const specSections = filterRenderableSections(
+    (product.spec_sections ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((s) => ({
+        category: sectionLabelMap[s.category] ?? s.category,
+        items: (s.spec_items ?? [])
+          .sort((a, b) => a.sort_order - b.sort_order)
+          .map((i) => ({
+            label: specLabelMap[i.label] ?? i.label,
+            value: i.value,
+          })),
+      })),
+  );
 
   const specPages = splitIntoPages(specSections);
 
@@ -432,7 +437,7 @@ body {
 .spec-category-header:first-child { margin-top: 0; }
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
 .spec-label { font-weight: 500; font-size: 7pt; color: ${theme.specLabel}; }
-.spec-value { font-weight: 300; font-size: 7pt; color: #6f7073; margin-top: 1pt; }
+.spec-value { font-weight: 300; font-size: 7pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
 
 /* Hardware overview */
 .hardware-page { padding: 0 35pt; }

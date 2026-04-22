@@ -1395,7 +1395,7 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
                       <td className="py-2 px-4 align-top text-sm font-medium text-muted-foreground">
                         {item.label}
                       </td>
-                      <td className="py-2 px-4 align-top text-sm leading-relaxed break-words">
+                      <td className="py-2 px-4 align-top text-sm leading-relaxed break-words whitespace-pre-line">
                         {item.value}
                       </td>
                     </tr>

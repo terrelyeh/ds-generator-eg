@@ -36,6 +36,37 @@ export const AVAILABLE_HEIGHT =
 
 export const CATEGORY_HEADER_HEIGHT = 18;
 
+/**
+ * Is a spec value effectively "no meaningful data" and therefore not
+ * worth rendering? Matches N/A variations, em-dash placeholders, and
+ * empty strings. PMs sometimes fill "N/A" in the sheet to keep the row
+ * present in the spec template, but once rendered the row is just
+ * noise — especially in categories like Compliance where Scanning
+ * Radio / BLE being N/A adds nothing useful to the datasheet.
+ */
+export function isBlankOrNA(value: string | null | undefined): boolean {
+  if (!value) return true;
+  const trimmed = value.trim();
+  if (!trimmed) return true;
+  if (/^(n\/?a|na|not\s+applicable)$/i.test(trimmed)) return true;
+  if (/^[-–—]+$/.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Filter out spec items whose value is blank / N/A, and drop any
+ * section that becomes empty as a result. Use this everywhere spec
+ * data is fed to pagination or a renderer so N/A rows never take up
+ * layout budget or visual space.
+ */
+export function filterRenderableSections<
+  S extends { category: string; items: { label: string; value: string }[] },
+>(sections: S[]): S[] {
+  return sections
+    .map((s) => ({ ...s, items: s.items.filter((i) => !isBlankOrNA(i.value)) }))
+    .filter((s) => s.items.length > 0);
+}
+
 // A single unwrapped spec row: label (7pt) on top + value (7pt) underneath
 // + border-bottom + vertical padding. Bumped 18→20pt to absorb per-row
 // rendering variance (padding/border accumulate over 30+ rows).

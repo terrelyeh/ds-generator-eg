@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
+import { filterRenderableSections } from "@/lib/datasheet/pagination";
 import {
   computeContentHash,
   isAckValid,
@@ -174,8 +175,12 @@ export default async function SolutionDashboardPage({
         .map((it) => ({ label: it.label, value: it.value })),
     });
   }
-  for (const sections of specMap.values()) {
+  // Drop N/A / blank rows so the layout overflow estimate isn't
+  // inflated by rows the PDF will actually hide. Done after build so
+  // sort_order-aware initial construction stays simple.
+  for (const [pid, sections] of specMap.entries()) {
     sections.sort((a, b) => a.sort_order - b.sort_order);
+    specMap.set(pid, filterRenderableSections(sections));
   }
 
   // Build specCount fallback for readiness

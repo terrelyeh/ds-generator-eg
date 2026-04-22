@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ProductDetail } from "@/components/product/product-detail";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
+import { filterRenderableSections } from "@/lib/datasheet/pagination";
 import {
   computeContentHash,
   isAckValid,
@@ -57,14 +58,18 @@ export default async function ProductPage({
   const productWithSpecs: ProductWithSpecs = {
     ...product,
     product_line: product.product_lines,
-    spec_sections: (product.spec_sections ?? [])
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .map((section) => ({
-        ...section,
-        items: (section.spec_items ?? []).sort(
-          (a, b) => a.sort_order - b.sort_order
-        ),
-      })),
+    // Filter N/A / blank rows so the detail page and the PDF preview
+    // both hide them (keeps DB data intact — filter is render-only).
+    spec_sections: filterRenderableSections(
+      (product.spec_sections ?? [])
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map((section) => ({
+          ...section,
+          items: (section.spec_items ?? []).sort(
+            (a, b) => a.sort_order - b.sort_order
+          ),
+        })),
+    ),
     hardware_labels: (product.hardware_labels ?? []).sort(
       (a, b) => a.sort_order - b.sort_order
     ),
