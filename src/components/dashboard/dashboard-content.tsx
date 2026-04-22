@@ -368,7 +368,40 @@ export function DashboardContent({
         { method: "POST", signal: controller.signal }
       );
       clearTimeout(timeoutId);
-      const data = await res.json();
+
+      // Safe response parsing. Vercel 504/500 returns an HTML/text
+      // error page starting with "An error occurred...", which breaks
+      // res.json(). Read as text first, then try to parse; otherwise
+      // surface the HTTP status and a sanitized preview so the PM
+      // sees the real problem (usually function timeout).
+      const rawText = await res.text();
+      let data: {
+        ok?: boolean;
+        error?: string;
+        results?: Array<{ synced?: string[]; errors?: string[] }>;
+      } | null = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok || !data) {
+        const preview = rawText.slice(0, 160).replace(/\s+/g, " ").trim();
+        if (res.status === 504 || /timed? ?out/i.test(preview)) {
+          toast.error(
+            `Sync timed out — Cloud AP has many models and may exceed Vercel's 60s limit. Try again, or run per-model sync via CLI.`,
+            { duration: 10000 },
+          );
+        } else {
+          toast.error(
+            `Sync failed (HTTP ${res.status})${preview ? ` — ${preview}` : ""}`,
+            { duration: 10000 },
+          );
+        }
+        return;
+      }
+
       if (data.ok) {
         const result = data.results?.[0];
         const synced: string[] = result?.synced ?? [];
