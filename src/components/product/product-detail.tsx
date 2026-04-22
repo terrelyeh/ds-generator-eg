@@ -684,6 +684,7 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
   const [showGenMenu, setShowGenMenu] = useState(false);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [showResyncMenu, setShowResyncMenu] = useState(false);
+  const [showSpecHelp, setShowSpecHelp] = useState(false);
 
   async function handleResyncImages() {
     setResyncing(true);
@@ -1355,6 +1356,19 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             Specifications
+            <button
+              type="button"
+              onClick={() => setShowSpecHelp((v) => !v)}
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold transition-colors ${
+                showSpecHelp
+                  ? "border-engenius-blue bg-engenius-blue text-white"
+                  : "border-muted-foreground/40 text-muted-foreground hover:border-engenius-blue hover:text-engenius-blue"
+              }`}
+              aria-label="Spec filling rules"
+              title="Click to show how to fill spec values in the Sheet"
+            >
+              i
+            </button>
             {layoutReport?.spec.status === "overflow" && (
               <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded px-1.5 py-0.5">
                 Overflow ({layoutReport.spec.metrics.max_column_fill_pct}%)
@@ -1366,6 +1380,45 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
               </span>
             )}
           </CardTitle>
+          {showSpecHelp && (
+            <div className="mt-3 rounded-md border border-engenius-blue/20 bg-engenius-blue/[0.04] px-4 py-3 text-sm">
+              <div className="mb-2 font-semibold text-engenius-blue">Spec 填寫規則（給 PM）</div>
+              <ul className="space-y-1.5 text-foreground/85">
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>N/A / 空白</strong>：填 <code className="rounded bg-muted px-1 text-xs">N/A</code> 或留空的列，PDF 會自動隱藏；可以保留以維持 spec template 結構。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>多項值</strong>：用<strong>逗號</strong>（短縮寫，像 <code className="rounded bg-muted px-1 text-xs">FCC, CE, IC, JP</code>）或<strong>換行</strong>（長項目，像每項 Package Contents 各自一行）分隔。空格分隔會在 PDF 渲染成一整句。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>不適用</strong>：寫 <code className="rounded bg-muted px-1 text-xs">-</code> 表示「該型號不適用」，PDF 也會隱藏。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>刪除線</strong>：Sheet 裡加刪除線的文字會在 sync 時自動過濾，不會進 PDF。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>Category header</strong>：整列只有 column A 有文字、其他 model 欄位全空時，該列會被當成分類標題。<code className="rounded bg-muted px-1 text-xs">-</code> 也算有值，會變成一般 spec 列。</span>
+                </li>
+              </ul>
+              <div className="mt-3 text-xs text-muted-foreground">
+                完整規則見{" "}
+                <a
+                  href="/docs/drive-folder-and-naming-rules.html#s5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-engenius-blue hover:underline"
+                >
+                  Drive 資料夾與命名規則 §5
+                </a>
+                。
+              </div>
+            </div>
+          )}
         </CardHeader>
         <CardContent className="space-y-5">
           {product.spec_sections.map((section) => (
