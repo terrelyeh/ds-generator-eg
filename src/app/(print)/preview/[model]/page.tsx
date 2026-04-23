@@ -541,14 +541,16 @@ body {
 .antenna-image {
   text-align: center; margin-top: 2pt;
 }
+/* No width:100% — let the image render at its natural size, bounded
+   by max-width/height. Container (cell) stays full column width so
+   images look centered with breathing room on both sides. */
 .antenna-image img {
-  width: 100%;
-  max-width: 255pt;
-  max-height: 260pt;
+  max-width: 200pt;
+  max-height: 200pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  max-width: 235pt;
+  max-width: 175pt;
   max-height: 175pt;
 }
 
