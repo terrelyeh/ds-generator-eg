@@ -545,13 +545,13 @@ body {
    by max-width/height. Container (cell) stays full column width so
    images look centered with breathing room on both sides. */
 .antenna-image img {
-  max-width: 200pt;
-  max-height: 200pt;
+  max-width: 260pt;
+  max-height: 260pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  max-width: 175pt;
-  max-height: 175pt;
+  max-width: 185pt;
+  max-height: 185pt;
 }
 
 /* Footer */
