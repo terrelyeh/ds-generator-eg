@@ -1257,9 +1257,14 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
           {/* Radio Pattern placeholders (AP only) */}
           {isAP && (
             <div className="mt-6">
-              <h4 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Radio Patterns
-              </h4>
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Radio Patterns
+                </h4>
+                <div className="text-[11px] leading-relaxed text-muted-foreground max-w-md text-right">
+                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長寬 ≥ 500px 的方形圖</strong>（純 polar plot 即可，不含側邊 legend）。PDF 會渲染為 175×175pt，解析度低會略模糊。
+                </div>
+              </div>
               <div className="flex flex-wrap gap-4">
                 {radioPatternSlots.map((slot) => {
                   const slotLabel = `${slot.band} ${slot.plane}`;

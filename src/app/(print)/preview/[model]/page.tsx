@@ -548,13 +548,13 @@ body {
    we chased for several rounds. object-fit: contain preserves aspect
    ratio so non-square sources don't distort. */
 .antenna-image img {
-  width: 195pt;
-  height: 195pt;
+  width: 175pt;
+  height: 175pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  width: 155pt;
-  height: 155pt;
+  width: 140pt;
+  height: 140pt;
 }
 
 /* Footer */
