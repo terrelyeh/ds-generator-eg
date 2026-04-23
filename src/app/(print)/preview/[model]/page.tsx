@@ -541,17 +541,20 @@ body {
 .antenna-image {
   text-align: center; margin-top: 2pt;
 }
-/* No width:100% — let the image render at its natural size, bounded
-   by max-width/height. Container (cell) stays full column width so
-   images look centered with breathing room on both sides. */
+/* Explicit width forces the image to render at this size regardless
+   of source file dimensions. Without this, small source images (e.g.
+   150x150 PNGs) would display at natural size instead of scaling up
+   to fill the target size — causing the "images look tiny" problem
+   we chased for several rounds. object-fit: contain preserves aspect
+   ratio so non-square sources don't distort. */
 .antenna-image img {
-  max-width: 260pt;
-  max-height: 260pt;
+  width: 230pt;
+  height: 230pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  max-width: 185pt;
-  max-height: 185pt;
+  width: 180pt;
+  height: 180pt;
 }
 
 /* Footer */
