@@ -505,14 +505,10 @@ body {
   font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
   padding-top: 31pt; margin-bottom: 14pt;
 }
-/* Reference layout (ECW230 / ECW536 v1.3) uses modest image sizes and
-   lets the page breathe, rather than stretching to fill vertical space.
-   Each cell ≈ 210pt wide × ~200pt tall regardless of row count; 2-row
-   layouts just have whitespace at the bottom, matching the reference. */
 .antennas-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16pt 24pt;
+  gap: 18pt 24pt;
 }
 .antenna-cell {
   break-inside: avoid;
@@ -535,13 +531,23 @@ body {
   min-width: 56pt;
   text-align: center;
 }
+/* Image sizing depends on row count. 2-row layout (non-6G) can afford
+   ~235pt square images that read comfortably; 3-row layout (with 6G)
+   must cap at ~175pt height to fit all three rows within the page.
+   Without this split, square polar plots would either look tiny (if
+   we force the 6G cap) or overflow the page (if we force the 2-row
+   size). The has-6g class on the grid toggles the cap. */
 .antenna-image {
   text-align: center; margin-top: 2pt;
 }
 .antenna-image img {
-  max-width: 215pt;
-  max-height: 185pt;
+  max-width: 245pt;
+  max-height: 235pt;
   object-fit: contain;
+}
+.antennas-grid.has-6g .antenna-image img {
+  max-width: 235pt;
+  max-height: 178pt;
 }
 
 /* Footer */
@@ -778,7 +784,7 @@ ${typo ? `
           <div className="top-bar" />
           <div className="antennas-page">
             <div className="antennas-title">{dict.antennasPatterns}</div>
-            <div className="antennas-grid">
+            <div className={`antennas-grid${has6G ? " has-6g" : ""}`}>
               {antennaPatterns.map((p) => (
                 <div key={`${p.band}-${p.plane}`} className="antenna-cell">
                   <div className="antenna-labels">
