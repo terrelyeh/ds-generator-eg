@@ -531,23 +531,25 @@ body {
   min-width: 56pt;
   text-align: center;
 }
-/* Image sizing depends on row count. 2-row layout (non-6G) can afford
-   ~235pt square images that read comfortably; 3-row layout (with 6G)
-   must cap at ~175pt height to fit all three rows within the page.
-   Without this split, square polar plots would either look tiny (if
-   we force the 6G cap) or overflow the page (if we force the 2-row
-   size). The has-6g class on the grid toggles the cap. */
+/* Image sizing depends on row count. Reference datasheets render
+   images at ~250pt wide (nearly full column). ECW560's images are
+   square (no side legend), so width and height are equal — hence the
+   2-row layout just uses a width cap and lets height follow naturally
+   (up to a generous safety cap that never bites for typical inputs).
+   3-row layout (with 6G) must cap height explicitly to fit all three
+   rows within one page. */
 .antenna-image {
   text-align: center; margin-top: 2pt;
 }
 .antenna-image img {
-  max-width: 245pt;
-  max-height: 235pt;
+  width: 100%;
+  max-width: 255pt;
+  max-height: 260pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
   max-width: 235pt;
-  max-height: 178pt;
+  max-height: 175pt;
 }
 
 /* Footer */
