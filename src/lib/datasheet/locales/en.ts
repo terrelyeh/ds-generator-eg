@@ -6,6 +6,7 @@ export const en: DatasheetDict = {
   featuresAndBenefits: "Features & Benefits",
   technicalSpecifications: "Technical Specifications",
   hardwareOverview: "Hardware Overview",
+  antennasPatterns: "Antennas Patterns",
   defaultQrLabel: "Quick Start Guide",
   defaultQrUrl: "https://qr.engenius.ai/qsg/{model}",
   disclaimer:

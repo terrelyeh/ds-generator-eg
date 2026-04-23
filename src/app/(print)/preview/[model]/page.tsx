@@ -11,11 +11,13 @@ import type {
   ProductLine,
   SpecSection,
   SpecItem,
+  ImageAsset,
 } from "@/types/database";
 
 interface ProductQueryRow extends Product {
   product_lines: ProductLine;
   spec_sections: (SpecSection & { spec_items: SpecItem[] })[];
+  image_assets: ImageAsset[];
 }
 
 /** Non-cloud product lines use gray theme instead of blue */
@@ -84,7 +86,8 @@ export default async function PreviewPage({
       `
       *,
       product_lines (*),
-      spec_sections (*, spec_items (*))
+      spec_sections (*, spec_items (*)),
+      image_assets (*)
     `
     )
     .eq("model_name", model)
@@ -164,6 +167,50 @@ export default async function PreviewPage({
 
   const specPages = splitIntoPages(specSections);
 
+  // --- Antennas Patterns page (AP only, only if any uploaded) ---
+  // Mirrors the logic in product-detail.tsx: detect AP by product_line
+  // category, detect 6GHz support by scanning Operating Frequency spec.
+  // A radio pattern slot is a (band, plane) pair; we look up its
+  // image_asset by the `<band> <plane>` label. The reference datasheet
+  // (ECW536 v1.3) renders these on a dedicated page BEFORE hardware
+  // overview — so we slot it in there.
+  const isAP = product.product_lines?.category === "APs";
+  const has6G =
+    isAP &&
+    product.spec_sections?.some((s) =>
+      s.spec_items?.some(
+        (i) =>
+          i.label.toLowerCase().includes("operating frequency") &&
+          /6\s*GHz/i.test(i.value),
+      ),
+    );
+  const radioPatternSlots = isAP
+    ? [
+        { band: "2.4G", plane: "H-plane" },
+        { band: "2.4G", plane: "E-plane" },
+        { band: "5G", plane: "H-plane" },
+        { band: "5G", plane: "E-plane" },
+        ...(has6G
+          ? [
+              { band: "6G", plane: "H-plane" },
+              { band: "6G", plane: "E-plane" },
+            ]
+          : []),
+      ]
+    : [];
+  const antennaPatterns = radioPatternSlots
+    .map((slot) => {
+      const label = `${slot.band} ${slot.plane}`;
+      const asset = (product.image_assets ?? []).find(
+        (a) => a.image_type === "radio_pattern" && a.label === label,
+      );
+      return asset && asset.status !== "missing" && asset.file_url
+        ? { ...slot, url: asset.file_url }
+        : null;
+    })
+    .filter((x): x is { band: string; plane: string; url: string } => x !== null);
+  const hasAntennaPage = antennaPatterns.length > 0;
+
   // --- Resolve display content ---
   const overview = (isTranslated && translatedOverview) ? translatedOverview : product.overview;
   const features = (isTranslated && translatedFeatures) ? translatedFeatures : (product.features ?? []);
@@ -203,7 +250,7 @@ export default async function PreviewPage({
   const qrUrlTemplate = customQrUrl || dict.defaultQrUrl;
   const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
-  const totalPages = 1 + specPages.length + 1; // cover + specs + hardware
+  const totalPages = 1 + specPages.length + (hasAntennaPage ? 1 : 0) + 1; // cover + specs + antennas (optional) + hardware
 
   const isCJK = lang === "ja" || lang === "zh-TW";
 
@@ -448,6 +495,52 @@ body {
 .hardware-image-container { text-align: center; margin: 10pt auto; }
 .hardware-image-container img { max-width: 530pt; max-height: 480pt; object-fit: contain; }
 
+/* Antennas Patterns page — AP only, renders radio pattern polar plots.
+   Grid layout mirrors reference PDF (ECW536 v1.3): 2 columns (H / E
+   plane), 2-3 rows (one per band). Each cell shows a band badge +
+   plane badge on the left, polar plot on the right. Images are
+   user-uploaded polar plots stored in Supabase Storage. */
+.antennas-page { padding: 0 35pt; }
+.antennas-title {
+  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
+  padding-top: 31pt; margin-bottom: 18pt;
+}
+.antennas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18pt 24pt;
+}
+.antenna-cell {
+  break-inside: avoid;
+  position: relative;
+}
+.antenna-labels {
+  display: flex; gap: 6pt;
+  margin-bottom: 6pt;
+}
+.antenna-band {
+  font-weight: 600; font-size: 9pt; color: white;
+  background: ${theme.sectionTitle};
+  padding: 2pt 10pt;
+  min-width: 46pt;
+  text-align: center;
+}
+.antenna-plane {
+  font-weight: 500; font-size: 9pt; color: ${theme.sectionTitle};
+  background: ${theme.isCloud ? "#E5F5FD" : "#E8E9EB"};
+  padding: 2pt 10pt;
+  min-width: 56pt;
+  text-align: center;
+}
+.antenna-image {
+  text-align: center; margin-top: 2pt;
+}
+.antenna-image img {
+  max-width: 100%;
+  max-height: 210pt;
+  object-fit: contain;
+}
+
 /* Footer */
 .footer {
   position: absolute; bottom: 0; left: 0; right: 0;
@@ -675,6 +768,31 @@ ${typo ? `
           <div className="page-number">{pageIdx + 2}</div>
         </div>
       ))}
+
+      {/* ANTENNAS PATTERNS (AP only, only if any uploaded) */}
+      {hasAntennaPage && (
+        <div className="page">
+          <div className="top-bar" />
+          <div className="antennas-page">
+            <div className="antennas-title">{dict.antennasPatterns}</div>
+            <div className="antennas-grid">
+              {antennaPatterns.map((p) => (
+                <div key={`${p.band}-${p.plane}`} className="antenna-cell">
+                  <div className="antenna-labels">
+                    <span className="antenna-band">{p.band === "2.4G" ? "2.4GHz" : p.band === "5G" ? "5GHz" : p.band === "6G" ? "6GHz" : p.band}</span>
+                    <span className="antenna-plane">{p.plane === "H-plane" ? "H-Plane" : p.plane === "E-plane" ? "E-Plane" : p.plane}</span>
+                  </div>
+                  <div className="antenna-image">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={p.url} alt={`${p.band} ${p.plane}`} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="page-number">{specPages.length + 2}</div>
+        </div>
+      )}
 
       {/* HARDWARE OVERVIEW + FOOTER */}
       <div className="page">

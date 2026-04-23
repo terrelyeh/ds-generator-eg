@@ -6,6 +6,7 @@ export const ja: DatasheetDict = {
   featuresAndBenefits: "\u7279\u9577\u30FB\u30E1\u30EA\u30C3\u30C8",
   technicalSpecifications: "\u6280\u8853\u4ED5\u69D8",
   hardwareOverview: "\u30CF\u30FC\u30C9\u30A6\u30A7\u30A2\u6982\u8981",
+  antennasPatterns: "\u30A2\u30F3\u30C6\u30CA\u30D1\u30BF\u30FC\u30F3",
   defaultQrLabel: "Contact Us",
   defaultQrUrl: "https://www.engenius.co.jp/contact",
   disclaimer:

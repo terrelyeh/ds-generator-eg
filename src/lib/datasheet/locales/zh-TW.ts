@@ -6,6 +6,7 @@ export const zhTW: DatasheetDict = {
   featuresAndBenefits: "\u529F\u80FD\u4ECB\u7D39",
   technicalSpecifications: "\u6280\u8853\u898F\u683C",
   hardwareOverview: "\u7522\u54C1\u5916\u89C0",
+  antennasPatterns: "\u5929\u7DDA\u8F3B\u5C04\u5834\u578B",
   defaultQrLabel: "Contact Us",
   defaultQrUrl: "https://www.engenius.com.tw/contact",
   disclaimer:

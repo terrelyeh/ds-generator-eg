@@ -9,6 +9,8 @@ export interface DatasheetDict {
   technicalSpecifications: string;
   /** Last page title */
   hardwareOverview: string;
+  /** Antennas Patterns page title (AP products with uploaded radio pattern images) */
+  antennasPatterns: string;
   /** QR code label (default, can be overridden per-product) */
   defaultQrLabel: string;
   /** QR code URL pattern (default, can be overridden per-product). Use {model} as placeholder */
