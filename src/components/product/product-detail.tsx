@@ -1262,7 +1262,7 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
                   Radio Patterns
                 </h4>
                 <div className="text-[11px] leading-relaxed text-muted-foreground max-w-md text-right">
-                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長寬 ≥ 500px 的方形圖</strong>（純 polar plot 即可，不含側邊 legend）。PDF 會渲染為 175×175pt，解析度低會略模糊。
+                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長寬 ≥ 500px 的方形圖</strong>（純 polar plot 即可，不含側邊 legend）。PDF 會渲染為 158×158pt，解析度低會略模糊。
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">

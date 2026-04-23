@@ -539,7 +539,7 @@ body {
    3-row layout (with 6G) must cap height explicitly to fit all three
    rows within one page. */
 .antenna-image {
-  text-align: center; margin-top: 2pt;
+  text-align: center; margin-top: 8pt;
 }
 /* Explicit width forces the image to render at this size regardless
    of source file dimensions. Without this, small source images (e.g.
@@ -548,13 +548,13 @@ body {
    we chased for several rounds. object-fit: contain preserves aspect
    ratio so non-square sources don't distort. */
 .antenna-image img {
-  width: 175pt;
-  height: 175pt;
+  width: 158pt;
+  height: 158pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  width: 140pt;
-  height: 140pt;
+  width: 125pt;
+  height: 125pt;
 }
 
 /* Footer */
