@@ -503,20 +503,22 @@ body {
 .antennas-page { padding: 0 35pt; }
 .antennas-title {
   font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
-  padding-top: 31pt; margin-bottom: 18pt;
+  padding-top: 31pt; margin-bottom: 14pt;
 }
+/* Grid: 2 cols, row height adapts to available page space.
+   - 2 rows (non-6G): each cell ~310pt tall → large polar plots
+   - 3 rows (6G):     each cell ~205pt tall → still readable, tighter */
 .antennas-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18pt 24pt;
+  gap: 14pt 24pt;
 }
 .antenna-cell {
   break-inside: avoid;
-  position: relative;
 }
 .antenna-labels {
-  display: flex; gap: 6pt;
-  margin-bottom: 6pt;
+  display: flex; gap: 4pt;
+  margin-bottom: 4pt;
 }
 .antenna-band {
   font-weight: 600; font-size: 9pt; color: white;
@@ -532,12 +534,18 @@ body {
   min-width: 56pt;
   text-align: center;
 }
+/* Let the polar plot fill the full cell width. The reference datasheet
+   (ECW536 v1.3) renders these images at ~260pt wide — nearly the
+   full column. Width-first sizing with a generous height cap lets
+   the image breathe; aspect-ratio 1 stays true since polar plots are
+   square. */
 .antenna-image {
   text-align: center; margin-top: 2pt;
 }
 .antenna-image img {
-  max-width: 100%;
-  max-height: 210pt;
+  width: 100%;
+  max-width: 260pt;
+  max-height: 300pt;
   object-fit: contain;
 }
 
