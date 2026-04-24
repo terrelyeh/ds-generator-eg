@@ -30,6 +30,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ### Datasheet PDF
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
+- **Antennas Patterns**（AP 專用）— 上傳 radio pattern 圖後，PDF 自動新增一頁顯示 2.4G / 5G / 6G H-Plane & E-Plane polar plots
 - Hardware Overview + QR Code footer
 - **Cloud 藍色 / Unmanaged 灰色** 雙主題
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
