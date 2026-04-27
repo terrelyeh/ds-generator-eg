@@ -1,8 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import type { Role } from "@/lib/auth/permissions";
 
-const SETTINGS_SECTIONS = [
+interface SettingsSection {
+  title: string;
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+  /** If set, only these roles see this card. Omitted = visible to everyone. */
+  roles?: Role[];
+}
+
+const SETTINGS_SECTIONS: SettingsSection[] = [
   {
     title: "AI Translation API Keys",
     description: "Manage API keys for Claude, GPT-4o, and Gemini translation providers.",
@@ -53,9 +63,23 @@ const SETTINGS_SECTIONS = [
       </svg>
     ),
   },
+  {
+    title: "Users",
+    description: "Manage who can access Product SpecHub. Invite, change roles, remove members.",
+    href: "/settings/users",
+    roles: ["admin"],
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
+      </svg>
+    ),
+  },
 ];
 
-export function SettingsPage() {
+export function SettingsPage({ role }: { role: Role }) {
+  const visible = SETTINGS_SECTIONS.filter(
+    (s) => !s.roles || s.roles.includes(role)
+  );
   return (
     <div className="space-y-6">
       <div>
@@ -66,7 +90,7 @@ export function SettingsPage() {
       </div>
 
       <div className="grid gap-4">
-        {SETTINGS_SECTIONS.map((section) => (
+        {visible.map((section) => (
           <Link key={section.href} href={section.href}>
             <div className="group flex items-center gap-4 rounded-lg border p-5 shadow-sm transition-all hover:border-engenius-blue/30 hover:shadow-md">
               <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-engenius-blue/10 text-engenius-blue group-hover:bg-engenius-blue group-hover:text-white transition-colors">
