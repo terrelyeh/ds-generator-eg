@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+const NEXT_KEY = "specHub.auth.next";
+
 export function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,9 +17,19 @@ export function SignInForm() {
     setLoading(true);
     setError(null);
     try {
+      // Stash the post-login destination here. The callback reads it
+      // back. We can't stick `?next=…` on `redirectTo` because Supabase
+      // validates `redirectTo` against the allow-list verbatim, query
+      // string included — adding params makes the URL fail validation
+      // and Supabase silently falls back to `site_url` (production).
+      try {
+        sessionStorage.setItem(NEXT_KEY, next);
+      } catch {
+        /* ignore — private browsing etc. Callback defaults to "/" */
+      }
+
       const supabase = createClient();
       const callbackUrl = new URL("/auth/callback", window.location.origin);
-      callbackUrl.searchParams.set("next", next);
 
       const { error: signInErr } = await supabase.auth.signInWithOAuth({
         provider: "google",
