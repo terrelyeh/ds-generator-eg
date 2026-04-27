@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
@@ -16,6 +17,8 @@ export const maxDuration = 300;
  * Returns document stats and list of indexed sources.
  */
 export async function GET(request: Request) {
+  const denied = await gate("knowledge.view");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const sourceType = searchParams.get("source_type");
 
@@ -135,6 +138,8 @@ export async function GET(request: Request) {
  * Body: { action: 'ingest', source_type: 'product_spec', model?: string, product_line_id?: string, force?: boolean }
  */
 export async function POST(request: Request) {
+  const denied = await gate("knowledge.edit");
+  if (denied) return denied;
   const body = await request.json();
   const {
     action,
@@ -312,6 +317,8 @@ export async function POST(request: Request) {
  * Body: { source_type: string, source_id?: string }
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("knowledge.edit");
+  if (denied) return denied;
   const body = await request.json();
   const { source_type, source_id } = body as {
     source_type: string;
@@ -349,6 +356,8 @@ export async function DELETE(request: Request) {
  * Body: { source_type: string, source_id: string, taxonomy: Partial<TaxonomyMeta> }
  */
 export async function PATCH(request: Request) {
+  const denied = await gate("knowledge.edit");
+  if (denied) return denied;
   const body = await request.json();
   const { source_type, source_id, taxonomy: taxonomyInput } = body as {
     source_type: string;

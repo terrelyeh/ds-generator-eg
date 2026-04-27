@@ -6,6 +6,7 @@ import {
   DEFAULT_PERSONAS,
 } from "@/lib/rag/personas";
 import type { Persona } from "@/lib/rag/personas";
+import { gate } from "@/lib/auth/session";
 
 /**
  * GET /api/personas
@@ -30,6 +31,8 @@ export async function GET() {
  * Body: { id, name, description, system_prompt, icon?, source_types? }
  */
 export async function POST(request: Request) {
+  const denied = await gate("settings.edit_personas");
+  if (denied) return denied;
   const body = await request.json();
   const { id, name, system_prompt, description, icon, source_types } = body as Partial<Persona>;
 
@@ -68,6 +71,8 @@ export async function POST(request: Request) {
  * Body: { id: string }
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("settings.edit_personas");
+  if (denied) return denied;
   const body = await request.json();
   const { id } = body as { id: string };
 

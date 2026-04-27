@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getCurrentUser } from "@/lib/auth/session";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import { filterRenderableSections } from "@/lib/datasheet/pagination";
@@ -72,6 +73,8 @@ export default async function SolutionDashboardPage({
   const { solution: solutionSlug } = await params;
   const { line: lineSlug } = await searchParams;
   const supabase = createAdminClient();
+  const user = await getCurrentUser();
+  const role = user?.role ?? "viewer";
 
   // Verify solution exists
   const { data: solutionRows } = await supabase
@@ -420,6 +423,7 @@ export default async function SolutionDashboardPage({
         productLines={productLines ?? []}
         products={productSummaries}
         initialLineId={initialLineId}
+        role={role}
       />
     </div>
   );

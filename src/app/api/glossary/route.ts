@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 
 interface GlossaryRow {
   id: string;
@@ -17,6 +18,8 @@ interface GlossaryRow {
  * GET /api/glossary?locale=ja&scope=global
  */
 export async function GET(request: Request) {
+  const denied = await gate("settings.edit_glossary");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const locale = searchParams.get("locale");
   const scope = searchParams.get("scope");
@@ -50,6 +53,8 @@ export async function GET(request: Request) {
  * Body: { english_term, locale, translated_term, scope?, source?, notes? }
  */
 export async function POST(request: Request) {
+  const denied = await gate("settings.edit_glossary");
+  if (denied) return denied;
   const body = await request.json();
   const { english_term, locale, translated_term, scope = "global", source = "manual", notes, expected_updated_at } = body as {
     english_term: string;
@@ -112,6 +117,8 @@ export async function POST(request: Request) {
  * Body: { id: string }
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("settings.edit_glossary");
+  if (denied) return denied;
   const body = await request.json();
   const { id } = body as { id: string };
 

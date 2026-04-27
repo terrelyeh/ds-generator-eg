@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 
 /**
  * GET /api/settings/fonts?locale=ja
  * Returns custom fonts for a locale.
  */
 export async function GET(request: Request) {
+  const denied = await gate("settings.edit_typography");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const locale = searchParams.get("locale");
   if (!locale) return NextResponse.json({ error: "Missing locale" }, { status: 400 });
@@ -31,6 +34,8 @@ export async function GET(request: Request) {
  * Body: { locale: string, fonts: { value, label, import }[] }
  */
 export async function POST(request: Request) {
+  const denied = await gate("settings.edit_typography");
+  if (denied) return denied;
   const body = await request.json();
   const { locale, fonts } = body as {
     locale: string;

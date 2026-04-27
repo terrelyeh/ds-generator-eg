@@ -6,6 +6,7 @@ import {
   uploadImageToDrive,
 } from "@/lib/google/drive-images";
 import { getLocaleSuffix } from "@/lib/google/drive-versions";
+import { gate } from "@/lib/auth/session";
 
 /**
  * POST /api/upload-image
@@ -23,6 +24,8 @@ import { getLocaleSuffix } from "@/lib/google/drive-versions";
  *     product_translations.hardware_image via the translations API.
  */
 export async function POST(request: Request) {
+  const denied = await gate("product.upload_image");
+  if (denied) return denied;
   const formData = await request.formData();
   const file = formData.get("file") as File | null;
   const model = formData.get("model") as string | null;
@@ -215,6 +218,8 @@ export async function POST(request: Request) {
  * For radio_pattern, also removes the corresponding image_assets row.
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("product.upload_image");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
   const imageType = searchParams.get("type");

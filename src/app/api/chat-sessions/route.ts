@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -38,6 +39,8 @@ function parseMessages(raw: ChatMessage[] | string | unknown): ChatMessage[] {
  * - With id: get a specific session with full messages
  */
 export async function GET(request: Request) {
+  const denied = await gate("ask.use");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   const supabase = createAdminClient();
@@ -78,6 +81,8 @@ export async function GET(request: Request) {
  * Body: { id?, title?, persona?, provider?, messages? }
  */
 export async function POST(request: Request) {
+  const denied = await gate("ask.use");
+  if (denied) return denied;
   const body = await request.json();
   const { id, title, persona, provider, messages } = body as {
     id?: string;
@@ -138,6 +143,8 @@ export async function POST(request: Request) {
  * Body: { id: string } or { ids: string[] } for batch delete
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("ask.use");
+  if (denied) return denied;
   const body = await request.json();
   const { id, ids } = body as { id?: string; ids?: string[] };
 

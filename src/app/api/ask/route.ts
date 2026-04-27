@@ -4,6 +4,7 @@ import { generateEmbedding } from "@/lib/rag/embeddings";
 import { getApiKey, API_KEY_MAP } from "@/lib/settings";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { matchesTaxonomyFilter, extractTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
+import { gate } from "@/lib/auth/session";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
 export const maxDuration = 60;
@@ -30,6 +31,8 @@ interface AskRequest {
  * Returns list of available personas.
  */
 export async function GET() {
+  const denied = await gate("ask.use");
+  if (denied) return denied;
   const personas = await listPersonas();
 
   // Fetch welcome config from app_settings
@@ -138,6 +141,8 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
  * RAG endpoint with SSE streaming: embed question -> vector search -> stream LLM answer with sources.
  */
 export async function POST(request: Request) {
+  const denied = await gate("ask.use");
+  if (denied) return denied;
   const body = (await request.json()) as AskRequest;
   const { question, source_type, product_line, taxonomy, provider = "gemini-2.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
 

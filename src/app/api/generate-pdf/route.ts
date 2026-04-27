@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 import {
   detectLatestVersion,
   detectLocaleVersion,
@@ -79,6 +80,8 @@ export async function GET(request: Request) {
  * 7. Releases lock
  */
 export async function POST(request: Request) {
+  const denied = await gate("pdf.generate");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
   const mode = searchParams.get("mode") ?? "regenerate"; // "regenerate" | "new"

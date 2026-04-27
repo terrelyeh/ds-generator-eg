@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 
 /**
  * GET /api/settings?keys=anthropic_api_key,openai_api_key,...
  * Returns settings with values masked (only last 4 chars visible).
  */
 export async function GET(request: Request) {
+  const denied = await gate("settings.edit_api_keys");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const keys = searchParams.get("keys")?.split(",") ?? [];
 
@@ -39,6 +42,8 @@ export async function GET(request: Request) {
  * Body: { settings: { key: string, value: string }[] }
  */
 export async function POST(request: Request) {
+  const denied = await gate("settings.edit_api_keys");
+  if (denied) return denied;
   const body = await request.json();
   const { settings, expected_updated_at } = body as {
     settings: { key: string; value: string }[];

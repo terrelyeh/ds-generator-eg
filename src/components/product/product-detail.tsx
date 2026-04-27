@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
+import { can, type Role } from "@/lib/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
@@ -78,6 +79,9 @@ interface ProductDetailProps {
   /** English: the layout has an issue but the PM acked it and the ack
    *  is still valid. Show the Undo affordance. */
   englishAcked?: boolean;
+  /** Caller-supplied user role. Used to hide editor-only controls
+   *  (Generate / Resync / Upload / Mark-as-Reviewed / Translation Editor). */
+  role?: Role;
 }
 
 function LayoutWarningBanner({
@@ -675,7 +679,15 @@ function RadioPatternSlot({
   );
 }
 
-export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false }: ProductDetailProps) {
+export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role }: ProductDetailProps) {
+  // Role-derived flags. Prefixed `roleCan` to avoid collision with the
+  // existing `canGenerate` that signals "all required fields are filled
+  // (Product Image, Hardware Image, Overview, Features)".
+  const roleCanEdit = can(role, "product.edit");
+  const roleCanUpload = can(role, "product.upload_image");
+  const roleCanGenerate = can(role, "pdf.generate");
+  const roleCanResync = can(role, "sync.run");
+  const roleCanTranslate = can(role, "translation.edit");
   const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
@@ -864,20 +876,22 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
           layout-ack API so the dashboard red flag goes away.
           If a locale is already acked (and the ack is still valid),
           we show a subtle green notice with an Undo button instead. */}
-      {englishAcked && (
+      {/* Layout banners hidden for non-editors — they have no actionable
+          buttons available and can read dashboard red/green flags instead. */}
+      {roleCanEdit && englishAcked && (
         <LayoutAckedNotice
           modelName={product.model_name}
           onUnacked={() => router.refresh()}
         />
       )}
-      {layoutReport && layoutReport.status !== "ok" && (
+      {roleCanEdit && layoutReport && layoutReport.status !== "ok" && (
         <LayoutWarningBanner
           report={layoutReport}
           modelName={product.model_name}
           onAcked={() => router.refresh()}
         />
       )}
-      {localizedLayoutReports.map(({ locale, report, acked }) => {
+      {roleCanEdit && localizedLayoutReports.map(({ locale, report, acked }) => {
         if (acked) {
           // Suppressed by a valid ack — show Undo affordance instead
           // of the warning. We only show this when the underlying
@@ -929,7 +943,9 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
           {/* Split button: main = images only (fast, no Sheet re-read).
               Dropdown reveals full Content + Images sync for this one
               model — safer than dashboard's per-line sync because a
-              single model never gets near the 60s Vercel limit. */}
+              single model never gets near the 60s Vercel limit.
+              Hidden for non-editor roles. */}
+          {roleCanResync && (
           <div className="relative flex">
             <Button
               variant="outline"
@@ -991,11 +1007,13 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
               </div>
             )}
           </div>
+          )}
           <Link href={`/preview/${product.model_name}`} target="_blank">
             <Button variant="outline" size="default">
               Preview Datasheet
             </Button>
           </Link>
+          {roleCanGenerate && (
           <div className="relative">
             {!canGenerate && (
               <p className="absolute -top-6 right-0 text-[11px] text-red-500 whitespace-nowrap">
@@ -1084,6 +1102,7 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
               </div>
             )}
           </div>
+          )}
 
           {/* 🌐 Other Languages button (方案 C) */}
           {localesWithTranslations.length > 0 && (
@@ -1179,7 +1198,7 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
         {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
       </p>
 
-      {/* Tab switcher */}
+      {/* Tab switcher — Translations tab hidden for non-translators. */}
       <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
         <button
           onClick={() => setActiveTab("detail")}
@@ -1191,19 +1210,21 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
         >
           Detail
         </button>
-        <button
-          onClick={() => setActiveTab("translations")}
-          className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
-            activeTab === "translations"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          Translations
-          {translations.length > 0 && (
-            <span className="ml-1.5 tabular-nums text-muted-foreground/50">{translations.length}</span>
-          )}
-        </button>
+        {roleCanTranslate && (
+          <button
+            onClick={() => setActiveTab("translations")}
+            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+              activeTab === "translations"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Translations
+            {translations.length > 0 && (
+              <span className="ml-1.5 tabular-nums text-muted-foreground/50">{translations.length}</span>
+            )}
+          </button>
+        )}
       </div>
 
       <Separator />

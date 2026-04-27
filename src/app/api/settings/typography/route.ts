@@ -2,12 +2,15 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { TYPOGRAPHY_DEFAULTS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
+import { gate } from "@/lib/auth/session";
 
 /**
  * GET /api/settings/typography?locale=ja
  * Returns typography settings for a locale (merged with defaults).
  */
 export async function GET(request: Request) {
+  const denied = await gate("settings.edit_typography");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const locale = searchParams.get("locale");
 
@@ -43,6 +46,8 @@ export async function GET(request: Request) {
  * Body: { locale: string, settings: Partial<TypographySettings> }
  */
 export async function POST(request: Request) {
+  const denied = await gate("settings.edit_typography");
+  if (denied) return denied;
   const body = await request.json();
   const { locale, settings, expected_updated_at } = body as {
     locale: string;
@@ -96,6 +101,8 @@ export async function POST(request: Request) {
  * Reset typography settings to defaults.
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("settings.edit_typography");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const locale = searchParams.get("locale");
 

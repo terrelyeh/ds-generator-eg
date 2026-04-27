@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { requirePagePermission } from "@/lib/auth/page-guards";
 import { SpecLabelTranslationsEditor } from "@/components/translations/spec-label-editor";
 import type { ProductLine } from "@/types/database";
 
@@ -17,6 +18,7 @@ export default async function TranslationsPage({
   params: Promise<{ line: string }>;
   searchParams: Promise<{ locale?: string }>;
 }) {
+  await requirePagePermission("translation.edit");
   const { line } = await params;
   const { locale = "ja" } = await searchParams;
   const decodedLine = decodeURIComponent(line);

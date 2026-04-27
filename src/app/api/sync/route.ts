@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gateOrCron } from "@/lib/auth/session";
 import {
   loadAllProductsFromSheet,
   loadProductFromSheets,
@@ -33,13 +34,9 @@ export const maxDuration = 60;
  *   ?model=ECC100         — sync only one model
  */
 export async function POST(request: Request) {
-  // Verify authorization (cron secret or service role key)
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // Vercel cron / CRON_SECRET bearer / signed-in editor+admin users only.
+  const denied = await gateOrCron(request, "sync.run");
+  if (denied) return denied;
 
   const { searchParams } = new URL(request.url);
   const filterLine = searchParams.get("line");

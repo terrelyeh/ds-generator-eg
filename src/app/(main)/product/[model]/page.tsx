@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/auth/session";
 import { ProductDetail } from "@/components/product/product-detail";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import { filterRenderableSections } from "@/lib/datasheet/pagination";
@@ -34,6 +35,8 @@ export default async function ProductPage({
 }) {
   const { model } = await params;
   const supabase = await createClient();
+  const user = await getCurrentUser();
+  const role = user?.role ?? "viewer";
 
   const { data } = await supabase
     .from("products")
@@ -160,6 +163,7 @@ export default async function ProductPage({
         layoutReport={layoutReport ?? undefined}
         localizedLayoutReports={localizedReports}
         englishAcked={enAckValid && layoutReportRaw.status !== "ok"}
+        role={role}
       />
     </div>
   );

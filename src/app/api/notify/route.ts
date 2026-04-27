@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendNotifications } from "@/lib/notifications";
+import { gateOrCron } from "@/lib/auth/session";
 import type { ChangeEntry } from "@/lib/notifications";
 
 /**
@@ -10,12 +11,8 @@ import type { ChangeEntry } from "@/lib/notifications";
  * Called after sync completes, or can be triggered independently.
  */
 export async function POST(request: Request) {
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  const denied = await gateOrCron(request, "sync.run");
+  if (denied) return denied;
 
   const supabase = createAdminClient();
 

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { translate, AVAILABLE_PROVIDERS } from "@/lib/translate";
 import type { ProviderId } from "@/lib/translate";
+import { gate } from "@/lib/auth/session";
 
 export const maxDuration = 30;
 
@@ -18,6 +19,8 @@ export const maxDuration = 30;
  * Returns: { ok: true, translated: string, provider: string }
  */
 export async function POST(request: Request) {
+  const denied = await gate("translation.edit");
+  if (denied) return denied;
   const body = await request.json();
   const {
     source,

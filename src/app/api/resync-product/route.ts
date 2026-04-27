@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { syncLocalizedHardwareImage, syncProductImages } from "@/lib/google/drive-images";
+import { gate } from "@/lib/auth/session";
 
 /**
  * POST /api/resync-product?model=ECC500Z
@@ -15,6 +16,8 @@ import { syncLocalizedHardwareImage, syncProductImages } from "@/lib/google/driv
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
+  const denied = await gate("sync.run");
+  if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
   if (!model) {

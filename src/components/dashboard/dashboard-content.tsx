@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Columns2, History, Languages } from "lucide-react";
 import type { ProductLine } from "@/types/database";
+import { can, type Role } from "@/lib/auth/permissions";
 
 interface ProductSummary {
   id: string;
@@ -51,6 +52,7 @@ interface ProductSummary {
 interface DashboardContentProps {
   productLines: ProductLine[];
   products: ProductSummary[];
+  role?: Role;
 }
 
 function formatDate(dateStr: string | null) {
@@ -323,9 +325,12 @@ export function DashboardContent({
   productLines,
   products,
   initialLineId,
+  role,
 }: DashboardContentProps & { initialLineId?: string }) {
   const router = useRouter();
   const pathname = usePathname();
+  const canSync = can(role, "sync.run");
+  const canEditTranslations = can(role, "translation.edit");
   // Default to "All" — matches PM expectation that the dashboard starts
   // as a full overview; they opt into "Active only" when they want to
   // hide Upcoming / Pending noise.
@@ -505,13 +510,15 @@ export function DashboardContent({
             <History className="h-3.5 w-3.5" />
             Changelog
           </Link>
-          <Link
-            href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
-            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-          >
-            <Languages className="h-3.5 w-3.5" />
-            Translations
-          </Link>
+          {canEditTranslations && (
+            <Link
+              href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Languages className="h-3.5 w-3.5" />
+              Translations
+            </Link>
+          )}
         </div>
 
         {/* Right group: status filter (chip with border) + Sync */}
@@ -546,7 +553,9 @@ export function DashboardContent({
           {/* Split button: main click does smart sync (skips unchanged
               lines via Drive modifiedTime). Dropdown arrow reveals
               "Force full re-sync" for the rare case — warns about
-              Hobby plan's 60s timeout since a full AP sync is tight. */}
+              Hobby plan's 60s timeout since a full AP sync is tight.
+              Hidden for non-editor roles (PM/Viewer). */}
+          {canSync && (
           <div className="relative flex items-center">
             <button
               onClick={() => handleSync(false)}
@@ -607,6 +616,7 @@ export function DashboardContent({
               </div>
             )}
           </div>
+          )}
         </div>
       </div>
 

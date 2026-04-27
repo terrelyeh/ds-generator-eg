@@ -15,6 +15,7 @@
  */
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 import {
   computeContentHash,
   type LayoutAckValue,
@@ -24,6 +25,8 @@ export async function PATCH(
   req: Request,
   ctx: { params: Promise<{ model: string }> },
 ) {
+  const denied = await gate("product.edit");
+  if (denied) return denied;
   const { model } = await ctx.params;
   const body = (await req.json().catch(() => null)) as
     | { locale?: string; ack?: boolean }

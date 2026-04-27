@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { gate } from "@/lib/auth/session";
 
 /**
  * POST /api/translations/product
@@ -16,6 +17,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
  * }
  */
 export async function POST(request: Request) {
+  const denied = await gate("translation.edit");
+  if (denied) return denied;
   const body = await request.json();
   const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, confirm } = body as {
     product_id: string;
