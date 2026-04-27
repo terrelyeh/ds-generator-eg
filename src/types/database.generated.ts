@@ -246,6 +246,38 @@ export type Database = {
         }
         Relationships: []
       }
+      email_whitelist: {
+        Row: {
+          email: string
+          invited_at: string
+          invited_by: string | null
+          note: string | null
+          role: string
+        }
+        Insert: {
+          email: string
+          invited_at?: string
+          invited_by?: string | null
+          note?: string | null
+          role?: string
+        }
+        Update: {
+          email?: string
+          invited_at?: string
+          invited_by?: string | null
+          note?: string | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_whitelist_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       hardware_labels: {
         Row: {
           id: string
@@ -525,30 +557,33 @@ export type Database = {
       }
       profiles: {
         Row: {
+          avatar_url: string | null
           created_at: string
-          display_name: string
           email: string
           id: string
-          product_line_ids: string[]
-          role: Database["public"]["Enums"]["user_role"]
+          last_sign_in_at: string | null
+          name: string | null
+          role: string
           updated_at: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
-          display_name?: string
           email: string
           id: string
-          product_line_ids?: string[]
-          role?: Database["public"]["Enums"]["user_role"]
+          last_sign_in_at?: string | null
+          name?: string | null
+          role?: string
           updated_at?: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
-          display_name?: string
           email?: string
           id?: string
-          product_line_ids?: string[]
-          role?: Database["public"]["Enums"]["user_role"]
+          last_sign_in_at?: string | null
+          name?: string | null
+          role?: string
           updated_at?: string
         }
         Relationships: []
@@ -852,7 +887,6 @@ export type Database = {
         | "radio_pattern"
         | "packaging"
         | "application"
-      user_role: "admin" | "pm" | "mkt" | "viewer"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -988,7 +1022,6 @@ export const Constants = {
         "packaging",
         "application",
       ],
-      user_role: ["admin", "pm", "mkt", "viewer"],
     },
   },
 } as const
