@@ -75,46 +75,54 @@ COMMENT ON TABLE email_whitelist IS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE email_whitelist ENABLE ROW LEVEL SECURITY;
 
+-- Helper: is the current request from an admin?
+-- Must be SECURITY DEFINER so it can SELECT profiles without re-triggering
+-- the policies on profiles (which would cause infinite recursion).
+CREATE OR REPLACE FUNCTION public.current_user_is_admin()
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+$$;
+
+REVOKE ALL ON FUNCTION public.current_user_is_admin() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.current_user_is_admin()
+  TO authenticated, anon, service_role;
+
 -- profiles: anyone authenticated can read their own row
 DROP POLICY IF EXISTS "users read own profile" ON profiles;
 CREATE POLICY "users read own profile" ON profiles
   FOR SELECT
   USING (auth.uid() = id);
 
--- profiles: admins can read all rows
+-- profiles: admins can read all rows (uses SECURITY DEFINER helper to
+-- avoid recursion through this very policy).
 DROP POLICY IF EXISTS "admin read all profiles" ON profiles;
 CREATE POLICY "admin read all profiles" ON profiles
-  FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  FOR SELECT USING (public.current_user_is_admin());
 
 -- profiles: admins can update any row (for role changes)
 DROP POLICY IF EXISTS "admin update profiles" ON profiles;
 CREATE POLICY "admin update profiles" ON profiles
-  FOR UPDATE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  FOR UPDATE USING (public.current_user_is_admin());
 
 -- profiles: admins can delete (for "Remove user")
 DROP POLICY IF EXISTS "admin delete profiles" ON profiles;
 CREATE POLICY "admin delete profiles" ON profiles
-  FOR DELETE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  FOR DELETE USING (public.current_user_is_admin());
 
 -- email_whitelist: admin-only for everything
 DROP POLICY IF EXISTS "admin manage whitelist" ON email_whitelist;
 CREATE POLICY "admin manage whitelist" ON email_whitelist
   FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  )
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.current_user_is_admin())
+  WITH CHECK (public.current_user_is_admin());
 
 -- 4. Trigger: on first sign-in, create profile from whitelist --------------
 
