@@ -1,13 +1,18 @@
 /**
- * Next.js 16 proxy (formerly middleware). Two responsibilities:
+ * Next.js 16 proxy (formerly middleware). Runs on Edge runtime.
+ *
+ * Two responsibilities — kept deliberately minimal so Edge cold-starts
+ * stay fast and the proxy doesn't crash on slow/flaky DB queries:
  *
  *   1. Refresh the Supabase session cookie on every request (required by
  *      @supabase/ssr — access tokens expire after 1 hour and are refreshed
  *      transparently via cookies).
- *   2. Gate access. Public routes pass through; otherwise we require both
- *      a Supabase session AND a matching profile row. If the user signed
- *      in via Google but isn't whitelisted (no profile), we sign them out
- *      and redirect to /auth/no-access.
+ *   2. Auth gate. Public routes pass through; otherwise we require an
+ *      authenticated Supabase session. If absent, redirect to sign-in.
+ *
+ * Whitelist enforcement (does the user have a profiles row?) happens in
+ * (main)/layout.tsx via getCurrentUser() — Node runtime, full DB access.
+ * Doing the DB query in Edge proved unreliable (Edge function 500s).
  */
 
 import { type NextRequest, NextResponse } from "next/server";
@@ -33,61 +38,58 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request });
 
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
+  // Public routes still get session refresh, but no gating.
+  // We do the supabase setup unconditionally so cookies stay fresh.
+  try {
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return request.cookies.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            );
+            response = NextResponse.next({ request });
+            cookiesToSet.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            );
+          },
         },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-        },
-      },
+      }
+    );
+
+    // Calling getUser() also refreshes the access token if needed.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (isPublic(pathname)) {
+      return response;
     }
-  );
 
-  // Calling getUser() also refreshes the access token if needed.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+    // Not signed in → redirect to sign-in, preserving the destination.
+    if (!user) {
+      const signInUrl = new URL("/auth/sign-in", request.url);
+      if (pathname !== "/") {
+        signInUrl.searchParams.set("next", pathname + request.nextUrl.search);
+      }
+      return NextResponse.redirect(signInUrl);
+    }
 
-  // Public route: pass through with refreshed cookies.
-  if (isPublic(pathname)) {
+    // Signed in. Profile/whitelist check happens downstream in
+    // (main)/layout.tsx via getCurrentUser().
+    return response;
+  } catch (err) {
+    // If anything in the proxy fails (Edge runtime quirk, network blip),
+    // don't take the whole site down. Let the request through and log so
+    // we can find out about it. The downstream layout will still gate.
+    console.error("[proxy] error, falling through:", err);
     return response;
   }
-
-  // Not signed in → redirect to sign-in, preserving the destination.
-  if (!user) {
-    const signInUrl = new URL("/auth/sign-in", request.url);
-    if (pathname !== "/") {
-      signInUrl.searchParams.set("next", pathname + request.nextUrl.search);
-    }
-    return NextResponse.redirect(signInUrl);
-  }
-
-  // Signed in via Google but not in whitelist (no profile row) → sign out
-  // + show no-access page. Goes through RLS; the "users read own profile"
-  // policy lets a user see their own row.
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .maybeSingle();
-
-  if (!profile) {
-    await supabase.auth.signOut();
-    return NextResponse.redirect(new URL("/auth/no-access", request.url));
-  }
-
-  return response;
 }
 
 export const config = {
