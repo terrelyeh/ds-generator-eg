@@ -89,13 +89,27 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Ask SpecHub 的法規引用會直接連到此頁面
 
 ### Settings
-- **Settings 導航頁** — 四個獨立管理區塊，各自獨立頁面
+- **Settings 導航頁** — 五個獨立管理區塊，各自獨立頁面
 - **API Key 管理**（`/settings/api-keys`）— 設定 AI API Key（Embedding + 翻譯 + RAG），存到 DB
 - **翻譯詞庫**（`/settings/glossary`）— 公司認可翻譯術語，分 Global 和產品線專屬
 - **Typography**（`/settings/typography`）— 每個語言獨立的字型、字級、字重設定
   - Google Font 選擇器（預設 + 自定義 URL 添加）
   - Split layout：左設定、右即時 Datasheet Preview（可縮放）
 - **Ask Personas**（`/settings/personas`）— 管理 AI 問答的 system prompt
+- **Users**（`/settings/users`）— 邀請 / 移除使用者、改 role（admin only）
+
+### Access Control
+- **Google OAuth 登入** — 走 Supabase Auth + PKCE flow，不需要密碼
+- **Email 白名單** — admin 預先邀請 email，使用者首次登入自動建 profile
+- **4 種角色**：
+  - **Admin** — 完整存取（含使用者管理 / API Key / 翻譯詞庫等所有 Settings）
+  - **Editor (MKT)** — 編輯內容、Sync、產 PDF、翻譯
+  - **PM** — 純瀏覽（review-only，未來會加 content approval workflow）
+  - **Viewer** — 純瀏覽 + Ask SpecHub（業務 / Field 用）
+- **三層 enforcement**：API gate（403 by role）、Server page guard（redirect 未授權）、UI hide（按鈕隱藏）
+- **使用者管理 UI** — Active Users / Pending Invites tabs、邀請表單、role 下拉、移除按鈕、自我保護（不能改自己 role / 不能移除最後一個 admin）
+- **自動 Session refresh** — Supabase access token 1 小時過期由 proxy 透明續期
+- **Cron / Service routes 例外** — `/api/sync` 透過 Vercel `x-vercel-cron` header 識別，不需登入
 
 ### Concurrency Protection
 - **PDF 生成鎖** — 同一 model + locale 同時只能一人生成，DB flag 自動 5 分鐘過期
@@ -122,6 +136,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 | UI | Tailwind CSS v4 + shadcn/ui |
 | Table | @tanstack/react-table |
 | Database | Supabase (PostgreSQL + Storage) |
+| Auth | Supabase Auth + Google OAuth + DB whitelist + 4-role RBAC |
 | Data Source | Google Sheets API + Drive API |
 | PDF | Puppeteer + Browser Print |
 | AI Translation | Claude / GPT-4o / Gemini (multi-provider) |
