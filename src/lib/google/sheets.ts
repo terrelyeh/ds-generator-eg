@@ -141,13 +141,39 @@ async function fetchTabRowsFiltered(
   });
 }
 
-function findModelColumn(rows: unknown[][], modelNumber: string): number | null {
+/**
+ * Return ALL columns where `modelNumber` appears in the first 5 rows
+ * (the model-number / model-name header band). Empty array if none.
+ *
+ * Sheets sometimes have the same model in two columns by accident
+ * (PM dragged-out a duplicate). Returning all occurrences lets callers
+ * decide whether to error, warn, or pick one deterministically.
+ */
+function findAllModelColumns(rows: unknown[][], modelNumber: string): number[] {
+  const cols = new Set<number>();
   for (let r = 0; r < Math.min(rows.length, 5); r++) {
     for (let c = 0; c < rows[r].length; c++) {
-      if (String(rows[r][c] ?? "").trim() === modelNumber) return c;
+      if (String(rows[r][c] ?? "").trim() === modelNumber) {
+        cols.add(c);
+      }
     }
   }
-  return null;
+  return Array.from(cols).sort((a, b) => a - b);
+}
+
+function findModelColumn(rows: unknown[][], modelNumber: string): number | null {
+  const cols = findAllModelColumns(rows, modelNumber);
+  if (cols.length === 0) return null;
+  if (cols.length > 1) {
+    console.warn(
+      `[sheets] Model "${modelNumber}" appears in ${cols.length} columns ` +
+        `(positions: ${cols.join(", ")}). Using first occurrence (col ${cols[0]}). ` +
+        `This causes inconsistent sync results — single-product sync uses the first column ` +
+        `but full-line sync's last-wins loop may write a different one. ` +
+        `Fix: remove the duplicate column from the Sheet's Detail Specs / Web Overview tab.`
+    );
+  }
+  return cols[0];
 }
 
 function findRowByLabel(rows: unknown[][], label: string): number | null {
@@ -497,10 +523,26 @@ export async function loadAllProductsFromSheet(
   const modelNumRow = detailRows[numRowIdx] ?? [];
 
   const results = new Map<string, SheetProduct>();
+  // Track duplicates so we behave consistently with loadProductFromSheets
+  // (which uses the first occurrence). Without this, the Map.set() loop
+  // below silently let the LAST occurrence win — meaning full-line sync
+  // and single-product sync could disagree on which column to read,
+  // producing the "every other sync flips the value" ping-pong bug.
+  const seenModels = new Set<string>();
 
   for (let col = 1; col < modelNumRow.length; col++) {
     const modelNum = String(modelNumRow[col] ?? "").trim();
     if (!modelNum) continue;
+
+    if (seenModels.has(modelNum)) {
+      console.warn(
+        `[sheets] Model "${modelNum}" appears in multiple columns; skipping ` +
+          `column ${col} (already imported from an earlier column). ` +
+          `Fix the Sheet by removing the duplicate column.`
+      );
+      continue;
+    }
+    seenModels.add(modelNum);
 
     const subtitle = getCell(detailRows[nameRowIdx], col);
     if (subtitle.includes("Vivotek")) continue;
