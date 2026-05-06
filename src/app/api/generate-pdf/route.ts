@@ -161,6 +161,31 @@ export async function POST(request: Request) {
       .eq("key", lockKey);
   }
 
+  // Defense-in-depth: refuse to generate locale PDF when the translation
+  // is still a Draft. The UI also blocks this, but a DevTools / curl
+  // request from an editor would otherwise slip through. English ("en")
+  // has no translation row — skip.
+  if (isLocalized) {
+    const { data: ptRow } = await supabase
+      .from("product_translations")
+      .select("confirmed")
+      .eq("product_id", product.model_name)
+      .eq("locale", lang)
+      .maybeSingle();
+    const confirmed = (ptRow as { confirmed?: boolean } | null)?.confirmed;
+    if (!confirmed) {
+      await releaseLock();
+      return NextResponse.json(
+        {
+          error:
+            `Cannot generate PDF: ${lang} translation is still a Draft. ` +
+            `Click "Save & Confirm" on the Translations tab first.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
   try {
     const dsPrefix = productLine.ds_prefix ?? "DS_Cloud";
     const currentVersions = (product.current_versions ?? {}) as Record<string, string>;

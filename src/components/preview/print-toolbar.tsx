@@ -2,19 +2,47 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
+import { can, type Role } from "@/lib/auth/permissions";
 
 interface PrintToolbarProps {
   model: string;
   currentVersion: string;
   canGenerate: boolean;
   locale?: string;
+  /** Logged-in user's role. PM and Viewer cannot generate PDFs even when
+   *  visiting a preview link — the Regenerate button is hidden entirely. */
+  userRole?: Role | null;
+  /** Whether the locale translation has been confirmed (Save & Confirm
+   *  button clicked). Draft-only translations can be previewed but must
+   *  not produce official PDFs. Always true for English. */
+  translationConfirmed?: boolean;
 }
 
-export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en" }: PrintToolbarProps) {
+export function PrintToolbar({
+  model,
+  currentVersion,
+  canGenerate,
+  locale = "en",
+  userRole = null,
+  translationConfirmed = true,
+}: PrintToolbarProps) {
   const [generating, setGenerating] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
 
   const hasExistingVersion = currentVersion !== "0.0";
+
+  // Role-level gate. Editors and admins can generate; PMs and viewers
+  // can only preview. When userRole is null (Puppeteer self-fetch via
+  // bypass header), allow — the API still gates server-side.
+  const roleAllowsGenerate = userRole == null || can(userRole, "pdf.generate");
+
+  // Translation Draft gate (locale only). English is always "confirmed".
+  // Draft locale translations show a warning + disabled button so PMs
+  // know they need Save & Confirm before they can generate the PDF.
+  const isDraftLocale = locale !== "en" && !translationConfirmed;
+
+  const showGenerateButton = roleAllowsGenerate;
+  const generateDisabled = generating || !canGenerate || isDraftLocale;
 
   async function handleGenerate(mode: "regenerate" | "new") {
     setShowMenu(false);
@@ -142,17 +170,32 @@ export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en"
       </span>
 
       <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-        {/* Generate PDF button */}
-        {canGenerate ? (
+        {/* Generate PDF button — hidden entirely for PM/Viewer roles
+            (they can preview but not produce official PDFs). */}
+        {!showGenerateButton ? null : isDraftLocale ? (
+          <span
+            style={{
+              fontSize: 12,
+              color: "#fbbf24",
+              maxWidth: 320,
+              textAlign: "right",
+              lineHeight: 1.35,
+            }}
+            title="Translation is still a Draft. Confirm it on the Product page before generating the official PDF."
+          >
+            ⚠️ Translation in Draft — Confirm before generating
+          </span>
+        ) : canGenerate ? (
           <div style={{ position: "relative", display: "flex" }}>
             <button
               onClick={() => handleGenerate(hasExistingVersion ? "regenerate" : "new")}
-              disabled={generating}
+              disabled={generateDisabled}
               style={{
                 ...btnBase,
-                background: generating ? "#64748b" : "#03a9f4",
+                background: generateDisabled ? "#64748b" : "#03a9f4",
                 borderRadius: hasExistingVersion ? "6px 0 0 6px" : "6px",
-                opacity: generating ? 0.7 : 1,
+                opacity: generateDisabled ? 0.7 : 1,
+                cursor: generateDisabled ? "not-allowed" : "pointer",
               }}
             >
               {generating
@@ -249,6 +292,21 @@ export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en"
         ) : (
           <span style={{ fontSize: 12, color: "#f87171" }}>
             Missing data — generate from Model page
+          </span>
+        )}
+
+        {/* Read-only role indicator — replaces the button area for
+            PM/Viewer so they understand why no Generate is shown. */}
+        {!showGenerateButton && (
+          <span
+            style={{
+              fontSize: 12,
+              color: "#94a3b8",
+              fontStyle: "italic",
+            }}
+            title="Your role can preview but not generate official PDFs."
+          >
+            Preview only · {userRole?.toUpperCase()}
           </span>
         )}
 

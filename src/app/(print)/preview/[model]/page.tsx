@@ -80,6 +80,13 @@ export default async function PreviewPage({
 
   const supabase = await createClient();
 
+  // Fetch current user — preview is gated by middleware so this should
+  // always be present, but tolerate null (e.g. Puppeteer self-fetch
+  // bypasses auth via the protection-bypass header).
+  const { getCurrentUser } = await import("@/lib/auth/session");
+  const currentUser = await getCurrentUser();
+  const userRole = currentUser?.role ?? null;
+
   const { data } = await supabase
     .from("products")
     .select(
@@ -107,14 +114,19 @@ export default async function PreviewPage({
   let specLabelMap: Record<string, string> = {};
   let sectionLabelMap: Record<string, string> = {};
 
+  // Track whether the locale translation has been confirmed (for gating
+  // PDF generation on Draft state). Default false → user has to Confirm
+  // first before they can produce the official PDF.
+  let translationConfirmed = false;
   if (isTranslated) {
     // Per-product translation (overview + features)
     const { data: pt } = await supabase
       .from("product_translations")
-      .select("overview, features, translation_mode, headline, subtitle, hardware_image, qr_label, qr_url")
+      .select("overview, features, translation_mode, headline, subtitle, hardware_image, qr_label, qr_url, confirmed")
       .eq("product_id", model)
       .eq("locale", lang)
-      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; subtitle: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null } | null };
+      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; subtitle: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null; confirmed: boolean } | null };
+    translationConfirmed = pt?.confirmed ?? false;
 
     if (pt) {
       translatedOverview = pt.overview;
@@ -306,6 +318,8 @@ export default async function PreviewPage({
             Array.isArray(product.features) && product.features.length > 0
           }
           locale={lang}
+          userRole={userRole}
+          translationConfirmed={!isTranslated || translationConfirmed}
         />
       )}
       <style
