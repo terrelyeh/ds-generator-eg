@@ -38,6 +38,20 @@ export async function proxy(request: NextRequest) {
 
   let response = NextResponse.next({ request });
 
+  // Internal automation bypass: our own Puppeteer (in /api/generate-pdf)
+  // self-fetches /preview/[model] to render the PDF. Without this, the
+  // request is treated as anonymous, redirected to /auth/sign-in, and
+  // Puppeteer dutifully prints the sign-in page as the "PDF". Same
+  // secret already gates Vercel Deployment Protection — extending it
+  // to our app auth is a single trust boundary, not a new one.
+  const automationSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (
+    automationSecret &&
+    request.headers.get("x-vercel-protection-bypass") === automationSecret
+  ) {
+    return NextResponse.next({ request });
+  }
+
   // Public routes still get session refresh, but no gating.
   // We do the supabase setup unconditionally so cookies stay fresh.
   try {
