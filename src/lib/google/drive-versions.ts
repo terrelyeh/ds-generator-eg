@@ -360,21 +360,77 @@ export async function uploadPdfToDrive(
   const existingFolder = existingFolderRes.data.files?.[0];
   if (existingFolder?.id) {
     targetFolderId = existingFolder.id;
-  } else if (!locale && existingVersion) {
-    // Back-compat: caller discovered an old-format folder like
-    // DS_Cloud_ECW526_v1.4/ via version detection — reuse it.
-    targetFolderId = existingVersion.folderId;
   } else {
-    const folderRes = await drive.files.create({
-      requestBody: {
-        name: targetFolderName,
-        mimeType: "application/vnd.google-apps.folder",
-        parents: [parentLineFolderId],
-      },
+    // No canonical folder. Look for a legacy version-suffixed folder
+    // (`DS_Cloud_ECC100_zh_v1.0/`) created by hand in the early days
+    // before this system existed. If we find any, rename the highest
+    // version one to canonical and reuse it — that way old PDFs stay
+    // in place + the folder name migrates to the new convention.
+    //
+    // We look up via Drive search rather than relying on the caller's
+    // existingVersion (which only resolves EN). This way both locale
+    // and EN benefit from the same migration.
+    const legacyRes = await drive.files.list({
+      q: `'${parentLineFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name contains '${targetFolderName}_v' and trashed = false`,
+      fields: "files(id, name)",
       supportsAllDrives: true,
-      fields: "id",
+      includeItemsFromAllDrives: true,
+      pageSize: 50,
     });
-    targetFolderId = folderRes.data.id!;
+    const legacyRe = new RegExp(
+      `^${targetFolderName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_v(\\d+)\\.(\\d+)$`,
+    );
+    const legacyMatches = (legacyRes.data.files ?? [])
+      .map((f) => {
+        const m = f.name?.match(legacyRe);
+        return m && f.id
+          ? { id: f.id, name: f.name!, major: +m[1], minor: +m[2] }
+          : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => !!x)
+      .sort((a, b) =>
+        a.major !== b.major ? b.major - a.major : b.minor - a.minor,
+      );
+
+    if (legacyMatches.length > 0) {
+      const newest = legacyMatches[0];
+      console.info(
+        `[drive] Migrating legacy folder "${newest.name}" → "${targetFolderName}" (and reusing for new PDF).`,
+      );
+      try {
+        await drive.files.update({
+          fileId: newest.id,
+          requestBody: { name: targetFolderName },
+          supportsAllDrives: true,
+        });
+        targetFolderId = newest.id;
+      } catch (err) {
+        console.warn(
+          `[drive] Legacy folder rename failed (${err instanceof Error ? err.message : String(err)}); creating fresh canonical folder instead.`,
+        );
+        targetFolderId = "";
+      }
+    } else if (!locale && existingVersion) {
+      // EN-only fallback retained for callers that already detected the
+      // old-format folder via detectLatestVersion(). Skip if we already
+      // migrated above.
+      targetFolderId = existingVersion.folderId;
+    } else {
+      targetFolderId = "";
+    }
+
+    if (!targetFolderId) {
+      const folderRes = await drive.files.create({
+        requestBody: {
+          name: targetFolderName,
+          mimeType: "application/vnd.google-apps.folder",
+          parents: [parentLineFolderId],
+        },
+        supportsAllDrives: true,
+        fields: "id",
+      });
+      targetFolderId = folderRes.data.id!;
+    }
   }
 
   // Upload PDF — overwrite existing same-name file, dedupe extras.
