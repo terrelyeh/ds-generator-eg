@@ -365,7 +365,8 @@ export async function POST(request: Request) {
           newVersion,
           pdfBuffer,
           null, // For localized, always create new folder if needed
-          isLocalized ? lang : undefined
+          isLocalized ? lang : undefined,
+          productLine.name, // needed to resolve sibling locale line folder
         );
       } catch (err) {
         console.error(
@@ -381,20 +382,34 @@ export async function POST(request: Request) {
       ? (currentVersions[lang] || "0.0") !== "0.0"
       : (product.current_version || "0.0") !== "0.0";
 
+    // Helper: surface DB errors instead of swallowing them. The earlier
+    // bug was a silent unique-constraint violation on (product_id,
+    // version) that left products.current_versions claiming a row
+    // existed when none did. Always check `error` after writes.
+    const throwIfDbError = (label: string) =>
+      (res: { error: { message?: string; code?: string } | null }) => {
+        if (res.error) {
+          throw new Error(
+            `[generate-pdf] ${label} failed: ${res.error.message ?? "unknown"} ` +
+              (res.error.code ? `(code=${res.error.code})` : ""),
+          );
+        }
+      };
+
     if (isRegenerate && hasExistingVersion) {
-      // Try to update existing version record
+      // .maybeSingle() so 0 rows returns null instead of throwing.
+      // Don't .order/.limit since the (product_id, version, locale)
+      // unique constraint guarantees at most 1 row.
       const { data: existingVersion } = await supabase
         .from("versions")
         .select("id")
         .eq("product_id", product.id)
         .eq("version", newVersion)
         .eq("locale", lang)
-        .order("generated_at", { ascending: false })
-        .limit(1)
-        .single();
+        .maybeSingle();
 
       if (existingVersion) {
-        await supabase
+        const updateRes = await supabase
           .from("versions")
           .update({
             pdf_storage_path: pdfUrl,
@@ -402,23 +417,26 @@ export async function POST(request: Request) {
             generated_at: new Date().toISOString(),
           })
           .eq("id", existingVersion.id);
+        throwIfDbError("versions update")(updateRes);
       } else {
-        await supabase.from("versions").insert({
+        const insertRes = await supabase.from("versions").insert({
           product_id: product.id,
           version: newVersion,
           locale: lang,
           changes: `PDF regenerated`,
           pdf_storage_path: pdfUrl,
         });
+        throwIfDbError("versions insert (regenerate-but-missing)")(insertRes);
       }
     } else {
-      await supabase.from("versions").insert({
+      const insertRes = await supabase.from("versions").insert({
         product_id: product.id,
         version: newVersion,
         locale: lang,
         changes: `PDF generated${hasExistingVersion ? ` (new version)` : " (initial)"}`,
         pdf_storage_path: pdfUrl,
       });
+      throwIfDbError("versions insert (new)")(insertRes);
     }
 
     // Update current_version(s) with optimistic locking

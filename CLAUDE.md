@@ -399,6 +399,14 @@ npm run lint   # ESLint check
 36. **Next.js 16 用 `proxy.ts` 不是 `middleware.ts`** — Next.js 16 把 middleware 改名為 proxy（功能一樣）。檔案在 `src/proxy.ts`，export `async function proxy(request)` 不是 `middleware`。如果同時有 `middleware.ts` 和 `proxy.ts` build 會直接 fail
 37. **Vercel cron 用 `x-vercel-cron` header 區分** — `CRON_SECRET` env var 沒設（也不需要設）。Vercel cron 觸發 `/api/sync` 時自動帶 `x-vercel-cron: 1` header，這個 header 不能從外部 spoof。`gateOrCron()` 先檢查這個 header 再 fallback 到 `CRON_SECRET` bearer 再 fallback 到 user permission
 
+38. **`versions` table unique constraint 一定要含 `locale`** — 早期建表用 `UNIQUE (product_id, version)`，沒包 locale。EN v1.0 存在後再 INSERT zh-TW v1.0 撞 duplicate key，`/api/generate-pdf` 又沒檢查 insert error → silent fail。products.current_versions 仍被更新成假裝 zh-TW PDF 存在，UI 顯示 "Regenerate v1.0" 但實際 versions row + Drive 都空。00013 migration 已修，constraint 改 `(product_id, version, locale)`。**所有 supabase insert/update/upsert 都要檢查 `error`** — 用 `throwIfDbError(label)` helper 包，silent fail 是這個系統踩過最久的雷
+
+39. **Drive PDF 上傳要分 EN/locale 用不同 parent + 用 `getLocaleSuffix()`** — `uploadPdfToDrive` 早期 bug：(a) filename 用 raw `locale`（產生 `_zh-TW.pdf`，正確應該是 `_zh.pdf`），(b) 上傳時 parent 永遠用 EN line 資料夾（locale PDF 跑去 nested 在 EN 線下），(c) 沒檢查同名舊檔，每次 Regenerate 累積一份。修法：parent 用 `resolveLocaleLineFolder()`（auto-create sibling locale line folder），filename 用 `getLocaleSuffix(locale)`，list 同名 → 第一個 update 內容、其他 trash
+
+40. **Service account 在 Shared Drive 通常 `canTrash=true canDelete=false`** — `drive.files.delete` 對 PM 擁有的 Shared Drive 內檔案會回 404（其實是 permission denial 偽裝）。要刪檔一律用 `drive.files.update({ trashed: true })`。Trash 是 reversible 的，service account 自己建的檔也適用。`uploadPdfToDrive` 的去重和 `cleanup-misplaced-locale-pdfs.mjs` 都用 trash
+
+41. **Drive locale line folder 自動建** — 從 2026-05-06 起，`resolveLocaleLineFolder()` / `resolveLocaleDsImagesFolder()` 找不到 sibling locale line folder（如 `Cloud Camera_zh`）時會**自動建在 root 底下**，而不是 throw。容忍 PM typo: 先找 canonical (`Cloud Camera_zh`)，沒有再找 `Cloud Camera_zh-TW` / `Cloud Camera_ZH` / `Cloud Camera_jp` (legacy ja 命名)，找到任何一個就用 + warn。都沒找到才建 canonical。改的是雙刃劍：少了 PM friction 但 typo 也不會被發現，所以要看 console.warn
+
 ## 詳細文件
 
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25（早期特定 feature 的踩雷紀錄）

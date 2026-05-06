@@ -132,6 +132,110 @@ export async function deleteDriveFilesByPrefix(
 // the same product line + locale.
 const _localeFolderCache = new Map<string, string>();
 
+// Same idea, but for the locale product-line folder itself (e.g.
+// "Cloud Camera_zh"). Keyed by `${enLineFolderId}:${locale}`.
+const _localeLineFolderCache = new Map<string, string>();
+
+/**
+ * Look up the locale-sibling product line folder (e.g. "Cloud Camera_zh")
+ * given the EN line folder ID + locale. Auto-creates the locale line folder
+ * if missing — PMs forget to set it up and we'd rather just create the
+ * canonical name than fail every sync until they remember.
+ *
+ * Tolerates a few common PM typos before giving up and creating fresh:
+ * canonical "Cloud Camera_zh", "Cloud Camera_zh-TW", "Cloud Camera_ZH", etc.
+ *
+ * Returns the locale line folder's Drive ID. Throws only on unrecoverable
+ * errors (root not found, Drive API failure).
+ */
+export async function resolveLocaleLineFolder(params: {
+  enLineFolderId: string;
+  lineName: string;
+  locale: string | null | undefined;
+}): Promise<string> {
+  const { enLineFolderId, lineName, locale } = params;
+
+  if (!locale || locale === "en") return enLineFolderId;
+
+  const suffix = getLocaleSuffix(locale);
+  if (!suffix || suffix === "en") return enLineFolderId;
+
+  const cacheKey = `${enLineFolderId}:${locale}`;
+  const cached = _localeLineFolderCache.get(cacheKey);
+  if (cached) return cached;
+
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: "v3", auth });
+
+  // Walk up: enLineFolderId → rootFolderId
+  const enLineFolder = await drive.files.get({
+    fileId: enLineFolderId,
+    fields: "parents",
+    supportsAllDrives: true,
+  });
+  const rootFolderId = enLineFolder.data.parents?.[0];
+  if (!rootFolderId) {
+    throw new Error(
+      `EN product line folder ${enLineFolderId} has no parent — cannot search for locale sibling`,
+    );
+  }
+
+  const canonicalName = `${lineName}_${suffix}`;
+
+  // Try canonical name first, then a few common PM-typo variants. We
+  // accept the first match silently when canonical, warn otherwise.
+  const candidateNames = [
+    canonicalName,
+    // PM typos we'll forgive (logged but used)
+    `${lineName}_${locale}`,                   // e.g. Cloud Camera_zh-TW
+    `${lineName}_${locale.replace("-", "_")}`, // Cloud Camera_zh_TW
+    `${lineName}_${suffix.toUpperCase()}`,     // Cloud Camera_ZH
+    locale === "ja" ? `${lineName}_jp` : null, // legacy JP naming
+  ].filter((n): n is string => !!n && n !== "");
+
+  for (const name of candidateNames) {
+    const res = await drive.files.list({
+      q: `'${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${name.replace(/'/g, "\\'")}' and trashed = false`,
+      fields: "files(id, name)",
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
+      pageSize: 1,
+    });
+    const found = res.data.files?.[0]?.id;
+    if (found) {
+      if (name !== canonicalName) {
+        console.warn(
+          `[drive] Locale line folder name "${name}" doesn't match canonical "${canonicalName}". ` +
+            `Using it for now; consider renaming in Drive for consistency.`,
+        );
+      }
+      _localeLineFolderCache.set(cacheKey, found);
+      return found;
+    }
+  }
+
+  // Nothing found — auto-create the canonical sibling so generate-pdf /
+  // upload-image / sync don't keep failing until the PM realises.
+  console.info(
+    `[drive] Auto-creating locale line folder "${canonicalName}" under root ${rootFolderId}.`,
+  );
+  const createRes = await drive.files.create({
+    requestBody: {
+      name: canonicalName,
+      mimeType: "application/vnd.google-apps.folder",
+      parents: [rootFolderId],
+    },
+    supportsAllDrives: true,
+    fields: "id",
+  });
+  const newId = createRes.data.id;
+  if (!newId) {
+    throw new Error(`Failed to create locale line folder "${canonicalName}"`);
+  }
+  _localeLineFolderCache.set(cacheKey, newId);
+  return newId;
+}
+
 export async function resolveLocaleDsImagesFolder(params: {
   enDsImagesFolderId: string;
   lineName: string;
@@ -144,9 +248,6 @@ export async function resolveLocaleDsImagesFolder(params: {
   const suffix = getLocaleSuffix(locale);
   if (!suffix || suffix === "en") return enDsImagesFolderId;
 
-  // Check cache first — same product line + locale always resolves to
-  // the same folder, so within a single sync run we only need to look
-  // it up once.
   const cacheKey = `${enDsImagesFolderId}:${locale}`;
   const cached = _localeFolderCache.get(cacheKey);
   if (cached) return cached;
@@ -154,7 +255,7 @@ export async function resolveLocaleDsImagesFolder(params: {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
-  // Walk up: enDsImagesFolderId → enLineFolderId → rootFolderId
+  // Walk up: enDsImagesFolderId → enLineFolderId
   const enDsFolder = await drive.files.get({
     fileId: enDsImagesFolderId,
     fields: "parents",
@@ -167,34 +268,12 @@ export async function resolveLocaleDsImagesFolder(params: {
     );
   }
 
-  const enLineFolder = await drive.files.get({
-    fileId: enLineFolderId,
-    fields: "parents",
-    supportsAllDrives: true,
+  // Resolve sibling locale line folder (auto-creates if missing).
+  const localeLineFolderId = await resolveLocaleLineFolder({
+    enLineFolderId,
+    lineName,
+    locale,
   });
-  const rootFolderId = enLineFolder.data.parents?.[0];
-  if (!rootFolderId) {
-    throw new Error(
-      `EN product line folder ${enLineFolderId} has no parent — cannot search for ${lineName}_${suffix}`,
-    );
-  }
-
-  // Find the locale-specific product line folder (e.g. "Cloud AP_ja")
-  const localeLineName = `${lineName}_${suffix}`;
-  const lineSearchRes = await drive.files.list({
-    q: `'${rootFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${localeLineName.replace(/'/g, "\\'")}' and trashed = false`,
-    fields: "files(id, name)",
-    supportsAllDrives: true,
-    includeItemsFromAllDrives: true,
-    pageSize: 1,
-  });
-
-  const localeLineFolderId = lineSearchRes.data.files?.[0]?.id;
-  if (!localeLineFolderId) {
-    throw new Error(
-      `Locale product line folder "${localeLineName}" not found under root. Please create it in Drive first.`,
-    );
-  }
 
   // Find DS Images subfolder inside the locale line folder
   const imagesSearchRes = await drive.files.list({
@@ -212,7 +291,7 @@ export async function resolveLocaleDsImagesFolder(params: {
   }
 
   // Auto-create DS Images subfolder
-  console.info(`[resolveLocaleDsImagesFolder] Creating "${DS_IMAGES_FOLDER_NAME}" inside "${localeLineName}"`);
+  console.info(`[drive] Creating "${DS_IMAGES_FOLDER_NAME}" inside "${lineName}_${suffix}"`);
   const createRes = await drive.files.create({
     requestBody: {
       name: DS_IMAGES_FOLDER_NAME,
@@ -224,7 +303,7 @@ export async function resolveLocaleDsImagesFolder(params: {
   });
   const newId = createRes.data.id;
   if (!newId) {
-    throw new Error(`Failed to create DS Images folder in ${localeLineName}`);
+    throw new Error(`Failed to create DS Images folder in ${lineName}_${suffix}`);
   }
   _localeFolderCache.set(cacheKey, newId);
   return newId;

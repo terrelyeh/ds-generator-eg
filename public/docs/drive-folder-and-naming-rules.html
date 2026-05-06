@@ -1026,7 +1026,13 @@ Model Datasheet/
 </pre>
 
 <div class="callout">
-  <strong>自動建立子資料夾:</strong> 若 <code>Cloud Camera_ja/</code> 下面還沒有 <code>DS Images/</code> 子資料夾，系統首次上傳或同步時會自動建立。但上層的 <code>Cloud Camera_ja/</code> 必須事先存在（這是 PM 決定新增語言支援時手動建立的）。
+  <strong>系統自動建立的資料夾</strong>（從 2026-05-06 起）：
+  <ul style="margin-top:8px; padding-left:20px; font-size:15px;">
+    <li><code>Cloud Camera_zh/</code> 等 sibling 語言產品線資料夾 — 若不存在會自動建在 <code>Model Datasheet/</code> 下面</li>
+    <li><code>Cloud Camera_zh/DS Images/</code> 子資料夾 — 自動建</li>
+    <li><code>Cloud Camera_zh/DS_Cloud_ECC120Z_zh/</code> 型號子資料夾 — Generate PDF 時自動建</li>
+  </ul>
+  <strong>容忍幾種命名 typo</strong>：找不到 canonical <code>Cloud Camera_zh</code> 時，系統會 fallback 找 <code>Cloud Camera_zh-TW</code>、<code>Cloud Camera_ZH</code>、<code>Cloud Camera_jp</code>（日文舊命名），找到任何一個就會用，並印 warning 提醒命名不規範。都找不到才自動建 canonical。
 </div>
 
 <h4>9.6.2 檔名規則</h4>

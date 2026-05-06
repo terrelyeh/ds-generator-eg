@@ -303,57 +303,73 @@ export async function detectLocaleVersion(
  * @returns The Google Drive file ID and web view link of the uploaded PDF
  */
 export async function uploadPdfToDrive(
-  driveFolderId: string,
+  driveFolderId: string,        // EN product line folder
   dsPrefix: string,
   modelName: string,
   version: string,
   pdfBuffer: Buffer,
   existingVersion: VersionInfo | null,
-  locale?: string
+  locale?: string,
+  lineName?: string,            // required for locale uploads (e.g. "Cloud Camera")
 ): Promise<{ fileId: string; webViewLink: string }> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
-  const langSuffix = locale ? `_${locale}` : "";
+  // Filename: ALWAYS use getLocaleSuffix() so zh-TW renders as _zh, not
+  // _zh-TW. The earlier bug used raw `locale`, producing _zh-TW.pdf
+  // which mismatched both the doc convention and the storage path.
+  const localeSuffix = locale ? getLocaleSuffix(locale) : null;
+  const langSuffix = localeSuffix ? `_${localeSuffix}` : "";
   const pdfFileName = `${dsPrefix}_${modelName}_v${version}${langSuffix}.pdf`;
 
-  let targetFolderId: string;
+  // For locale uploads, parent must be the SIBLING locale line folder
+  // (e.g. "Cloud Camera_zh"), not the EN line. Earlier bug used EN
+  // directly so locale PDFs ended up nested under the wrong parent.
+  let parentLineFolderId = driveFolderId;
+  if (locale && locale !== "en") {
+    if (!lineName) {
+      throw new Error(
+        `uploadPdfToDrive: locale=${locale} requires lineName to resolve sibling folder`,
+      );
+    }
+    // Lazy-import to avoid circular dependency between drive-images and
+    // drive-versions. resolveLocaleLineFolder lives in drive-images.
+    const { resolveLocaleLineFolder } = await import("./drive-images");
+    parentLineFolderId = await resolveLocaleLineFolder({
+      enLineFolderId: driveFolderId,
+      lineName,
+      locale,
+    });
+  }
 
-  // Resolve target folder by name. Always search first (reuse if it already
-  // exists) before creating — avoids accumulating duplicate same-name folders
-  // every time a PDF is generated. Drive allows duplicate folder names so
-  // `files.create` without a prior lookup is a footgun.
-  //
-  // Folder naming:
-  //   - English:  DS_Cloud_ECC100
-  //   - Locale:   DS_Cloud_ECC100_ja
-  const targetFolderName = locale
-    ? `${dsPrefix}_${modelName}_${getLocaleSuffix(locale)}`
+  // Subfolder per model. Per docs/drive-folder-and-naming-rules.html:
+  //   EN:     <Line>/DS_Cloud_<model>/
+  //   Locale: <Line>_<suffix>/DS_Cloud_<model>_<suffix>/
+  const targetFolderName = localeSuffix
+    ? `${dsPrefix}_${modelName}_${localeSuffix}`
     : `${dsPrefix}_${modelName}`;
 
+  let targetFolderId: string;
   const existingFolderRes = await drive.files.list({
-    q: `'${driveFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${targetFolderName}' and trashed = false`,
+    q: `'${parentLineFolderId}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '${targetFolderName}' and trashed = false`,
     fields: "files(id)",
     supportsAllDrives: true,
     includeItemsFromAllDrives: true,
     pageSize: 1,
   });
-
   const existingFolder = existingFolderRes.data.files?.[0];
-
   if (existingFolder?.id) {
     targetFolderId = existingFolder.id;
   } else if (!locale && existingVersion) {
     // Back-compat: caller discovered an old-format folder like
-    // DS_Cloud_ECW526_v1.4/ via version detection — reuse it instead of
-    // creating a brand-new DS_Cloud_ECW526/ alongside it.
+    // DS_Cloud_ECW526_v1.4/ via version detection — reuse it.
     targetFolderId = existingVersion.folderId;
   } else {
     const folderRes = await drive.files.create({
       requestBody: {
         name: targetFolderName,
         mimeType: "application/vnd.google-apps.folder",
-        parents: [driveFolderId],
+        parents: [parentLineFolderId],
       },
       supportsAllDrives: true,
       fields: "id",
@@ -361,7 +377,62 @@ export async function uploadPdfToDrive(
     targetFolderId = folderRes.data.id!;
   }
 
-  // Upload the PDF
+  // Upload PDF — overwrite existing same-name file, dedupe extras.
+  // Drive allows multiple files in the same folder with identical names,
+  // so prior `files.create` calls accumulated copies on every Regenerate.
+  const sameNameRes = await drive.files.list({
+    q: `'${targetFolderId}' in parents and name = '${pdfFileName}' and trashed = false`,
+    fields: "files(id, modifiedTime)",
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+    orderBy: "createdTime",
+    pageSize: 100,
+  });
+  const sameNameFiles = sameNameRes.data.files ?? [];
+
+  if (sameNameFiles.length > 0) {
+    // Keep the first (oldest) one, trash duplicates, then update content.
+    // Use trash, not hard delete: service accounts in Shared Drives often
+    // have canTrash=true but canDelete=false. files.delete then 404s on
+    // permission denial. Trashing is reversible and always works.
+    const [keep, ...dupes] = sameNameFiles;
+    for (const d of dupes) {
+      if (d.id) {
+        try {
+          await drive.files.update({
+            fileId: d.id,
+            requestBody: { trashed: true },
+            supportsAllDrives: true,
+          });
+        } catch (err) {
+          console.warn(
+            `[drive] Failed to trash duplicate PDF ${d.id}:`,
+            err instanceof Error ? err.message : String(err),
+          );
+        }
+      }
+    }
+    if (dupes.length > 0) {
+      console.info(
+        `[drive] Cleaned up ${dupes.length} duplicate "${pdfFileName}" in target folder.`,
+      );
+    }
+    const updateRes = await drive.files.update({
+      fileId: keep.id!,
+      media: {
+        mimeType: "application/pdf",
+        body: Readable.from(pdfBuffer),
+      },
+      supportsAllDrives: true,
+      fields: "id, webViewLink",
+    });
+    return {
+      fileId: updateRes.data.id!,
+      webViewLink: updateRes.data.webViewLink ?? "",
+    };
+  }
+
+  // No existing file — create fresh.
   const fileRes = await drive.files.create({
     requestBody: {
       name: pdfFileName,
