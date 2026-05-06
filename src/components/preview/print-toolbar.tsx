@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 interface PrintToolbarProps {
   model: string;
@@ -18,6 +19,9 @@ export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en"
   async function handleGenerate(mode: "regenerate" | "new") {
     setShowMenu(false);
     setGenerating(true);
+    const toastId = toast.loading("Generating PDF…", {
+      description: `${model}${locale !== "en" ? ` · ${locale.toUpperCase()}` : ""}`,
+    });
     try {
       const res = await fetch(
         `/api/generate-pdf?model=${encodeURIComponent(model)}&mode=${mode}&lang=${locale}`,
@@ -25,17 +29,46 @@ export function PrintToolbar({ model, currentVersion, canGenerate, locale = "en"
       );
       const data = await res.json();
       if (res.status === 409) {
-        alert(data.error || "Another PDF generation is in progress. Please wait.");
+        toast.error("Already generating", {
+          id: toastId,
+          description:
+            data.error ||
+            "Another PDF generation is in progress. Please wait.",
+        });
         return;
       }
       if (data.ok && data.pdfUrl) {
-        window.open(data.pdfUrl, "_blank");
+        // Browsers block window.open after async operations (popup
+        // blocker), so we don't auto-open. Surface a Sonner toast with
+        // an action button — that click is a real user gesture so it
+        // can open a new tab reliably.
+        toast.success(
+          mode === "regenerate"
+            ? `Regenerated v${data.version}`
+            : `Generated v${data.version}`,
+          {
+            id: toastId,
+            description: data.fileName,
+            duration: 12000,
+            action: {
+              label: "Open PDF",
+              onClick: () => window.open(data.pdfUrl, "_blank"),
+            },
+          }
+        );
       } else {
-        const detail = data.details ? `\n\n${data.details}` : "";
-        alert(`PDF generation failed: ${data.error || "Unknown error"}${detail}`);
+        toast.error("PDF generation failed", {
+          id: toastId,
+          description: data.error || data.details || "Unknown error",
+          duration: 15000,
+        });
       }
     } catch (err) {
-      alert(`PDF generation failed: ${err instanceof Error ? err.message : String(err)}`);
+      toast.error("PDF generation failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : String(err),
+        duration: 15000,
+      });
     } finally {
       setGenerating(false);
     }

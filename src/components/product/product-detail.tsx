@@ -827,6 +827,9 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
     setShowGenMenu(false);
     setShowLangMenu(false);
     setGenerating(true);
+    const toastId = toast.loading("Generating PDF…", {
+      description: `${product.model_name}${locale !== "en" ? ` · ${locale.toUpperCase()}` : ""}`,
+    });
     try {
       const res = await fetch(
         `/api/generate-pdf?model=${encodeURIComponent(product.model_name)}&mode=${mode}&lang=${locale}`,
@@ -834,20 +837,46 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
       );
       const data = await res.json();
       if (res.status === 409) {
-        alert(data.error || "Another PDF generation is in progress. Please wait.");
+        toast.error("Already generating", {
+          id: toastId,
+          description:
+            data.error ||
+            "Another PDF generation is in progress. Please wait.",
+        });
         return;
       }
       if (data.ok && data.pdfUrl) {
-        window.open(data.pdfUrl, "_blank");
+        // Don't auto-window.open — popup blockers swallow it after the
+        // long await. Show a toast with an Open-PDF action button so a
+        // real user gesture handles the navigation.
+        toast.success(
+          mode === "regenerate"
+            ? `Regenerated v${data.version}`
+            : `Generated v${data.version}`,
+          {
+            id: toastId,
+            description: data.fileName,
+            duration: 12000,
+            action: {
+              label: "Open PDF",
+              onClick: () => window.open(data.pdfUrl, "_blank"),
+            },
+          }
+        );
         router.refresh();
       } else {
-        const detail = data.details ? `\n\n${data.details}` : "";
-        alert(`PDF generation failed: ${data.error || "Unknown error"}${detail}`);
+        toast.error("PDF generation failed", {
+          id: toastId,
+          description: data.error || data.details || "Unknown error",
+          duration: 15000,
+        });
       }
     } catch (err) {
-      alert(
-        `PDF generation failed: ${err instanceof Error ? err.message : String(err)}`
-      );
+      toast.error("PDF generation failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : String(err),
+        duration: 15000,
+      });
     } finally {
       setGenerating(false);
     }
