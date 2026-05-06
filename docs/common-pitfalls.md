@@ -1,12 +1,13 @@
-# Common Pitfalls (Archive 1–25)
+# Common Pitfalls (Archive 1–37)
 
 > Earlier accumulated pitfalls extracted from CLAUDE.md to keep the working
-> memo focused. The most recent / cross-cutting items (#26–#37+) stay
-> inline in CLAUDE.md. Numbers preserved as historical references.
+> memo focused. The most recent items (#38+) stay inline in CLAUDE.md.
+> Numbers preserved as historical references.
 
 When working in a new session, **scan inline pitfalls in CLAUDE.md first**
 — those are the active / recently-bitten ones. Reach for this file when
-working on the older specific subsystems below.
+working on the older subsystems documented below (RAG ingestion, layout
+metrics, auth setup, OAuth flow, Vercel cron, Next.js 16 proxy).
 
 ---
 
@@ -59,3 +60,27 @@ working on the older specific subsystems below.
 24. **Vision API `maxOutputTokens` 預設太小** — 2-4 句描述夠用的預設值（300）會把 12 行 LED table 壓成摘要。`vision.ts` 提到 2000，並在 prompt 裡明確要求 tables 輸出完整 markdown
 
 25. **`text-embedding-3-small` 跨語言 retrieval 偏弱** — 中文 query 抓英文 chunk 時相似度常常低於 threshold。解法是在 `/api/ask/route.ts` 加 literal-match supplementary lookup（model/country regex）+ re-rank，詳見 RAG section
+
+26. **Gitbook vision LED table dilution** — 原本 LED image 描述混在 page 的大 chunk 裡（跟封面、配件、mounting 圖混在一起），embedding 訊號被稀釋。解法：`ingest-gitbook.ts` 偵測 LED table pattern 後額外輸出一個 focused chunk（`chunk_index ≥ 10000`，含 bilingual header），標題乾淨如 `"ECW536 — LED Behavior"`
+
+27. **`CitationTooltip` 連結判斷** — `ask-chat.tsx` 判斷 `source_type !== "product_spec" && (source_url.startsWith("http") || (wifi_regulation && source_url.startsWith("/")))`。新增有內部頁面的 source type 時要更新此條件
+
+28. **Cover layout CJK metrics** — `cover-layout.ts` 的 `LOCALE_METRICS` 必須分開估 `overviewLineHeightPt` 和 `featureLineHeightPt`，因為 features 字比 overview 小（差 1pt）。用同一個 line-height 會 over-allocate features，壓縮 overview 導致假性紅燈。CJK 的 `coverGapPt` 用 10pt（非 20pt）買回空間。改 metrics 後務必用 `scripts/check-locale-layout.ts <model>` 驗證多個 locale
+
+29. **Layout ack 格式** — `products.layout_ack` 目前兩種格式並存：legacy `true`（永遠 valid）和新 `{acked: true, hash: "..."}`（hash-bound）。讀取一律走 `isAckValid(ack, currentHash)` 判斷，別直接 `ack[locale] === true`。Hash 只涵蓋 overview + features（specs 不算，因為 spec overflow 非 per-locale）
+
+30. **空翻譯誤判紅燈** — 啟用 ja 但還沒填 overview/features 時，若 fallback 到 EN 內容 + 用 CJK metrics 量，會假性紅燈。dashboard 和 product detail 兩處都有 `hasAnyTranslation` 守門，未翻譯時完全 skip 該 locale 的 check
+
+31. **PDF 圖片尺寸用 `width` 不用 `max-width`** — `max-width` 只是上限，不會把小圖放大。如果來源圖檔比 CSS 上限小（例如 PM 上傳 150×150 PNG 但 max-width 設 260pt），圖會顯示自然尺寸而不是拉到目標大小。解法：用**顯式 `width: Xpt; height: Xpt`** 強制渲染到指定尺寸，`object-fit: contain` 保持 aspect ratio。Radio pattern PDF 頁就是這樣寫的（`.antenna-image img { width: 158pt; height: 158pt }`）。調過 9 輪才找到這個 root cause — 一有「改 max-width 還是太小」症狀就該想到這個
+
+32. **Profiles RLS 無限遞迴** — Admin policies 寫成 `EXISTS (SELECT 1 FROM profiles WHERE role='admin')` 會導致 SELECT profiles 觸發 policy → policy 內的 SELECT 又觸發 policy → Postgres 回 `42P17 infinite recursion`。解法：抽出 `current_user_is_admin()` SECURITY DEFINER function，function body 的 SELECT bypass RLS。Policies 全部改用 `USING (current_user_is_admin())`。symptom 是「DB 有 row、auth.users 也有，但 getCurrentUser 回 null + redirect 到 no-access」
+
+33. **Edge runtime + Supabase `from()` 不可靠** — Day 1 把 profile lookup 放在 `proxy.ts`（Edge runtime）裡，production 偶發 500。Edge 能跑 `auth.getUser()` 但跑 `.from("profiles").select(...)` 不穩。解法：proxy 只做 session refresh + redirect 沒登入；profile 白名單檢查移到 `(main)/layout.tsx`（Node runtime）。把所有需要 DB 查詢的東西留在 Node runtime
+
+34. **Vercel Preview env vars 跟 Production 是分開的** — Production 設好 `NEXT_PUBLIC_SUPABASE_URL` 等不代表 Preview 也有。Preview deployment 看不到 env var → `createServerClient` 拿到 undefined → 整站 500。解法：env var 設定時要勾 All Environments（CLI: 用 Vercel REST API `POST /v10/projects/.../env` with `target: ["preview"]`），或在 Vercel Dashboard 三個環境都打勾
+
+35. **Supabase OAuth `redirectTo` 嚴格比對** — `redirectTo` URL 帶 query string（如 `?next=/`）會跟 allow-list 的純 URL 比對失敗，Supabase 默默 fallback 到 `site_url` (production)。Preview branch 上的 user 會被 OAuth 完成後丟到 production，超詭異。解法：`redirectTo` 永遠送乾淨的 URL（無 query），post-login `next` 用 sessionStorage 暫存。callback 完成後 server redirect 到 `/auth/redirecting` (client page)，client 讀 sessionStorage 跳目的地
+
+36. **Next.js 16 用 `proxy.ts` 不是 `middleware.ts`** — Next.js 16 把 middleware 改名為 proxy（功能一樣）。檔案在 `src/proxy.ts`，export `async function proxy(request)` 不是 `middleware`。如果同時有 `middleware.ts` 和 `proxy.ts` build 會直接 fail
+
+37. **Vercel cron 用 `x-vercel-cron` header 區分** — `CRON_SECRET` env var 沒設（也不需要設）。Vercel cron 觸發 `/api/sync` 時自動帶 `x-vercel-cron: 1` header，這個 header 不能從外部 spoof。`gateOrCron()` 先檢查這個 header 再 fallback 到 `CRON_SECRET` bearer 再 fallback 到 user permission

@@ -35,6 +35,11 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **Cloud 藍色 / Unmanaged 灰色** 雙主題
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
+- **Drive 自動建資料夾** — 第一次產 zh / ja PDF 時自動建立 `Cloud Camera_zh` / `Cloud Camera_ja` 等 sibling 資料夾（PM 不需要事先手動建）
+- **Drive 重複自動清** — Regenerate 時偵測同名舊檔自動覆蓋 + 移到垃圾桶清掉重複版本
+- **Toast 通知** — 生成中／完成／失敗都有即時 toast，完成後一鍵「Open PDF」開新分頁
+- **Draft 翻譯不能產官方 PDF** — 翻譯狀態還是 Draft 時 Regenerate 按鈕停用，強迫先 Save & Confirm 再產
+- **角色限制** — PM / Viewer 收到 preview 連結時看得到內容但**沒有 Regenerate 按鈕**，只有 Editor / Admin 可以產官方 PDF
 
 ### Layout Overflow Detection
 - **跑版預警** — Dashboard 和 Product Detail 自動偵測 overview/features/spec 會不會超過版面容納範圍，紅燈提示 PM 要精簡
