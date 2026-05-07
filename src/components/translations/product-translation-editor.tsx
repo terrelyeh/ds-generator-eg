@@ -361,6 +361,7 @@ export function ProductTranslationEditor({
 
   async function handlePreview() {
     setPreviewing(true);
+    const wasDraft = !confirmedLocales.has(activeLocale);
     try {
       await fetch("/api/translations/product", {
         method: "POST",
@@ -379,6 +380,17 @@ export function ProductTranslationEditor({
         }),
       });
       setDirty(false);
+      // 防呆：Draft 狀態下開 Preview 提醒使用者要 Save & Confirm 才能生 PDF。
+      // 已 Confirmed 的 locale 不跳，避免雜訊。
+      if (wasDraft) {
+        toast.info(
+          `${currentLocaleInfo?.label ?? activeLocale} 預覽已存為 Draft`,
+          {
+            description: "正式生 PDF 前請按「Save & Confirm」。",
+            duration: 7000,
+          }
+        );
+      }
       window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
     } catch {
       window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
@@ -560,9 +572,38 @@ export function ProductTranslationEditor({
               <path d="M5 3h8v8M13 3 6 10" />
             </svg>
           </button>
-          <Button onClick={handleSave} disabled={saving || !dirty} size="sm">
-            {saving ? "Saving..." : "Save & Confirm"}
-          </Button>
+          {(() => {
+            // (A) 拆掉 dirty gate：Draft 狀態下只要有翻譯內容就能 Save，
+            // 已 Confirmed 的 locale 才需要 dirty 才能再 Save（避免重複按）。
+            const hasContent = !!(
+              headlineTrans.trim() ||
+              subtitleTrans.trim() ||
+              overview.trim() ||
+              features.some((f) => f.trim())
+            );
+            const isDraft = !confirmedLocales.has(activeLocale);
+            const canSave = hasContent && (isDraft || dirty);
+            // (C) Draft + 可按時，按鈕用 amber 強調 + pulse 提示「這裡還沒 confirm」
+            const draftEmphasis =
+              isDraft && canSave && !saving
+                ? "bg-amber-500 text-white hover:bg-amber-500/90 ring-2 ring-amber-300 ring-offset-1 animate-pulse"
+                : "";
+            return (
+              <Button
+                onClick={handleSave}
+                disabled={saving || !canSave}
+                size="sm"
+                className={draftEmphasis}
+                title={
+                  isDraft && hasContent
+                    ? "目前是 Draft，按下將正式 Confirm 並開放 PDF 生成"
+                    : undefined
+                }
+              >
+                {saving ? "Saving..." : "Save & Confirm"}
+              </Button>
+            );
+          })()}
         </div>
       </div>
 
