@@ -17,6 +17,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "AI Translation API Keys",
     description: "Manage API keys for Claude, GPT-4o, and Gemini translation providers.",
     href: "/settings/api-keys",
+    roles: ["admin"],
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clipRule="evenodd" />
@@ -47,6 +48,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "Ask Welcome",
     description: "Customize the greeting, description, and example questions shown in the Ask panel.",
     href: "/settings/ask-welcome",
+    roles: ["admin"],
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" />
@@ -57,6 +59,7 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     title: "Ask Personas",
     description: "Manage AI personas for Ask SpecHub — customize system prompts for different teams.",
     href: "/settings/personas",
+    roles: ["admin"],
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z" />

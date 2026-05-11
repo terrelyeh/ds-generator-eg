@@ -78,9 +78,11 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   "review.approve": ["admin", "pm"],
   "review.self_approve": ["admin", "editor"],
 
-  "settings.view": ["admin"],
-  "settings.edit_typography": ["admin"],
-  "settings.edit_glossary": ["admin"],
+  // Editor gets settings access for Glossary + Typography only. Personas
+  // and API Keys remain admin-only because they're cross-cutting config.
+  "settings.view": ["admin", "editor"],
+  "settings.edit_typography": ["admin", "editor"],
+  "settings.edit_glossary": ["admin", "editor"],
   "settings.edit_personas": ["admin"],
   "settings.edit_api_keys": ["admin"],
 
