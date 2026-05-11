@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Overview 字數規則</title>
+<style>
+  :root {
+    --text: #1E293B;
+    --muted: #64748B;
+    --bg: #F5F3F0;
+    --card: #FFFFFF;
+    --line: #E5E7EB;
+    --blue: #03a9f4;
+    --blue-tint: #E8F6FE;
+    --blue-tint-2: #F4FBFF;
+    --warn: #DC2626;
+    --warn-tint: #FEF2F2;
+    --gray-block: #F1F5F9;
+    --gray-block-strong: #E2E8F0;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI",
+                 "PingFang TC", "Microsoft JhengHei", "Helvetica Neue",
+                 Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  .page {
+    width: 960px;
+    margin: 32px auto;
+    padding: 0 16px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 20px;
+    box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06),
+                0 1px 3px rgba(15, 23, 42, 0.04);
+    padding: 44px 48px 36px;
+  }
+  .accent {
+    height: 4px;
+    width: 56px;
+    background: var(--blue);
+    border-radius: 2px;
+    margin-bottom: 22px;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 30px;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+  }
+  .subtitle {
+    margin: 0 0 28px;
+    color: var(--muted);
+    font-size: 15px;
+  }
+  .section {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+  }
+  .section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  .section h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: -0.005em;
+  }
+  .section p {
+    margin: 0 0 16px;
+    font-size: 16px;
+  }
+
+  /* Diagram for Section 1 */
+  .diagram-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    align-items: stretch;
+    margin-top: 6px;
+  }
+  .diagram {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 14px;
+    background: #FAFBFC;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .blk {
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text);
+  }
+  .blk-fixed {
+    background: var(--gray-block);
+    border: 1px solid var(--gray-block-strong);
+    height: 56px;
+    display: flex; align-items: center;
+  }
+  .blk-flex {
+    background: var(--blue-tint);
+    border: 1px dashed var(--blue);
+    color: #0369A1;
+    flex: 1;
+    min-height: 110px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .blk-flex small { font-weight: 500; color: #0284C7; font-size: 12.5px; }
+  .blk-cap {
+    background: var(--gray-block);
+    border: 1px solid #94A3B8;
+    height: 70px;
+    display: flex; align-items: center;
+  }
+  .diagram-note {
+    font-size: 14px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  .diagram-note strong { color: var(--text); }
+
+  /* Section 2 — three columns */
+  .lang-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    margin-top: 4px;
+  }
+  .lang-card {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px 18px 16px;
+    background: #FAFBFC;
+  }
+  .lang-card .lbl {
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .lang-card .num {
+    font-size: 30px;
+    font-weight: 800;
+    color: var(--text);
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+  }
+  .lang-card .num small { font-size: 14px; font-weight: 600; color: var(--muted); margin-left: 4px; }
+  .lang-card .hint { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .lang-grid + .note {
+    margin-top: 12px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+
+  /* Section 3 — numbered steps */
+  ol.steps {
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: step;
+  }
+  ol.steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 10px 4px 10px 44px;
+    font-size: 15.5px;
+  }
+  ol.steps li + li { border-top: 1px dashed var(--line); }
+  ol.steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0; top: 50%;
+    transform: translateY(-50%);
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    background: var(--blue-tint);
+    color: var(--blue);
+    font-weight: 700;
+    font-size: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .red-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--warn);
+    vertical-align: 1px;
+    margin: 0 2px;
+  }
+
+  /* Section 4 — highlight */
+  .highlight {
+    background: var(--blue-tint-2);
+    border: 1px solid #BAE6FD;
+    border-radius: 14px;
+    padding: 18px 22px;
+  }
+  .highlight ul {
+    margin: 0;
+    padding-left: 20px;
+  }
+  .highlight li {
+    font-size: 15.5px;
+    margin: 6px 0;
+  }
+  .highlight li strong { color: #075985; }
+
+  footer {
+    margin-top: 28px;
+    text-align: right;
+    font-size: 12.5px;
+    color: var(--muted);
+    letter-spacing: 0.02em;
+  }
+
+  /* === Print / PDF === */
+  @page {
+    size: A4 portrait;
+    margin: 14mm;
+  }
+  @media print {
+    body { background: white; }
+    .page { width: 100%; margin: 0; padding: 0; }
+    .card {
+      box-shadow: none;
+      border: 1px solid var(--line);
+      padding: 28px 32px 24px;
+      page-break-inside: avoid;
+    }
+    .section { page-break-inside: avoid; }
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+</style>
+</head>
+<body>
+  <div class="page">
+    <div class="card">
+      <div class="accent"></div>
+      <h1>📏 Overview 字數規則</h1>
+      <p class="subtitle">Datasheet 封面排版邏輯，給 PM / MKT 參考</p>
+
+      <!-- Section 1 -->
+      <section class="section">
+        <h2>📐 為什麼沒有固定字數上限？</h2>
+        <p>Cover 頁的 Overview 跟 Features <strong>共用一塊空間</strong>。Features 越多，Overview 能放的就越少。</p>
+        <div class="diagram-wrap">
+          <div class="diagram">
+            <div class="blk blk-fixed">Hero + Hardware Image</div>
+            <div class="blk blk-flex">
+              Overview ← 彈性
+              <small>吃剩下的空間</small>
+            </div>
+            <div class="blk blk-cap">Features（最多 320pt）</div>
+          </div>
+          <div class="diagram-note">
+            <p><strong>Features 先佔，Overview 拿剩下的。</strong></p>
+            <p>同一頁的空間是固定的，所以你寫越多 features，留給 overview 的位置自然越少 — 反過來也一樣。</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2 -->
+      <section class="section">
+        <h2>✅ 安全字數參考（features 量中等時）</h2>
+        <div class="lang-grid">
+          <div class="lang-card">
+            <div class="lbl">English</div>
+            <div class="num">~800<small>字</small></div>
+            <div class="hint">超過 800 字建議先預覽</div>
+          </div>
+          <div class="lang-card">
+            <div class="lbl">日文 / Japanese</div>
+            <div class="num">~600<small>字</small></div>
+            <div class="hint">CJK 字較大、行高較高</div>
+          </div>
+          <div class="lang-card">
+            <div class="lbl">繁中 / Traditional</div>
+            <div class="num">~600<small>字</small></div>
+            <div class="hint">CJK 字較大、行高較高</div>
+          </div>
+        </div>
+        <div class="note">同樣意思翻譯成日文 / 繁中後，會比英文佔更多排版空間，所以建議字數比英文少。</div>
+      </section>
+
+      <!-- Section 3 -->
+      <section class="section">
+        <h2>🚨 超出會怎樣？</h2>
+        <ol class="steps">
+          <li>Dashboard 對應 OV 欄位顯示<span class="red-dot"></span><strong>紅點</strong></li>
+          <li>Product 頁出現紅色警告橫幅</li>
+          <li><strong>不會擋 PDF 生成</strong>，但建議先預覽確認版面</li>
+          <li>看過覺得 OK → 按「<strong>Mark as Reviewed OK</strong>」紅燈消失</li>
+          <li>之後若有人再改 Overview / Features，紅燈會自動回來再提醒</li>
+        </ol>
+      </section>
+
+      <!-- Section 4 -->
+      <section class="section">
+        <h2>💡 重點提醒</h2>
+        <div class="highlight">
+          <ul>
+            <li><strong>每個語言獨立判斷</strong> — 英文過不代表日文也過</li>
+            <li><strong>紅燈是提示不是禁令</strong> — 確認過版面 OK 就可以 Mark</li>
+            <li><strong>順序：</strong>寫完先看 Dashboard → 紅點就預覽確認 → 沒事就 Mark OK</li>
+          </ul>
+        </div>
+      </section>
+
+      <footer>Product SpecHub · Datasheet System</footer>
+    </div>
+  </div>
+</body>
+</html>

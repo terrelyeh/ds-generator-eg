@@ -142,7 +142,20 @@ function LayoutWarningBanner({
         <span className="text-xl leading-none pt-0.5">{Icon}</span>
         <div className="min-w-0 flex-1 space-y-3">
           <div className="flex items-center justify-between gap-3">
-            <div className="font-semibold text-base">{title}</div>
+            <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
+              {title}
+              <a
+                href="/docs/overview-length-rule.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-xs font-normal underline-offset-2 hover:underline ${
+                  isOverflow ? "text-red-700/80" : "text-amber-800/80"
+                }`}
+                title="說明 Overview 為什麼會超出、CJK 跟英文的差異、Mark OK 是什麼意思"
+              >
+                📖 字數規則說明
+              </a>
+            </div>
             <button
               onClick={markReviewed}
               disabled={acking}
