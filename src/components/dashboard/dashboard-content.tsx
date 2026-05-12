@@ -358,6 +358,68 @@ export function DashboardContent({
 
   const [syncing, setSyncing] = useState(false);
   const [showSyncMenu, setShowSyncMenu] = useState(false);
+  const [resyncingVersions, setResyncingVersions] = useState(false);
+
+  /**
+   * Re-scan Drive for each model's latest PDF version and update the DB.
+   * Daily sync doesn't probe Drive for versions (it only syncs Sheet
+   * content + images), so if a PM manually drops a new PDF or the
+   * generate-pdf flow partially failed, the Dashboard shows stale
+   * version numbers. This brings the DB back in line.
+   */
+  async function handleResyncVersions() {
+    if (!activeLine) return;
+    setResyncingVersions(true);
+    setShowSyncMenu(false);
+    const toastId = toast.loading(`Resyncing versions for ${activeLine.label}…`, {
+      description: "Scanning Drive for each model",
+    });
+    try {
+      const res = await fetch(
+        `/api/resync-versions?line=${encodeURIComponent(activeLine.name)}`,
+        { method: "POST" },
+      );
+      const data = (await res.json()) as {
+        ok?: boolean;
+        scanned?: number;
+        changes?: Array<{ model: string; from: string; to: string }>;
+        unchanged_count?: number;
+        not_found_in_drive?: string[];
+        errors?: Array<{ model: string; error: string }>;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        toast.error(`Resync failed: ${data.error ?? res.statusText}`, { id: toastId });
+        return;
+      }
+      const changed = data.changes ?? [];
+      const errs = data.errors ?? [];
+      const summary = changed.length === 0
+        ? `${data.scanned ?? 0} models scanned, all already up to date`
+        : `${changed.length} updated: ${changed.map((c) => `${c.model} ${c.from}→${c.to}`).join(", ")}`;
+      if (errs.length > 0) {
+        toast.warning(`Versions resynced with ${errs.length} error(s)`, {
+          id: toastId,
+          description: `${summary} · errors: ${errs.map((e) => e.model).join(", ")}`,
+          duration: 12000,
+        });
+      } else {
+        toast.success("Versions resynced", {
+          id: toastId,
+          description: summary,
+          duration: 8000,
+        });
+      }
+      router.refresh();
+    } catch (err) {
+      toast.error("Resync failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setResyncingVersions(false);
+    }
+  }
 
   /**
    * Smart sync by default: only pulls lines whose Drive modifiedTime
@@ -610,6 +672,22 @@ export function DashboardContent({
                     <div className="font-medium">Force full re-sync</div>
                     <div className="text-[11px] text-muted-foreground mt-0.5">
                       Re-pull everything. ⚠️ Cloud AP (25 models) may exceed the 60s Vercel limit.
+                    </div>
+                  </div>
+                </button>
+                <div className="my-1 h-px bg-border" />
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+                  onClick={handleResyncVersions}
+                  disabled={resyncingVersions}
+                >
+                  <span className="mt-0.5">🔢</span>
+                  <div>
+                    <div className="font-medium">
+                      {resyncingVersions ? "Resyncing versions…" : "Resync versions from Drive"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Detect each model&apos;s latest PDF version in Drive and update DB. Use when Dashboard version looks stale.
                     </div>
                   </div>
                 </button>
