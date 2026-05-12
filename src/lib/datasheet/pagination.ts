@@ -130,11 +130,17 @@ export function looksLikeUnseparatedList(value: string): boolean {
   return true;
 }
 
-// A single unwrapped spec row: label (7pt) on top + value (7pt) underneath
-// + border-bottom + vertical padding. Bumped 18→20pt to absorb per-row
-// rendering variance (padding/border accumulate over 30+ rows).
-// Each additional wrapped line of value ≈ 10pt (7pt text * ~1.4 leading).
-export const SPEC_BASE_ROW_HEIGHT = 20;
+// A single unwrapped spec row (matches actual CSS in preview/[model]):
+//   padding 2pt+2pt + label 7pt×1.2 + value-margin 1pt + value 7pt×1.2
+//     + border-bottom 0.5pt ≈ 22.3pt
+// Was 20pt — under-estimated by 2.3pt per row. On dense spec sections
+// (e.g. ESG320 with 24 single-line items) that's ~55pt of cumulative
+// drift, which silently pushed columns past BOTTOM_MARGIN and clipped
+// the bottom row at the page edge. Bumped to 22pt to absorb the gap.
+// SPEC_LINE_EXTRA stays at 10pt — real wrap-line is ~8.4pt, so a small
+// over-estimate per wrapped line; this compensates further for any
+// residual drift on multi-line rows.
+export const SPEC_BASE_ROW_HEIGHT = 22;
 export const SPEC_LINE_EXTRA = 10;
 
 // Approx chars that fit on one line in a half-column. Reduced 62→52 after
