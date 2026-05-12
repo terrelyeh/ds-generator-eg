@@ -199,26 +199,52 @@ function estimateSectionHeight(section: Section): number {
   return h;
 }
 
+/**
+ * Aesthetic single-page rebalance: distribute whole sections between
+ * left and right column so heights are roughly equal. Only used when no
+ * section had to be split — the caller (splitIntoPages) preserves the
+ * fitSection-driven layout otherwise.
+ *
+ * Height-based, not count-based: ESG320 has 36 items split 19/17 by
+ * count, but the right side ends up 760pt of content vs left's 416pt
+ * (Networking Features alone is 170pt over 16 lines). Count-based
+ * splits overflow the page in that case. We walk sections in order and
+ * pick the boundary whose |leftH - rightH| is smallest.
+ */
 function balanceColumns(sections: Section[]): SpecPage {
-  const totalItems = sections.reduce((sum, s) => sum + s.items.length, 0);
-  const target = totalItems / 2;
+  if (sections.length <= 1) {
+    return { left: sections, right: [] };
+  }
 
-  const left: Section[] = [];
-  const right: Section[] = [];
-  let count = 0;
-  let splitDone = false;
+  const heights = sections.map((s) => estimateSectionHeight(s));
+  const totalH = heights.reduce((a, b) => a + b, 0);
 
-  for (const section of sections) {
-    if (!splitDone && count + section.items.length <= target + 2) {
-      left.push(section);
-      count += section.items.length;
-    } else {
-      splitDone = true;
-      right.push(section);
+  // Try every split index 1..N-1 and pick the one minimising imbalance.
+  // Also require both columns fit in AVAILABLE_HEIGHT — if any candidate
+  // overflows, prefer one that doesn't, even if slightly less balanced.
+  let bestIdx = 1;
+  let bestScore = Infinity;
+  let runningH = 0;
+  for (let i = 0; i < sections.length - 1; i++) {
+    runningH += heights[i];
+    const leftH = runningH;
+    const rightH = totalH - runningH;
+    const overflowPenalty =
+      (leftH > AVAILABLE_HEIGHT ? leftH - AVAILABLE_HEIGHT : 0) +
+      (rightH > AVAILABLE_HEIGHT ? rightH - AVAILABLE_HEIGHT : 0);
+    const imbalance = Math.abs(leftH - rightH);
+    // Overflow weighted 10x — non-overflowing splits always beat overflowing ones
+    const score = imbalance + overflowPenalty * 10;
+    if (score < bestScore) {
+      bestScore = score;
+      bestIdx = i + 1;
     }
   }
 
-  return { left, right };
+  return {
+    left: sections.slice(0, bestIdx),
+    right: sections.slice(bestIdx),
+  };
 }
 
 /**
@@ -390,7 +416,14 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
           left.push(fitted);
           leftH += estimateSectionHeight(fitted);
           queue.shift();
-          if (cont) queue.unshift(cont);
+          if (cont) {
+            queue.unshift(cont);
+            // A partial split happened — must skip the single-page
+            // balanceColumns rebalance below, otherwise the careful
+            // fitSection-driven layout gets overwritten with a naive
+            // (count-based) split that can overflow the page.
+            splitOccurred = true;
+          }
         } else {
           // Can't fit even one more item → move to right column
           break;
@@ -428,7 +461,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
           right.push(fitted);
           rightH += estimateSectionHeight(fitted);
           queue.shift();
-          if (cont) queue.unshift(cont);
+          if (cont) {
+            queue.unshift(cont);
+            splitOccurred = true; // see comment in left-column branch
+          }
         } else {
           break;
         }
