@@ -377,6 +377,17 @@ pointers so you know it exists:
 5. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
 6. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
 7. **Resync versions per-locale** — 目前 `/api/resync-versions` 只更新 EN。未來掃 ja/zh-TW Drive 資料夾把 `current_versions.{ja,zh-TW}` 也同步
+8. **新增第 4 個翻譯語言（如 Spanish / es）** — 動 8 個檔案：
+   - `locales/types.ts` 加 `"es"` 到 union + `SUPPORTED_LOCALES`
+   - `locales/es.ts` 新建 dict（datasheet/overview/disclaimer 等 UI 文案）
+   - `locales/index.ts` 註冊
+   - `cover-layout.ts` `LOCALE_METRICS.es`（拉丁字母可抄 EN 但西文比英文長 ~20%，可能要 charsPerLine -1)
+   - `typography.ts` `TYPOGRAPHY_DEFAULTS.es`（拉丁字母可抄 EN）
+   - `translate/prompts/locales/es.ts` AI 翻譯規則
+   - `translate/index.ts` 註冊 `es: esLocalePrompt`
+   - `getLocaleSuffix()` 預設 fall-through 直接用 `es`，無需動
+
+   PM 操作：產品頁 Translations tab → Enable Spanish → AI Translate → Save & Confirm → Generate PDF。Drive 資料夾 `<line>_es` 會自動建。Spec label 翻譯走 `/translations/[line]` 頁面（optional）
 
 **系統**：
 8. **Review Workflow** — Phase 2 計畫 (PM approve content → MKT generate)。設計 plan 已在對話中討論定案，等實作。需要 `products.review_approval` JSONB + content-hash bound + 在 `/api/generate-pdf` 加 approval gate
