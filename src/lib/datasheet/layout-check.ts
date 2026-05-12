@@ -103,10 +103,19 @@ export function checkCoverLayout(params: {
     );
   }
 
-  if (layout.overviewOverflow) {
+  // Safety buffer: estimateCoverLayout's char-per-line / line-height math
+  // can underestimate real rendering by 1 line due to font metrics drift
+  // and CSS padding rounding. ESG510 case: overview wanted 145pt, space
+  // 146pt → green light but actual PDF clipped last line. Require ~12pt
+  // headroom (≈ one half-line) so borderline cases get flagged.
+  const OVERVIEW_SAFETY_BUFFER_PT = 12;
+  const overviewExceedsWithBuffer =
+    layout.overviewWantedHeight > layout.overviewSpaceAvailable - OVERVIEW_SAFETY_BUFFER_PT;
+
+  if (layout.overviewOverflow || overviewExceedsWithBuffer) {
     overview_status = "overflow";
-    const excessPt = layout.overviewWantedHeight - layout.overviewSpaceAvailable;
-    const approxCharsToCut = Math.ceil((excessPt / 15) * 38); // ~38 chars/line
+    const effectiveExcess = layout.overviewWantedHeight - (layout.overviewSpaceAvailable - OVERVIEW_SAFETY_BUFFER_PT);
+    const approxCharsToCut = Math.max(1, Math.ceil((effectiveExcess / 15) * 38)); // ~38 chars/line
     reasons.push(
       `Overview 擠不進剩餘空間 (需 ${layout.overviewWantedHeight}pt / 剩 ${layout.overviewSpaceAvailable}pt — 因為 Features 佔用 ${layout.featuresHeight}pt) — 建議刪 ~${approxCharsToCut} 字`,
     );

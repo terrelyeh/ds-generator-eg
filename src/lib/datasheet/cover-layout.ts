@@ -153,14 +153,22 @@ export interface CoverLayoutEstimate {
 }
 
 /**
- * Distribute features across two columns by estimated HEIGHT rather than
- * by item count. A naive ceil(n/2) split puts 6 items left / 5 right, but
- * when item 4 is a 3-liner and items 5-6 are 1-liners, the left column
- * ends up much taller visually — exactly the ECW560 imbalance issue.
+ * Distribute features across two columns using **balanced column-first**
+ * ordering: items go to the left column in their original order until
+ * adding the next item would push the left column past half the total
+ * estimated height, then the remaining items fill the right column.
  *
- * Greedy bin-packing: walk items in order, assign each to whichever
- * column is currently shorter. Preserves reading order within each
- * column (but items may interleave across columns).
+ * Why not pure column-first (ceil(n/2) split)? When item lengths vary
+ * a lot (ECW560: items 1-3 = 3 lines each, 4-11 = 1 line each), naive
+ * count-based split makes the left column 16 lines tall vs right 5 lines.
+ *
+ * Why not greedy height-balance (previous behavior)? It interleaves items
+ * across columns (1,3,5 left / 2,4,6 right), which breaks reading order —
+ * PMs list features by priority, so column-first reading is more natural.
+ *
+ * Balanced column-first preserves order AND keeps columns visually close:
+ *   - ECW560: left = items 1-3 (9 lines), right = items 4-11 (8 lines)
+ *   - Typical 14 even features: left = 1-7, right = 8-14
  */
 export function balanceFeatureColumns(
   features: string[],
@@ -170,24 +178,40 @@ export function balanceFeatureColumns(
   right: string[];
 } {
   const m = metricsFor(locale);
-  const left: string[] = [];
-  const right: string[] = [];
-  let leftH = 0;
-  let rightH = 0;
+  if (features.length === 0) return { left: [], right: [] };
+  if (features.length === 1) return { left: [features[0]], right: [] };
 
-  for (const f of features) {
-    const lines = countLines(f, m.featureCharsPerLine);
-    const itemH = lines * m.featureLineHeightPt + m.itemMarginPt;
-    if (leftH <= rightH) {
-      left.push(f);
-      leftH += itemH;
-    } else {
-      right.push(f);
-      rightH += itemH;
+  // Pre-compute each item's height in pt.
+  const heights = features.map(
+    (f) => countLines(f, m.featureCharsPerLine) * m.featureLineHeightPt + m.itemMarginPt,
+  );
+  const totalH = heights.reduce((s, h) => s + h, 0);
+  const halfH = totalH / 2;
+
+  // Walk in order, accumulating into the left column. Switch the moment
+  // adding the next item would tip the left column past half — that item
+  // and all remaining items go right. This keeps reading order intact.
+  // Always leave at least one item for the right column to avoid an empty
+  // column when the very first item is huge.
+  let leftH = 0;
+  let splitIdx = features.length - 1; // default: everything but last → left
+  for (let i = 0; i < features.length - 1; i++) {
+    if (leftH + heights[i] > halfH) {
+      splitIdx = i;
+      break;
     }
+    leftH += heights[i];
+    splitIdx = i + 1;
   }
 
-  return { left, right };
+  // Guard: if the very first item alone exceeds half, the loop sets
+  // splitIdx=0 → empty left column. Always keep at least one item on left.
+  if (splitIdx === 0) splitIdx = 1;
+
+  return {
+    left: features.slice(0, splitIdx),
+    right: features.slice(splitIdx),
+  };
 }
 
 export function estimateCoverLayout(params: {
