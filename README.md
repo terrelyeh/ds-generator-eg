@@ -54,7 +54,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **AI 翻譯**：支援 Claude、GPT-4o、Gemini，翻譯同時改善原文品質
 - **翻譯筆記**：AI 翻譯後顯示做了哪些優化的中文說明
 - **翻譯詞庫**（Glossary）：公司級術語字典，AI 自動遵循
-- **Draft / Confirmed 流程**：Preview 可隨時預覽，Save & Confirm 後才能生成 PDF
+- **Draft / Confirmed 流程**：Preview 隨時可預覽（自動存草稿），Save & Confirm 後才能生成 PDF。Draft 狀態下 Save 按鈕用 amber pulse 視覺強調 + Preview 跳 toast 提醒「請按 Save & Confirm」，避免使用者卡在 Draft 出不來
 - 每個語言版本號獨立管理，Drive 獨立資料夾
 - CJK 排版優化：禁則處理、兩端對齊、per-locale 專用字型
 - 語言專屬 Hardware Image 支援（不同語言的標註圖）
@@ -107,8 +107,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **Google OAuth 登入** — 走 Supabase Auth + PKCE flow，不需要密碼
 - **Email 白名單** — admin 預先邀請 email，使用者首次登入自動建 profile
 - **4 種角色**：
-  - **Admin** — 完整存取（含使用者管理 / API Key / 翻譯詞庫等所有 Settings）
-  - **Editor (MKT)** — 編輯內容、Sync、產 PDF、翻譯
+  - **Admin** — 完整存取（含使用者管理 / API Key / Ask Personas 等所有 Settings）
+  - **Editor (MKT)** — 編輯內容、Sync、產 PDF、翻譯，**可管理翻譯詞庫 + Typography 設定**
   - **PM** — 純瀏覽（review-only，未來會加 content approval workflow）
   - **Viewer** — 純瀏覽 + Ask SpecHub（業務 / Field 用）
 - **三層 enforcement**：API gate（403 by role）、Server page guard（redirect 未授權）、UI hide（按鈕隱藏）
@@ -126,6 +126,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - 自動偵測並補齊缺失的產品圖片
 - 變更偵測：field-level + spec-level + status + comparison table deep diff
 - **Auto Re-index RAG**：sync 完成後自動重建有變動 product 的向量索引，讓 Ask SpecHub 馬上能回答新內容
+- **Resync versions from Drive**（Dashboard `Sync ▾` 選項）— 一鍵重新掃 Drive 把 DB 版號拉到跟實際 PDF 一致，PM 手動動 Drive 後可修正
 - Telegram 通知：按產品線分組的精簡摘要格式
 
 ### Documentation
