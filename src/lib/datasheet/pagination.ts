@@ -23,10 +23,18 @@ interface SpecPage {
   right: Section[];
 }
 
-// Height estimates (in pt) for page layout
+// Height estimates (in pt) for page layout. Must match actual CSS in
+// preview/[model]/page.tsx — under-estimating these means fitSection
+// thinks the column has more space than it really does, so content
+// gets packed past the designed BOTTOM_MARGIN and hugs the page edge.
 export const PAGE_HEIGHT = 792;
-export const TOP_BAR_HEIGHT = 21;
-export const SPEC_TITLE_HEIGHT = 42; // title + margin
+export const TOP_BAR_HEIGHT = 22; // .top-bar { height: 21.4pt } rounded up
+// .spec-page-title { padding-top: 27pt; font-size: 14pt (~16.8pt line);
+// margin-bottom: 18pt } = ~62pt. Was 42pt — under-estimated by 20pt,
+// which silently ate into BOTTOM_MARGIN on dense spec pages (see
+// ECW510P zh-TW page 2 where columns rendered ~20pt past the designed
+// 1-inch margin and visually hugged the page number).
+export const SPEC_TITLE_HEIGHT = 62;
 // Bottom safety margin. Bumped from 40→72pt (1 inch) because per-row height
 // estimates accumulate small errors over 30+ rows — a generous footer buffer
 // triggers earlier column/page breaks so content never hugs the page edge.
