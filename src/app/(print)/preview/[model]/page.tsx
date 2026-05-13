@@ -264,6 +264,7 @@ export default async function PreviewPage({
   const productLineExt = productLine as typeof productLine & {
     spec_footnote: string | null;
     spec_footnote_translations: Record<string, string> | null;
+    qr_url_template: string | null;
   };
   const specFootnote =
     (lang !== "en" && productLineExt.spec_footnote_translations?.[lang]) ||
@@ -272,7 +273,16 @@ export default async function PreviewPage({
 
   // QR: custom per-product-translation > locale default
   const qrLabel = customQrLabel || dict.defaultQrLabel;
-  const qrUrlTemplate = customQrUrl || dict.defaultQrUrl;
+  // QR URL resolution priority:
+  //   1. product_translations.qr_url (per-product per-locale override)
+  //   2. product_lines.qr_url_template (per-line template — most product
+  //      lines share QSG URL structure with model suffix, e.g.
+  //      .../cloud-switch/{model})
+  //   3. dict.defaultQrUrl (e.g. https://qr.engenius.ai/qsg/{model} — used
+  //      by Cloud AP and Cloud Camera which keep the short URL)
+  // {model} placeholder gets replaced with lowercase model_name.
+  const qrUrlTemplate =
+    customQrUrl || productLineExt.qr_url_template || dict.defaultQrUrl;
   const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   const totalPages = 1 + specPages.length + (hasAntennaPage ? 1 : 0) + 1; // cover + specs + antennas (optional) + hardware
