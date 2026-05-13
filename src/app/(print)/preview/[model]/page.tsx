@@ -257,6 +257,19 @@ export default async function PreviewPage({
   const productLine = product.product_lines;
   const theme = getTheme(productLine.category);
 
+  // Per-product-line spec footnote (e.g. "*Note: Performance figures…" for
+  // VPN Firewall). Shown once at the bottom of the LAST spec page only.
+  // Resolution: locale-specific override → EN fallback → null (no render).
+  // Fields are nullable (NULL = product line has no footnote).
+  const productLineExt = productLine as typeof productLine & {
+    spec_footnote: string | null;
+    spec_footnote_translations: Record<string, string> | null;
+  };
+  const specFootnote =
+    (lang !== "en" && productLineExt.spec_footnote_translations?.[lang]) ||
+    productLineExt.spec_footnote ||
+    null;
+
   // QR: custom per-product-translation > locale default
   const qrLabel = customQrLabel || dict.defaultQrLabel;
   const qrUrlTemplate = customQrUrl || dict.defaultQrUrl;
@@ -499,6 +512,20 @@ body {
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
 .spec-label { font-weight: 500; font-size: 7pt; color: ${theme.specLabel}; }
 .spec-value { font-weight: 300; font-size: 7pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
+
+/* Footnote shown once at the bottom of the last spec page (per-product-line,
+   nullable in DB). Sits in normal flow below .spec-columns, full width,
+   small grey text. */
+.spec-footnote {
+  margin-top: 14pt;
+  padding-top: 6pt;
+  border-top: 0.5pt solid #d8dadd;
+  font-size: 6.5pt;
+  font-weight: 300;
+  line-height: 1.5;
+  color: #6f7073;
+  text-align: left;
+}
 
 /* Hardware overview */
 .hardware-page { padding: 0 35pt; }
@@ -794,6 +821,12 @@ ${typo ? `
                 ))}
               </div>
             </div>
+            {/* Per-product-line footnote on the LAST spec page only (e.g.
+                VPN Firewall asterisk disclaimer). Sits in flow below the
+                two columns, full width. */}
+            {pageIdx === specPages.length - 1 && specFootnote && (
+              <div className="spec-footnote">{specFootnote}</div>
+            )}
           </div>
           <div className="page-number">{pageIdx + 2}</div>
         </div>
