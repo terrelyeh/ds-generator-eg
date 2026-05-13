@@ -692,6 +692,90 @@ function RadioPatternSlot({
   );
 }
 
+/**
+ * Read-only display of the QSG URL that gets printed as the QR code on
+ * the datasheet PDF cover. Lets PM/Editor verify the link before
+ * generating the PDF and provides Copy / Test affordances.
+ *
+ * Resolution mirrors `preview/[model]/page.tsx`:
+ *   lineTemplate (from product_lines.qr_url_template)
+ *     → fallback to "https://qr.engenius.ai/qsg/{model}" (en dict default)
+ * Per-locale `product_translations.qr_url` overrides are NOT shown here —
+ * those are visible per-locale in the Translations editor. This card
+ * shows the EN/default URL that the EN PDF will use.
+ */
+function QsgUrlCard({
+  modelName,
+  lineTemplate,
+}: {
+  modelName: string;
+  lineTemplate: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const template = lineTemplate || "https://qr.engenius.ai/qsg/{model}";
+  const url = template.replace("{model}", modelName.toLowerCase());
+  const source = lineTemplate ? "Per-line template" : "Default short URL";
+
+  async function copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed");
+    }
+  }
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          QSG URL
+          <span className="text-[11px] font-normal text-muted-foreground">
+            (printed as QR code on the datasheet)
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2 flex-wrap">
+          <code className="flex-1 min-w-0 truncate rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono text-foreground">
+            {url}
+          </code>
+          <button
+            onClick={copyToClipboard}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+            title="Copy URL"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            {copied ? "Copied!" : "Copy"}
+          </button>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+            title="Open in new tab to verify the page exists"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Test
+          </a>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Source: {source}. Configure per-line templates via
+          {" "}<code className="font-mono text-[10px] bg-muted px-1 rounded">product_lines.qr_url_template</code>.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role }: ProductDetailProps) {
   // Role-derived flags. Prefixed `roleCan` to avoid collision with the
   // existing `canGenerate` that signals "all required fields are filled
@@ -1360,6 +1444,14 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
           </p>
         </CardContent>
       </Card>
+
+      {/* QSG URL (printed as QR code on the datasheet) — admin/editor only */}
+      {roleCanEdit && (
+        <QsgUrlCard
+          modelName={product.model_name}
+          lineTemplate={(product.product_line as { qr_url_template?: string | null }).qr_url_template ?? null}
+        />
+      )}
 
       {/* Overview & Features */}
       {(product.overview || product.features?.length > 0) && (
