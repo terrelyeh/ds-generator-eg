@@ -514,15 +514,14 @@ body {
 .spec-value { font-weight: 300; font-size: 7pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
 
 /* Footnote shown once at the bottom of the last spec page (per-product-line,
-   nullable in DB). Sits in normal flow below .spec-columns, full width,
-   small grey text. */
+   nullable in DB). Sits in normal flow below .spec-columns, spans full width
+   like industry-standard datasheet disclaimers. No top border — looked
+   visually disconnected from the spec content above. */
 .spec-footnote {
-  margin-top: 14pt;
-  padding-top: 6pt;
-  border-top: 0.5pt solid #d8dadd;
-  font-size: 6.5pt;
+  margin-top: 16pt;
+  font-size: 7.5pt;
   font-weight: 300;
-  line-height: 1.5;
+  line-height: 1.55;
   color: #6f7073;
   text-align: left;
 }
