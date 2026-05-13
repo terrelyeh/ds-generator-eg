@@ -1,7 +1,7 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-05-12 (Translation Draft UX fix + Editor settings access +
-> Resync versions from Drive button + pagination constant calibration overhaul)
+> Last updated: 2026-05-13 (Per-product-line spec footnote + QR URL template
+> + QSG URL display on Product Detail page)
 
 ## Project Overview
 

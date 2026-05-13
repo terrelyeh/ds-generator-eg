@@ -18,6 +18,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - 完整規格表（分類 header + zebra striping）
 - **圖片雙向管理** — 上傳到 Supabase + 自動同步到 Google Drive，自動重新命名
 - **Radio Pattern**（AP 專用）— 2.4G/5G/6G H-plane & E-plane 圖片 placeholder + 上傳
+- **QSG URL 預覽** — Detail 頁顯示這個 model 印在 PDF 上的 QR Code 將指向哪個連結，含 Copy / Test 按鈕（admin/editor only）
 - **Regenerate / New Version** 兩種 PDF 生成模式
 - 版本紀錄與 PDF 下載
 - Generate PDF 前置條件檢查（需 Product Image + Hardware Image + Overview + Features）
@@ -30,8 +31,9 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ### Datasheet PDF
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
+- **規格表備註區**（per-product-line, optional）— VPN Firewall 等產品線可在最後一頁 spec 下方放免責備註（如 `*Note: Performance figures are estimates…`），支援多語言
 - **Antennas Patterns**（AP 專用）— 上傳 radio pattern 圖後，PDF 自動新增一頁顯示 2.4G / 5G / 6G H-Plane & E-Plane polar plots
-- Hardware Overview + QR Code footer
+- Hardware Overview + QR Code footer（QR URL 解析優先序：per-product → per-product-line template → 預設短連結）
 - **Cloud 藍色 / Unmanaged 灰色** 雙主題
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
