@@ -177,7 +177,10 @@ export default async function PreviewPage({
       })),
   );
 
-  const specPages = splitIntoPages(specSections);
+  // Pagination is locale-aware — CJK fonts render with larger leading,
+  // so JA / zh-TW need slightly taller row estimates to avoid clipping
+  // the bottom row past BOTTOM_MARGIN.
+  const specPages = splitIntoPages(specSections, lang);
 
   // --- Antennas Patterns page (AP only, only if any uploaded) ---
   // Mirrors the logic in product-detail.tsx: detect AP by product_line

@@ -132,16 +132,34 @@ export function looksLikeUnseparatedList(value: string): boolean {
 
 // A single unwrapped spec row (matches actual CSS in preview/[model]):
 //   padding 2pt+2pt + label 7pt×1.2 + value-margin 1pt + value 7pt×1.2
-//     + border-bottom 0.5pt ≈ 22.3pt
-// Was 20pt — under-estimated by 2.3pt per row. On dense spec sections
-// (e.g. ESG320 with 24 single-line items) that's ~55pt of cumulative
-// drift, which silently pushed columns past BOTTOM_MARGIN and clipped
-// the bottom row at the page edge. Bumped to 22pt to absorb the gap.
-// SPEC_LINE_EXTRA stays at 10pt — real wrap-line is ~8.4pt, so a small
-// over-estimate per wrapped line; this compensates further for any
-// residual drift on multi-line rows.
-export const SPEC_BASE_ROW_HEIGHT = 22;
-export const SPEC_LINE_EXTRA = 10;
+//     + border-bottom 0.5pt ≈ 22.3pt for Latin text
+// CJK fonts (Zen Kaku Gothic / Noto Sans TC) render with larger intrinsic
+// leading (~1.3-1.4 line-height) vs Latin (~1.2), so each row is ~1.5-2pt
+// taller. For ESG510 ja PDF that's 36 items × ~1.5pt ≈ 54pt accumulated
+// drift past BOTTOM_MARGIN → bottom rows scrape the page edge. Locale-
+// aware metrics fix this without wasting space on EN datasheets.
+//
+// Calibration reference (from real PDF rendering):
+//   EN: ~22.3pt per row, ~8.4pt per extra wrap-line
+//   JA: ~24pt per row, ~10pt per extra wrap-line (CJK leading + occasional
+//       label wrap when Japanese spec_label_translations are long)
+//   zh-TW: ~25pt per row, ~11pt per extra wrap-line
+export interface LocaleRowMetrics {
+  baseRowHeight: number;
+  lineExtra: number;
+}
+export const LOCALE_ROW_METRICS: Record<string, LocaleRowMetrics> = {
+  default: { baseRowHeight: 22, lineExtra: 10 },
+  ja: { baseRowHeight: 24, lineExtra: 11 },
+  "zh-TW": { baseRowHeight: 25, lineExtra: 12 },
+};
+function rowMetricsFor(locale?: string): LocaleRowMetrics {
+  return LOCALE_ROW_METRICS[locale ?? "default"] ?? LOCALE_ROW_METRICS.default;
+}
+// Default constants kept as exports for backwards compatibility with
+// callers that don't yet thread locale (layout-check fallback path).
+export const SPEC_BASE_ROW_HEIGHT = LOCALE_ROW_METRICS.default.baseRowHeight;
+export const SPEC_LINE_EXTRA = LOCALE_ROW_METRICS.default.lineExtra;
 
 // Approx chars that fit on one line in a half-column. Reduced 62→52 after
 // ECW515 showed actual rendering wraps more aggressively than estimated
@@ -166,9 +184,10 @@ function countWrappedLines(value: string): number {
   return Math.max(1, total);
 }
 
-export function estimateItemHeight(value: string): number {
+export function estimateItemHeight(value: string, locale?: string): number {
+  const m = rowMetricsFor(locale);
   const lines = countWrappedLines(value);
-  return SPEC_BASE_ROW_HEIGHT + (lines - 1) * SPEC_LINE_EXTRA;
+  return m.baseRowHeight + (lines - 1) * m.lineExtra;
 }
 
 /**
@@ -204,11 +223,11 @@ function splitValueAtLines(
   return [head, tail];
 }
 
-function estimateSectionHeight(section: Section): number {
+function estimateSectionHeight(section: Section, locale?: string): number {
   // Continuation sections don't re-render the category header
   let h = section.isContinuation ? 0 : CATEGORY_HEADER_HEIGHT;
   for (const item of section.items) {
-    h += estimateItemHeight(item.value);
+    h += estimateItemHeight(item.value, locale);
   }
   return h;
 }
@@ -225,12 +244,12 @@ function estimateSectionHeight(section: Section): number {
  * splits overflow the page in that case. We walk sections in order and
  * pick the boundary whose |leftH - rightH| is smallest.
  */
-function balanceColumns(sections: Section[]): SpecPage {
+function balanceColumns(sections: Section[], locale?: string): SpecPage {
   if (sections.length <= 1) {
     return { left: sections, right: [] };
   }
 
-  const heights = sections.map((s) => estimateSectionHeight(s));
+  const heights = sections.map((s) => estimateSectionHeight(s, locale));
   const totalH = heights.reduce((a, b) => a + b, 0);
 
   // Try every split index 1..N-1 and pick the one minimising imbalance.
@@ -291,7 +310,9 @@ function fitSection(
    * Contents had been force-fit into a nearly-full right column.
    */
   allowForceFit = false,
+  locale?: string,
 ): { fitted: Section | null; remaining: Section | null } {
+  const rowM = rowMetricsFor(locale);
   // Continuation sections skip the header row — only deduct header height
   // for the first (non-continuation) appearance of a section.
   const headerH = section.isContinuation ? 0 : CATEGORY_HEADER_HEIGHT;
@@ -308,7 +329,7 @@ function fitSection(
 
   for (; i < section.items.length; i++) {
     const item = section.items[i];
-    const itemH = estimateItemHeight(item.value);
+    const itemH = estimateItemHeight(item.value, locale);
 
     if (h + itemH <= availableHeight) {
       fittedItems.push(item);
@@ -321,7 +342,7 @@ function fitSection(
     // the split worthwhile (otherwise just push the whole item to next col).
     const roomLeft = availableHeight - h;
     const linesThatFit = Math.floor(
-      (roomLeft - SPEC_BASE_ROW_HEIGHT) / SPEC_LINE_EXTRA,
+      (roomLeft - rowM.baseRowHeight) / rowM.lineExtra,
     ) + 1;
     const totalLines = countWrappedLines(item.value);
 
@@ -379,7 +400,7 @@ function fitSection(
   return { fitted, remaining };
 }
 
-export function splitIntoPages(sections: Section[]): SpecPage[] {
+export function splitIntoPages(sections: Section[], locale?: string): SpecPage[] {
   if (!sections.length) return [{ left: [], right: [] }];
 
   const pages: SpecPage[] = [];
@@ -400,7 +421,7 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
     while (queue.length > 0) {
       const remaining = AVAILABLE_HEIGHT - leftH;
       const nextSection = queue[0];
-      const sectionH = estimateSectionHeight(nextSection);
+      const sectionH = estimateSectionHeight(nextSection, locale);
 
       if (sectionH <= remaining) {
         // Whole section fits
@@ -411,10 +432,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
         // Column empty but section too tall → try to fit what we can.
         // Force-fit at least one item so we don't infinite-loop on a
         // giant first item.
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining, true);
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, true, locale);
         if (fitted) {
           left.push(fitted);
-          leftH += estimateSectionHeight(fitted);
+          leftH += estimateSectionHeight(fitted, locale);
         }
         queue.shift();
         if (cont) {
@@ -425,10 +446,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
         // Column has content + won't fit next section → try partial split.
         // DON'T force-fit here — we'd rather break and send the item to
         // the next column than overshoot this one and orphan later items.
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false);
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false, locale);
         if (fitted && fitted.items.length > 0) {
           left.push(fitted);
-          leftH += estimateSectionHeight(fitted);
+          leftH += estimateSectionHeight(fitted, locale);
           queue.shift();
           if (cont) {
             queue.unshift(cont);
@@ -449,7 +470,7 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
     while (queue.length > 0) {
       const remaining = AVAILABLE_HEIGHT - rightH;
       const nextSection = queue[0];
-      const sectionH = estimateSectionHeight(nextSection);
+      const sectionH = estimateSectionHeight(nextSection, locale);
 
       if (sectionH <= remaining) {
         right.push(nextSection);
@@ -458,10 +479,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
       } else if (right.length === 0) {
         // Empty column → allow force-fit (prevents infinite loop on
         // oversized sections that don't fit any column).
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining, true);
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, true, locale);
         if (fitted) {
           right.push(fitted);
-          rightH += estimateSectionHeight(fitted);
+          rightH += estimateSectionHeight(fitted, locale);
         }
         queue.shift();
         if (cont) {
@@ -470,10 +491,10 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
         }
       } else {
         // Has content → no force-fit; let the rest flow to next page.
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false);
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false, locale);
         if (fitted && fitted.items.length > 0) {
           right.push(fitted);
-          rightH += estimateSectionHeight(fitted);
+          rightH += estimateSectionHeight(fitted, locale);
           queue.shift();
           if (cont) {
             queue.unshift(cont);
@@ -493,7 +514,7 @@ export function splitIntoPages(sections: Section[]): SpecPage[] {
   // keep the fitSection-driven layout — rebalancing would blow the
   // column heights.
   if (pages.length === 1 && !splitOccurred) {
-    return [balanceColumns(sections)];
+    return [balanceColumns(sections, locale)];
   }
 
   return pages;

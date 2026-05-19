@@ -176,6 +176,7 @@ export interface SpecLayoutReport {
 
 export function checkSpecLayout(
   sections: { category: string; items: { label: string; value: string }[] }[],
+  locale?: string,
 ): SpecLayoutReport {
   if (!sections.length) {
     return {
@@ -186,7 +187,7 @@ export function checkSpecLayout(
     };
   }
 
-  const pages = splitIntoPages(sections);
+  const pages = splitIntoPages(sections, locale);
 
   let worstFillPct = 0;
   for (const page of pages) {
@@ -195,7 +196,7 @@ export function checkSpecLayout(
       for (const section of column) {
         h += CATEGORY_HEADER_HEIGHT;
         for (const item of section.items) {
-          h += estimateItemHeight(item.value);
+          h += estimateItemHeight(item.value, locale);
         }
       }
       const pct = (h / AVAILABLE_HEIGHT) * 100;
@@ -275,7 +276,7 @@ export function checkProductLayout(params: {
     features: params.features,
     locale: params.locale,
   });
-  const spec = checkSpecLayout(params.spec_sections);
+  const spec = checkSpecLayout(params.spec_sections, params.locale);
   return {
     status: worst(cover.status, spec.status),
     cover,
