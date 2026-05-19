@@ -42,7 +42,14 @@ export const BOTTOM_MARGIN = 72;
 export const AVAILABLE_HEIGHT =
   PAGE_HEIGHT - TOP_BAR_HEIGHT - SPEC_TITLE_HEIGHT - BOTTOM_MARGIN;
 
-export const CATEGORY_HEADER_HEIGHT = 18;
+// Real CSS:
+//   .spec-category-header { font-size: 7.5pt (~9pt line); padding 2.5+2.5pt;
+//                           margin-top 6pt + margin-bottom 2pt } = ~22pt
+//   (first one has margin-top:0 → ~16pt, but the over-estimate on the first
+//   is fine and offsets row-level drift.)
+// Was 18pt — under-estimated by 4pt per header. For ESG320 with 7 sections
+// that's ~28pt cumulative drift past BOTTOM_MARGIN.
+export const CATEGORY_HEADER_HEIGHT = 22;
 
 /**
  * Is a spec value effectively "no meaningful data" and therefore not
@@ -149,7 +156,10 @@ export interface LocaleRowMetrics {
   lineExtra: number;
 }
 export const LOCALE_ROW_METRICS: Record<string, LocaleRowMetrics> = {
-  default: { baseRowHeight: 22, lineExtra: 10 },
+  // EN bumped 22→23 (real ~22.3pt). 0.7pt over-estimate per row provides
+  // a safety margin that accumulates ~25pt for dense 36-item ESG datasheets,
+  // ensuring last row doesn't kiss BOTTOM_MARGIN.
+  default: { baseRowHeight: 23, lineExtra: 10 },
   ja: { baseRowHeight: 24, lineExtra: 11 },
   "zh-TW": { baseRowHeight: 25, lineExtra: 12 },
 };
