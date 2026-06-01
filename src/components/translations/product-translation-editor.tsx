@@ -148,6 +148,7 @@ export function ProductTranslationEditor({
   const [hwImage, setHwImage] = useState(existing?.hardware_image ?? "");
   const [hwUploading, setHwUploading] = useState(false);
   const [hwDeleting, setHwDeleting] = useState(false);
+  const [hwLightbox, setHwLightbox] = useState(false);
   const [qrLabel, setQrLabel] = useState(existing?.qr_label ?? "");
   const [qrUrl, setQrUrl] = useState(existing?.qr_url ?? "");
 
@@ -858,7 +859,13 @@ export function ProductTranslationEditor({
             {hwImage ? (
               <div className="flex items-center gap-3">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={hwImage} alt="Hardware" className="h-24 w-auto rounded border object-contain" />
+                <img
+                  src={hwImage}
+                  alt="Hardware"
+                  className="h-24 w-auto rounded border object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={() => setHwLightbox(true)}
+                  title="Click to enlarge"
+                />
                 <button
                   disabled={hwDeleting}
                   onClick={async () => {
@@ -933,6 +940,35 @@ export function ProductTranslationEditor({
           </div>
         </CardContent>
       </Card>
+
+      {/* Hardware image lightbox — lets PM verify localized labels at full
+          size without leaving the page (EN had this via ImageUploadButton;
+          localized versions were plain <img> with no enlarge). */}
+      {hwLightbox && hwImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8"
+          onClick={() => setHwLightbox(false)}
+        >
+          <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={hwImage}
+              alt={`${modelName} ${activeLocale} hardware`}
+              className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            />
+            <button
+              onClick={() => setHwLightbox(false)}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors"
+              aria-label="Close"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* QR Code Settings */}
       <Card className="shadow-sm">
