@@ -199,9 +199,31 @@ function findRowByLabel(rows: unknown[][], label: string): number | null {
  * mistakenly treated as category headers. The PM fix is to put "-" in
  * not-applicable cells, or delete the row entirely.
  */
-function isRowOnlyLabel(row: unknown[] | undefined): boolean {
+/**
+ * Find the rightmost column index that has a model number in the "Model #"
+ * row. Used to bound category detection — any column beyond this is a
+ * non-spec column (Cloud Camera sheet has a Chinese translation column at
+ * index 14 that was breaking isRowOnlyLabel detection).
+ * Returns null if no Model # row found or all model cells empty.
+ */
+function findMaxModelColumn(rows: unknown[][]): number | null {
+  for (const row of rows) {
+    if (String(row?.[0] ?? "").trim() === "Model #") {
+      let maxIdx = 0;
+      for (let c = 1; c < row.length; c++) {
+        const v = String(row[c] ?? "").trim();
+        if (v) maxIdx = c;
+      }
+      return maxIdx > 0 ? maxIdx : null;
+    }
+  }
+  return null;
+}
+
+function isRowOnlyLabel(row: unknown[] | undefined, maxCol = Infinity): boolean {
   if (!row || row.length <= 1) return true;
-  for (let c = 1; c < row.length; c++) {
+  const limit = Math.min(row.length, maxCol + 1);
+  for (let c = 1; c < limit; c++) {
     const v = String(row[c] ?? "").trim();
     if (v) return false; // any content (including "-") → row has values
   }
@@ -222,16 +244,22 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
     }
   }
 
+  // Cloud Camera sheet has extra columns past the last model (e.g. Chinese
+  // translation column at index 14). Bound category detection to columns
+  // that are actually model spec columns so those extras don't mask
+  // category rows from isRowOnlyLabel.
+  const maxModelCol = findMaxModelColumn(rows) ?? Infinity;
+
   for (let i = startRow; i < rows.length; i++) {
     const label = String(rows[i]?.[0] ?? "").trim();
     const value = getCell(rows[i], colIdx);
 
     if (!label) continue;
 
-    // Pattern-based category detection: column A has text, all other
+    // Pattern-based category detection: column A has text, all model
     // cells empty → category header. Works across all product lines
     // without maintaining a hardcoded whitelist.
-    if (isRowOnlyLabel(rows[i])) {
+    if (isRowOnlyLabel(rows[i], maxModelCol)) {
       if (currentCategory && currentItems.length > 0) {
         sections.push({ category: currentCategory, items: currentItems });
       }
