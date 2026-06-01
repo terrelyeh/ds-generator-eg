@@ -429,6 +429,15 @@ export interface ImageSyncOptions {
     product_image?: string;
     hardware_image?: string;
   };
+  /**
+   * Force re-download even when Drive modifiedTime <= Storage last-modified.
+   * The smart-sync timestamp check is unreliable when a Drive file is
+   * MOVED into the folder (Google preserves the original modifiedTime) or
+   * replaced with content whose timestamp ends up older than the last
+   * sync — the stale Storage copy then never refreshes. Force mode bypasses
+   * the check so "Force full re-sync" actually re-pulls every image.
+   */
+  force?: boolean;
 }
 
 export interface LocalizedImageSyncResult {
@@ -616,9 +625,10 @@ export async function syncProductImages(
       const storagePath = `images/${modelName}/${modelName}_${suffix}.${ext}`;
 
       // Smart sync: if we have an existing image, compare Drive modifiedTime
-      // with Storage last-modified to skip unnecessary re-downloads
+      // with Storage last-modified to skip unnecessary re-downloads.
+      // Force mode skips this check entirely (always re-download).
       const existingUrl = options?.existingImages?.[dbField];
-      if (existingUrl && file.modifiedTime) {
+      if (!options?.force && existingUrl && file.modifiedTime) {
         try {
           const headRes = await fetch(existingUrl, { method: "HEAD" });
           const storageLastMod = headRes.headers.get("last-modified");

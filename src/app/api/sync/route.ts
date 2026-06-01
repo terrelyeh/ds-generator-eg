@@ -253,6 +253,7 @@ export async function POST(request: Request) {
                   product_image: existing.product_image || undefined,
                   hardware_image: existing.hardware_image || undefined,
                 },
+                force: forceSync,
               });
               if (imgResult.product_image_url) {
                 updateFields.product_image = imgResult.product_image_url;
@@ -337,6 +338,7 @@ export async function POST(request: Request) {
                 product_image: existing.product_image || undefined,
                 hardware_image: existing.hardware_image || undefined,
               } : undefined,
+              force: forceSync,
             });
             const imageUpdate: Record<string, string | null> = {};
             if (images.product_image_url) {
