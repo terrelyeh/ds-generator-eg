@@ -121,7 +121,14 @@ export default async function TranslationsPage({
         </div>
       </div>
 
+      {/* key={locale} forces a remount when the language tab switches.
+          Without it, the editor's `translations` useState (seeded once from
+          initialTranslations) keeps the PREVIOUS locale's values — so e.g.
+          Chinese filled on the zh-TW tab would still show (and could be
+          saved!) on the Japanese tab. Remount re-seeds state from the
+          correct locale's server data. */}
       <SpecLabelTranslationsEditor
+        key={locale}
         productLineId={productLine.id}
         productLineLabel={productLine.label}
         locale={locale}
