@@ -8,7 +8,7 @@ export const zhTW: DatasheetDict = {
   hardwareOverview: "\u7522\u54C1\u5916\u89C0",
   antennasPatterns: "\u5929\u7DDA\u8F3B\u5C04\u5834\u578B",
   defaultQrLabel: "Contact Us",
-  defaultQrUrl: "https://www.engenius.com.tw/contact",
+  defaultQrUrl: "https://www.engeniustech.com/tw/contact_us",
   disclaimer:
     "\u529F\u80FD\u8207\u898F\u683C\u5982\u6709\u8B8A\u66F4\uFF0C\u6055\u4E0D\u53E6\u884C\u901A\u77E5\u3002" +
     "\u5546\u6A19\u53CA\u8A3B\u518A\u5546\u6A19\u5747\u70BA\u5176\u5404\u81EA\u6240\u6709\u8005\u4E4B\u8CA1\u7522\u3002" +
