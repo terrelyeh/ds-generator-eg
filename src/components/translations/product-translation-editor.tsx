@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
+import { SUPPORTED_LOCALES, getDict } from "@/lib/datasheet/locales";
 import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
 
@@ -979,13 +979,13 @@ export function ProductTranslationEditor({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                QR Label <span className="text-muted-foreground/40">(default: {SUPPORTED_LOCALES.find(l => l.value === activeLocale)?.value === "en" ? "Quick Start Guide" : "Contact Us"})</span>
+                QR Label <span className="text-muted-foreground/40">(default: {getDict(activeLocale).defaultQrLabel})</span>
               </label>
               <input
                 type="text"
                 value={qrLabel}
                 onChange={(e) => { setQrLabel(e.target.value); setDirty(true); }}
-                placeholder="Contact Us"
+                placeholder={getDict(activeLocale).defaultQrLabel}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
               />
             </div>
@@ -997,7 +997,7 @@ export function ProductTranslationEditor({
                 type="text"
                 value={qrUrl}
                 onChange={(e) => { setQrUrl(e.target.value); setDirty(true); }}
-                placeholder="https://www.engenius.co.jp/contact"
+                placeholder={getDict(activeLocale).defaultQrUrl}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
               />
             </div>
