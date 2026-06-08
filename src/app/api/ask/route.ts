@@ -398,7 +398,15 @@ export async function POST(request: Request) {
 
 1. **Language match:** Detect the language of the user's LATEST message and answer in the SAME language. English in → English out. 中文進 → 中文出. 日本語入力 → 日本語で出力. Do NOT default to Chinese when the user wrote in English.
 
-2. **Markdown structure:** Use headings (\`##\`, \`###\`), bullet lists (\`- \`), numbered lists (\`1.\`) and tables. Never pack multiple parallel points into a single dense paragraph. Leave a blank line between paragraphs.`;
+2. **Lead with the answer:** Open with 1–2 sentences that directly answer the question, before any background. No throat-clearing like "Based on the documents…".
+
+3. **Markdown structure (write like ChatGPT / Claude — scannable, not a wall of text):**
+   - Use \`##\` / \`###\` headings to split a multi-part answer into sections.
+   - Use \`- \` bullet lists for parallel points; \`1.\` numbered lists for steps or sequences.
+   - Use a Markdown **table** whenever you compare 2 or more products, models, or options (one row per item, columns for the compared attributes).
+   - **Bold** key terms, model numbers and spec values (e.g. **ECW536**, **WiFi 7**, **2.5 GbE**).
+   - Keep paragraphs short (2–4 sentences) with a blank line between them. Never pack multiple parallel points into one dense paragraph.
+   - Use a fenced code block only for real commands / config / CLI snippets — not for plain prose.`;
         const systemPrompt = personaPrompt + profilePrompt + finalEnforcement;
 
         // Build conversation context for follow-up questions

@@ -1,12 +1,17 @@
 "use client";
 
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { EngenieMark } from "./engenie-mark";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { CodeBlock } from "@/components/chat/code-block";
+import {
+  useChatStream,
+  type ChatMessage as Message,
+  type ChatSource as Source,
+} from "@/hooks/use-chat-stream";
 
 const markdownComponents: Components = {
   // Wrap tables in a horizontal-scroll container so wide comparison
@@ -21,22 +26,6 @@ const markdownComponents: Components = {
   // Fenced code blocks → shared CodeBlock (language label + copy + dark body)
   pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
 };
-
-interface Source {
-  title: string;
-  source_id: string;
-  source_type: string;
-  source_url: string | null;
-  similarity: number;
-}
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  sources?: Source[];
-  followUps?: string[];
-  isStreaming?: boolean;
-}
 
 export interface EngenieChatProps {
   provider: string;
@@ -62,43 +51,17 @@ export function EngenieChat({
   welcomeDescription,
   exampleQuestions,
 }: EngenieChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  // Mirrors the main Ask panel: surface the backend's progress phase
-  // ("searching" → "generating") so the demo shows the same live status
-  // ("搜尋相關資料中…" / "整理回覆中…") instead of a silent spinner.
-  const [loadingStatus, setLoadingStatus] = useState<"searching" | "generating" | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Shared chat streaming engine — same logic as the desktop Ask panel.
+  // Live status ("searching" → "generating") drives 搜尋相關資料中… / 整理回覆中…
+  const { messages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
+    getParams: () => ({ provider, persona, profile }),
+    stoppedLabel: "_(已停止)_",
+  });
+
   const { ref: scrollRef, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([messages, loading]);
-
-  // rAF-batched streaming: accumulate chunks in a ref, flush to state once per frame
-  const pendingContentRef = useRef<string>("");
-  const rafIdRef = useRef<number | null>(null);
-  // Aborts the in-flight /api/ask stream when the user hits Stop.
-  const abortRef = useRef<AbortController | null>(null);
-
-  const scheduleFlush = useCallback(() => {
-    if (rafIdRef.current !== null) return;
-    rafIdRef.current = requestAnimationFrame(() => {
-      rafIdRef.current = null;
-      const content = pendingContentRef.current;
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last?.role === "assistant") {
-          updated[updated.length - 1] = { ...last, content };
-        }
-        return updated;
-      });
-    });
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
-    };
-  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => textareaRef.current?.focus(), 120);
@@ -112,147 +75,14 @@ export function EngenieChat({
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
   }
 
-  // Core streaming routine shared by submit + regenerate. `base` is the
-  // conversation up to and including the user question being answered.
-  async function runAsk(q: string, base: Message[]) {
-    setMessages([...base, { role: "assistant", content: "", isStreaming: true }]);
-    setLoading(true);
-    setLoadingStatus("searching");
-    pendingContentRef.current = "";
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    let fullContent = "";
-    let streamSources: Source[] = [];
-
-    try {
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          question: q,
-          provider,
-          persona,
-          profile,
-          history: base.slice(-20).map((m) => ({ role: m.role, content: m.content })),
-        }),
-      });
-
-      if (!res.ok || !res.body) {
-        const errText = await res.text().catch(() => "");
-        setMessages([
-          ...base,
-          { role: "assistant", content: `Error: ${res.status}. ${errText.slice(0, 200)}` },
-        ]);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (payload === "[DONE]") continue;
-          try {
-            const event = JSON.parse(payload);
-            if (event.type === "status") {
-              setLoadingStatus(event.status);
-            } else if (event.type === "chunk") {
-              fullContent += event.content;
-              pendingContentRef.current = fullContent;
-              scheduleFlush();
-            } else if (event.type === "sources") {
-              streamSources = event.sources ?? [];
-            }
-          } catch {
-            /* skip */
-          }
-        }
-      }
-
-      // Final flush — cancel pending rAF and commit final state
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-
-      const { answer, followUps } = parseFollowUps(fullContent);
-
-      setMessages([
-        ...base,
-        {
-          role: "assistant",
-          content: answer,
-          sources: streamSources,
-          followUps,
-          isStreaming: false,
-        },
-      ]);
-    } catch (err) {
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
-      }
-      if (err instanceof DOMException && err.name === "AbortError") {
-        // User hit Stop — keep whatever streamed so far as the final answer.
-        const { answer } = parseFollowUps(fullContent);
-        const partial = (answer || fullContent).trim();
-        setMessages([
-          ...base,
-          {
-            role: "assistant",
-            content: partial ? `${partial}\n\n_(已停止)_` : "_(已停止)_",
-            sources: streamSources,
-            isStreaming: false,
-          },
-        ]);
-      } else {
-        setMessages([
-          ...base,
-          {
-            role: "assistant",
-            content: `Error: ${err instanceof Error ? err.message : String(err)}`,
-          },
-        ]);
-      }
-    } finally {
-      setLoading(false);
-      setLoadingStatus(null);
-      abortRef.current = null;
-    }
-  }
-
-  async function handleSubmit(question?: string) {
+  // Submit from the input box / example chips. Streaming lives in
+  // useChatStream; this only manages the textarea (clear + autosize).
+  function handleSubmit(question?: string) {
     const q = (question ?? input).trim();
     if (!q || loading) return;
     setInput("");
     requestAnimationFrame(autosize);
-    await runAsk(q, [...messages, { role: "user", content: q }]);
-  }
-
-  function handleStop() {
-    abortRef.current?.abort();
-  }
-
-  async function handleRegenerate() {
-    if (loading) return;
-    let idx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") { idx = i; break; }
-    }
-    if (idx === -1) return;
-    await runAsk(messages[idx].content, messages.slice(0, idx + 1));
+    submit(q);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -310,8 +140,8 @@ export function EngenieChat({
                   key={i}
                   message={m}
                   loadingStatus={m.isStreaming ? loadingStatus : null}
-                  onFollowUp={isLastAssistant ? handleSubmit : undefined}
-                  onRegenerate={isLastAssistant && !loading ? handleRegenerate : undefined}
+                  onFollowUp={isLastAssistant ? submit : undefined}
+                  onRegenerate={isLastAssistant && !loading ? regenerate : undefined}
                 />
               );
             })}
@@ -356,7 +186,7 @@ export function EngenieChat({
           />
           {loading ? (
             <button
-              onClick={handleStop}
+              onClick={stop}
               aria-label="Stop"
               className="mb-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-engenius-dark text-white transition-all hover:bg-engenius-dark/90"
             >
@@ -534,23 +364,6 @@ function FollowUpList({
       </div>
     </div>
   );
-}
-
-function parseFollowUps(text: string): { answer: string; followUps: string[] } {
-  const sepIdx = text.lastIndexOf("\n---\n");
-  if (sepIdx === -1) return { answer: text, followUps: [] };
-  const answerPart = text.slice(0, sepIdx).replace(/\n+$/, "");
-  const afterSeparator = text.slice(sepIdx + 5).trim();
-  const lines = afterSeparator.split("\n").map((l) => l.trim()).filter(Boolean);
-  const followUps: string[] = [];
-  for (const line of lines) {
-    const cleaned = line
-      .replace(/^[\d]+[.)]\s*/, "")
-      .replace(/^[-*]\s*/, "")
-      .trim();
-    if (cleaned.length > 5 && cleaned.length < 200) followUps.push(cleaned);
-  }
-  return { answer: answerPart, followUps: followUps.slice(0, 3) };
 }
 
 function ActionBar({ content, sources, onRegenerate }: { content: string; sources?: Source[]; onRegenerate?: () => void }) {

@@ -7,25 +7,11 @@ import rehypeHighlight from "rehype-highlight";
 import { Card } from "@/components/ui/card";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { CodeBlock } from "@/components/chat/code-block";
-
-interface Source {
-  title: string;
-  source_id: string;
-  source_type: string;
-  source_url: string | null;
-  similarity: number;
-  image_urls?: string[];
-}
-
-interface Message {
-  role: "user" | "assistant";
-  content: string;
-  sources?: Source[];
-  provider?: string;
-  followUps?: string[];
-  imageMap?: Record<string, string[]>;
-  isStreaming?: boolean;
-}
+import {
+  useChatStream,
+  type ChatMessage as Message,
+  type ChatSource as Source,
+} from "@/hooks/use-chat-stream";
 
 interface PersonaOption {
   id: string;
@@ -341,29 +327,6 @@ function processTextWithCitations(text: string, sources: Source[]): React.ReactN
   });
 }
 
-/* ─── Parse follow-ups from text after --- separator ─── */
-function parseFollowUps(text: string): { answer: string; followUps: string[] } {
-  // Find the last --- separator
-  const separatorIdx = text.lastIndexOf("\n---\n");
-  if (separatorIdx === -1) return { answer: text, followUps: [] };
-
-  const answerPart = text.slice(0, separatorIdx).replace(/\n+$/, "");
-  const afterSeparator = text.slice(separatorIdx + 5).trim();
-
-  // Parse lines after separator as follow-up questions
-  const lines = afterSeparator.split("\n").map((l) => l.trim()).filter(Boolean);
-  const followUps: string[] = [];
-  for (const line of lines) {
-    // Remove numbered prefixes like "1. ", "2) ", "- ", etc.
-    const cleaned = line.replace(/^[\d]+[.)]\s*/, "").replace(/^[-*]\s*/, "").trim();
-    if (cleaned.length > 5 && cleaned.length < 200) {
-      followUps.push(cleaned);
-    }
-  }
-
-  return { answer: answerPart, followUps: followUps.slice(0, 3) };
-}
-
 /* ─── AI message avatar (the little node icon beside each reply) ─── */
 function AskAvatar() {
   return (
@@ -514,10 +477,7 @@ export interface AskChatProps {
 }
 
 export function AskChat({ compact = false }: AskChatProps) {
-  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [loadingStatus, setLoadingStatus] = useState<"searching" | "generating" | null>(null);
   const [provider, setProvider] = useState("gemini-3.5-flash");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
@@ -528,27 +488,15 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [welcomeDescription, setWelcomeDescription] = useState<string | null>(null);
   const [customQuestions, setCustomQuestions] = useState<string[] | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const { ref: scrollRef, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([messages, loading]);
 
-  // rAF-batched streaming: accumulate chunks in a ref, flush to state once per
-  // frame (mirrors the demo) so streaming doesn't re-render the list per token.
-  const pendingContentRef = useRef("");
-  const rafIdRef = useRef<number | null>(null);
-  // Aborts the in-flight /api/ask stream when the user hits Stop.
-  const abortRef = useRef<AbortController | null>(null);
-  const scheduleFlush = useCallback(() => {
-    if (rafIdRef.current !== null) return;
-    rafIdRef.current = requestAnimationFrame(() => {
-      rafIdRef.current = null;
-      const content = pendingContentRef.current;
-      setMessages((prev) => {
-        const updated = [...prev];
-        const last = updated[updated.length - 1];
-        if (last?.role === "assistant") updated[updated.length - 1] = { ...last, content };
-        return updated;
-      });
-    });
-  }, []);
+  // Shared chat streaming engine — owns messages/loading/status + the
+  // stream/abort/regenerate logic (identical to the EnGenie demo).
+  const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
+    getParams: () => ({ provider, persona, profile }),
+    onComplete: (m) => scheduleSave(m),
+  });
+
+  const { ref: scrollRef, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([messages, loading]);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -597,11 +545,6 @@ export function AskChat({ compact = false }: AskChatProps) {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
-  // Cancel any pending streaming flush on unmount.
-  useEffect(() => () => {
-    if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
-  }, []);
-
   // Auto-grow the input textarea up to a cap (mirrors the demo).
   const autosize = useCallback(() => {
     const el = inputRef.current;
@@ -639,150 +582,15 @@ export function AskChat({ compact = false }: AskChatProps) {
   /* ─── SSE Streaming submit ─── */
   // Core streaming routine shared by submit + regenerate. `base` is the
   // conversation up to and including the user question being answered.
-  async function runAsk(q: string, base: Message[]) {
-    setMessages([...base, { role: "assistant", content: "", isStreaming: true }]);
-    setLoading(true);
-    setLoadingStatus("searching");
-    pendingContentRef.current = "";
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    let fullContent = "";
-    let streamSources: Source[] = [];
-    let streamFollowUps: string[] = [];
-    let streamImageMap: Record<string, string[]> = {};
-    let streamProvider = provider;
-
-    try {
-      const res = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          question: q, provider, persona, profile,
-          history: base.slice(-20).map((m) => ({ role: m.role, content: m.content })),
-        }),
-      });
-
-      if (!res.ok || !res.body) {
-        const errText = await res.text();
-        setMessages([...base, { role: "assistant" as const, content: `Error: Server error (${res.status}). ${errText.slice(0, 200)}` }]);
-        return;
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const payload = line.slice(6).trim();
-          if (payload === "[DONE]") continue;
-
-          try {
-            const event = JSON.parse(payload);
-            if (event.type === "status") {
-              setLoadingStatus(event.status);
-              continue;
-            }
-            if (event.type === "chunk") {
-              fullContent += event.content;
-              pendingContentRef.current = fullContent;
-              scheduleFlush();
-            } else if (event.type === "sources") {
-              streamSources = event.sources ?? [];
-            } else if (event.type === "metadata") {
-              streamFollowUps = event.follow_ups ?? [];
-              streamImageMap = event.image_map ?? {};
-              streamProvider = event.provider ?? provider;
-            }
-          } catch {
-            // skip unparseable
-          }
-        }
-      }
-
-      // Final flush — cancel any pending rAF; final state is committed below.
-      if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
-
-      const { answer, followUps: parsedFollowUps } = parseFollowUps(fullContent);
-      const finalFollowUps = parsedFollowUps.length > 0 ? parsedFollowUps : streamFollowUps;
-
-      const finalAssistantMsg: Message = {
-        role: "assistant",
-        content: answer,
-        sources: streamSources,
-        followUps: finalFollowUps,
-        imageMap: Object.keys(streamImageMap).length > 0 ? streamImageMap : undefined,
-        provider: streamProvider,
-        isStreaming: false,
-      };
-
-      const finalMessages = [...base, finalAssistantMsg];
-      setMessages(finalMessages);
-      scheduleSave(finalMessages);
-    } catch (err) {
-      if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
-      if (err instanceof DOMException && err.name === "AbortError") {
-        // User hit Stop — keep whatever streamed so far as the final answer.
-        const { answer } = parseFollowUps(fullContent);
-        const partial = (answer || fullContent).trim();
-        const finalMessages: Message[] = [...base, {
-          role: "assistant",
-          content: partial ? `${partial}\n\n_(stopped)_` : "_(stopped)_",
-          sources: streamSources,
-          provider: streamProvider,
-          isStreaming: false,
-        }];
-        setMessages(finalMessages);
-        scheduleSave(finalMessages);
-      } else {
-        setMessages([...base, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
-      }
-    } finally {
-      setLoading(false); setLoadingStatus(null); abortRef.current = null;
-    }
-  }
-
-  async function handleSubmit(question?: string) {
+  // Submit from the input box / example chips. The streaming itself lives in
+  // useChatStream; this just handles the textarea (clear + autosize).
+  function handleSubmit(question?: string) {
     const q = (question ?? input).trim();
     if (!q || loading) return;
     setInput("");
     requestAnimationFrame(autosize);
-    const base: Message[] = [...messages, { role: "user", content: q }];
-    await runAsk(q, base);
+    submit(q);
   }
-
-  function handleStop() {
-    abortRef.current?.abort();
-  }
-
-  async function handleRegenerate() {
-    if (loading) return;
-    let idx = -1;
-    for (let i = messages.length - 1; i >= 0; i--) {
-      if (messages[i].role === "user") { idx = i; break; }
-    }
-    if (idx === -1) return;
-    await runAsk(messages[idx].content, messages.slice(0, idx + 1));
-  }
-
-  // Stable callbacks so memoized messages don't re-render every streaming frame.
-  const submitRef = useRef<(q?: string) => void>(() => {});
-  submitRef.current = handleSubmit;
-  const handleFollowUp = useCallback((q: string) => submitRef.current(q), []);
-  const regenRef = useRef<() => void>(() => {});
-  regenRef.current = handleRegenerate;
-  const handleRegen = useCallback(() => regenRef.current(), []);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -844,6 +652,9 @@ export function AskChat({ compact = false }: AskChatProps) {
   }
 
   function formatRelativeTime(dateStr: string) {
+    // Display-only relative time for the session list — reading "now" during
+    // render is intentional and harmless (re-renders just refresh the label).
+    // eslint-disable-next-line react-hooks/purity
     const diff = Date.now() - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "Just now";
@@ -1151,10 +962,10 @@ export function AskChat({ compact = false }: AskChatProps) {
                   isLast={i === messages.length - 1}
                   compact={compact}
                   loadingStatus={msg.isStreaming ? loadingStatus : null}
-                  onFollowUp={handleFollowUp}
+                  onFollowUp={submit}
                   onRegenerate={
                     i === messages.length - 1 && msg.role === "assistant" && !msg.isStreaming && !loading
-                      ? handleRegen
+                      ? regenerate
                       : undefined
                   }
                 />
@@ -1254,7 +1065,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                   Based on EnGenius product data
                 </span>
                 {loading ? (
-                  <button onClick={handleStop}
+                  <button onClick={stop}
                     className="inline-flex items-center gap-1.5 rounded-lg bg-[#3a3f47] px-3 py-1 text-xs font-medium text-white hover:bg-[#2c3038] transition-colors">
                     <span className="h-2.5 w-2.5 rounded-[2px] bg-white" />
                     Stop
