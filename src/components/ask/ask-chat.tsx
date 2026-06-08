@@ -3,8 +3,10 @@
 import { useState, useRef, useEffect, useCallback, memo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import { Card } from "@/components/ui/card";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
+import { CodeBlock } from "@/components/chat/code-block";
 
 interface Source {
   title: string;
@@ -276,10 +278,16 @@ function MarkdownWithCitations({ content, sources }: { content: string; sources?
       }
       return <strong {...props}>{processChildren(children, sources ?? [])}</strong>;
     },
+    // Fenced code blocks → shared CodeBlock (language label + copy + dark body)
+    pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
   };
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
+      components={markdownComponents}
+    >
       {content}
     </ReactMarkdown>
   );
@@ -385,12 +393,14 @@ const AskMessage = memo(function AskMessage({
   compact,
   loadingStatus,
   onFollowUp,
+  onRegenerate,
 }: {
   message: Message;
   isLast: boolean;
   compact: boolean;
   loadingStatus: "searching" | "generating" | null;
   onFollowUp: (q: string) => void;
+  onRegenerate?: () => void;
 }) {
   const [copied, setCopied] = useState(false);
 
@@ -460,6 +470,18 @@ const AskMessage = memo(function AskMessage({
                 </svg>
               )}
             </button>
+            {onRegenerate && (
+              <button
+                onClick={onRegenerate}
+                className="text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+                title="Regenerate"
+              >
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M23 4v6h-6M1 20v-6h6" />
+                  <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                </svg>
+              </button>
+            )}
             {message.provider && (
               <span className="ml-auto text-xs text-muted-foreground/30">via {message.provider}</span>
             )}
@@ -512,6 +534,8 @@ export function AskChat({ compact = false }: AskChatProps) {
   // frame (mirrors the demo) so streaming doesn't re-render the list per token.
   const pendingContentRef = useRef("");
   const rafIdRef = useRef<number | null>(null);
+  // Aborts the in-flight /api/ask stream when the user hits Stop.
+  const abortRef = useRef<AbortController | null>(null);
   const scheduleFlush = useCallback(() => {
     if (rafIdRef.current !== null) return;
     rafIdRef.current = requestAnimationFrame(() => {
@@ -613,48 +637,43 @@ export function AskChat({ compact = false }: AskChatProps) {
   }
 
   /* ─── SSE Streaming submit ─── */
-  async function handleSubmit(question?: string) {
-    const q = (question ?? input).trim();
-    if (!q || loading) return;
-    setInput("");
-    requestAnimationFrame(autosize);
-    const userMsg: Message = { role: "user", content: q };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
+  // Core streaming routine shared by submit + regenerate. `base` is the
+  // conversation up to and including the user question being answered.
+  async function runAsk(q: string, base: Message[]) {
+    setMessages([...base, { role: "assistant", content: "", isStreaming: true }]);
     setLoading(true);
     setLoadingStatus("searching");
     pendingContentRef.current = "";
 
-    // Create a placeholder assistant message for streaming
-    const assistantMsg: Message = { role: "assistant", content: "", isStreaming: true };
-    setMessages([...newMessages, assistantMsg]);
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    let fullContent = "";
+    let streamSources: Source[] = [];
+    let streamFollowUps: string[] = [];
+    let streamImageMap: Record<string, string[]> = {};
+    let streamProvider = provider;
 
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           question: q, provider, persona, profile,
-          history: newMessages.slice(-20).map((m) => ({ role: m.role, content: m.content })),
+          history: base.slice(-20).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
 
       if (!res.ok || !res.body) {
         const errText = await res.text();
-        const finalMessages = [...newMessages, { role: "assistant" as const, content: `Error: Server error (${res.status}). ${errText.slice(0, 200)}` }];
-        setMessages(finalMessages);
-        setLoading(false); setLoadingStatus(null);
+        setMessages([...base, { role: "assistant" as const, content: `Error: Server error (${res.status}). ${errText.slice(0, 200)}` }]);
         return;
       }
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let fullContent = "";
-      let streamSources: Source[] = [];
-      let streamFollowUps: string[] = [];
-      let streamImageMap: Record<string, string[]> = {};
-      let streamProvider = provider;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -695,7 +714,6 @@ export function AskChat({ compact = false }: AskChatProps) {
       // Final flush — cancel any pending rAF; final state is committed below.
       if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
 
-      // Parse follow-ups from the text (after --- separator)
       const { answer, followUps: parsedFollowUps } = parseFollowUps(fullContent);
       const finalFollowUps = parsedFollowUps.length > 0 ? parsedFollowUps : streamFollowUps;
 
@@ -709,21 +727,62 @@ export function AskChat({ compact = false }: AskChatProps) {
         isStreaming: false,
       };
 
-      const finalMessages = [...newMessages, finalAssistantMsg];
+      const finalMessages = [...base, finalAssistantMsg];
       setMessages(finalMessages);
       scheduleSave(finalMessages);
     } catch (err) {
-      setMessages([...newMessages, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
+      if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // User hit Stop — keep whatever streamed so far as the final answer.
+        const { answer } = parseFollowUps(fullContent);
+        const partial = (answer || fullContent).trim();
+        const finalMessages: Message[] = [...base, {
+          role: "assistant",
+          content: partial ? `${partial}\n\n_(stopped)_` : "_(stopped)_",
+          sources: streamSources,
+          provider: streamProvider,
+          isStreaming: false,
+        }];
+        setMessages(finalMessages);
+        scheduleSave(finalMessages);
+      } else {
+        setMessages([...base, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
+      }
     } finally {
-      setLoading(false); setLoadingStatus(null);
+      setLoading(false); setLoadingStatus(null); abortRef.current = null;
     }
   }
 
-  // Stable callback for follow-up chips so memoized messages don't re-render
-  // every streaming frame (handleSubmit is recreated each render).
+  async function handleSubmit(question?: string) {
+    const q = (question ?? input).trim();
+    if (!q || loading) return;
+    setInput("");
+    requestAnimationFrame(autosize);
+    const base: Message[] = [...messages, { role: "user", content: q }];
+    await runAsk(q, base);
+  }
+
+  function handleStop() {
+    abortRef.current?.abort();
+  }
+
+  async function handleRegenerate() {
+    if (loading) return;
+    let idx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { idx = i; break; }
+    }
+    if (idx === -1) return;
+    await runAsk(messages[idx].content, messages.slice(0, idx + 1));
+  }
+
+  // Stable callbacks so memoized messages don't re-render every streaming frame.
   const submitRef = useRef<(q?: string) => void>(() => {});
   submitRef.current = handleSubmit;
   const handleFollowUp = useCallback((q: string) => submitRef.current(q), []);
+  const regenRef = useRef<() => void>(() => {});
+  regenRef.current = handleRegenerate;
+  const handleRegen = useCallback(() => regenRef.current(), []);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -1093,6 +1152,11 @@ export function AskChat({ compact = false }: AskChatProps) {
                   compact={compact}
                   loadingStatus={msg.isStreaming ? loadingStatus : null}
                   onFollowUp={handleFollowUp}
+                  onRegenerate={
+                    i === messages.length - 1 && msg.role === "assistant" && !msg.isStreaming && !loading
+                      ? handleRegen
+                      : undefined
+                  }
                 />
               ))
             )}
@@ -1189,10 +1253,18 @@ export function AskChat({ compact = false }: AskChatProps) {
                   <span className="inline-flex items-center justify-center rounded bg-engenius-blue/10 text-engenius-blue px-1 py-0.5 text-[10px] font-semibold leading-none">AI</span>
                   Based on EnGenius product data
                 </span>
-                <button onClick={() => handleSubmit()} disabled={loading || !input.trim()}
-                  className="rounded-lg bg-engenius-blue/90 px-3.5 py-1 text-xs font-medium text-white hover:bg-engenius-blue disabled:bg-muted disabled:text-muted-foreground/40 transition-colors">
-                  {loading ? "..." : "Send"}
-                </button>
+                {loading ? (
+                  <button onClick={handleStop}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-[#3a3f47] px-3 py-1 text-xs font-medium text-white hover:bg-[#2c3038] transition-colors">
+                    <span className="h-2.5 w-2.5 rounded-[2px] bg-white" />
+                    Stop
+                  </button>
+                ) : (
+                  <button onClick={() => handleSubmit()} disabled={!input.trim()}
+                    className="rounded-lg bg-engenius-blue/90 px-3.5 py-1 text-xs font-medium text-white hover:bg-engenius-blue disabled:bg-muted disabled:text-muted-foreground/40 transition-colors">
+                    Send
+                  </button>
+                )}
               </div>
             </div>
             {/* Current model info */}

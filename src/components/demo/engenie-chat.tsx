@@ -3,8 +3,10 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
+import rehypeHighlight from "rehype-highlight";
 import { EngenieMark } from "./engenie-mark";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
+import { CodeBlock } from "@/components/chat/code-block";
 
 const markdownComponents: Components = {
   // Wrap tables in a horizontal-scroll container so wide comparison
@@ -16,6 +18,8 @@ const markdownComponents: Components = {
       </table>
     </div>
   ),
+  // Fenced code blocks → shared CodeBlock (language label + copy + dark body)
+  pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
 };
 
 interface Source {
@@ -71,6 +75,8 @@ export function EngenieChat({
   // rAF-batched streaming: accumulate chunks in a ref, flush to state once per frame
   const pendingContentRef = useRef<string>("");
   const rafIdRef = useRef<number | null>(null);
+  // Aborts the in-flight /api/ask stream when the user hits Stop.
+  const abortRef = useRef<AbortController | null>(null);
 
   const scheduleFlush = useCallback(() => {
     if (rafIdRef.current !== null) return;
@@ -106,36 +112,38 @@ export function EngenieChat({
     el.style.height = Math.min(el.scrollHeight, 140) + "px";
   }
 
-  async function handleSubmit(question?: string) {
-    const q = (question ?? input).trim();
-    if (!q || loading) return;
-    setInput("");
-    requestAnimationFrame(autosize);
-
-    const userMsg: Message = { role: "user", content: q };
-    const history = [...messages, userMsg];
-    setMessages([...history, { role: "assistant", content: "", isStreaming: true }]);
+  // Core streaming routine shared by submit + regenerate. `base` is the
+  // conversation up to and including the user question being answered.
+  async function runAsk(q: string, base: Message[]) {
+    setMessages([...base, { role: "assistant", content: "", isStreaming: true }]);
     setLoading(true);
     setLoadingStatus("searching");
     pendingContentRef.current = "";
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    let fullContent = "";
+    let streamSources: Source[] = [];
 
     try {
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
         body: JSON.stringify({
           question: q,
           provider,
           persona,
           profile,
-          history: history.slice(-20).map((m) => ({ role: m.role, content: m.content })),
+          history: base.slice(-20).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
 
       if (!res.ok || !res.body) {
         const errText = await res.text().catch(() => "");
         setMessages([
-          ...history,
+          ...base,
           { role: "assistant", content: `Error: ${res.status}. ${errText.slice(0, 200)}` },
         ]);
         return;
@@ -144,8 +152,6 @@ export function EngenieChat({
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let fullContent = "";
-      let streamSources: Source[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -184,7 +190,7 @@ export function EngenieChat({
       const { answer, followUps } = parseFollowUps(fullContent);
 
       setMessages([
-        ...history,
+        ...base,
         {
           role: "assistant",
           content: answer,
@@ -194,17 +200,59 @@ export function EngenieChat({
         },
       ]);
     } catch (err) {
-      setMessages([
-        ...history,
-        {
-          role: "assistant",
-          content: `Error: ${err instanceof Error ? err.message : String(err)}`,
-        },
-      ]);
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      if (err instanceof DOMException && err.name === "AbortError") {
+        // User hit Stop — keep whatever streamed so far as the final answer.
+        const { answer } = parseFollowUps(fullContent);
+        const partial = (answer || fullContent).trim();
+        setMessages([
+          ...base,
+          {
+            role: "assistant",
+            content: partial ? `${partial}\n\n_(已停止)_` : "_(已停止)_",
+            sources: streamSources,
+            isStreaming: false,
+          },
+        ]);
+      } else {
+        setMessages([
+          ...base,
+          {
+            role: "assistant",
+            content: `Error: ${err instanceof Error ? err.message : String(err)}`,
+          },
+        ]);
+      }
     } finally {
       setLoading(false);
       setLoadingStatus(null);
+      abortRef.current = null;
     }
+  }
+
+  async function handleSubmit(question?: string) {
+    const q = (question ?? input).trim();
+    if (!q || loading) return;
+    setInput("");
+    requestAnimationFrame(autosize);
+    await runAsk(q, [...messages, { role: "user", content: q }]);
+  }
+
+  function handleStop() {
+    abortRef.current?.abort();
+  }
+
+  async function handleRegenerate() {
+    if (loading) return;
+    let idx = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i].role === "user") { idx = i; break; }
+    }
+    if (idx === -1) return;
+    await runAsk(messages[idx].content, messages.slice(0, idx + 1));
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -263,6 +311,7 @@ export function EngenieChat({
                   message={m}
                   loadingStatus={m.isStreaming ? loadingStatus : null}
                   onFollowUp={isLastAssistant ? handleSubmit : undefined}
+                  onRegenerate={isLastAssistant && !loading ? handleRegenerate : undefined}
                 />
               );
             })}
@@ -305,16 +354,26 @@ export function EngenieChat({
             className="flex-1 resize-none bg-transparent py-2 leading-[1.5] text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
             style={{ fontFamily: "inherit", fontSize: "16px" }}
           />
-          <button
-            onClick={() => handleSubmit()}
-            disabled={loading || !input.trim()}
-            aria-label="Send"
-            className="mb-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-engenius-dark text-white transition-all hover:bg-engenius-dark/90 disabled:bg-engenius-gray/30"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          </button>
+          {loading ? (
+            <button
+              onClick={handleStop}
+              aria-label="Stop"
+              className="mb-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-engenius-dark text-white transition-all hover:bg-engenius-dark/90"
+            >
+              <span className="h-3 w-3 rounded-[3px] bg-white" />
+            </button>
+          ) : (
+            <button
+              onClick={() => handleSubmit()}
+              disabled={!input.trim()}
+              aria-label="Send"
+              className="mb-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-engenius-dark text-white transition-all hover:bg-engenius-dark/90 disabled:bg-engenius-gray/30"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
     </div>
@@ -326,14 +385,16 @@ const MessageBubble = memo(function MessageBubble({
   message,
   loadingStatus = null,
   onFollowUp,
+  onRegenerate,
 }: {
   message: Message;
   loadingStatus?: "searching" | "generating" | null;
   onFollowUp?: (q: string) => void;
+  onRegenerate?: () => void;
 }) {
   if (message.role === "user") {
     return (
-      <div className="mb-8 flex justify-end">
+      <div className="mb-8 flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-300">
         <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-3 text-[16px] leading-[1.65] text-engenius-dark">
           {message.content}
         </div>
@@ -350,7 +411,7 @@ const MessageBubble = memo(function MessageBubble({
   // Assistant message: EnGenie mark on the left (pulses while thinking),
   // answer / live status on the right — mirrors the main Ask panel.
   return (
-    <div className="mb-8 flex w-full gap-3">
+    <div className="mb-8 flex w-full gap-3 animate-in fade-in duration-300">
       <div className="flex-shrink-0 pt-0.5">
         <EngenieAvatar thinking={thinking} />
       </div>
@@ -372,7 +433,11 @@ const MessageBubble = memo(function MessageBubble({
               prose-table:text-[14px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
               ${message.isStreaming ? cursor : ""}`}
           >
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
+              components={markdownComponents}
+            >
               {stripCitations(message.content)}
             </ReactMarkdown>
           </div>
@@ -396,7 +461,7 @@ const MessageBubble = memo(function MessageBubble({
         ) : null}
         {!message.isStreaming && message.content && (
           <>
-            <ActionBar content={message.content} sources={message.sources} />
+            <ActionBar content={message.content} sources={message.sources} onRegenerate={onRegenerate} />
             {onFollowUp && message.followUps && message.followUps.length > 0 && (
               <FollowUpList questions={message.followUps} onClick={onFollowUp} />
             )}
@@ -488,7 +553,7 @@ function parseFollowUps(text: string): { answer: string; followUps: string[] } {
   return { answer: answerPart, followUps: followUps.slice(0, 3) };
 }
 
-function ActionBar({ content, sources }: { content: string; sources?: Source[] }) {
+function ActionBar({ content, sources, onRegenerate }: { content: string; sources?: Source[]; onRegenerate?: () => void }) {
   const [copied, setCopied] = useState(false);
   const [refOpen, setRefOpen] = useState(false);
   const unique = sources ? dedupe(sources) : [];
@@ -522,6 +587,19 @@ function ActionBar({ content, sources }: { content: string; sources?: Source[] }
           )}
           <span>{copied ? "Copied" : "Copy"}</span>
         </button>
+
+        {onRegenerate && (
+          <button
+            onClick={onRegenerate}
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-engenius-dark"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 4v6h-6M1 20v-6h6" />
+              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+            </svg>
+            <span>Retry</span>
+          </button>
+        )}
 
         {unique.length > 0 && (
           <button

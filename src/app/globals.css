@@ -1,6 +1,10 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+/* highlight.js token colours for chat code blocks (CodeBlock component).
+   Layout/background is owned by `.chat-codeblock` below; this only supplies
+   syntax token colours via rehype-highlight. */
+@import "highlight.js/styles/github-dark.css";
 
 /* Typography plugin — powers the `prose` classes used by the EnGenie
    demo chat (engenie-chat) and the WiFi regulation markdown viewer.
@@ -166,11 +170,25 @@
 .ask-markdown h1 { font-size: 19px; }
 .ask-markdown h2 { font-size: 17px; }
 .ask-markdown h3 { font-size: 15.5px; }
-.ask-markdown code {
+.ask-markdown :not(pre) > code {
   background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; font-size: 13px;
 }
 .ask-markdown pre { background: #1e293b; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 14px 0; font-size: 13px; line-height: 1.6; }
 .ask-markdown pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+
+/* Shared chat code block (CodeBlock component) — dark body + hljs token
+   colours. Layout owned here so it renders identically under .ask-markdown
+   and `prose`. Higher specificity than .ask-markdown pre / prose :where(pre). */
+.chat-codeblock { background: #0d1117; }
+.chat-codeblock .chat-pre {
+  margin: 0; padding: 14px 16px; overflow-x: auto;
+  background: #0d1117; font-size: 13px; line-height: 1.6;
+}
+.chat-codeblock .chat-pre code {
+  background: transparent; padding: 0; border-radius: 0;
+  color: #c9d1d9; font-size: inherit;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
 .ask-markdown table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
 .ask-markdown th {
   background: rgba(0,0,0,0.04); text-align: left; padding: 8px 12px;
