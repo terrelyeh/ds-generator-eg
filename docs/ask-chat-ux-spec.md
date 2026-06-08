@@ -5,6 +5,8 @@
 
 本系統的「與 AI 對話」分成兩個介面,但**共用同一套互動引擎**。這份文件定義它們的共同規範,並標註兩者刻意保留的差異。新增任何聊天介面、或調整既有行為時,都應遵循此規範。
 
+> **實機預覽**:HTML 版本(`public/docs/ask-chat-ux-spec.html`,部署後 `…/docs/ask-chat-ux-spec.html`)頂端內嵌了 `/demo/ask` 的實機畫面,可邊讀規範邊操作。Demo 線上位置:`https://ds-generator-eg.vercel.app/demo/ask`(需 demo 通行碼)。
+
 ---
 
 ## 1. 總覽與範圍

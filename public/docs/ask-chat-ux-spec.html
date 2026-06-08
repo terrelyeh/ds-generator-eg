@@ -137,7 +137,29 @@
     .do-box li::marker { content: "✓  "; color: var(--green); }
     .dont-box li::marker { content: "✕  "; color: var(--red); }
 
+    /* Live demo preview (embedded /demo/ask) */
+    .preview-wrap { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; margin: 8px 0 28px; }
+    .phone {
+      width: 380px; height: 760px; flex-shrink: 0;
+      border: 10px solid #1a1d24; border-radius: 40px; overflow: hidden;
+      box-shadow: 0 20px 50px -20px rgba(0,0,0,0.4); background: #fff;
+    }
+    .phone iframe { width: 100%; height: 100%; border: 0; display: block; }
+    .preview-side { flex: 1; min-width: 240px; }
+    .open-btn {
+      display: inline-block; margin-top: 16px; background: var(--blue); color: #fff;
+      text-decoration: none; font-weight: 600; padding: 10px 18px; border-radius: 8px; font-size: 15px;
+    }
+    .open-btn:hover { background: var(--blue-dark); }
+    .preview-note {
+      font-size: 13px; color: var(--gray-light); margin-top: 14px; line-height: 1.6;
+    }
+    @media (max-width: 768px) {
+      .phone { width: 100%; height: 620px; border-radius: 28px; }
+    }
+
     @media print {
+      .preview-wrap { display: none; }
       .sidebar { display: none; }
       .main-content { padding: 20px; }
       table, pre { break-inside: avoid; }
@@ -162,6 +184,7 @@
 <nav class="sidebar">
   <div class="sidebar-title">Contents</div>
   <ol>
+    <li><a href="#preview">▶ 實機預覽</a></li>
     <li><a href="#s1">1 · 總覽與範圍</a></li>
     <li><a href="#s2">2 · 架構</a></li>
     <li><a href="#s3">3 · 互動行為</a></li>
@@ -182,6 +205,43 @@
   本系統的「與 AI 對話」分成兩個介面，但<strong>共用同一套互動引擎</strong>。這份文件定義它們的共同規範，並標註刻意保留的差異。<br>
   <strong>核心原則：互動引擎共用，外觀個性分流。</strong>串流、停止、重新生成、捲動、輸入等<strong>行為</strong>由共用程式碼決定，兩版必然一致；字級、配色、引用呈現等<strong>外觀</strong>留在各自元件，維持品牌差異。
 </div>
+
+<!-- Live preview -->
+<h2 id="preview" style="border-bottom-color: var(--blue)">實機預覽 &nbsp;<span style="font-size:14px;font-weight:500;color:var(--gray-light)">Live Demo &middot; /demo/ask</span></h2>
+<p>下方直接嵌入對外的 EnGenie demo。輸入 demo 通行碼後即可實際互動，對照本規範描述的<strong>串流、即時狀態、停止、重新生成、排版與動畫</strong>。</p>
+<div class="preview-wrap">
+  <div class="phone">
+    <iframe id="demoFrame" title="EnGenie demo (/demo/ask)" loading="lazy"></iframe>
+  </div>
+  <div class="preview-side">
+    <p style="margin-top:0"><strong>看這幾個重點：</strong></p>
+    <ul>
+      <li>送出後的<strong>即時狀態</strong>：搜尋相關資料中… → 整理回覆中…</li>
+      <li>串流時的<strong>打字游標</strong>與淡入動畫</li>
+      <li>生成中按 <span class="badge badge-gray">■ 停止</span>，已生成內容會保留</li>
+      <li>回答下方的 <strong>Copy / Retry</strong>、來源 references、延伸問題</li>
+      <li>往上捲讀歷史不會被拉回；右下出現「↓ 回到最新」</li>
+    </ul>
+    <a class="open-btn" id="demoOpen" target="_blank" rel="noopener">在新分頁開啟 ↗</a>
+    <p class="preview-note">
+      需輸入 demo 通行碼（向 Terrel 索取，恕不寫入文件）。<br>
+      若預覽區空白：可能是尚未部署、或瀏覽器擋了跨來源 iframe — 改用上方「在新分頁開啟」即可。
+    </p>
+  </div>
+</div>
+<script>
+  (function () {
+    // Same-origin relative path when this doc is served from the app;
+    // absolute production URL when opened as a local file (file://).
+    var rel = "/demo/ask";
+    var abs = "https://ds-generator-eg.vercel.app/demo/ask";
+    var url = location.protocol === "file:" ? abs : rel;
+    var f = document.getElementById("demoFrame");
+    var a = document.getElementById("demoOpen");
+    if (f) f.src = url;
+    if (a) a.href = url;
+  })();
+</script>
 
 <!-- 1 -->
 <h2 id="s1"><span class="num">1</span>總覽與範圍</h2>
