@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Product SpecHub — Ask 聊天互動規範</title>
+  <style>
+    :root {
+      --blue: #03a9f4;
+      --blue-dark: #0288d1;
+      --gray-dark: #2C3345;
+      --gray: #58595B;
+      --gray-light: #6f6f6f;
+      --gray-bg: #f8f9fa;
+      --border: #e2e5e9;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --green: #059669;
+      --green-bg: #ecfdf5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--gray-dark);
+      font-size: 16px;
+      line-height: 1.8;
+      background: #fff;
+    }
+
+    .page-layout { display: flex; max-width: 1280px; margin: 0 auto; }
+
+    /* Left sidebar TOC */
+    .sidebar {
+      width: 240px; flex-shrink: 0; position: sticky; top: 0;
+      height: 100vh; overflow-y: auto;
+      border-right: 1px solid var(--border); padding: 32px 20px; background: var(--gray-bg);
+    }
+    .sidebar-title {
+      font-weight: 700; font-size: 13px; text-transform: uppercase;
+      letter-spacing: 0.05em; color: var(--gray-light); margin-bottom: 16px;
+    }
+    .sidebar ol { list-style: none; padding: 0; margin: 0; }
+    .sidebar li { margin: 0; }
+    .sidebar a {
+      display: block; padding: 7px 12px; border-radius: 6px; font-size: 14px;
+      color: var(--gray); text-decoration: none; transition: all 0.15s; line-height: 1.4;
+    }
+    .sidebar a:hover { background: rgba(3,169,244,0.08); color: var(--blue-dark); }
+
+    /* Main content */
+    .main-content { flex: 1; min-width: 0; padding: 48px 48px 80px; }
+
+    h1 {
+      font-size: 36px; font-weight: 700; color: var(--blue-dark);
+      margin-bottom: 6px; border-bottom: 3px solid var(--blue); padding-bottom: 14px;
+    }
+    .subtitle { font-size: 16px; color: var(--gray-light); margin-bottom: 36px; }
+
+    h2 {
+      font-size: 24px; font-weight: 700; color: var(--gray-dark);
+      margin: 48px 0 20px; padding-bottom: 10px; border-bottom: 2px solid var(--border);
+    }
+    h2 .num {
+      display: inline-block; background: var(--blue); color: #fff;
+      width: 32px; height: 32px; border-radius: 6px; text-align: center;
+      line-height: 32px; font-size: 16px; margin-right: 10px; vertical-align: middle;
+    }
+    h3 { font-size: 19px; font-weight: 600; color: var(--gray); margin: 28px 0 10px; }
+
+    p { margin-bottom: 14px; }
+    ul, ol { margin: 0 0 18px; padding-left: 24px; }
+    li { margin-bottom: 6px; }
+
+    table { width: 100%; border-collapse: collapse; margin: 14px 0 24px; font-size: 15px; }
+    thead th {
+      background: var(--gray-dark); color: #fff; font-weight: 600;
+      padding: 10px 14px; text-align: left;
+    }
+    tbody td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+    tbody tr:hover { background: rgba(3, 169, 244, 0.06); }
+
+    code {
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace; font-size: 14px;
+      background: #f0f2f5; padding: 2px 7px; border-radius: 4px; color: #c7254e;
+    }
+    pre {
+      background: #0d1117; color: #c9d1d9; padding: 20px 24px; border-radius: 8px;
+      overflow-x: auto; font-size: 13.5px; line-height: 1.7; margin: 14px 0 24px;
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace;
+    }
+    pre code { background: none; padding: 0; color: inherit; }
+    pre .comment { color: #6c7086; }
+    pre .kw { color: #ff7b72; }
+    pre .fn { color: #d2a8ff; }
+    pre .str { color: #a5d6ff; }
+
+    .badge {
+      display: inline-block; font-size: 13px; font-weight: 600;
+      padding: 3px 10px; border-radius: 10px; white-space: nowrap;
+    }
+    .badge-blue { background: rgba(3,169,244,0.12); color: var(--blue-dark); }
+    .badge-gray { background: #eee; color: var(--gray); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+
+    kbd {
+      background: #f5f6f8; border: 1px solid var(--border); border-bottom-width: 2px;
+      border-radius: 4px; padding: 2px 6px; font-family: ui-monospace, Menlo, monospace;
+      font-size: 13px; color: var(--gray-dark);
+    }
+
+    .callout {
+      background: rgba(3,169,244,0.06); border-left: 4px solid var(--blue);
+      padding: 14px 20px; border-radius: 0 8px 8px 0; margin: 14px 0 24px; font-size: 15px;
+    }
+    .callout-warn { background: var(--amber-bg); border-left-color: var(--amber); }
+    .callout-ok { background: var(--green-bg); border-left-color: var(--green); }
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn strong { color: var(--amber); }
+    .callout-ok strong { color: var(--green); }
+
+    .lead {
+      font-size: 17px; color: var(--gray); background: var(--gray-bg);
+      border-radius: 12px; padding: 18px 22px; margin-bottom: 28px;
+    }
+
+    .do-dont { display: flex; gap: 20px; flex-wrap: wrap; }
+    .do-dont > div { flex: 1; min-width: 280px; }
+    .do-dont h3 { margin-top: 0; }
+    .do-box { background: var(--green-bg); border-radius: 12px; padding: 8px 22px 16px; }
+    .dont-box { background: var(--red-bg); border-radius: 12px; padding: 8px 22px 16px; }
+    .do-box li::marker { content: "✓  "; color: var(--green); }
+    .dont-box li::marker { content: "✕  "; color: var(--red); }
+
+    @media print {
+      .sidebar { display: none; }
+      .main-content { padding: 20px; }
+      table, pre { break-inside: avoid; }
+    }
+    @media (max-width: 768px) {
+      .page-layout { flex-direction: column; }
+      .sidebar {
+        position: relative; width: 100%; height: auto;
+        border-right: none; border-bottom: 1px solid var(--border); padding: 20px;
+      }
+      .main-content { padding: 24px 20px 60px; }
+      h1 { font-size: 28px; }
+      h2 { font-size: 21px; }
+      table { font-size: 13.5px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-layout">
+
+<nav class="sidebar">
+  <div class="sidebar-title">Contents</div>
+  <ol>
+    <li><a href="#s1">1 · 總覽與範圍</a></li>
+    <li><a href="#s2">2 · 架構</a></li>
+    <li><a href="#s3">3 · 互動行為</a></li>
+    <li><a href="#s4">4 · 動態效果</a></li>
+    <li><a href="#s5">5 · 格式與樣式</a></li>
+    <li><a href="#s6">6 · 回答內容契約</a></li>
+    <li><a href="#s7">7 · RD：複用引擎</a></li>
+    <li><a href="#s8">8 · Do / Don't</a></li>
+  </ol>
+</nav>
+
+<div class="main-content">
+
+<h1>Ask 聊天互動規範</h1>
+<p class="subtitle">Ask Chat UX Spec &mdash; 給 RD / PM 團隊參考 &middot; 2026-06-09</p>
+
+<div class="lead">
+  本系統的「與 AI 對話」分成兩個介面，但<strong>共用同一套互動引擎</strong>。這份文件定義它們的共同規範，並標註刻意保留的差異。<br>
+  <strong>核心原則：互動引擎共用，外觀個性分流。</strong>串流、停止、重新生成、捲動、輸入等<strong>行為</strong>由共用程式碼決定，兩版必然一致；字級、配色、引用呈現等<strong>外觀</strong>留在各自元件，維持品牌差異。
+</div>
+
+<!-- 1 -->
+<h2 id="s1"><span class="num">1</span>總覽與範圍</h2>
+<table>
+  <thead><tr><th>介面</th><th>路徑</th><th>對象</th><th>個性</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Ask SpecHub</strong><br>(桌機 / 網頁 panel)</td><td>Navbar「Ask」右側滑出 + <code>/ask</code> 全頁</td><td>內部團隊(需登入)</td><td>工具感、藍色、inline 引用、對話歷史</td></tr>
+    <tr><td><strong>EnGenie demo</strong></td><td><code>/demo/ask</code>(passcode + iOS PWA)</td><td>對外展示 / 非帳號使用者</td><td>溫暖紙感、serif 標題、隱藏 inline 引用</td></tr>
+  </tbody>
+</table>
+
+<!-- 2 -->
+<h2 id="s2"><span class="num">2</span>架構</h2>
+
+<h3>2.1 共用檔案 — 改這裡，兩版同時生效</h3>
+<table>
+  <thead><tr><th>檔案</th><th>職責</th></tr></thead>
+  <tbody>
+    <tr><td><code>hooks/use-chat-stream.ts</code></td><td><strong>聊天核心引擎</strong>：訊息列、loading/status、SSE 串流、rAF 批次、停止(abort)、重新生成、最終解析。匯出 <code>ChatMessage</code> / <code>ChatSource</code> 型別。</td></tr>
+    <tr><td><code>hooks/use-stick-to-bottom.ts</code></td><td><strong>智慧自動捲動</strong>：只有貼底時才跟著捲；否則放手並透過 <code>isAtBottom</code> 顯示「回到底部」鈕。</td></tr>
+    <tr><td><code>components/chat/code-block.tsx</code></td><td><strong>程式碼區塊</strong>：語言標籤 + 一鍵複製 + 深色底 + 語法高亮。作為 react-markdown 的 <code>pre</code> override。</td></tr>
+  </tbody>
+</table>
+
+<h3>2.2 各介面元件 — 只放外觀 / 該介面特有功能</h3>
+<table>
+  <thead><tr><th>檔案</th><th>內容</th></tr></thead>
+  <tbody>
+    <tr><td><code>components/ask/ask-chat.tsx</code></td><td>桌機 panel：<code>.ask-markdown</code> 樣式、inline 引用 tooltip、對話歷史 sidebar、Persona / Profile / Model 選擇器。</td></tr>
+    <tr><td><code>components/demo/engenie-chat.tsx</code></td><td>demo：<code>prose</code> 樣式、EngenieMark 頭像、隱藏 inline 引用(改用來源 chips)、serif 歡迎標題。</td></tr>
+  </tbody>
+</table>
+
+<h3>2.3 後端 — <code>POST /api/ask</code> (SSE streaming)</h3>
+<table>
+  <thead><tr><th>event</th><th>內容</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><code>status</code></td><td><code>"searching"</code> / <code>"generating"</code></td><td>驅動即時狀態文字</td></tr>
+    <tr><td><code>chunk</code></td><td><code>content</code> 片段</td><td>串流文字</td></tr>
+    <tr><td><code>sources</code></td><td>來源文件陣列</td><td>引用 / 來源清單</td></tr>
+    <tr><td><code>metadata</code></td><td><code>follow_ups</code>、<code>image_map</code>、<code>provider</code></td><td>後續問題、圖片、實際使用模型</td></tr>
+    <tr><td><code>[DONE]</code></td><td>—</td><td>串流結束</td></tr>
+  </tbody>
+</table>
+
+<!-- 3 -->
+<h2 id="s3"><span class="num">3</span>互動行為規範</h2>
+
+<h3>3.1 串流 Streaming</h3>
+<ul>
+  <li>文字以 <strong>rAF 批次</strong>更新：chunk 累積在 ref，<strong>每一幀只 flush 一次</strong> state。禁止「每個 token 就 setState」(逐字重渲染整列、閃爍掉幀)。</li>
+  <li>訊息列 <strong>memoize</strong>：只有正在串流的那一則重渲染。</li>
+  <li>串流中顯示游標(見第 4 節)。</li>
+</ul>
+
+<h3>3.2 即時狀態 Live status</h3>
+<table>
+  <thead><tr><th>階段</th><th>文案</th></tr></thead>
+  <tbody>
+    <tr><td><code>searching</code>(送出當下 + 檢索中)</td><td>搜尋相關資料中…</td></tr>
+    <tr><td><code>generating</code>(開始生成)</td><td>整理回覆中…</td></tr>
+  </tbody>
+</table>
+
+<h3>3.3 停止生成 Stop</h3>
+<ul>
+  <li>生成中，送出鈕變成 <span class="badge badge-gray">■ Stop</span>。</li>
+  <li>按下 → <code>AbortController.abort()</code> 中止串流。</li>
+  <li><strong>已生成內容必須保留</strong>，標記結尾：桌機 <code>_(stopped)_</code>、demo <code>_(已停止)_</code>。不可整段丟棄、不可顯示成 Error。</li>
+</ul>
+
+<h3>3.4 重新生成 Regenerate</h3>
+<ul>
+  <li>最後一則回覆下方提供「Retry / ↻」。</li>
+  <li>行為：找到<strong>最後一則使用者訊息</strong>，沿用先前 history 重跑，覆蓋舊回答。生成中不顯示。</li>
+</ul>
+
+<h3>3.5 智慧自動捲動 Smart auto-scroll</h3>
+<ul>
+  <li>貼底(距底 &lt; <strong>80px</strong>)：新內容自動跟到底(串流用即時捲動，不用 smooth)。</li>
+  <li>往上讀歷史：放手，不強制拉回。</li>
+  <li>不在底部且有訊息：右下出現「↓ 回到最新」浮動鈕，點了平滑捲到底。</li>
+</ul>
+
+<h3>3.6 輸入框 Input</h3>
+<ul>
+  <li><kbd>Enter</kbd> 送出；<kbd>Shift</kbd>+<kbd>Enter</kbd> 換行。</li>
+  <li><strong>自動長高</strong>至上限後內部捲動：桌機 panel 120 / 全頁 160px；demo 140px。送出後清空並重置高度。</li>
+</ul>
+
+<h3>3.7 後續問題 Follow-ups</h3>
+<ul>
+  <li>後端在回答後以 <code>---</code> 分隔，接 <strong>3 個</strong>建議問題。</li>
+  <li>解析成可點 chips(只在最後一則顯示)，點擊即送出。</li>
+</ul>
+
+<h3>3.8 複製 / 來源 / 引用</h3>
+<table>
+  <thead><tr><th></th><th>桌機 Ask panel</th><th>demo</th></tr></thead>
+  <tbody>
+    <tr><td>inline 引用</td><td>顯示 <code>[n]</code>，hover 出 tooltip(標題、類型、相似度 %、參考圖)；外部 / wifi-regulation 連結可點</td><td><strong>隱藏 <code>[n]</code></strong>(stripCitations)，保持乾淨</td></tr>
+    <tr><td>來源清單</td><td>「📎 N sources referenced」可折疊</td><td>ActionBar「N references」展開成 chips</td></tr>
+    <tr><td>動作列</td><td>Copy · Regenerate · <code>via {provider}</code></td><td>Copy · Retry · references</td></tr>
+  </tbody>
+</table>
+
+<h3>3.9 對話歷史 Sessions — 僅桌機版</h3>
+<ul>
+  <li>每輪結束<strong>自動存檔</strong>(debounce 1s)；左側 sidebar 可載入 / 刪除 / 批次刪除 / 相對時間。</li>
+  <li>demo <strong>無</strong>歷史(刻意：對外、無帳號)。</li>
+</ul>
+
+<!-- 4 -->
+<h2 id="s4"><span class="num">4</span>動態效果規範</h2>
+<table>
+  <thead><tr><th>效果</th><th>介面</th><th>規格</th></tr></thead>
+  <tbody>
+    <tr><td>訊息淡入</td><td>兩版</td><td><code>animate-in fade-in duration-300</code>；使用者訊息加 <code>slide-in-from-bottom-1</code></td></tr>
+    <tr><td>思考中圓點</td><td>demo</td><td>3 顆點，<code>engenieDot</code> 1.2s、stagger 0.2s，上下浮動 + 透明度</td></tr>
+    <tr><td>思考中 spinner</td><td>桌機</td><td>環狀 spinner + 狀態文字</td></tr>
+    <tr><td>串流游標</td><td>兩版</td><td>結尾脈動 caret；桌機 = 行內 3px 直條，demo = 最後段落 <code>::after</code></td></tr>
+    <tr><td>頭像脈動(思考時)</td><td>demo</td><td><code>engenieThink</code> 1.6s，scale 0.9↔1.06</td></tr>
+    <tr><td>歡迎圖示呼吸</td><td>桌機</td><td><code>breathe</code> 3s，scale 1↔1.08</td></tr>
+    <tr><td>回到底部 FAB</td><td>兩版</td><td><code>animate-in fade-in zoom-in</code> 200ms</td></tr>
+    <tr><td>複製回饋</td><td>兩版</td><td>勾勾 icon + 「Copied」維持 1.6s</td></tr>
+  </tbody>
+</table>
+<div class="callout"><strong>原則：</strong>動畫一律短(進場 200–300ms，脈動 1.2–3s)，只用來「指示狀態」，不喧賓奪主。</div>
+
+<!-- 5 -->
+<h2 id="s5"><span class="num">5</span>格式與樣式規範</h2>
+
+<h3>5.1 文字排版 Typography</h3>
+<p>ChatGPT/Claude 的舒適感來自<strong>大行距 + 足夠間距 + 限制行寬</strong>。兩版基準刻意對齊，讀起來一致：</p>
+<table>
+  <thead><tr><th></th><th>桌機 <code>.ask-markdown</code></th><th>demo <code>prose</code></th></tr></thead>
+  <tbody>
+    <tr><td>內文字級</td><td>15px</td><td>16.5px</td></tr>
+    <tr><td>行距</td><td>1.75</td><td>1.85</td></tr>
+    <tr><td>段落間距</td><td>14px</td><td>24px (my-6)</td></tr>
+    <tr><td>標題</td><td>h1 19 / h2 17 / h3 15.5</td><td>h1 23 / h2 20 / h3 17.5</td></tr>
+    <tr><td>清單</td><td>padding-left 24px、項目 6px</td><td>pl-5、my-2.5</td></tr>
+    <tr><td>表格</td><td>14px，斑馬紋</td><td>14px，可橫向捲動</td></tr>
+    <tr><td>閱讀寬度上限</td><td><code>max-w-[46rem]</code></td><td>容器 <code>max-w-[720px]</code></td></tr>
+  </tbody>
+</table>
+<div class="callout">桌機 markdown 樣式集中在 <code>globals.css</code> 的 <code>.ask-markdown</code>；demo 用 Tailwind <code>prose</code>(需 <code>@tailwindcss/typography</code> plugin)。</div>
+
+<h3>5.2 Markdown 渲染</h3>
+<ul>
+  <li><code>react-markdown</code> + <code>remark-gfm</code>(表格、刪除線等 GFM)。</li>
+  <li>表格、清單(含巢狀)、引用區塊、水平線、連結、圖片皆有樣式；引用區塊左側用 engenius-blue 色條。</li>
+</ul>
+
+<h3>5.3 程式碼區塊 CodeBlock</h3>
+<ul>
+  <li>共用元件，兩版外觀一致。</li>
+  <li>頂部 header bar(深色 <code>#0d1117</code>)：左 = 語言標籤(大寫、等寬、slate-400)、右 = 一鍵 <strong>Copy</strong>。</li>
+  <li>內文深色底 + 語法高亮(<code>rehype-highlight</code> + highlight.js <code>github-dark</code>)，選項 <code>{ detect: true, ignoreMissing: true }</code>。</li>
+  <li>inline code 與 block code 樣式分離(<code>.ask-markdown :not(pre) &gt; code</code> 才套 inline)。</li>
+</ul>
+
+<h3>5.4 色彩 Brand tokens</h3>
+<table>
+  <thead><tr><th>用途</th><th>值</th></tr></thead>
+  <tbody>
+    <tr><td>主藍</td><td><code>#03a9f4</code> (engenius-blue)</td></tr>
+    <tr><td>深藍</td><td><code>#0288d1</code></td></tr>
+    <tr><td>深色文字</td><td><code>#231f20</code> (engenius-dark)</td></tr>
+    <tr><td>灰色文字</td><td><code>#6f6f6f</code> (engenius-gray)</td></tr>
+    <tr><td>程式碼底</td><td><code>#0d1117</code></td></tr>
+  </tbody>
+</table>
+<div class="callout callout-warn"><strong>禁止純黑 <code>#000000</code></strong> — 一律用 <code>#231f20</code> 或 <code>#2C3345</code>。數字用 <code>tabular-nums</code>。</div>
+
+<!-- 6 -->
+<h2 id="s6"><span class="num">6</span>回答內容契約</h2>
+<p>樣式再好也救不了一坨純文字 —— 回答<strong>本身的結構</strong>由 <code>/api/ask</code> 的 system prompt 強制(節錄，以程式碼為準)：</p>
+<ol>
+  <li><strong>語言對齊</strong>：用使用者最後一則訊息的語言回答(英進英出、中進中出、日進日出)。</li>
+  <li><strong>開門見山</strong>：開頭 1–2 句直接回答，不要「根據文件…」開場白。</li>
+  <li><strong>Markdown 結構</strong>(寫得像 ChatGPT/Claude，可掃讀)：
+    <ul>
+      <li>多段落用 <code>##</code> / <code>###</code> 分節。</li>
+      <li>並列重點用 <code>-</code>；步驟用 <code>1.</code>。</li>
+      <li><strong>比較 2 個以上產品 / 型號 / 方案時用表格</strong>(一列一項)。</li>
+      <li><strong>粗體</strong>標出關鍵字、型號、規格值(如 <strong>ECW536</strong>、<strong>WiFi 7</strong>、<strong>2.5 GbE</strong>)。</li>
+      <li>段落短(2–4 句)，段間留空行；code fence 只給真正的指令 / 設定。</li>
+    </ul>
+  </li>
+  <li><strong>引用</strong>：<code>[n]</code> 放段落 / 關鍵主張結尾，每段最多 2 個，不可疊放 <code>[1,3,4]</code>。</li>
+  <li><strong>後續問題</strong>：答完後一行 <code>---</code>，接<strong>正好 3 個</strong>後續問題。</li>
+</ol>
+
+<!-- 7 -->
+<h2 id="s7"><span class="num">7</span>RD：如何用共用引擎做新的聊天介面</h2>
+<p>新增任何聊天 surface，<strong>不要再複製串流邏輯</strong>，直接用共用 hook：</p>
+<pre><span class="kw">const</span> { messages, loading, loadingStatus, submit, stop, regenerate } = <span class="fn">useChatStream</span>({
+  getParams: () =&gt; ({ provider, persona, profile }), <span class="comment">// 每次請求帶的參數</span>
+  onComplete: (msgs) =&gt; <span class="fn">save</span>(msgs),                  <span class="comment">// 可選：存檔</span>
+  stoppedLabel: <span class="str">"_(stopped)_"</span>,                       <span class="comment">// 可選：停止標記</span>
+});
+<span class="kw">const</span> { ref, isAtBottom, scrollToBottom } = <span class="fn">useStickToBottom</span>([messages, loading]);
+
+<span class="comment">// markdown 用 CodeBlock 當 pre override：</span>
+<span class="comment">// &lt;ReactMarkdown remarkPlugins={[remarkGfm]}</span>
+<span class="comment">//   rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}</span>
+<span class="comment">//   components={{ pre: ({children}) =&gt; &lt;CodeBlock&gt;{children}&lt;/CodeBlock&gt; }} /&gt;</span></pre>
+<ul>
+  <li><code>submit</code> / <code>stop</code> / <code>regenerate</code> 是 <strong>referentially stable</strong>，可直接傳給 memoized 訊息元件而不會每幀重渲染。</li>
+  <li>自訂外觀留在你的元件；<strong>行為別自己重寫</strong>。</li>
+</ul>
+
+<!-- 8 -->
+<h2 id="s8"><span class="num">8</span>Do / Don't 檢查清單</h2>
+<div class="do-dont">
+  <div>
+    <h3 style="color:var(--green)">Do</h3>
+    <div class="do-box"><ul>
+      <li>串流用 rAF 批次 + memoize 訊息。</li>
+      <li>自動捲動只在貼底時跟；否則給「回到底部」鈕。</li>
+      <li>停止時保留已生成內容。</li>
+      <li>表格 / 粗體 / 分節讓回答可掃讀。</li>
+      <li>動畫短而克制(進場 200–300ms)。</li>
+      <li>新介面複用 useChatStream / useStickToBottom / CodeBlock。</li>
+    </ul></div>
+  </div>
+  <div>
+    <h3 style="color:var(--red)">Don't</h3>
+    <div class="dont-box"><ul>
+      <li>每個 token 就 setState(閃爍掉幀)。</li>
+      <li>每次訊息變動就硬捲到底(讀歷史被拉走)。</li>
+      <li>停止 / 出錯就丟掉已生成內容。</li>
+      <li>把串流邏輯複製成第三份。</li>
+      <li>用純黑 <code>#000000</code>。</li>
+      <li>在元件裡硬寫 hex 色值(用 token / globals.css)。</li>
+    </ul></div>
+  </div>
+</div>
+
+<div class="callout callout-ok" style="margin-top:32px">
+  <strong>相關檔案速查：</strong>
+  <code>hooks/use-chat-stream.ts</code>(引擎)·
+  <code>hooks/use-stick-to-bottom.ts</code>(捲動)·
+  <code>components/chat/code-block.tsx</code>(程式碼區塊)·
+  <code>components/ask/ask-chat.tsx</code>(桌機)·
+  <code>components/demo/engenie-chat.tsx</code>(demo)·
+  <code>app/api/ask/route.ts</code>(SSE + 內容契約)·
+  <code>app/globals.css</code>(.ask-markdown + hljs 主題)
+</div>
+
+</div><!-- main-content -->
+</div><!-- page-layout -->
+
+</body>
+</html>
