@@ -5,9 +5,22 @@ import { getApiKey, API_KEY_MAP } from "@/lib/settings";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { matchesTaxonomyFilter, extractTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
 import { gate } from "@/lib/auth/session";
+import { cookies } from "next/headers";
+import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
 export const maxDuration = 60;
+
+/**
+ * Ask is reachable two ways: a logged-in user with the `ask.use` permission,
+ * OR a passcode demo session (EnGenie public entry). Returns a denial
+ * NextResponse, or null if allowed.
+ */
+async function gateAskOrDemo(): Promise<NextResponse | null> {
+  const c = await cookies();
+  if (await isValidDemoToken(c.get(DEMO_COOKIE)?.value)) return null;
+  return gate("ask.use");
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -31,7 +44,7 @@ interface AskRequest {
  * Returns list of available personas.
  */
 export async function GET() {
-  const denied = await gate("ask.use");
+  const denied = await gateAskOrDemo();
   if (denied) return denied;
   const personas = await listPersonas();
 
@@ -141,7 +154,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
  * RAG endpoint with SSE streaming: embed question -> vector search -> stream LLM answer with sources.
  */
 export async function POST(request: Request) {
-  const denied = await gate("ask.use");
+  const denied = await gateAskOrDemo();
   if (denied) return denied;
   const body = (await request.json()) as AskRequest;
   const { question, source_type, product_line, taxonomy, provider = "gemini-3.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;

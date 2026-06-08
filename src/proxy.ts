@@ -17,20 +17,35 @@
 
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 
 // Routes accessible without a session.
-const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/"];
+// /demo/ is the passcode-gated EnGenie surface — the page renders the
+// passcode prompt itself (EngenieGate), so the page route is public.
+// /api/demo-auth verifies the passcode and issues the demo cookie.
+const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/"];
+const PUBLIC_EXACT_PATHS = ["/api/demo-auth"];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/sync", "/api/cron"];
+// APIs the demo needs, reachable with a valid demo cookie (no Google login).
+// Kept tight: only the read + ask endpoints the EnGenie UI calls.
+const DEMO_API_PREFIXES = ["/api/ask", "/api/settings/providers"];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))) return true;
+  if (PUBLIC_EXACT_PATHS.includes(pathname)) return true;
   if (
     SERVICE_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
   ) {
     return true;
   }
   return false;
+}
+
+function isDemoApi(pathname: string): boolean {
+  return DEMO_API_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
 }
 
 export async function proxy(request: NextRequest) {
@@ -85,8 +100,17 @@ export async function proxy(request: NextRequest) {
       return response;
     }
 
-    // Not signed in → redirect to sign-in, preserving the destination.
+    // Not signed in with Google. Before redirecting, allow demo-permitted
+    // APIs through if the request carries a valid passcode demo cookie —
+    // this is how external (non-account) users reach /api/ask from the
+    // EnGenie demo. The handlers re-verify the cookie too (defense in depth).
     if (!user) {
+      if (
+        isDemoApi(pathname) &&
+        (await isValidDemoToken(request.cookies.get(DEMO_COOKIE)?.value))
+      ) {
+        return response;
+      }
       const signInUrl = new URL("/auth/sign-in", request.url);
       if (pathname !== "/") {
         signInUrl.searchParams.set("next", pathname + request.nextUrl.search);
