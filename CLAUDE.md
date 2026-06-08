@@ -1,8 +1,9 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-05-14 (Perf: Vercel function region → Tokyo to match
-> Supabase + parallelized page query waterfalls; spec-label locale stale-state
-> fix; per-locale default QR URL update)
+> Last updated: 2026-06-09 (Ask chat UX overhaul: shared useChatStream /
+> useStickToBottom / CodeBlock engine across desktop panel + EnGenie demo;
+> ChatGPT-grade typography, stop/regenerate, structured-answer prompt;
+> docs/ask-chat-ux-spec.md added)
 
 ## Project Overview
 
@@ -89,9 +90,14 @@ src/
         whitelist/[email]/route.ts    # DELETE pending invite
   middleware/proxy
     src/proxy.ts                      # Next.js 16 proxy (formerly middleware) — refresh session + auth gate
+  hooks/
+    use-chat-stream.ts                  # SHARED Ask 串流引擎（messages/loading/status + SSE + abort + regenerate）。ask-chat 與 engenie-chat 共用
+    use-stick-to-bottom.ts              # SHARED 智慧自動捲動（貼底才跟 + 回到底部鈕）
   components/
     layout/navbar.tsx, solution-sidebar.tsx, main-shell.tsx, user-menu.tsx
-    ask/ask-chat.tsx                    # Chat UI + citations (http external OR /wifi-regulation/* internal)
+    chat/code-block.tsx                 # SHARED 程式碼區塊（語言標籤 + 複製 + hljs 高亮）— react-markdown 的 pre override
+    ask/ask-chat.tsx                    # 桌機 Ask panel（.ask-markdown 樣式、inline 引用 tooltip、對話歷史、Persona/Profile/Model 選擇器）
+    demo/engenie-chat.tsx               # EnGenie demo 聊天（prose 樣式、隱藏 inline 引用、EngenieMark 頭像）
     knowledge/
       knowledge-base.tsx                # Source cards + per-row Sync/Edit, TaxonomyBadges
       taxonomy-picker.tsx               # Cascading Solution > Product Line > Model multi-select
@@ -363,6 +369,15 @@ pointers so you know it exists:
   `text-embedding-3-small` weakness on CJK query → EN chunk matching
 - **3 Personas × 4 User Profiles** configurable in Settings
 
+### 兩個聊天介面共用同一個串流引擎（重要）
+
+有**兩個** Ask 聊天 surface，但**行為共用、外觀分流**：
+- `components/ask/ask-chat.tsx` — 桌機/網頁 panel（內部、工具感、inline 引用、對話歷史）
+- `components/demo/engenie-chat.tsx` — `/demo/ask`（對外 passcode + iOS PWA、溫暖紙感、隱藏 inline 引用）
+
+**串流核心只有一份**：`hooks/use-chat-stream.ts`（`useChatStream`）擁有 messages/loading/loadingStatus、rAF 批次串流、停止(AbortController)、重新生成、最終解析，回傳 referentially-stable 的 `submit`/`stop`/`regenerate`（可直接傳給 memoized 訊息列）。配 `hooks/use-stick-to-bottom.ts`（貼底才跟，距底 80px 閾值）+ `components/chat/code-block.tsx`（語言標籤+複製+hljs 高亮，當 react-markdown 的 `pre`）。**改串流行為只改 hook，兩版同步生效；新增聊天 surface 一律複用這三個檔，不要再複製串流邏輯**。回答結構由 `/api/ask` 的 FINAL OUTPUT CONTRACT 強制（開門見山、表格比較、粗體型號、語言對齊）。完整規範見 [`docs/ask-chat-ux-spec.md`](docs/ask-chat-ux-spec.md)（HTML 好讀版 `public/docs/ask-chat-ux-spec.html`，服務於 `/docs/ask-chat-ux-spec.html`）。
+- 桌機 markdown 樣式 = `globals.css` 的 `.ask-markdown`（15px/1.75，inline code 用 `:not(pre) > code` 才套）；demo = Tailwind `prose`（需 `@tailwindcss/typography` plugin）。`@import "highlight.js/styles/github-dark.css"` 提供 code token 配色
+
 ## Current Status
 
 功能清單詳見 [README.md](README.md)。
@@ -437,5 +452,6 @@ npm run lint   # ESLint check
 
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25（早期特定 feature 的踩雷紀錄）
 - [`docs/rag-context.md`](docs/rag-context.md) — Ask SpecHub / RAG 完整架構
+- [`docs/ask-chat-ux-spec.md`](docs/ask-chat-ux-spec.md) — Ask 聊天互動規範（兩介面共用引擎、動態效果、格式樣式、回答契約；給 RD/PM 參考。HTML 版 `public/docs/ask-chat-ux-spec.html`）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知流程
 - [`public/docs/drive-folder-and-naming-rules.html`](public/docs/drive-folder-and-naming-rules.html) — Drive 資料夾結構、檔名規則、Detail Specs 填寫規則
