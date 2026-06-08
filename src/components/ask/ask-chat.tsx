@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
-import Link from "next/link";
+import { useState, useRef, useEffect, useCallback, memo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
 interface Source {
   title: string;
@@ -357,6 +356,135 @@ function parseFollowUps(text: string): { answer: string; followUps: string[] } {
   return { answer: answerPart, followUps: followUps.slice(0, 3) };
 }
 
+/* ─── AI message avatar (the little node icon beside each reply) ─── */
+function AskAvatar() {
+  return (
+    <div className="h-6 w-6 rounded-full bg-engenius-blue/10 flex items-center justify-center">
+      <svg className="h-3.5 w-3.5 text-engenius-blue" viewBox="0 0 48 48" fill="none">
+        <circle cx="24" cy="24" r="6" fill="currentColor" opacity="0.9" />
+        <circle cx="24" cy="7" r="2.5" fill="currentColor" opacity="0.5" />
+        <circle cx="24" cy="41" r="2.5" fill="currentColor" opacity="0.5" />
+        <circle cx="7" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
+        <circle cx="41" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
+        <line x1="24" y1="15" x2="24" y2="8" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+        <line x1="24" y1="33" x2="24" y2="40" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+        <line x1="15" y1="24" x2="8" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+        <line x1="33" y1="24" x2="40" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+        <path d="M36 10 L37.5 13.5 L41 15 L37.5 16.5 L36 20 L34.5 16.5 L31 15 L34.5 13.5 Z" fill="currentColor" opacity="0.6" />
+      </svg>
+    </div>
+  );
+}
+
+/* ─── Memoized message row ─── */
+/* Memoized so settled messages don't re-render on every streaming frame —
+   only the streaming message (whose `message` identity changes) re-renders. */
+const AskMessage = memo(function AskMessage({
+  message,
+  isLast,
+  compact,
+  loadingStatus,
+  onFollowUp,
+}: {
+  message: Message;
+  isLast: boolean;
+  compact: boolean;
+  loadingStatus: "searching" | "generating" | null;
+  onFollowUp: (q: string) => void;
+}) {
+  const [copied, setCopied] = useState(false);
+
+  if (message.role === "user") {
+    return (
+      <div className="flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-300">
+        <div className={`rounded-2xl rounded-br-md px-4 py-2.5 bg-engenius-blue text-white text-[15px] leading-relaxed ${compact ? "max-w-[90%]" : "max-w-[80%]"}`}>
+          {message.content}
+        </div>
+      </div>
+    );
+  }
+
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch { /* ignore */ }
+  }
+
+  const thinking = !message.content && message.isStreaming;
+
+  return (
+    <div className="flex gap-2.5 group/msg animate-in fade-in duration-300">
+      <div className="flex-shrink-0 mt-0.5">
+        <AskAvatar />
+      </div>
+      <div className="flex-1 min-w-0">
+        {message.content ? (
+          <div className="ask-markdown max-w-[46rem]">
+            <MarkdownWithCitations content={message.content} sources={message.sources} />
+            {message.isStreaming && (
+              <span className="inline-block w-[3px] h-[1.05em] translate-y-[0.15em] bg-engenius-blue/70 animate-pulse ml-0.5 rounded-[1px]" />
+            )}
+          </div>
+        ) : thinking ? (
+          <div className="flex items-center gap-2.5 py-1.5">
+            <span className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
+            <span className="text-xs text-muted-foreground/70">
+              {loadingStatus === "generating" ? "整理回覆中…" : "搜尋相關資料中…"}
+            </span>
+          </div>
+        ) : null}
+
+        {/* Reference list */}
+        {!message.isStreaming && message.sources && message.sources.length > 0 && (
+          <ReferenceList sources={message.sources} />
+        )}
+
+        {/* Action bar: copy + provider */}
+        {!message.isStreaming && message.content && (
+          <div className="mt-2 pt-1.5 flex items-center gap-1.5">
+            <button
+              onClick={handleCopy}
+              className="text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+              title="Copy"
+            >
+              {copied ? (
+                <svg className="h-3.5 w-3.5 text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 6L9 17l-5-5" />
+                </svg>
+              ) : (
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                  <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </svg>
+              )}
+            </button>
+            {message.provider && (
+              <span className="ml-auto text-xs text-muted-foreground/30">via {message.provider}</span>
+            )}
+          </div>
+        )}
+
+        {/* Follow-up questions (last message only) */}
+        {!message.isStreaming && message.followUps && message.followUps.length > 0 && isLast && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {message.followUps.map((q, qi) => (
+              <button
+                key={qi}
+                onClick={() => onFollowUp(q)}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-all"
+              >
+                {q}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+});
+
 /* ─── Main AskChat component ─── */
 export interface AskChatProps {
   /** Compact mode for panel usage */
@@ -377,8 +505,26 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [welcomeSubtitle, setWelcomeSubtitle] = useState<string | null>(null);
   const [welcomeDescription, setWelcomeDescription] = useState<string | null>(null);
   const [customQuestions, setCustomQuestions] = useState<string[] | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const { ref: scrollRef, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([messages, loading]);
+
+  // rAF-batched streaming: accumulate chunks in a ref, flush to state once per
+  // frame (mirrors the demo) so streaming doesn't re-render the list per token.
+  const pendingContentRef = useRef("");
+  const rafIdRef = useRef<number | null>(null);
+  const scheduleFlush = useCallback(() => {
+    if (rafIdRef.current !== null) return;
+    rafIdRef.current = requestAnimationFrame(() => {
+      rafIdRef.current = null;
+      const content = pendingContentRef.current;
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last?.role === "assistant") updated[updated.length - 1] = { ...last, content };
+        return updated;
+      });
+    });
+  }, []);
 
   // Session state
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -427,9 +573,18 @@ export function AskChat({ compact = false }: AskChatProps) {
 
   useEffect(() => { fetchSessions(); }, [fetchSessions]);
 
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, loading]);
+  // Cancel any pending streaming flush on unmount.
+  useEffect(() => () => {
+    if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+  }, []);
+
+  // Auto-grow the input textarea up to a cap (mirrors the demo).
+  const autosize = useCallback(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, compact ? 120 : 160) + "px";
+  }, [compact]);
 
   const saveSession = useCallback(async (msgs: Message[]) => {
     if (msgs.length === 0) return;
@@ -462,10 +617,13 @@ export function AskChat({ compact = false }: AskChatProps) {
     const q = (question ?? input).trim();
     if (!q || loading) return;
     setInput("");
+    requestAnimationFrame(autosize);
     const userMsg: Message = { role: "user", content: q };
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setLoading(true);
+    setLoadingStatus("searching");
+    pendingContentRef.current = "";
 
     // Create a placeholder assistant message for streaming
     const assistantMsg: Message = { role: "assistant", content: "", isStreaming: true };
@@ -519,15 +677,8 @@ export function AskChat({ compact = false }: AskChatProps) {
             }
             if (event.type === "chunk") {
               fullContent += event.content;
-              // Update the assistant message in-place
-              setMessages((prev) => {
-                const updated = [...prev];
-                const last = updated[updated.length - 1];
-                if (last?.role === "assistant") {
-                  updated[updated.length - 1] = { ...last, content: fullContent };
-                }
-                return updated;
-              });
+              pendingContentRef.current = fullContent;
+              scheduleFlush();
             } else if (event.type === "sources") {
               streamSources = event.sources ?? [];
             } else if (event.type === "metadata") {
@@ -540,6 +691,9 @@ export function AskChat({ compact = false }: AskChatProps) {
           }
         }
       }
+
+      // Final flush — cancel any pending rAF; final state is committed below.
+      if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
 
       // Parse follow-ups from the text (after --- separator)
       const { answer, followUps: parsedFollowUps } = parseFollowUps(fullContent);
@@ -564,6 +718,12 @@ export function AskChat({ compact = false }: AskChatProps) {
       setLoading(false); setLoadingStatus(null);
     }
   }
+
+  // Stable callback for follow-up chips so memoized messages don't re-render
+  // every streaming frame (handleSubmit is recreated each render).
+  const submitRef = useRef<(q?: string) => void>(() => {});
+  submitRef.current = handleSubmit;
+  const handleFollowUp = useCallback((q: string) => submitRef.current(q), []);
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
@@ -902,8 +1062,9 @@ export function AskChat({ compact = false }: AskChatProps) {
 
 
         {/* Chat card */}
-        <Card className={`flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden ${compact ? "border-0 rounded-none shadow-none" : ""}`}>
-          <div ref={scrollRef} className={`flex-1 overflow-y-auto space-y-4 ${compact ? "px-5 py-3" : "px-5 py-4"}`}>
+        <Card className={`relative flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden ${compact ? "border-0 rounded-none shadow-none" : ""}`}>
+          <div className="relative flex-1 min-h-0">
+          <div ref={scrollRef} className={`h-full overflow-y-auto space-y-5 ${compact ? "px-5 py-3" : "px-5 py-4"}`}>
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <AssistantIcon size={compact ? 48 : 60} />
@@ -925,100 +1086,31 @@ export function AskChat({ compact = false }: AskChatProps) {
               </div>
             ) : (
               messages.map((msg, i) => (
-                <div key={i} className={msg.role === "user" ? "flex justify-end" : ""}>
-                  {msg.role === "user" ? (
-                    <div className={`rounded-xl px-4 py-2.5 bg-engenius-blue text-white text-sm leading-relaxed ${compact ? "max-w-[90%]" : "max-w-[80%]"}`}>
-                      {msg.content}
-                    </div>
-                  ) : (
-                    <div className="flex gap-2.5 text-sm leading-relaxed group/msg">
-                      {/* AI avatar */}
-                      <div className="flex-shrink-0 mt-0.5">
-                        <div className="h-6 w-6 rounded-full bg-engenius-blue/10 flex items-center justify-center">
-                          <svg className="h-3.5 w-3.5 text-engenius-blue" viewBox="0 0 48 48" fill="none">
-                            <circle cx="24" cy="24" r="6" fill="currentColor" opacity="0.9" />
-                            <circle cx="24" cy="7" r="2.5" fill="currentColor" opacity="0.5" />
-                            <circle cx="24" cy="41" r="2.5" fill="currentColor" opacity="0.5" />
-                            <circle cx="7" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
-                            <circle cx="41" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
-                            <line x1="24" y1="15" x2="24" y2="8" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-                            <line x1="24" y1="33" x2="24" y2="40" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-                            <line x1="15" y1="24" x2="8" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-                            <line x1="33" y1="24" x2="40" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-                            <path d="M36 10 L37.5 13.5 L41 15 L37.5 16.5 L36 20 L34.5 16.5 L31 15 L34.5 13.5 Z" fill="currentColor" opacity="0.6" />
-                          </svg>
-                        </div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                      <div className="ask-markdown">
-                        <MarkdownWithCitations content={msg.content} sources={msg.sources} />
-                        {msg.isStreaming && (
-                          <span className="inline-block w-2 h-4 bg-engenius-blue/60 animate-pulse ml-0.5 rounded-sm" />
-                        )}
-                      </div>
-
-                      {/* Reference list (replaces old source badges) */}
-                      {!msg.isStreaming && msg.sources && msg.sources.length > 0 && (
-                        <ReferenceList sources={msg.sources} />
-                      )}
-
-                      {/* Action bar: copy + provider */}
-                      {!msg.isStreaming && (
-                        <div className="mt-2 pt-1.5 flex items-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              navigator.clipboard.writeText(msg.content);
-                              const el = document.getElementById(`copy-icon-${i}`);
-                              if (el) { el.setAttribute("data-copied", "true"); setTimeout(() => el.removeAttribute("data-copied"), 1500); }
-                            }}
-                            id={`copy-icon-${i}`}
-                            className="group/copy text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
-                            title="Copy"
-                          >
-                            <svg className="h-3.5 w-3.5 group-data-[copied]/copy:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                              <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
-                            </svg>
-                            <svg className="h-3.5 w-3.5 hidden group-data-[copied]/copy:block text-emerald-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M20 6L9 17l-5-5" />
-                            </svg>
-                          </button>
-                          {msg.provider && (
-                            <span className="ml-auto text-xs text-muted-foreground/30">via {msg.provider}</span>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Follow-up questions */}
-                      {!msg.isStreaming && msg.followUps && msg.followUps.length > 0 && i === messages.length - 1 && (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {msg.followUps.map((q, qi) => (
-                            <button
-                              key={qi}
-                              onClick={() => handleSubmit(q)}
-                              className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 hover:border-border transition-all"
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      </div>
-                    </div>
-                  )}
-                </div>
+                <AskMessage
+                  key={i}
+                  message={msg}
+                  isLast={i === messages.length - 1}
+                  compact={compact}
+                  loadingStatus={msg.isStreaming ? loadingStatus : null}
+                  onFollowUp={handleFollowUp}
+                />
               ))
             )}
+          </div>
 
-            {/* Loading state — shows current phase */}
-            {loading && messages[messages.length - 1]?.content === "" && (
-              <div className="flex items-center gap-2.5 py-2 pl-9">
-                <div className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
-                <span className="text-xs text-muted-foreground/70">
-                  {loadingStatus === "generating" ? "整理回覆中..." : "搜尋相關資料中..."}
-                </span>
-              </div>
-            )}
+          {/* Scroll-to-bottom button */}
+          {!isAtBottom && !isEmpty && (
+            <button
+              onClick={() => scrollToBottom()}
+              className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex h-8 w-8 items-center justify-center rounded-full border bg-background/95 text-muted-foreground shadow-md backdrop-blur transition-colors hover:text-foreground animate-in fade-in zoom-in duration-200"
+              title="Scroll to latest"
+              aria-label="Scroll to latest"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 5v14M5 12l7 7 7-7" />
+              </svg>
+            </button>
+          )}
           </div>
 
           {/* Input area */}
@@ -1086,10 +1178,10 @@ export function AskChat({ compact = false }: AskChatProps) {
               })}
             </div>
             <div className="relative">
-              <textarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={handleKeyDown}
+              <textarea ref={inputRef} value={input} onChange={(e) => { setInput(e.target.value); autosize(); }} onKeyDown={handleKeyDown}
                 placeholder="Ask, search, or explain..."
-                rows={compact ? 2 : 2}
-                className="w-full resize-none rounded-xl border border-input bg-background px-4 pt-3 pb-10 text-sm shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/20 focus:border-engenius-blue/30"
+                rows={2}
+                className="w-full resize-none overflow-y-auto rounded-xl border border-input bg-background px-4 pt-3 pb-10 text-[15px] shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/20 focus:border-engenius-blue/30"
                 style={{ minHeight: compact ? 72 : 80, maxHeight: compact ? 120 : 160 }}
               />
               <div className="absolute bottom-2.5 left-3 right-3 flex items-center justify-between">

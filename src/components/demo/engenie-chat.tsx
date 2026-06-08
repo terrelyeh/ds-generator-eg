@@ -4,6 +4,7 @@ import { memo, useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { EngenieMark } from "./engenie-mark";
+import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 
 const markdownComponents: Components = {
   // Wrap tables in a horizontal-scroll container so wide comparison
@@ -64,8 +65,8 @@ export function EngenieChat({
   // ("searching" → "generating") so the demo shows the same live status
   // ("搜尋相關資料中…" / "整理回覆中…") instead of a silent spinner.
   const [loadingStatus, setLoadingStatus] = useState<"searching" | "generating" | null>(null);
-  const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const { ref: scrollRef, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([messages, loading]);
 
   // rAF-batched streaming: accumulate chunks in a ref, flush to state once per frame
   const pendingContentRef = useRef<string>("");
@@ -92,13 +93,6 @@ export function EngenieChat({
       if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
     };
   }, []);
-
-  useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
-    });
-  }, [messages, loading]);
 
   useEffect(() => {
     const t = setTimeout(() => textareaRef.current?.focus(), 120);
@@ -225,7 +219,8 @@ export function EngenieChat({
 
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto">
+      <div className="relative flex-1 min-h-0">
+      <div ref={scrollRef} className="h-full overflow-y-auto">
         {isEmpty ? (
           <div className="flex h-full flex-col items-center justify-center px-6 pb-8">
             <EngenieMark size={56} />
@@ -273,6 +268,20 @@ export function EngenieChat({
             })}
           </div>
         )}
+      </div>
+
+      {/* Scroll-to-bottom button */}
+      {!isAtBottom && !isEmpty && (
+        <button
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex h-9 w-9 items-center justify-center rounded-full border border-black/[0.08] bg-white text-engenius-dark/70 shadow-[0_2px_12px_-2px_rgba(0,0,0,0.12)] transition-all hover:text-engenius-dark"
+          aria-label="Scroll to latest"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M12 5v14M5 12l7 7 7-7" />
+          </svg>
+        </button>
+      )}
       </div>
 
       {/* Input bar */}
