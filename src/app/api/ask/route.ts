@@ -92,18 +92,18 @@ interface MatchedDoc {
 
 // Model ID mapping
 const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string }> = {
-  // Claude
-  "claude-opus": { fn: "claude", model: "claude-opus-4-6-20250514" },
-  "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-6-20250514" },
+  // Claude (dateless IDs are pinned snapshots from the 4.6 generation on)
+  "claude-opus": { fn: "claude", model: "claude-opus-4-8" },
+  "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-6" },
   "claude-haiku": { fn: "claude", model: "claude-haiku-4-5-20251001" },
   // OpenAI
-  "gpt-4o": { fn: "openai", model: "gpt-4o" },
-  "gpt-4o-mini": { fn: "openai", model: "gpt-4o-mini" },
-  "gpt-4.1-nano": { fn: "openai", model: "gpt-4.1-nano" },
-  // Gemini
-  "gemini-2.5-pro": { fn: "gemini", model: "gemini-2.5-pro" },
-  "gemini-2.5-flash": { fn: "gemini", model: "gemini-2.5-flash" },
-  "gemini-2.5-flash-lite": { fn: "gemini", model: "gemini-2.5-flash-lite" },
+  "gpt-5.5": { fn: "openai", model: "gpt-5.5" },
+  "gpt-5.4-mini": { fn: "openai", model: "gpt-5.4-mini" },
+  "gpt-5.4-nano": { fn: "openai", model: "gpt-5.4-nano" },
+  // Gemini (3.x — 3.5 Flash is GA frontier; 3.1 Pro is still preview-only)
+  "gemini-3.1-pro": { fn: "gemini", model: "gemini-3.1-pro-preview" },
+  "gemini-3.5-flash": { fn: "gemini", model: "gemini-3.5-flash" },
+  "gemini-3.1-flash-lite": { fn: "gemini", model: "gemini-3.1-flash-lite" },
 };
 
 /**
@@ -144,7 +144,7 @@ export async function POST(request: Request) {
   const denied = await gate("ask.use");
   if (denied) return denied;
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, taxonomy, provider = "gemini-2.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
+  const { question, source_type, product_line, taxonomy, provider = "gemini-3.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
 
   // If taxonomy filter is active, we pre-filter post-RPC (pgvector containment
   // can't express the "empty product_lines = applies to all lines" inheritance
@@ -437,7 +437,7 @@ IMPORTANT formatting rules:
 
         // Step 5: Stream LLM response
         sendEvent(JSON.stringify({ type: "status", status: "generating" }));
-        const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-2.5-flash" };
+        const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-3.5-flash" };
 
         switch (mapped.fn) {
           case "claude":

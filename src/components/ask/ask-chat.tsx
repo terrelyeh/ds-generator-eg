@@ -64,11 +64,11 @@ const PROVIDERS: ProviderGroup[] = [
   {
     id: "gemini",
     label: "Gemini",
-    checkKeys: ["gemini-2.5-pro"],
+    checkKeys: ["gemini-3.5-flash"],
     models: [
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tier: "Strongest" },
-      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tier: "Mainstream" },
-      { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite", tier: "Best CP" },
+      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", tier: "Strongest" },
+      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", tier: "Mainstream" },
+      { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite", tier: "Best CP" },
     ],
   },
   {
@@ -86,9 +86,9 @@ const PROVIDERS: ProviderGroup[] = [
     label: "Claude",
     checkKeys: ["claude-sonnet", "claude-opus"],
     models: [
-      { id: "claude-opus", label: "Claude Opus 4.6", tier: "Strongest" },
+      { id: "claude-opus", label: "Claude Opus 4.8", tier: "Strongest" },
       { id: "claude-sonnet", label: "Claude Sonnet 4.6", tier: "Mainstream" },
-      { id: "claude-haiku", label: "Claude Haiku 3.5", tier: "Best CP" },
+      { id: "claude-haiku", label: "Claude Haiku 4.5", tier: "Best CP" },
     ],
   },
 ];
@@ -368,7 +368,7 @@ export function AskChat({ compact = false }: AskChatProps) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState<"searching" | "generating" | null>(null);
-  const [provider, setProvider] = useState("gemini-2.5-flash");
+  const [provider, setProvider] = useState("gemini-3.5-flash");
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
@@ -583,7 +583,7 @@ export function AskChat({ compact = false }: AskChatProps) {
         setMessages(msgs);
         setSessionId(id);
         setPersona(data.session.persona || "default");
-        setProvider(data.session.provider || "gemini-2.5-flash");
+        setProvider(data.session.provider || "gemini-3.5-flash");
         setShowSidebar(false);
         setShowSessionList(false);
       }

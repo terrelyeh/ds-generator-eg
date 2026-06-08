@@ -123,7 +123,7 @@ export async function POST(request: Request) {
     .insert({
       title: title || "New conversation",
       persona: persona || "default",
-      provider: provider || "gemini-2.5-flash",
+      provider: provider || "gemini-3.5-flash",
       messages: messages || [],
       message_count: messages?.length || 0,
       user_id: "anonymous",
