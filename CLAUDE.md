@@ -1,8 +1,8 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-05-13 (Pagination calibration round 2: locale-aware row
-> height for CJK + CATEGORY_HEADER 18→22 + EN row 22→23; L3 Switch Drive
-> folder ID swap fix)
+> Last updated: 2026-05-14 (Perf: Vercel function region → Tokyo to match
+> Supabase + parallelized page query waterfalls; spec-label locale stale-state
+> fix; per-locale default QR URL update)
 
 ## Project Overview
 
@@ -405,6 +405,8 @@ npm run lint   # ESLint check
 
 - Vercel 自動部署 main branch
 - Vercel Cron: `vercel.json` → `"0 1 * * *"` (每天 09:00 台灣時間)
+- **⚠️ Vercel function region 釘在 `hnd1`（東京）** — `vercel.json` 的 `"regions": ["hnd1"]`。**不要改掉**。Supabase 在 `ap-northeast-1`（東京），function 一定要同區，否則每個 DB query 跨太平洋 ~170ms（之前預設 iad1 美東，一個頁面 3-5 個 query 浪費 600-900ms）。同區後 ~5ms。改 region 前先確認 Supabase 也在哪
+- **Server component query 並行化** — 高流量頁面（product detail、dashboard）已用 `Promise.all` 把互相獨立的 Supabase query 並行（避免 waterfall）。加新 query 前先想「這個 query 依賴前面的結果嗎？不依賴就塞進同一個 Promise.all」
 - 需要的 env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CRON_SECRET`
 - AI 翻譯 env vars（可選，也可在 Settings 頁面設定）：`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`
 
