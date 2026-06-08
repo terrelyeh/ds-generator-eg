@@ -46,6 +46,21 @@ interface ChangeLogRow {
   changes_summary: string;
 }
 
+interface SpecSectionRow {
+  id: string;
+  product_id: string;
+  category: string;
+  sort_order: number;
+  spec_items: { label: string; value: string; sort_order: number }[];
+}
+
+interface TranslationRow {
+  product_id: string;
+  locale: string;
+  overview: string | null;
+  features: string[] | null;
+}
+
 /** Return a shallow-copied LayoutReport with every status forced to "ok".
  *  Used when the PM has manually acknowledged this locale's overflow —
  *  heuristics were flagging it red but the PM says the rendered PDF is
@@ -121,46 +136,47 @@ export default async function SolutionDashboardPage({
         .order("model_name")) as { data: ProductRow[] | null })
     : { data: [] as ProductRow[] };
 
-  // Fetch radio pattern assets (for AP)
+  // radioAssets / changeLogs / specSectionRows / translationRows all depend
+  // only on the product list (productIds / productModelNames) and are
+  // independent of each other — run them in ONE parallel batch instead of
+  // four sequential round trips. Biggest dashboard latency win.
   const productIds = (products ?? []).map((p) => p.id);
-  const { data: radioAssets } = productIds.length
-    ? ((await supabase
-        .from("image_assets")
-        .select("product_id, label, status")
-        .eq("image_type", "radio_pattern")
-        .in("product_id", productIds)) as { data: RadioPatternAsset[] | null })
-    : { data: [] as RadioPatternAsset[] };
+  const productModelNames = (products ?? []).map((p) => p.model_name);
 
-  // Fetch latest change_log per product (for "Last Changed" column)
-  const { data: changeLogs } = productIds.length
-    ? ((await supabase
-        .from("change_logs")
-        .select("product_id, edited_at, edited_by, changes_summary")
-        .not("product_id", "is", null)
-        .in("product_id", productIds)
-        .order("created_at", { ascending: false })) as {
-        data: ChangeLogRow[] | null;
-      })
-    : { data: [] as ChangeLogRow[] };
-
-  // Fetch spec_sections + their items per product. Used both for SP
-  // readiness and for layout-overflow pre-checking.
-  const { data: specSectionRows } = productIds.length
-    ? ((await supabase
-        .from("spec_sections")
-        .select("id, product_id, category, sort_order, spec_items (label, value, sort_order)")
-        .in("product_id", productIds)) as {
-        data:
-          | {
-              id: string;
-              product_id: string;
-              category: string;
-              sort_order: number;
-              spec_items: { label: string; value: string; sort_order: number }[];
-            }[]
-          | null;
-      })
-    : { data: [] };
+  const [
+    { data: radioAssets },
+    { data: changeLogs },
+    { data: specSectionRows },
+    { data: translationRows },
+  ] = await Promise.all([
+    productIds.length
+      ? (supabase
+          .from("image_assets")
+          .select("product_id, label, status")
+          .eq("image_type", "radio_pattern")
+          .in("product_id", productIds) as unknown as Promise<{ data: RadioPatternAsset[] | null }>)
+      : Promise.resolve({ data: [] as RadioPatternAsset[] }),
+    productIds.length
+      ? (supabase
+          .from("change_logs")
+          .select("product_id, edited_at, edited_by, changes_summary")
+          .not("product_id", "is", null)
+          .in("product_id", productIds)
+          .order("created_at", { ascending: false }) as unknown as Promise<{ data: ChangeLogRow[] | null }>)
+      : Promise.resolve({ data: [] as ChangeLogRow[] }),
+    productIds.length
+      ? (supabase
+          .from("spec_sections")
+          .select("id, product_id, category, sort_order, spec_items (label, value, sort_order)")
+          .in("product_id", productIds) as unknown as Promise<{ data: SpecSectionRow[] | null }>)
+      : Promise.resolve({ data: [] as SpecSectionRow[] }),
+    productModelNames.length
+      ? (supabase
+          .from("product_translations" as "products")
+          .select("product_id, locale, overview, features")
+          .in("product_id", productModelNames) as unknown as Promise<{ data: TranslationRow[] | null }>)
+      : Promise.resolve({ data: [] as TranslationRow[] }),
+  ]);
 
   // Build map: product_id → sorted spec sections (for layout estimation)
   const specMap = new Map<
@@ -192,27 +208,9 @@ export default async function SolutionDashboardPage({
     specCountMap.set(pid, sections.length);
   }
 
-  // Fetch translation locales per product (model_name based).
-  // Also pulls overview + features per locale so the layout red/green
-  // check can run against CJK content, not just English.
-  const productModelNames = (products ?? []).map((p) => p.model_name);
-  const { data: translationRows } = productModelNames.length
-    ? ((await supabase
-        .from("product_translations" as "products")
-        .select("product_id, locale, overview, features")
-        .in("product_id", productModelNames)) as {
-        data:
-          | { product_id: string; locale: string; overview: string | null; features: string[] | null }[]
-          | null;
-      })
-    : {
-        data: [] as {
-          product_id: string;
-          locale: string;
-          overview: string | null;
-          features: string[] | null;
-        }[],
-      };
+  // translationRows was fetched in the parallel batch above (model_name
+  // based; pulls overview + features per locale so the layout red/green
+  // check can run against CJK content, not just English).
 
   // Build map: model_name → locales[]
   const translationLocalesMap = new Map<string, string[]>();

@@ -35,22 +35,32 @@ export default async function ProductPage({
 }) {
   const { model } = await params;
   const supabase = await createClient();
-  const user = await getCurrentUser();
-  const role = user?.role ?? "viewer";
 
-  const { data } = await supabase
-    .from("products")
-    .select(
-      `
+  // These three are independent — run in parallel instead of waterfalling.
+  // getCurrentUser uses its own client; the product fetch keys on
+  // model_name; product_translations.product_id is the model_name string
+  // (not products.id), so it doesn't need the product row first.
+  const [user, { data }, { data: translationData }] = await Promise.all([
+    getCurrentUser(),
+    supabase
+      .from("products")
+      .select(
+        `
       *,
       product_lines (*),
       spec_sections (*, spec_items (*)),
       hardware_labels (*),
       image_assets (*)
     `
-    )
-    .eq("model_name", model)
-    .single();
+      )
+      .eq("model_name", model)
+      .single(),
+    supabase
+      .from("product_translations")
+      .select("*")
+      .eq("product_id", model) as unknown as Promise<{ data: ProductTranslation[] | null }>,
+  ]);
+  const role = user?.role ?? "viewer";
 
   const product = data as ProductQueryRow | null;
 
@@ -79,17 +89,14 @@ export default async function ProductPage({
     image_assets: product.image_assets ?? [],
   };
 
+  // versions needs product.id (only known after the product fetch above),
+  // so it stays as a second round trip. translationData was already
+  // fetched in parallel above.
   const { data: versionData } = await supabase
     .from("versions")
     .select("*")
     .eq("product_id", product.id)
     .order("generated_at", { ascending: false }) as { data: Version[] | null };
-
-  // Fetch existing translations for this product
-  const { data: translationData } = (await supabase
-    .from("product_translations")
-    .select("*")
-    .eq("product_id", model)) as { data: ProductTranslation[] | null };
 
   // Pre-compute layout overflow estimate for English + every enabled
   // translation locale. Each locale uses its own typography metrics
