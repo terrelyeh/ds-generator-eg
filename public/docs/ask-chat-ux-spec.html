@@ -216,7 +216,8 @@
 
 <!-- Live preview -->
 <h2 id="preview" style="border-bottom-color: var(--blue)">實機預覽 &nbsp;<span style="font-size:14px;font-weight:500;color:var(--gray-light)">Live Demo &middot; /demo/ask</span></h2>
-<p>下方直接嵌入對外的 EnGenie demo。輸入 demo 通行碼後即可實際互動，對照本規範描述的<strong>串流、即時狀態、停止、重新生成、排版與動畫</strong>。</p>
+<p>下方直接嵌入對外的 EnGenie demo（真實互動，非示意圖）。對照本規範描述的<strong>串流、即時狀態、停止、重新生成、排版與動畫</strong>。</p>
+<div id="previewBanner"></div>
 <div class="preview-wrap">
   <div class="phone">
     <iframe id="demoFrame" title="EnGenie demo (/demo/ask)" loading="lazy"></iframe>
@@ -230,24 +231,35 @@
       <li>回答下方的 <strong>Copy / Retry</strong>、來源 references、延伸問題</li>
       <li>往上捲讀歷史不會被拉回；右下出現「↓ 回到最新」</li>
     </ul>
-    <a class="open-btn" id="demoOpen" target="_blank" rel="noopener">在新分頁開啟 ↗</a>
+    <a class="open-btn" id="demoOpen" target="_blank" rel="noopener">在新分頁開啟實際操作 ↗</a>
     <p class="preview-note">
       需輸入 demo 通行碼（向 Terrel 索取，恕不寫入文件）。<br>
-      若預覽區空白：可能是尚未部署、或瀏覽器擋了跨來源 iframe — 改用上方「在新分頁開啟」即可。
+      <strong>線上版</strong>（與 demo 同網域）：框內可直接輸入通行碼、正常對話。<br>
+      <strong>本機開檔（file://）</strong>：因瀏覽器跨來源限制，框內輸入通行碼會出現 <code>405</code>，請改用上方「在新分頁開啟」。
     </p>
   </div>
 </div>
 <script>
   (function () {
-    // Same-origin relative path when this doc is served from the app;
-    // absolute production URL when opened as a local file (file://).
+    // Same-origin relative path when this doc is served from the app (in-frame
+    // chat works); absolute production URL when opened as a local file
+    // (file://) — that path is cross-origin so the passcode POST hits a CORS
+    // preflight (405) and only "open in new tab" actually works.
     var rel = "/demo/ask";
     var abs = "https://ds-generator-eg.vercel.app/demo/ask";
-    var url = location.protocol === "file:" ? abs : rel;
+    var isLocal = location.protocol === "file:";
+    var url = isLocal ? abs : rel;
     var f = document.getElementById("demoFrame");
     var a = document.getElementById("demoOpen");
     if (f) f.src = url;
     if (a) a.href = url;
+    if (isLocal) {
+      var b = document.getElementById("previewBanner");
+      if (b) {
+        b.className = "callout callout-warn";
+        b.innerHTML = "<strong>本機預覽模式：</strong>你正用本機檔案（file://）開啟，下方 iframe 為跨來源，框內<strong>無法輸入通行碼</strong>（會出現 405）。請點下方「在新分頁開啟實際操作」，或改看部署後的線上版 <code>…/docs/ask-chat-ux-spec.html</code>（同網域，框內可直接互動）。";
+      }
+    }
   })();
 </script>
 
