@@ -2,6 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+/* Typography plugin — powers the `prose` classes used by the EnGenie
+   demo chat (engenie-chat) and the WiFi regulation markdown viewer.
+   Without it, `prose`/`prose-*` are no-ops and markdown renders bare
+   (no list bullets, heading sizes, table borders, paragraph spacing).
+   The main Ask panel uses its own `.ask-markdown` CSS instead. */
+@plugin "@tailwindcss/typography";
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
