@@ -20,11 +20,13 @@ export interface TranslateProvider {
   ) => Promise<string>;
 }
 
+// NOTE: ids are stable internal keys (registry + availability wiring);
+// only display names track the actual model generation.
 export const AVAILABLE_PROVIDERS = [
   { id: "claude-sonnet", name: "Claude Sonnet 4.6" },
-  { id: "claude-opus", name: "Claude Opus 4.6" },
-  { id: "gpt-4o", name: "GPT-4o" },
-  { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
+  { id: "claude-opus", name: "Claude Opus 4.8" },
+  { id: "gpt-4o", name: "GPT-5.5" },
+  { id: "gemini-2.5-pro", name: "Gemini 3.1 Pro" },
 ] as const;
 
 export type ProviderId = (typeof AVAILABLE_PROVIDERS)[number]["id"];

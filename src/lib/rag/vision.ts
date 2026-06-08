@@ -5,7 +5,7 @@
 
 import { getApiKey, API_KEY_MAP } from "@/lib/settings";
 
-const VISION_MODEL = "gemini-2.5-flash";
+const VISION_MODEL = "gemini-3.5-flash";
 
 const DESCRIPTION_PROMPT = `You are describing an image from EnGenius networking product documentation.
 Your description will be embedded into a vector database for semantic search.

@@ -1,15 +1,18 @@
 import { getApiKey } from "@/lib/settings";
 import type { TranslateProvider } from "../types";
 
+// id stays "gemini-2.5-pro" — internal registry/availability key wired
+// through translate/index.ts, types.ts, and /api/settings/providers.
+// Only the display name + actual model id in the URL change.
 export const gemini25Pro: TranslateProvider = {
   id: "gemini-2.5-pro",
-  name: "Gemini 2.5 Pro",
+  name: "Gemini 3.1 Pro",
   async translate(systemPrompt: string, userMessage: string): Promise<string> {
     const apiKey = await getApiKey("google_ai_api_key", "GOOGLE_AI_API_KEY");
     if (!apiKey) throw new Error("Google AI API Key 尚未設定。請到 Settings 頁面輸入。");
 
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-pro-preview:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },

@@ -10,7 +10,7 @@ function createClaudeProvider(modelId: string, name: string): TranslateProvider 
       if (!apiKey) throw new Error("Anthropic API Key 尚未設定。請到 Settings 頁面輸入。");
 
       const model = modelId === "claude-opus"
-        ? "claude-opus-4-6"
+        ? "claude-opus-4-8"
         : "claude-sonnet-4-6";
 
       const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -42,4 +42,4 @@ function createClaudeProvider(modelId: string, name: string): TranslateProvider 
 }
 
 export const claudeSonnet = createClaudeProvider("claude-sonnet", "Claude Sonnet 4.6");
-export const claudeOpus = createClaudeProvider("claude-opus", "Claude Opus 4.6");
+export const claudeOpus = createClaudeProvider("claude-opus", "Claude Opus 4.8");
