@@ -1,0 +1,25 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#29b6f6"/>
+      <stop offset="1" stop-color="#0288d1"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="55%">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="215" r="250" fill="url(#glow)"/>
+  <!-- main sparkle (EnGenie mark) scaled from 56-unit viewBox, centered -->
+  <g transform="translate(46,62.5) scale(7.5)">
+    <path d="M28 6 L31.4 22.4 L47 25.8 L31.4 29.2 L28 45.6 L24.6 29.2 L9 25.8 L24.6 22.4 Z"
+          fill="#ffffff"/>
+    <circle cx="28" cy="25.8" r="2.8" fill="#0288d1"/>
+  </g>
+  <!-- accent sparkles -->
+  <path d="M398 96 L404 116 L424 122 L404 128 L398 148 L392 128 L372 122 L392 116 Z"
+        fill="#ffffff" opacity="0.55"/>
+  <path d="M120 360 L124.5 374 L138 378.5 L124.5 383 L120 397 L115.5 383 L102 378.5 L115.5 374 Z"
+        fill="#ffffff" opacity="0.45"/>
+</svg>

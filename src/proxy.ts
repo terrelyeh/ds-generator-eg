@@ -113,6 +113,6 @@ export const config = {
      * /api routes — auth gating applies there too. Routes that need to
      * bypass (cron) are handled in `isPublic()` above.
      */
-    "/((?!_next/static|_next/image|favicon.ico|logo/|images/|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|map)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|logo/|images/|robots.txt|sitemap.xml|.*\\.(?:svg|png|jpg|jpeg|gif|webp|css|js|map|webmanifest)$).*)",
   ],
 };
