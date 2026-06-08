@@ -60,6 +60,10 @@ export function EngenieChat({
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  // Mirrors the main Ask panel: surface the backend's progress phase
+  // ("searching" → "generating") so the demo shows the same live status
+  // ("搜尋相關資料中…" / "整理回覆中…") instead of a silent spinner.
+  const [loadingStatus, setLoadingStatus] = useState<"searching" | "generating" | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -118,6 +122,7 @@ export function EngenieChat({
     const history = [...messages, userMsg];
     setMessages([...history, { role: "assistant", content: "", isStreaming: true }]);
     setLoading(true);
+    setLoadingStatus("searching");
     pendingContentRef.current = "";
 
     try {
@@ -161,7 +166,9 @@ export function EngenieChat({
           if (payload === "[DONE]") continue;
           try {
             const event = JSON.parse(payload);
-            if (event.type === "chunk") {
+            if (event.type === "status") {
+              setLoadingStatus(event.status);
+            } else if (event.type === "chunk") {
               fullContent += event.content;
               pendingContentRef.current = fullContent;
               scheduleFlush();
@@ -202,6 +209,7 @@ export function EngenieChat({
       ]);
     } finally {
       setLoading(false);
+      setLoadingStatus(null);
     }
   }
 
@@ -258,6 +266,7 @@ export function EngenieChat({
                 <MessageBubble
                   key={i}
                   message={m}
+                  loadingStatus={m.isStreaming ? loadingStatus : null}
                   onFollowUp={isLastAssistant ? handleSubmit : undefined}
                 />
               );
@@ -306,9 +315,11 @@ export function EngenieChat({
 /* ─── Message bubble (memoized to prevent re-render of prior messages during streaming) ─── */
 const MessageBubble = memo(function MessageBubble({
   message,
+  loadingStatus = null,
   onFollowUp,
 }: {
   message: Message;
+  loadingStatus?: "searching" | "generating" | null;
   onFollowUp?: (q: string) => void;
 }) {
   if (message.role === "user") {
@@ -325,43 +336,88 @@ const MessageBubble = memo(function MessageBubble({
   const cursor =
     "[&_p:last-child]:after:ml-1 [&_p:last-child]:after:inline-block [&_p:last-child]:after:h-[0.95em] [&_p:last-child]:after:w-[2.5px] [&_p:last-child]:after:translate-y-[0.15em] [&_p:last-child]:after:rounded-[1px] [&_p:last-child]:after:bg-engenius-dark/70 [&_p:last-child]:after:animate-pulse [&_p:last-child]:after:content-['']";
 
+  const thinking = !message.content && message.isStreaming;
+
+  // Assistant message: EnGenie mark on the left (pulses while thinking),
+  // answer / live status on the right — mirrors the main Ask panel.
   return (
-    <div className="mb-8 w-full">
-      <div
-        className={`prose max-w-none text-[16.5px] text-engenius-dark
-          prose-p:my-6 prose-p:leading-[1.85]
-          prose-headings:mb-4 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
-          prose-h1:mt-10 prose-h1:text-[23px]
-          prose-h2:mt-9 prose-h2:text-[20px]
-          prose-h3:mt-7 prose-h3:text-[17.5px]
-          prose-strong:font-semibold prose-strong:text-engenius-dark
-          prose-ul:my-6 prose-ul:pl-5 prose-ol:my-6 prose-ol:pl-5 prose-li:my-2.5 prose-li:leading-[1.8] prose-li:marker:text-engenius-dark/40
-          prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[14px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
-          prose-pre:bg-black/[0.04] prose-pre:text-[13.5px] prose-pre:border prose-pre:border-black/[0.06]
-          prose-blockquote:border-l-2 prose-blockquote:border-engenius-blue/40 prose-blockquote:pl-4 prose-blockquote:text-engenius-dark/80 prose-blockquote:font-normal prose-blockquote:not-italic
-          prose-hr:my-8 prose-hr:border-black/[0.08]
-          prose-table:text-[14px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
-          ${message.isStreaming && message.content ? cursor : ""}`}
-      >
-        {message.content ? (
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {stripCitations(message.content)}
-          </ReactMarkdown>
-        ) : message.isStreaming ? (
-          <ThinkingOrb />
-        ) : null}
+    <div className="mb-8 flex w-full gap-3">
+      <div className="flex-shrink-0 pt-0.5">
+        <EngenieAvatar thinking={thinking} />
       </div>
-      {!message.isStreaming && message.content && (
-        <>
-          <ActionBar content={message.content} sources={message.sources} />
-          {onFollowUp && message.followUps && message.followUps.length > 0 && (
-            <FollowUpList questions={message.followUps} onClick={onFollowUp} />
-          )}
-        </>
-      )}
+      <div className="min-w-0 flex-1">
+        {message.content ? (
+          <div
+            className={`prose max-w-none text-[16.5px] text-engenius-dark
+              prose-p:my-6 prose-p:leading-[1.85]
+              prose-headings:mb-4 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
+              prose-h1:mt-10 prose-h1:text-[23px]
+              prose-h2:mt-9 prose-h2:text-[20px]
+              prose-h3:mt-7 prose-h3:text-[17.5px]
+              prose-strong:font-semibold prose-strong:text-engenius-dark
+              prose-ul:my-6 prose-ul:pl-5 prose-ol:my-6 prose-ol:pl-5 prose-li:my-2.5 prose-li:leading-[1.8] prose-li:marker:text-engenius-dark/40
+              prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[14px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
+              prose-pre:bg-black/[0.04] prose-pre:text-[13.5px] prose-pre:border prose-pre:border-black/[0.06]
+              prose-blockquote:border-l-2 prose-blockquote:border-engenius-blue/40 prose-blockquote:pl-4 prose-blockquote:text-engenius-dark/80 prose-blockquote:font-normal prose-blockquote:not-italic
+              prose-hr:my-8 prose-hr:border-black/[0.08]
+              prose-table:text-[14px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
+              ${message.isStreaming ? cursor : ""}`}
+          >
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {stripCitations(message.content)}
+            </ReactMarkdown>
+          </div>
+        ) : thinking ? (
+          <div className="flex items-center gap-2 py-2">
+            <span className="inline-flex gap-1">
+              <span className="h-1.5 w-1.5 rounded-full bg-engenius-dark/30 animate-[engenieDot_1.2s_ease-in-out_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-engenius-dark/30 animate-[engenieDot_1.2s_ease-in-out_0.2s_infinite]" />
+              <span className="h-1.5 w-1.5 rounded-full bg-engenius-dark/30 animate-[engenieDot_1.2s_ease-in-out_0.4s_infinite]" />
+            </span>
+            <span className="text-[13px] text-engenius-gray">
+              {loadingStatus === "generating" ? "整理回覆中…" : "搜尋相關資料中…"}
+            </span>
+            <style>{`
+              @keyframes engenieDot {
+                0%, 100% { opacity: 0.25; transform: translateY(0); }
+                50% { opacity: 0.9; transform: translateY(-2px); }
+              }
+            `}</style>
+          </div>
+        ) : null}
+        {!message.isStreaming && message.content && (
+          <>
+            <ActionBar content={message.content} sources={message.sources} />
+            {onFollowUp && message.followUps && message.followUps.length > 0 && (
+              <FollowUpList questions={message.followUps} onClick={onFollowUp} />
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 });
+
+/* ─── Small EnGenie avatar shown beside each assistant reply ─── */
+function EngenieAvatar({ thinking }: { thinking?: boolean }) {
+  return (
+    <div
+      style={
+        thinking
+          ? { animation: "engenieThink 1.6s ease-in-out infinite", transformOrigin: "center", display: "inline-block" }
+          : undefined
+      }
+    >
+      <EngenieMark size={20} />
+      <style>{`
+        @keyframes engenieThink {
+          0%, 100% { transform: scale(0.9); opacity: 0.75; }
+          50% { transform: scale(1.06); opacity: 1; }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 function FollowUpList({
   questions,
@@ -491,21 +547,6 @@ function ActionBar({ content, sources }: { content: string; sources?: Source[] }
   );
 }
 
-function ThinkingOrb() {
-  return (
-    <div className="py-1">
-      <div style={{ animation: "engenieThink 1.6s ease-in-out infinite", transformOrigin: "center", display: "inline-block" }}>
-        <EngenieMark size={32} />
-      </div>
-      <style>{`
-        @keyframes engenieThink {
-          0%, 100% { transform: scale(0.88); opacity: 0.7; }
-          50% { transform: scale(1.08); opacity: 1; }
-        }
-      `}</style>
-    </div>
-  );
-}
 
 function stripCitations(text: string): string {
   return text.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, "");
