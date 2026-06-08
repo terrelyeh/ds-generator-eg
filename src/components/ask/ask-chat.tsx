@@ -74,11 +74,11 @@ const PROVIDERS: ProviderGroup[] = [
   {
     id: "openai",
     label: "GPT",
-    checkKeys: ["gpt-4o"],
+    checkKeys: ["gpt-5.5"],
     models: [
-      { id: "gpt-4o", label: "GPT-4o", tier: "Strongest" },
-      { id: "gpt-4o-mini", label: "GPT-4o Mini", tier: "Mainstream" },
-      { id: "gpt-4.1-nano", label: "GPT-4.1 Nano", tier: "Best CP" },
+      { id: "gpt-5.5", label: "GPT-5.5", tier: "Strongest" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", tier: "Mainstream" },
+      { id: "gpt-5.4-nano", label: "GPT-5.4 Nano", tier: "Best CP" },
     ],
   },
   {

@@ -6,7 +6,7 @@ import { EngenieDrawer, type PersonaOption, type ProfileOption } from "./engenie
 
 export function EngenieShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [provider, setProvider] = useState("gemini-2.5-flash");
+  const [provider, setProvider] = useState("gemini-3.5-flash");
   const [persona, setPersona] = useState("default");
   const [profile, setProfile] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);

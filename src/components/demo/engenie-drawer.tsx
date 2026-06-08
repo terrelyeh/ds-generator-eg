@@ -18,22 +18,22 @@ const MODEL_GROUPS: ModelGroup[] = [
   {
     label: "Gemini",
     models: [
-      { id: "gemini-2.5-pro", label: "Gemini 2.5 Pro", tier: "Strongest" },
-      { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash", tier: "Fast" },
+      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", tier: "Strongest" },
+      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", tier: "Fast" },
     ],
   },
   {
     label: "Claude",
     models: [
-      { id: "claude-opus", label: "Claude Opus 4.6", tier: "Strongest" },
+      { id: "claude-opus", label: "Claude Opus 4.8", tier: "Strongest" },
       { id: "claude-sonnet", label: "Claude Sonnet 4.6", tier: "Balanced" },
     ],
   },
   {
     label: "GPT",
     models: [
-      { id: "gpt-4o", label: "GPT-4o", tier: "Strongest" },
-      { id: "gpt-4o-mini", label: "GPT-4o Mini", tier: "Fast" },
+      { id: "gpt-5.5", label: "GPT-5.5", tier: "Strongest" },
+      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", tier: "Fast" },
     ],
   },
 ];
