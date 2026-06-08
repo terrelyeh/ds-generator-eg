@@ -45,12 +45,14 @@ export function AskPanel({ isOpen, onClose }: AskPanelProps) {
         aria-hidden="true"
       />
 
-      {/* Panel — overlays navbar */}
+      {/* Panel — overlays navbar.
+          Desktop width +25% (600→750 / 42vw→52.5vw / 520→650).
+          95vw guard keeps it from overflowing on phones. */}
       <div
         className={`fixed top-0 right-0 bottom-0 z-50 flex flex-col bg-background border-l shadow-2xl transition-transform duration-300 ease-in-out ${
           isOpen ? "translate-x-0" : "translate-x-full"
         }`}
-        style={{ width: "min(600px, max(42vw, 520px))" }}
+        style={{ width: "min(95vw, 750px, max(52.5vw, 650px))" }}
       >
         {/* Panel header — brand title bar */}
         <div className="flex items-center justify-between px-5 py-3 border-b flex-shrink-0">
