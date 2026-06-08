@@ -370,7 +370,7 @@ const AskMessage = memo(function AskMessage({
   if (message.role === "user") {
     return (
       <div className="flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-300">
-        <div className={`rounded-2xl rounded-br-md px-4 py-2.5 bg-engenius-blue text-white text-[15px] leading-relaxed ${compact ? "max-w-[90%]" : "max-w-[80%]"}`}>
+        <div className={`rounded-2xl rounded-br-md px-4 py-2.5 bg-engenius-blue text-white text-[14px] leading-relaxed ${compact ? "max-w-[90%]" : "max-w-[80%]"}`}>
           {message.content}
         </div>
       </div>

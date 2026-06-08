@@ -225,7 +225,7 @@ const MessageBubble = memo(function MessageBubble({
   if (message.role === "user") {
     return (
       <div className="mb-8 flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-300">
-        <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-3 text-[16px] leading-[1.65] text-engenius-dark">
+        <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-3 text-[15px] leading-[1.6] text-engenius-dark">
           {message.content}
         </div>
       </div>
@@ -248,19 +248,19 @@ const MessageBubble = memo(function MessageBubble({
       <div className="min-w-0 flex-1">
         {message.content ? (
           <div
-            className={`prose max-w-none text-[16.5px] text-engenius-dark
-              prose-p:my-6 prose-p:leading-[1.85]
-              prose-headings:mb-4 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
-              prose-h1:mt-10 prose-h1:text-[23px]
-              prose-h2:mt-9 prose-h2:text-[20px]
-              prose-h3:mt-7 prose-h3:text-[17.5px]
+            className={`prose max-w-none text-[15px] text-engenius-dark
+              prose-p:my-5 prose-p:leading-[1.75]
+              prose-headings:mb-3.5 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
+              prose-h1:mt-9 prose-h1:text-[21px]
+              prose-h2:mt-8 prose-h2:text-[18px]
+              prose-h3:mt-6 prose-h3:text-[16px]
               prose-strong:font-semibold prose-strong:text-engenius-dark
-              prose-ul:my-6 prose-ul:pl-5 prose-ol:my-6 prose-ol:pl-5 prose-li:my-2.5 prose-li:leading-[1.8] prose-li:marker:text-engenius-dark/40
-              prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[14px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
-              prose-pre:bg-black/[0.04] prose-pre:text-[13.5px] prose-pre:border prose-pre:border-black/[0.06]
+              prose-ul:my-5 prose-ul:pl-5 prose-ol:my-5 prose-ol:pl-5 prose-li:my-2 prose-li:leading-[1.7] prose-li:marker:text-engenius-dark/40
+              prose-code:rounded prose-code:bg-black/[0.05] prose-code:px-1.5 prose-code:py-0.5 prose-code:text-[13px] prose-code:font-normal prose-code:before:content-none prose-code:after:content-none
+              prose-pre:bg-black/[0.04] prose-pre:text-[13px] prose-pre:border prose-pre:border-black/[0.06]
               prose-blockquote:border-l-2 prose-blockquote:border-engenius-blue/40 prose-blockquote:pl-4 prose-blockquote:text-engenius-dark/80 prose-blockquote:font-normal prose-blockquote:not-italic
-              prose-hr:my-8 prose-hr:border-black/[0.08]
-              prose-table:text-[14px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
+              prose-hr:my-7 prose-hr:border-black/[0.08]
+              prose-table:text-[13.5px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
               ${message.isStreaming ? cursor : ""}`}
           >
             <ReactMarkdown

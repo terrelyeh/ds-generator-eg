@@ -150,28 +150,28 @@
    feel (generous line-height + spacing) so the desktop panel and the demo read
    the same. Closer to ChatGPT/Claude: 15px body, 1.75 line-height, airy blocks. */
 .ask-markdown {
-  font-size: 15px;
-  line-height: 1.75;
+  font-size: 14px;
+  line-height: 1.7;
   color: var(--color-engenius-dark);
 }
-.ask-markdown p { margin: 14px 0; }
+.ask-markdown p { margin: 12px 0; }
 .ask-markdown > :first-child { margin-top: 0; }
 .ask-markdown > :last-child { margin-bottom: 0; }
 .ask-markdown strong { font-weight: 600; }
 .ask-markdown ul, .ask-markdown ol { margin: 14px 0; padding-left: 24px; }
 .ask-markdown ul { list-style: disc; }
 .ask-markdown ol { list-style: decimal; }
-.ask-markdown li { margin: 6px 0; line-height: 1.7; }
+.ask-markdown li { margin: 5px 0; line-height: 1.65; }
 .ask-markdown li::marker { color: rgba(35,31,32,0.4); }
 .ask-markdown li > ul, .ask-markdown li > ol { margin: 6px 0; }
 .ask-markdown h1, .ask-markdown h2, .ask-markdown h3, .ask-markdown h4 {
   font-weight: 600; line-height: 1.3; margin: 22px 0 10px; letter-spacing: -0.01em;
 }
-.ask-markdown h1 { font-size: 19px; }
-.ask-markdown h2 { font-size: 17px; }
-.ask-markdown h3 { font-size: 15.5px; }
+.ask-markdown h1 { font-size: 17px; }
+.ask-markdown h2 { font-size: 15.5px; }
+.ask-markdown h3 { font-size: 14.5px; }
 .ask-markdown :not(pre) > code {
-  background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; font-size: 13px;
+  background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; font-size: 12.5px;
 }
 .ask-markdown pre { background: #1e293b; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 14px 0; font-size: 13px; line-height: 1.6; }
 .ask-markdown pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
@@ -189,7 +189,7 @@
   color: #c9d1d9; font-size: inherit;
   font-family: var(--font-mono, ui-monospace, monospace);
 }
-.ask-markdown table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 14px; }
+.ask-markdown table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
 .ask-markdown th {
   background: rgba(0,0,0,0.04); text-align: left; padding: 8px 12px;
   font-weight: 600; border: 1px solid rgba(0,0,0,0.1);
