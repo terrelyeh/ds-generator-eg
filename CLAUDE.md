@@ -350,6 +350,8 @@ npm run lint   # ESLint check
 
 53. **新產品線設定容易把 `drive_folder_id` 跟 `ds_images_folder_id` 填反** — PM 給的 Drive folder URL 如果是 DS Images 子資料夾，填到 `drive_folder_id` 會讓 PDF 上傳失敗 + 圖片進錯位置。L3 Switch 上線時就踩過：DB 寫 `drive_folder_id = NULL` + `ds_images_folder_id = <root_id>`，正確應該是 root → drive_folder_id、DS Images → ds_images_folder_id。設定新產品線時必須跟 PM 確認**這兩個欄位指的是不同層級**：drive_folder_id 是「產品線」資料夾、ds_images_folder_id 是裡面的「DS Images」子資料夾
 
+54. **`useChatStream` 組 POST body 一律用 `...getParams()` 展開，別寫死欄位清單** — `hooks/use-chat-stream.ts` 曾把 body 寫死成 `{question, provider, persona, profile, history}`，但 `getParams()` 回傳的額外欄位（`workspace`、`userKey`、未來的 `taxonomy` 等）因此**被靜默丟掉**，從沒送到 `/api/ask`。後果：每個 workspace 提問都掉進 `else`（一般 RBAC `gateAskOrDemo()`）→ 無痕未登入回 `401 "Unauthorized — sign in required"`，且 scope/BYOK/persona 鎖定全被繞過。**最毒的是它「看起來能用」**——GET（welcome/personas 走 query param）正常、頁面照載、輸入框能打字，只有真的送出才壞；又因為 `ask_workspace_touch` 在 workspace 分支內才呼叫，`request_count` 一直是 0（debug 時這就是「POST 從沒進過 workspace 分支」的鐵證）。Phase 1 當時只用登入的 admin 測（else 分支剛好 gate 通過）才沒抓到。修法：`const params = getParams(); body: {question, ...params, history}`，並把 `getParams` 型別加 index signature，讓新增欄位不用再動 hook。**新增任何 per-request 欄位時，確認它真的進了 body，別只加進 getParams。**
+
 ## 詳細文件
 
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25（早期特定 feature 的踩雷紀錄）
