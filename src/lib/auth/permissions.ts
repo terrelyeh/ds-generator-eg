@@ -53,6 +53,7 @@ export type Permission =
   | "settings.edit_glossary"
   | "settings.edit_personas"
   | "settings.edit_api_keys"
+  | "settings.manage_api_access"
   // user management
   | "users.view"
   | "users.invite"
@@ -85,6 +86,7 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   "settings.edit_glossary": ["admin", "editor"],
   "settings.edit_personas": ["admin"],
   "settings.edit_api_keys": ["admin"],
+  "settings.manage_api_access": ["admin"],
 
   "users.view": ["admin"],
   "users.invite": ["admin"],

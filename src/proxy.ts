@@ -23,7 +23,10 @@ import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 // /demo/ is the passcode-gated EnGenie surface — the page renders the
 // passcode prompt itself (EngenieGate), so the page route is public.
 // /api/demo-auth verifies the passcode and issues the demo cookie.
-const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/"];
+// /api/v1/ is the external (department) API surface — it authenticates via its
+// own API-key Bearer check and returns JSON errors, so it must bypass the
+// session redirect (an HTML 307 to sign-in would break machine clients).
+const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/"];
 const PUBLIC_EXACT_PATHS = ["/api/demo-auth"];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/sync", "/api/cron"];

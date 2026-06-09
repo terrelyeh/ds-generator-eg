@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { generateEmbedding } from "@/lib/rag/embeddings";
 import { getApiKey, API_KEY_MAP } from "@/lib/settings";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
-import { matchesTaxonomyFilter, extractTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
+import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
+import { retrieveDocuments } from "@/lib/rag/retrieve";
 import { gate } from "@/lib/auth/session";
 import { cookies } from "next/headers";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
@@ -158,17 +158,6 @@ export async function GET() {
   });
 }
 
-interface MatchedDoc {
-  id: string;
-  source_type: string;
-  source_id: string;
-  source_url: string | null;
-  title: string;
-  content: string;
-  metadata: Record<string, unknown>;
-  similarity: number;
-}
-
 // Model ID mapping
 const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string }> = {
   // Claude (dateless IDs are pinned snapshots from the 4.6 generation on)
@@ -225,67 +214,12 @@ export async function POST(request: Request) {
   const body = (await request.json()) as AskRequest;
   const { question, source_type, product_line, taxonomy, provider = "gemini-3.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
 
-  // If taxonomy filter is active, we pre-filter post-RPC (pgvector containment
-  // can't express the "empty product_lines = applies to all lines" inheritance
-  // rule), so fetch a larger candidate pool then narrow it.
-  const hasTaxonomyFilter = !!(taxonomy && (taxonomy.solution || (taxonomy.product_lines && taxonomy.product_lines.length > 0) || (taxonomy.models && taxonomy.models.length > 0)));
-
-  // Detect model-number mentions in the question (e.g., "ECW536", "ECC500",
-  // "EVS1004D"). When present, we fetch more candidates and re-rank so the
-  // chunks that literally mention that model float to the top — necessary
-  // because text-embedding-3-small has weaker cross-lingual performance so
-  // a Chinese query may not match an English model-specific chunk tightly.
-  const modelMentionRegex = /\b(E[CWS][CWS]?\d{2,4}[A-Z]?|EVS\d{2,4}[A-Z]?|ESG\d{2,4}[A-Z]?|EOC\d{2,4}[A-Z]?|EAP\d{2,4}[A-Z]?|ECP\d{2,4}[A-Z]?)\b/gi;
-  const mentionedModels = [...new Set((question.match(modelMentionRegex) ?? []).map((m) => m.toUpperCase()))];
-  const hasModelMention = mentionedModels.length > 0;
-
-  // Detect country mentions (for wifi_regulation). Covers common markets in
-  // English, Chinese, and ISO alpha-2 codes. Same cross-lingual embedding
-  // issue as models — a Chinese query "台灣 5GHz 法規" won't reliably match
-  // the English "Taiwan (TW)" chunk without a literal-match boost.
-  const COUNTRY_ALIASES: Record<string, string[]> = {
-    TW: ["Taiwan", "台灣", "台湾", "TW"],
-    JP: ["Japan", "日本", "JP"],
-    US: ["USA", "United States", "America", "美國", "美国", "US"],
-    GB: ["UK", "United Kingdom", "Britain", "英國", "英国", "GB"],
-    DE: ["Germany", "德國", "德国", "DE"],
-    FR: ["France", "法國", "法国", "FR"],
-    CN: ["China", "中國", "中国", "PRC", "CN"],
-    HK: ["Hong Kong", "香港", "HK"],
-    SG: ["Singapore", "新加坡", "SG"],
-    MY: ["Malaysia", "馬來西亞", "马来西亚", "MY"],
-    TH: ["Thailand", "泰國", "泰国", "TH"],
-    ID: ["Indonesia", "印尼", "ID"],
-    PH: ["Philippines", "菲律賓", "菲律宾", "PH"],
-    VN: ["Vietnam", "越南", "VN"],
-    KR: ["Korea", "South Korea", "韓國", "韩国", "KR"],
-    IN: ["India", "印度", "IN"],
-    AU: ["Australia", "澳洲", "澳大利亞", "澳大利亚", "AU"],
-    CA: ["Canada", "加拿大", "CA"],
-    MX: ["Mexico", "墨西哥", "MX"],
-    BR: ["Brazil", "巴西", "BR"],
-  };
-  const mentionedCountries: string[] = [];
-  for (const [code, aliases] of Object.entries(COUNTRY_ALIASES)) {
-    for (const alias of aliases) {
-      // Use word boundary for English/ISO codes, plain substring for CJK
-      const isCjk = /[\u4e00-\u9fff]/.test(alias);
-      const regex = isCjk
-        ? new RegExp(alias, "i")
-        : new RegExp(`\\b${alias.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&")}\\b`, "i");
-      if (regex.test(question)) {
-        mentionedCountries.push(code);
-        break;
-      }
-    }
-  }
-  const hasCountryMention = mentionedCountries.length > 0;
-
-  const matchCount = hasTaxonomyFilter || hasModelMention || hasCountryMention ? 40 : 12;
-
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
   }
+  // Retrieval (embed → vector search → taxonomy filter → cross-lingual
+  // supplements → re-rank → trim) lives in the shared lib/rag/retrieve.ts so
+  // the chat and the Search API stay in lockstep.
 
   // Create SSE stream
   const encoder = new TextEncoder();
@@ -299,139 +233,27 @@ export async function POST(request: Request) {
         // Immediately signal that we're working
         sendEvent(JSON.stringify({ type: "status", status: "searching" }));
 
-        // Step 1: Build search query
+        // Step 1+2: Retrieve scoped, ranked chunks via the shared core.
         const recentHistory = history.slice(-20);
-        const searchQuery = recentHistory.length > 0
-          ? `${recentHistory.map((m) => m.content).join("\n")}\n${question}`
-          : question;
-
-        const queryEmbedding = await generateEmbedding(
-          searchQuery.length > 8000 ? searchQuery.slice(-8000) : searchQuery
-        );
-
-        // Step 2: Vector search in Supabase
         const supabase = createAdminClient();
-        const filterMetadata = product_line ? JSON.stringify({ product_line }) : null;
 
-        const { data: matches, error: searchError } = await supabase.rpc(
-          "match_documents",
-          {
-            query_embedding: JSON.stringify(queryEmbedding),
-            match_count: matchCount,
-            match_threshold: 0.3,
-            filter_source_type: source_type || null,
-            filter_metadata: filterMetadata,
-          }
-        ) as { data: MatchedDoc[] | null; error: unknown };
-
-        if (searchError) {
+        let docs;
+        try {
+          docs = await retrieveDocuments({
+            question,
+            history,
+            sourceType: source_type,
+            productLine: product_line,
+            taxonomy,
+            finalLimit: 12,
+          });
+        } catch (searchError) {
           console.error("Vector search error:", searchError);
           sendEvent(JSON.stringify({ type: "chunk", content: "Error: Search failed. " + String(searchError) }));
           sendEvent("[DONE]");
           controller.close();
           return;
         }
-
-        let docs = matches ?? [];
-
-        // App-level taxonomy filter — enforces solution-level inheritance rule
-        // (docs with empty product_lines belong to the whole solution so they
-        // should also be included when filtering by a specific product_line).
-        if (hasTaxonomyFilter && taxonomy) {
-          docs = docs.filter((d) => matchesTaxonomyFilter(extractTaxonomy(d.metadata), taxonomy));
-        }
-
-        // Model-mention supplementary lookup — text-embedding-3-small has weak
-        // cross-lingual performance so a Chinese query like "ECW536 橘色 LED"
-        // may not surface the English-language model-specific chunk. When the
-        // question names one or more models explicitly, run a direct content
-        // ILIKE lookup and merge those chunks into the candidate pool, then
-        // re-rank so they float to the top.
-        // Supplementary literal-match lookups (model + country) plus re-rank.
-        // text-embedding-3-small has weak cross-lingual performance so a
-        // Chinese query may not surface the right English-language chunk via
-        // vector search alone. When the question names a model or a country,
-        // we fetch the matching chunks directly and re-rank them to the top.
-        if (hasModelMention || hasCountryMention) {
-          const existingIds = new Set(docs.map((d) => d.id));
-          const addUnique = (rows: Omit<MatchedDoc, "similarity">[] | null) => {
-            if (!rows) return;
-            for (const r of rows) {
-              if (!existingIds.has(r.id)) {
-                docs.push({ ...r, similarity: 0 });
-                existingIds.add(r.id);
-              }
-            }
-          };
-
-          if (hasModelMention && mentionedModels.length > 0) {
-            // Pass 1: pull ALL focused-table chunks matching this model (they
-            // are high-signal and we never want them cut off by a low limit).
-            for (const m of mentionedModels) {
-              const { data: focused } = await supabase
-                .from("documents" as "products")
-                .select("id, source_type, source_id, source_url, title, content, metadata")
-                .gte("chunk_index", 10000)
-                .or(`content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
-                .limit(10) as { data: Omit<MatchedDoc, "similarity">[] | null };
-              addUnique(focused);
-            }
-
-            // Pass 2: broader content match (product_spec + gitbook).
-            const orClauses = mentionedModels
-              .map((m) => `content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
-              .join(",");
-            const { data: modelMatches } = await supabase
-              .from("documents" as "products")
-              .select("id, source_type, source_id, source_url, title, content, metadata")
-              .or(orClauses)
-              .limit(30) as { data: Omit<MatchedDoc, "similarity">[] | null };
-            addUnique(modelMatches);
-          }
-
-          if (hasCountryMention) {
-            // Country-mention supplementary lookup for wifi_regulation chunks.
-            for (const code of mentionedCountries) {
-              const { data: countryChunks } = await supabase
-                .from("documents" as "products")
-                .select("id, source_type, source_id, source_url, title, content, metadata")
-                .eq("source_type", "wifi_regulation")
-                .eq("source_id", code)
-                .limit(3) as { data: Omit<MatchedDoc, "similarity">[] | null };
-              addUnique(countryChunks);
-            }
-          }
-
-          // Unified re-rank: literal model matches + focused LED bonus +
-          // country literal matches + similarity.
-          const scored = docs.map((d) => {
-            const haystack = `${d.source_id} ${d.title} ${d.content}`.toUpperCase();
-            const modelMatches = hasModelMention
-              ? mentionedModels.filter((m) => haystack.includes(m)).length
-              : 0;
-            const isFocusedLed =
-              (d.metadata?.chunk_type as string) === "focused_led_table" ? 1 : 0;
-            const countryMatch =
-              hasCountryMention &&
-              d.source_type === "wifi_regulation" &&
-              mentionedCountries.includes((d.source_id || "").toUpperCase())
-                ? 1
-                : 0;
-            return {
-              doc: d,
-              score:
-                modelMatches * 10 +
-                isFocusedLed * 5 +
-                countryMatch * 20 +
-                d.similarity,
-            };
-          });
-          scored.sort((a, b) => b.score - a.score);
-          docs = scored.map((s) => s.doc);
-        }
-
-        // Trim to final context budget
-        docs = docs.slice(0, 12);
 
         if (docs.length === 0 && recentHistory.length === 0) {
           sendEvent(JSON.stringify({ type: "chunk", content: "I couldn't find relevant product information to answer your question. Try rephrasing or asking about a specific product model." }));

@@ -67,6 +67,17 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     ),
   },
   {
+    title: "API Access (Departments)",
+    description: "Issue scoped API keys so other departments' apps can query the RAG knowledge base (Search API).",
+    href: "/settings/api-access",
+    roles: ["admin"],
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm3.293 2.293a1 1 0 011.414 0l2 2a1 1 0 010 1.414l-2 2a1 1 0 01-1.414-1.414L7.586 10 6.293 8.707a1 1 0 010-1.414zM11 12a1 1 0 100 2h2a1 1 0 100-2h-2z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
     title: "Users",
     description: "Manage who can access Product SpecHub. Invite, change roles, remove members.",
     href: "/settings/users",
