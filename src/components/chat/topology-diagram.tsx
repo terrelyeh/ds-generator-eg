@@ -3,31 +3,44 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 /**
- * Renders a network/application topology diagram from a ```topology JSON block
- * the LLM emits, using EnGenius product icons (topology_icons catalog, side-iso
- * "b" view). Layout is tiered by role (internet → gateway → switch → edge), so
- * connectors run mostly vertical/parallel. Non-product nodes (internet, client,
- * server…) fall back to built-in line shapes until real icons are uploaded.
+ * Renders a network/application topology from a ```topology JSON block the LLM
+ * emits, using EnGenius product icons (topology_icons, side-iso "b" view).
+ * Tiered by role so connectors run parallel. Supports zones (dashed group
+ * boxes) and per-link colour by speed/interface (1G/2.5G/10G/SFP/WiFi) with a
+ * legend. Non-product nodes fall back to built-in line shapes.
  */
 
 interface TopoNode { id: string; model?: string; role?: string; label?: string }
-interface TopoLink { from: string; to: string; label?: string }
-interface TopoSpec { title?: string; nodes: TopoNode[]; links?: TopoLink[] }
-
+interface TopoLink { from: string; to: string; speed?: string; type?: string }
+interface TopoZone { label?: string; nodes: string[] }
+interface TopoSpec { title?: string; nodes: TopoNode[]; links?: TopoLink[]; zones?: TopoZone[] }
 interface CatalogIcon { key: string; url: string; role: string | null; label: string | null }
 
-// role → vertical tier (lower = higher up in the diagram)
 const ROLE_TIER: Record<string, number> = {
   internet: 0, isp: 0, cloud: 0, wan: 0,
-  modem: 1, router: 1,
-  gateway: 1, firewall: 1,
+  modem: 1, router: 1, gateway: 1, firewall: 1,
   switch: 2, extender: 2, bridge: 2, nvs: 2, pdu: 2,
   ap: 3, camera: 3, server: 3,
   client: 4, phone: 4, generic: 4, device: 4,
 };
 const tierOf = (role?: string) => ROLE_TIER[(role ?? "device").toLowerCase()] ?? 4;
 
-/* ── catalog fetch (cached across all diagrams on the page) ── */
+/* link colour by speed / interface */
+const LINK_STYLES: { test: RegExp; color: string; dash?: string; label: string }[] = [
+  { test: /wifi|wireless|無線/i, color: "#94a3b8", dash: "5 4", label: "WiFi" },
+  { test: /sfp|fib(er|re)|光纖/i, color: "#059669", label: "SFP / Fiber" },
+  { test: /10\s*g/i, color: "#7c3aed", label: "10G" },
+  { test: /2\.5\s*g/i, color: "#0288d1", label: "2.5G" },
+  { test: /(^|[^0-9.])5\s*g(?!hz)/i, color: "#db2777", label: "5G" },
+  { test: /(1\s*g|gigabit|1gbe)/i, color: "#64748b", label: "1G" },
+];
+function linkStyle(l: TopoLink): { color: string; dash?: string; label: string } {
+  const s = `${l.speed ?? ""} ${l.type ?? ""}`;
+  for (const st of LINK_STYLES) if (st.test.test(s)) return st;
+  return { color: "#cbd1da", label: "" };
+}
+
+/* catalog fetch (cached) */
 let catalogPromise: Promise<CatalogIcon[]> | null = null;
 function loadCatalog(): Promise<CatalogIcon[]> {
   if (!catalogPromise) {
@@ -39,14 +52,16 @@ function loadCatalog(): Promise<CatalogIcon[]> {
   return catalogPromise;
 }
 
-/* ── geometry ── */
-const NODE_W = 156;
-const ICON_W = 96;
-const ICON_H = 64;
-const TIER_H = 156;
-const PAD = 28;
+/* geometry (compact) */
+const NODE_W = 150;
+const ICON_W = 88;
+const ICON_H = 56;
+const TIER_H = 130;
+const PAD = 24;
+const ZONE_PAD = 14;
+const LABEL_TOP = 14;   // first label line below icon
+const LINE_H = 13;
 
-/** Wrap text to <= maxLines lines of ~maxChars each (CJK hard-cuts; ellipsis if longer). */
 function wrapText(text: string, maxChars: number, maxLines: number): string[] {
   const t = (text || "").trim();
   if (!t) return [];
@@ -59,41 +74,30 @@ function wrapText(text: string, maxChars: number, maxLines: number): string[] {
     lines.push(rest.slice(0, cut).trim());
     rest = rest.slice(cut).trim();
   }
-  if (rest.length && lines.length) {
-    lines[lines.length - 1] = lines[lines.length - 1].replace(/.$/, "…");
-  }
+  if (rest.length && lines.length) lines[lines.length - 1] = lines[lines.length - 1].replace(/.$/, "…");
   return lines;
 }
-
-/** Label as a bold model line + greyer wrapped description line(s). */
 function nodeLabelLines(n: TopoNode): { t: string; b: boolean }[] {
   const label = n.label || n.model || n.role || n.id;
   if (n.model) {
-    const desc =
-      label === n.model
-        ? ""
-        : label.toUpperCase().startsWith(n.model.toUpperCase())
-          ? label.slice(n.model.length).trim()
-          : label;
-    return [{ t: n.model, b: true }, ...wrapText(desc, 13, 2).map((t) => ({ t, b: false }))];
+    const desc = label === n.model
+      ? ""
+      : label.toUpperCase().startsWith(n.model.toUpperCase()) ? label.slice(n.model.length).trim() : label;
+    return [{ t: n.model, b: true }, ...wrapText(desc, 14, 2).map((t) => ({ t, b: false }))];
   }
-  return wrapText(label, 13, 2).map((t, i) => ({ t, b: i === 0 }));
+  return wrapText(label, 14, 2).map((t, i) => ({ t, b: i === 0 }));
 }
 
 export function TopologyDiagram({ source }: { source: string }) {
   const [catalog, setCatalog] = useState<CatalogIcon[] | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
-
   useEffect(() => { loadCatalog().then(setCatalog); }, []);
 
   const spec = useMemo<TopoSpec | null>(() => {
     try {
       const s = JSON.parse(source);
-      if (!s || !Array.isArray(s.nodes)) return null;
-      return s as TopoSpec;
-    } catch {
-      return null;
-    }
+      return s && Array.isArray(s.nodes) ? (s as TopoSpec) : null;
+    } catch { return null; }
   }, [source]);
 
   const maps = useMemo(() => {
@@ -113,9 +117,8 @@ export function TopologyDiagram({ source }: { source: string }) {
       </pre>
     );
   }
-  const sp = spec; // narrowed; closures (download) need a const, not flow-narrowing
+  const sp = spec;
 
-  // Resolve icon url for a node (null → built-in fallback shape).
   function urlFor(n: TopoNode): string | null {
     if (n.model) {
       const hit = maps.byKey.get(n.model.toUpperCase());
@@ -125,26 +128,45 @@ export function TopologyDiagram({ source }: { source: string }) {
     return null;
   }
 
-  // Tiered layout.
+  // tiered layout
   const tiers = new Map<number, TopoNode[]>();
   for (const n of sp.nodes) {
     const t = tierOf(n.role);
-    if (!tiers.has(t)) tiers.set(t, []);
-    tiers.get(t)!.push(n);
+    (tiers.get(t) ?? tiers.set(t, []).get(t)!).push(n);
   }
   const tierKeys = [...tiers.keys()].sort((a, b) => a - b);
   const maxRow = Math.max(1, ...tierKeys.map((t) => tiers.get(t)!.length));
   const width = PAD * 2 + maxRow * NODE_W;
-  const height = PAD * 2 + tierKeys.length * TIER_H;
-
   const pos = new Map<string, { x: number; y: number }>();
   tierKeys.forEach((t, ti) => {
     const row = tiers.get(t)!;
-    const rowW = row.length * NODE_W;
-    const startX = (width - rowW) / 2;
-    const y = PAD + ti * TIER_H + TIER_H / 2 - 6;
+    const startX = (width - row.length * NODE_W) / 2;
+    const y = PAD + ti * TIER_H + ICON_H / 2 + 4;
     row.forEach((n, i) => pos.set(n.id, { x: startX + i * NODE_W + NODE_W / 2, y }));
   });
+
+  // legend entries actually used
+  const usedLegend = new Map<string, { color: string; dash?: string }>();
+  for (const l of sp.links ?? []) {
+    const st = linkStyle(l);
+    if (st.label) usedLegend.set(st.label, { color: st.color, dash: st.dash });
+  }
+  const legendH = usedLegend.size ? 26 : 0;
+  const height = PAD * 2 + tierKeys.length * TIER_H + legendH;
+
+  // zone boxes (computed from member positions)
+  const zoneRects = (sp.zones ?? []).map((z) => {
+    const pts = (z.nodes ?? []).map((id) => pos.get(id)).filter(Boolean) as { x: number; y: number }[];
+    if (!pts.length) return null;
+    const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+    return {
+      label: z.label,
+      x: Math.min(...xs) - ICON_W / 2 - ZONE_PAD,
+      y: Math.min(...ys) - ICON_H / 2 - ZONE_PAD - 12,
+      w: Math.max(...xs) - Math.min(...xs) + ICON_W + ZONE_PAD * 2,
+      h: Math.max(...ys) - Math.min(...ys) + ICON_H + 3 * LINE_H + ZONE_PAD * 2,
+    };
+  }).filter(Boolean) as { label?: string; x: number; y: number; w: number; h: number }[];
 
   function download() {
     const svg = svgRef.current;
@@ -161,14 +183,9 @@ export function TopologyDiagram({ source }: { source: string }) {
   return (
     <div className="chat-topology my-4 overflow-hidden rounded-xl border border-black/10 bg-white">
       <div className="flex items-center justify-between border-b border-black/[0.06] bg-black/[0.015] px-3 py-1.5">
-        <span className="text-[12px] font-semibold text-engenius-dark/70">
-          {sp.title || "Network Topology"}
-        </span>
-        <button
-          onClick={download}
-          className="inline-flex items-center gap-1 text-[11px] text-engenius-blue hover:text-engenius-blue-dark transition-colors"
-          title="Download SVG"
-        >
+        <span className="text-[12px] font-semibold text-engenius-dark/70">{sp.title || "Network Topology"}</span>
+        <button onClick={download}
+          className="inline-flex items-center gap-1 text-[11px] text-engenius-blue hover:text-engenius-blue-dark transition-colors" title="Download SVG">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
           </svg>
@@ -176,57 +193,77 @@ export function TopologyDiagram({ source }: { source: string }) {
         </button>
       </div>
       <div className="overflow-x-auto p-2">
-        <svg
-          ref={svgRef}
-          viewBox={`0 0 ${width} ${height}`}
-          width={width}
-          height={height}
-          style={{ maxWidth: "100%", height: "auto" }}
-          xmlns="http://www.w3.org/2000/svg"
-          fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
-        >
-          {/* connectors first (behind icons) — orthogonal elbows: drop below
-              the parent's label, jog horizontally at the midpoint, drop to the
-              child icon top. Sibling jogs share a midY → a clean bus. */}
+        <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} width={width} height={height}
+          style={{ maxWidth: "100%", height: "auto" }} xmlns="http://www.w3.org/2000/svg"
+          fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif">
+
+          {/* zones (background) */}
+          {zoneRects.map((z, i) => (
+            <g key={`z${i}`}>
+              <rect x={z.x} y={z.y} width={z.w} height={z.h} rx={12}
+                fill="#03a9f4" fillOpacity={0.03} stroke="#03a9f4" strokeOpacity={0.35}
+                strokeWidth={1.2} strokeDasharray="6 4" />
+              {z.label && (
+                <text x={z.x + 10} y={z.y + 15} fontSize={10.5} fontWeight={700} fill="#0288d1">{z.label}</text>
+              )}
+            </g>
+          ))}
+
+          {/* connectors (orthogonal, coloured by speed) */}
           {(sp.links ?? []).map((l, i) => {
-            const a = pos.get(l.from);
-            const b = pos.get(l.to);
+            const a = pos.get(l.from), b = pos.get(l.to);
             if (!a || !b) return null;
             const [up, dn] = a.y <= b.y ? [a, b] : [b, a];
-            const sy = up.y + ICON_H / 2 + 44; // below the upper node's label+role
-            const ey = dn.y - ICON_H / 2 - 2;  // top of the lower icon
+            const sy = up.y + ICON_H / 2 + 3 * LINE_H + 6;
+            const ey = dn.y - ICON_H / 2 - 2;
             const my = Math.round((sy + ey) / 2);
             const d = up.x === dn.x
               ? `M ${up.x} ${sy} L ${dn.x} ${ey}`
               : `M ${up.x} ${sy} L ${up.x} ${my} L ${dn.x} ${my} L ${dn.x} ${ey}`;
-            return (
-              <path key={`l${i}`} d={d} fill="none" stroke="#cbd1da"
-                strokeWidth={1.5} strokeLinejoin="round" />
-            );
+            const st = linkStyle(l);
+            return <path key={`l${i}`} d={d} fill="none" stroke={st.color} strokeWidth={1.8}
+              strokeDasharray={st.dash} strokeLinejoin="round" />;
           })}
+
           {/* nodes */}
           {sp.nodes.map((n) => {
             const p = pos.get(n.id);
             if (!p) return null;
             const url = urlFor(n);
             const lines = nodeLabelLines(n);
-            const baseY = p.y + ICON_H / 2 + 16;
+            const baseY = p.y + ICON_H / 2 + LABEL_TOP;
             return (
               <g key={n.id}>
                 {url ? (
-                  <image href={url} x={p.x - ICON_W / 2} y={p.y - ICON_H / 2}
-                    width={ICON_W} height={ICON_H} preserveAspectRatio="xMidYMid meet" />
+                  <image href={url} x={p.x - ICON_W / 2} y={p.y - ICON_H / 2} width={ICON_W} height={ICON_H} preserveAspectRatio="xMidYMid meet" />
                 ) : (
                   <FallbackShape role={n.role} cx={p.x} cy={p.y} />
                 )}
                 {lines.map((ln, i) => (
-                  <text key={i} x={p.x} y={baseY + i * 13} textAnchor="middle"
-                    fontSize={ln.b ? 11.5 : 10} fontWeight={ln.b ? 600 : 400}
-                    fill={ln.b ? "#2C3345" : "#8a93a3"}>{ln.t}</text>
+                  <text key={i} x={p.x} y={baseY + i * LINE_H} textAnchor="middle"
+                    fontSize={ln.b ? 11 : 9.5} fontWeight={ln.b ? 600 : 400} fill={ln.b ? "#2C3345" : "#8a93a3"}>{ln.t}</text>
                 ))}
               </g>
             );
           })}
+
+          {/* legend */}
+          {usedLegend.size > 0 && (() => {
+            const items = [...usedLegend.entries()];
+            const gap = 96;
+            const totalW = items.length * gap;
+            let lx = (width - totalW) / 2 + 8;
+            const ly = height - 12;
+            return items.map(([label, st]) => {
+              const x = lx; lx += gap;
+              return (
+                <g key={label}>
+                  <line x1={x} y1={ly} x2={x + 22} y2={ly} stroke={st.color} strokeWidth={2.2} strokeDasharray={st.dash} />
+                  <text x={x + 28} y={ly + 3.5} fontSize={10} fill="#6f6f6f">{label}</text>
+                </g>
+              );
+            });
+          })()}
         </svg>
       </div>
     </div>
@@ -239,34 +276,23 @@ function FallbackShape({ role, cx, cy }: { role?: string; cx: number; cy: number
   const stroke = "#6f6f6f";
   const common = { fill: "none", stroke, strokeWidth: 2, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
   if (["internet", "isp", "cloud", "wan"].includes(r)) {
-    return (
-      <path transform={`translate(${cx - 26},${cy - 16})`} {...common}
-        d="M14 30 a10 10 0 01.5 -20 a13 13 0 0124 4 a8 8 0 01-2 16 z" />
-    );
+    return <path transform={`translate(${cx - 24},${cy - 14})`} {...common} d="M13 28 a9 9 0 01.5 -18 a12 12 0 0122 4 a7 7 0 01-2 14 z" />;
   }
   if (["client", "phone", "generic", "device"].includes(r)) {
     return (
-      <g transform={`translate(${cx - 22},${cy - 16})`} {...common}>
-        <rect x="0" y="0" width="44" height="28" rx="2" />
-        <line x1="14" y1="34" x2="30" y2="34" />
-        <line x1="22" y1="28" x2="22" y2="34" />
+      <g transform={`translate(${cx - 20},${cy - 14})`} {...common}>
+        <rect x="0" y="0" width="40" height="26" rx="2" />
+        <line x1="13" y1="31" x2="27" y2="31" /><line x1="20" y1="26" x2="20" y2="31" />
       </g>
     );
   }
   if (["server", "modem", "router"].includes(r)) {
     return (
-      <g transform={`translate(${cx - 20},${cy - 18})`} {...common}>
-        <rect x="0" y="0" width="40" height="14" rx="2" />
-        <rect x="0" y="20" width="40" height="14" rx="2" />
-        <circle cx="7" cy="7" r="1.5" fill={stroke} />
-        <circle cx="7" cy="27" r="1.5" fill={stroke} />
+      <g transform={`translate(${cx - 18},${cy - 16})`} {...common}>
+        <rect x="0" y="0" width="36" height="12" rx="2" /><rect x="0" y="18" width="36" height="12" rx="2" />
+        <circle cx="6" cy="6" r="1.4" fill={stroke} /><circle cx="6" cy="24" r="1.4" fill={stroke} />
       </g>
     );
   }
-  // generic box with role initial
-  return (
-    <g transform={`translate(${cx - 20},${cy - 16})`} {...common}>
-      <rect x="0" y="0" width="40" height="32" rx="4" />
-    </g>
-  );
+  return <g transform={`translate(${cx - 18},${cy - 14})`} {...common}><rect x="0" y="0" width="36" height="28" rx="4" /></g>;
 }

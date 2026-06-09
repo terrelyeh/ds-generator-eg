@@ -33,6 +33,16 @@ async function buildTopologyHint(
   question: string,
 ): Promise<string> {
   if (!TOPOLOGY_RE.test(question)) return "";
+
+  // If the user explicitly wants a text/ASCII diagram, instruct that instead.
+  if (/ascii|文字版|純文字|text[\s-]*diagram|text[\s-]*only/i.test(question)) {
+    return `
+
+---
+
+The user asked for a TEXT / ASCII diagram. Draw the architecture as an ASCII tree inside a plain \`\`\` code block. Use English (or short) labels inside boxes so monospace alignment holds (CJK characters are double-width and break box alignment). Do NOT output a \`topology\` block.`;
+  }
+
   const { data } = (await supabase
     .from("topology_icons" as "products")
     .select("key, role")) as { data: { key: string; role: string | null }[] | null };
@@ -51,16 +61,18 @@ async function buildTopologyHint(
 
 ---
 
-DIAGRAM MODE: If a network / application topology would help answer this, ALSO output a fenced code block tagged \`topology\` with JSON of this shape:
+DIAGRAM MODE: If a network / application topology would help, output a fenced \`topology\` block with JSON of this shape:
 \`\`\`topology
-{"title":"…","nodes":[{"id":"n1","model":"ESG620","role":"gateway","label":"Firewall"}],"links":[{"from":"n1","to":"n2"}]}
+{"title":"…","nodes":[{"id":"n1","model":"ESG620","role":"gateway","label":"防火牆"}],"links":[{"from":"n1","to":"n2","speed":"10G"}],"zones":[{"label":"客房區","nodes":["n3","n4"]}]}
 \`\`\`
 Rules:
 - Product nodes MUST use one of these exact model keys (pick what genuinely fits):
 ${catalog}
-- Generic nodes (no model) use role ∈ internet, modem, server, client.
-- Each product node: {id, model, role, label}. Place the topology block AFTER your text answer and BEFORE the final "---" follow-up separator. Keep it ≤ ~12 nodes.
-- Do NOT also draw the diagram as ASCII art or any other text/code block — output ONLY the \`topology\` block; the app renders it visually.`;
+- Generic nodes (no model): role ∈ internet, modem, server, client.
+- links: add "speed" when known — one of "1G","2.5G","5G","10G","SFP","WiFi" (it colours the line). Keep links logical (each device connects to its real uplink).
+- zones (optional): group nodes by area/floor, e.g. {"label":"客房區","nodes":["n3","n4"]}.
+- label = SHORT purpose only (the model number is shown separately), e.g. 「核心交換器」「大廳 AP」, ≤ 8 chars.
+- Place the block AFTER your text answer and BEFORE the final "---". Keep ≤ ~14 nodes. Output ONLY this block — do NOT also draw an ASCII/text version.`;
 }
 
 interface ChatMessage {
