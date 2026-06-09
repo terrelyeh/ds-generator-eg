@@ -43,7 +43,7 @@ function loadCatalog(): Promise<CatalogIcon[]> {
 const NODE_W = 128;
 const ICON_W = 96;
 const ICON_H = 64;
-const TIER_H = 132;
+const TIER_H = 152;
 const PAD = 28;
 const LABEL_DY = 16;
 
@@ -152,17 +152,23 @@ export function TopologyDiagram({ source }: { source: string }) {
           xmlns="http://www.w3.org/2000/svg"
           fontFamily="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
         >
-          {/* connectors first (behind icons) */}
+          {/* connectors first (behind icons) — orthogonal elbows: drop below
+              the parent's label, jog horizontally at the midpoint, drop to the
+              child icon top. Sibling jogs share a midY → a clean bus. */}
           {(sp.links ?? []).map((l, i) => {
             const a = pos.get(l.from);
             const b = pos.get(l.to);
             if (!a || !b) return null;
-            const [hi, lo] = a.y <= b.y ? [a, b] : [b, a];
-            const x1 = hi.x, y1 = hi.y + ICON_H / 2 + 2;
-            const x2 = lo.x, y2 = lo.y - ICON_H / 2 - LABEL_DY;
+            const [up, dn] = a.y <= b.y ? [a, b] : [b, a];
+            const sy = up.y + ICON_H / 2 + 44; // below the upper node's label+role
+            const ey = dn.y - ICON_H / 2 - 2;  // top of the lower icon
+            const my = Math.round((sy + ey) / 2);
+            const d = up.x === dn.x
+              ? `M ${up.x} ${sy} L ${dn.x} ${ey}`
+              : `M ${up.x} ${sy} L ${up.x} ${my} L ${dn.x} ${my} L ${dn.x} ${ey}`;
             return (
-              <line key={`l${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
-                stroke="#9aa3b2" strokeWidth={1.6} />
+              <path key={`l${i}`} d={d} fill="none" stroke="#cbd1da"
+                strokeWidth={1.5} strokeLinejoin="round" />
             );
           })}
           {/* nodes */}

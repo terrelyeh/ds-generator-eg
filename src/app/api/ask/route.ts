@@ -59,7 +59,8 @@ Rules:
 - Product nodes MUST use one of these exact model keys (pick what genuinely fits):
 ${catalog}
 - Generic nodes (no model) use role ∈ internet, modem, server, client.
-- Each product node: {id, model, role, label}. Place the topology block AFTER your text answer and BEFORE the final "---" follow-up separator. Keep it ≤ ~12 nodes.`;
+- Each product node: {id, model, role, label}. Place the topology block AFTER your text answer and BEFORE the final "---" follow-up separator. Keep it ≤ ~12 nodes.
+- Do NOT also draw the diagram as ASCII art or any other text/code block — output ONLY the \`topology\` block; the app renders it visually.`;
 }
 
 interface ChatMessage {
