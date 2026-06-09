@@ -63,7 +63,8 @@ ${catalog}
 - links: add "speed" when known — one of "1G","2.5G","5G","10G","SFP","WiFi" (it colours the line). Keep links logical (each device connects to its real uplink).
 - zones (optional): group nodes by area/floor, e.g. {"label":"客房區","nodes":["n3","n4"]}.
 - label = SHORT purpose only (the model number is shown separately), e.g. 「核心交換器」「大廳 AP」, ≤ 8 chars.
-- Place the block AFTER your text answer and BEFORE the final "---". Keep ≤ ~14 nodes. Output ONLY this block — do NOT also draw an ASCII/text version.`;
+- Place the block AFTER your text answer and BEFORE the final "---". Keep ≤ ~14 nodes. Output ONLY this block — do NOT also draw an ASCII/text version.
+- The block MUST be ONE line of strictly valid minified JSON: ASCII straight double-quotes only ("), ASCII commas/colons only (never full-width ，：「」), no comments, no trailing commas. The renderer parses it directly.`;
 }
 
 interface ChatMessage {

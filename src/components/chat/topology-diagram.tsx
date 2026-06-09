@@ -118,6 +118,86 @@ function buildTextTree(sp: TopoSpec): string {
   return lines.join("\n");
 }
 
+/** Return the substring from the first "{" to its matching "}", respecting
+ *  string literals + escapes. Robust against trailing prose that has braces
+ *  (lastIndexOf("}") over-includes such prose and breaks JSON.parse). */
+function balancedObject(s: string): string | null {
+  const start = s.indexOf("{");
+  if (start < 0) return null;
+  let depth = 0, inStr = false, esc = false;
+  for (let i = start; i < s.length; i++) {
+    const c = s[i];
+    if (esc) { esc = false; continue; }
+    if (c === "\\") { esc = true; continue; }
+    if (c === '"') { inStr = !inStr; continue; }
+    if (inStr) continue;
+    if (c === "{") depth++;
+    else if (c === "}") { depth--; if (depth === 0) return s.slice(start, i + 1); }
+  }
+  return null;
+}
+
+/** Normalize full-width / CJK structural punctuation to ASCII, but ONLY
+ *  outside string literals so CJK label text stays intact. CJK-context LLMs
+ *  often slip 全形 ，：［］ into the JSON structure. */
+function normalizeStructuralChars(s: string): string {
+  const map: Record<string, string> = {
+    "，": ",", "：": ":", "；": ";", "［": "[", "］": "]", "｛": "{", "｝": "}", "　": " ",
+  };
+  let out = "", inStr = false, esc = false;
+  for (const c of s) {
+    if (esc) { out += c; esc = false; continue; }
+    if (c === "\\") { out += c; esc = true; continue; }
+    if (c === '"') { inStr = !inStr; out += c; continue; }
+    out += !inStr && map[c] ? map[c] : c;
+  }
+  return out;
+}
+
+/** Tolerant parse of the LLM's ```topology JSON. Handles code fences, stray
+ *  prose, trailing commas, // and /* *​/ comments, smart/full-width quotes,
+ *  and full-width structural punctuation — escalating only as needed so the
+ *  common (already-valid) case stays a single fast JSON.parse. */
+function parseTopologySpec(input: string): TopoSpec | null {
+  let raw = (input ?? "").trim();
+  if (!raw) return null;
+  raw = raw.replace(/^```[\w-]*\n?/i, "").replace(/\n?```$/i, "").trim();
+
+  const tryParse = (s: string): TopoSpec | null => {
+    try {
+      const o = JSON.parse(s);
+      return o && Array.isArray(o.nodes) ? (o as TopoSpec) : null;
+    } catch { return null; }
+  };
+  const dropTrailingCommas = (s: string) => s.replace(/,\s*([}\]])/g, "$1");
+  const dropComments = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"])\/\/.*$/gm, "$1");
+
+  const slice = balancedObject(raw) ?? raw;
+
+  // 1) happy path — already-valid JSON, just trailing-comma tolerant
+  let out = tryParse(dropTrailingCommas(slice));
+  if (out) return out;
+
+  // 2) + strip comments
+  out = tryParse(dropTrailingCommas(dropComments(slice)));
+  if (out) return out;
+
+  // 3) + normalize smart double-quotes then full-width structural punctuation
+  const straightQuotes = dropComments(slice).replace(/[“”„‟″＂]/g, '"');
+  const normalized = normalizeStructuralChars(straightQuotes);
+  out = tryParse(dropTrailingCommas(normalized));
+  if (out) return out;
+
+  // 4) re-slice on the normalized text (prose braces may have shifted bounds)
+  const reSliced = balancedObject(normalized);
+  if (reSliced) {
+    out = tryParse(dropTrailingCommas(reSliced));
+    if (out) return out;
+  }
+  return null;
+}
+
 export function TopologyDiagram({ source }: { source: string }) {
   const [catalog, setCatalog] = useState<CatalogIcon[] | null>(null);
   const [view, setView] = useState<"diagram" | "text">("diagram");
@@ -125,18 +205,7 @@ export function TopologyDiagram({ source }: { source: string }) {
   const svgRef = useRef<SVGSVGElement>(null);
   useEffect(() => { loadCatalog().then(setCatalog); }, []);
 
-  const spec = useMemo<TopoSpec | null>(() => {
-    try {
-      let t = (source ?? "").trim();
-      // tolerate stray prose / code fences around the JSON, and trailing commas
-      const first = t.indexOf("{");
-      const last = t.lastIndexOf("}");
-      if (first >= 0 && last > first) t = t.slice(first, last + 1);
-      t = t.replace(/,\s*([}\]])/g, "$1");
-      const s = JSON.parse(t);
-      return s && Array.isArray(s.nodes) ? (s as TopoSpec) : null;
-    } catch { return null; }
-  }, [source]);
+  const spec = useMemo<TopoSpec | null>(() => parseTopologySpec(source), [source]);
 
   const maps = useMemo(() => {
     const byKey = new Map<string, CatalogIcon>();
@@ -149,14 +218,29 @@ export function TopologyDiagram({ source }: { source: string }) {
   }, [catalog]);
 
   if (!spec) {
+    // Never render blank. While the JSON is still streaming in (no closing
+    // brace yet) show a "繪製中…" note; once it looks complete but still won't
+    // parse, fall back to the raw block so the content is always visible.
+    const trimmed = (source ?? "").trim();
+    const streaming = !/\}\s*$/.test(trimmed);
     return (
-      <pre className="chat-pre my-4 overflow-x-auto rounded-lg border border-amber-300 bg-amber-50 p-3 text-[12px] text-amber-800">
-        ⚠ topology 區塊解析失敗（JSON 格式錯誤）
-      </pre>
+      <div className="chat-topology my-4 overflow-hidden rounded-xl border border-black/10 bg-white">
+        <div className="flex items-center justify-between gap-2 border-b border-black/[0.06] bg-black/[0.015] px-3 py-1.5">
+          <span className="text-[12px] font-semibold text-engenius-dark/70">Network Topology</span>
+          <span className="text-[11px] text-engenius-gray">{streaming ? "繪製中…" : "拓樸資料"}</span>
+        </div>
+        <pre className="m-2 overflow-x-auto rounded-lg bg-[#0d1117] p-3 text-[12px] leading-[1.6] text-slate-100">{trimmed || "（無內容）"}</pre>
+      </div>
     );
   }
   const sp = spec;
-  const textTree = buildTextTree(sp);
+  // Fallback so the 文字 view is never blank even for a degenerate spec.
+  const textTree =
+    buildTextTree(sp) ||
+    sp.nodes
+      .map((n) => `• ${n.model ? n.model + " " : ""}${n.label || n.role || n.id}`)
+      .join("\n") ||
+    "（無節點）";
 
   async function copyText() {
     try { await navigator.clipboard.writeText(textTree); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* ignore */ }
