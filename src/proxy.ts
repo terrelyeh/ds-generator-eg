@@ -27,10 +27,16 @@ import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 // own API-key Bearer check and returns JSON errors, so it must bypass the
 // session redirect (an HTML 307 to sign-in would break machine clients).
 const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/"];
-// /docs/api-search.html is the external integration spec — shared with other
-// departments who have no SpecHub login, so it must be reachable anonymously.
-// (Other /docs/*.html stay gated — they're internal process docs.)
-const PUBLIC_EXACT_PATHS = ["/api/demo-auth", "/docs/api-search.html"];
+// Publicly-shareable docs — handed to people without a SpecHub login (other
+// departments, RD/PM, the design team), so they bypass the session redirect.
+// Add a doc here only when it's meant to be shared and contains no secrets.
+// (Other /docs/*.html stay gated — internal process docs.)
+const PUBLIC_EXACT_PATHS = [
+  "/api/demo-auth",
+  "/docs/api-search.html",      // external RAG Search API spec (integrators)
+  "/docs/ask-chat-ux-spec.html", // Ask chat UX spec (RD / PM)
+  "/docs/topology-icon-spec.html", // topology icon spec (design team)
+];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/sync", "/api/cron"];
 // APIs the demo needs, reachable with a valid demo cookie (no Google login).
