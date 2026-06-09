@@ -34,8 +34,13 @@ export interface ChatMessage {
 export type ChatLoadStatus = "searching" | "generating" | null;
 
 export interface UseChatStreamConfig {
-  /** Current model/persona/profile to send with each request (read at call time). */
-  getParams: () => { provider: string; persona: string; profile: string };
+  /**
+   * Per-request body fields, read at call time. `provider`/`persona`/`profile`
+   * are always sent; any extra keys (e.g. `workspace`, `userKey`, `taxonomy`)
+   * are forwarded verbatim into the POST body, so callers can add fields
+   * without changing this hook.
+   */
+  getParams: () => { provider: string; persona: string; profile: string; [key: string]: unknown };
   /** Called with the final message list after a successful (or stopped) turn. */
   onComplete?: (messages: ChatMessage[]) => void;
   /** Text appended to a stopped answer. Defaults to "_(stopped)_". */
@@ -100,7 +105,8 @@ export function useChatStream(config: UseChatStreamConfig) {
     inFlightRef.current = true;
 
     const cfg = configRef.current;
-    const { provider, persona, profile } = cfg.getParams();
+    const params = cfg.getParams();
+    const { provider } = params;
     const endpoint = cfg.endpoint ?? "/api/ask";
     const stoppedLabel = cfg.stoppedLabel ?? "_(stopped)_";
 
@@ -124,10 +130,11 @@ export function useChatStream(config: UseChatStreamConfig) {
         headers: { "Content-Type": "application/json" },
         signal: controller.signal,
         body: JSON.stringify({
+          // ...params carries provider/persona/profile PLUS any caller extras
+          // (workspace, userKey, taxonomy, …) — don't hardcode the field list,
+          // or workspace-mode requests silently drop their scope/key.
           question: q,
-          provider,
-          persona,
-          profile,
+          ...params,
           history: base.slice(-20).map((m) => ({ role: m.role, content: m.content })),
         }),
       });
