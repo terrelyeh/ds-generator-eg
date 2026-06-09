@@ -56,7 +56,7 @@ function loadCatalog(): Promise<CatalogIcon[]> {
 const NODE_W = 150;
 const ICON_W = 88;
 const ICON_H = 56;
-const TIER_H = 130;
+const TIER_H = 150;
 const PAD = 24;
 const ZONE_PAD = 14;
 const LABEL_TOP = 14;   // first label line below icon
@@ -127,7 +127,13 @@ export function TopologyDiagram({ source }: { source: string }) {
 
   const spec = useMemo<TopoSpec | null>(() => {
     try {
-      const s = JSON.parse(source);
+      let t = (source ?? "").trim();
+      // tolerate stray prose / code fences around the JSON, and trailing commas
+      const first = t.indexOf("{");
+      const last = t.lastIndexOf("}");
+      if (first >= 0 && last > first) t = t.slice(first, last + 1);
+      t = t.replace(/,\s*([}\]])/g, "$1");
+      const s = JSON.parse(t);
       return s && Array.isArray(s.nodes) ? (s as TopoSpec) : null;
     } catch { return null; }
   }, [source]);
@@ -230,9 +236,9 @@ export function TopologyDiagram({ source }: { source: string }) {
     return {
       label: z.label,
       x: Math.min(...xs) - ICON_W / 2 - ZONE_PAD,
-      y: Math.min(...ys) - ICON_H / 2 - ZONE_PAD - 12,
+      y: Math.min(...ys) - ICON_H / 2 - 10,
       w: Math.max(...xs) - Math.min(...xs) + ICON_W + ZONE_PAD * 2,
-      h: Math.max(...ys) - Math.min(...ys) + ICON_H + 3 * LINE_H + ZONE_PAD * 2,
+      h: Math.max(...ys) - Math.min(...ys) + ICON_H + 3 * LINE_H + ZONE_PAD + 10,
     };
   }).filter(Boolean) as { label?: string; x: number; y: number; w: number; h: number }[];
 
@@ -291,9 +297,9 @@ export function TopologyDiagram({ source }: { source: string }) {
                 strokeWidth={1.2} strokeDasharray="6 4" />
               {z.label && (
                 <>
-                  <rect x={z.x + 8} y={z.y + 4} width={z.label.length * 8 + 10} height={15} rx={3}
-                    fill="#ffffff" fillOpacity={0.92} />
-                  <text x={z.x + 13} y={z.y + 15} fontSize={10.5} fontWeight={700} fill="#0288d1">{z.label}</text>
+                  <rect x={z.x + 6} y={z.y - 14} width={z.label.length * 8 + 10} height={15} rx={3}
+                    fill="#ffffff" fillOpacity={0.95} stroke="#03a9f4" strokeOpacity={0.25} />
+                  <text x={z.x + 11} y={z.y - 3} fontSize={10.5} fontWeight={700} fill="#0288d1">{z.label}</text>
                 </>
               )}
             </g>
@@ -306,10 +312,12 @@ export function TopologyDiagram({ source }: { source: string }) {
             const [up, dn] = a.y <= b.y ? [a, b] : [b, a];
             const sy = up.y + ICON_H / 2 + 3 * LINE_H + 6;
             const ey = dn.y - ICON_H / 2 - 2;
-            const my = Math.round((sy + ey) / 2);
+            // jog right below the parent so the horizontal trunk stays ABOVE the
+            // zone boxes; only the vertical drops enter the zones.
+            const jogY = sy + 12;
             const d = up.x === dn.x
               ? `M ${up.x} ${sy} L ${dn.x} ${ey}`
-              : `M ${up.x} ${sy} L ${up.x} ${my} L ${dn.x} ${my} L ${dn.x} ${ey}`;
+              : `M ${up.x} ${sy} L ${up.x} ${jogY} L ${dn.x} ${jogY} L ${dn.x} ${ey}`;
             const st = linkStyle(l);
             return <path key={`l${i}`} d={d} fill="none" stroke={st.color} strokeWidth={1.8}
               strokeDasharray={st.dash} strokeLinejoin="round" />;
