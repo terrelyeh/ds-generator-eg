@@ -1398,7 +1398,7 @@ export function KnowledgeBase() {
                   onChange={(e) => setFileToUpload(e.target.files?.[0] ?? null)}
                   disabled={fileUploading}
                   className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-engenius-blue/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-engenius-blue hover:file:bg-engenius-blue/20" />
-                <p className="mt-1 text-[11px] text-muted-foreground/50">PDF or Word (.docx), max 4 MB. Text is extracted and indexed; scanned / image-only PDFs aren&apos;t supported.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground/50">PDF or Word (.docx), max 4 MB. PDFs are read by AI (tables → Markdown, figures described, scanned pages OCR&apos;d); .docx extracts text.</p>
                 {fileToUpload && <p className="mt-1 text-[11px] text-muted-foreground">{fileToUpload.name} · {(fileToUpload.size / 1024).toFixed(0)} KB</p>}
               </div>
               <div>

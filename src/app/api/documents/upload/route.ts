@@ -66,18 +66,30 @@ export async function POST(request: Request) {
 
   const buf = Buffer.from(await file.arrayBuffer());
 
-  // Extract text.
+  // Extract text. PDFs go through Gemini (tables → Markdown, figures described,
+  // scanned pages OCR'd); unpdf text-layer extraction is the fallback if AI
+  // extraction is unavailable. .docx uses mammoth.
   let text = "";
+  let extractMethod: "gemini" | "text" | "docx" = "text";
   try {
     if (isPdf) {
-      const { extractText, getDocumentProxy } = await import("unpdf");
-      const pdf = await getDocumentProxy(new Uint8Array(buf));
-      const { text: t } = await extractText(pdf, { mergePages: true });
-      text = Array.isArray(t) ? t.join("\n\n") : t;
+      const { extractPdfMarkdown } = await import("@/lib/rag/extract-pdf-ai");
+      const md = await extractPdfMarkdown(buf);
+      if (md && md.length >= 20) {
+        text = md;
+        extractMethod = "gemini";
+      } else {
+        const { extractText, getDocumentProxy } = await import("unpdf");
+        const pdf = await getDocumentProxy(new Uint8Array(buf));
+        const { text: t } = await extractText(pdf, { mergePages: true });
+        text = Array.isArray(t) ? t.join("\n\n") : t;
+        extractMethod = "text";
+      }
     } else {
       const mammoth = (await import("mammoth")).default;
       const { value } = await mammoth.extractRawText({ buffer: buf });
       text = value;
+      extractMethod = "docx";
     }
   } catch (err) {
     return NextResponse.json(
@@ -89,7 +101,7 @@ export async function POST(request: Request) {
   text = (text || "").trim();
   if (text.length < 20) {
     return NextResponse.json(
-      { error: "No extractable text found — scanned / image-only files aren't supported yet." },
+      { error: "Couldn't extract any text from this file. If it's a scanned PDF, check that the Google AI key is configured (used for OCR)." },
       { status: 422 },
     );
   }
@@ -118,8 +130,9 @@ export async function POST(request: Request) {
       text,
       label,
       taxonomy,
+      extractMethod,
     });
-    return NextResponse.json({ ok: true, source_id: sourceId, stored: !!storedPath, ...result });
+    return NextResponse.json({ ok: true, source_id: sourceId, stored: !!storedPath, extract_method: extractMethod, ...result });
   } catch (err) {
     return NextResponse.json(
       { error: `File ingest failed: ${err instanceof Error ? err.message : String(err)}` },

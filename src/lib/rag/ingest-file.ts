@@ -25,6 +25,8 @@ export interface IngestFileOptions {
   text: string;
   label?: string;
   taxonomy?: Partial<TaxonomyMeta>;
+  /** How the text was obtained: "gemini" (AI), "text" (PDF text layer), "docx". */
+  extractMethod?: string;
 }
 
 export interface IngestFileResult {
@@ -33,7 +35,7 @@ export interface IngestFileResult {
 }
 
 export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileResult> {
-  const { sourceId, fileName, fileType, fileSize, storagePath, text, label } = opts;
+  const { sourceId, fileName, fileType, fileSize, storagePath, text, label, extractMethod } = opts;
   const tax = normalizeTaxonomy(opts.taxonomy);
   const supabase = createAdminClient();
   const displayTitle = label?.trim() || fileName;
@@ -53,6 +55,7 @@ export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileRes
     file_size: fileSize,
     file_label: label || null,
     storage_path: storagePath,
+    extract_method: extractMethod || null,
     solution: tax.solution,
     product_lines: tax.product_lines,
     models: tax.models,
