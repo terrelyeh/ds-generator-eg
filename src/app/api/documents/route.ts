@@ -7,8 +7,16 @@ import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 import { ingestWifiRegulations } from "@/lib/rag/ingest-wifi-regulations";
 import { ingestWeb } from "@/lib/rag/ingest-web";
+import { ingestTextSnippet } from "@/lib/rag/ingest-text-snippet";
 import { fetchGoogleDoc } from "@/lib/google/docs";
 import { normalizeTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
+
+/** Colon-free, stable source_id for a new text snippet (GET splits on ":"). */
+function snippetSourceId(title: string): string {
+  const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `snippet-${slug || "note"}-${rand}`;
+}
 
 // Allow up to 300s for Gitbook ingestion (many pages + Vision API)
 export const maxDuration = 300;
@@ -22,6 +30,34 @@ export async function GET(request: Request) {
   if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const sourceType = searchParams.get("source_type");
+
+  // Raw-fetch mode: return a single source's editable content (used by the
+  // Text Snippet editor to reload the raw markdown from chunk 0's metadata).
+  const rawSourceId = searchParams.get("raw") ? searchParams.get("source_id") : null;
+  if (rawSourceId && sourceType) {
+    const supabaseRaw = createAdminClient();
+    const { data: row } = (await supabaseRaw
+      .from("documents" as "products")
+      .select("title, metadata")
+      .eq("source_type", sourceType)
+      .eq("source_id", rawSourceId)
+      .eq("chunk_index", 0)
+      .maybeSingle()) as { data: { title: string; metadata: Record<string, unknown> | null } | null };
+    if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const meta = row.metadata ?? {};
+    return NextResponse.json({
+      ok: true,
+      source_id: rawSourceId,
+      title: (meta.snippet_title as string) ?? row.title,
+      content: (meta.raw as string) ?? "",
+      label: (meta.snippet_label as string) ?? "",
+      taxonomy: {
+        solution: (meta.solution as string) ?? null,
+        product_lines: Array.isArray(meta.product_lines) ? meta.product_lines : [],
+        models: Array.isArray(meta.models) ? meta.models : [],
+      },
+    });
+  }
 
   const supabase = createAdminClient();
 
@@ -337,7 +373,29 @@ export async function POST(request: Request) {
     }
   }
 
-  // Future source types: file, text_snippet
+  if (source_type === "text_snippet") {
+    const { title, content, label, source_id } = body as {
+      title?: string;
+      content?: string;
+      label?: string;
+      source_id?: string;
+    };
+    if (!title?.trim() || !content?.trim()) {
+      return NextResponse.json({ error: "Missing title or content for text snippet" }, { status: 400 });
+    }
+    const sid = source_id?.trim() || snippetSourceId(title);
+    try {
+      const result = await ingestTextSnippet({ sourceId: sid, title: title.trim(), content, label, taxonomy });
+      return NextResponse.json({ ok: true, source_id: sid, ...result });
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Snippet ingest failed: ${err instanceof Error ? err.message : String(err)}` },
+        { status: 500 },
+      );
+    }
+  }
+
+  // Note: source_type "file" is ingested via the multipart POST /api/documents/upload.
   return NextResponse.json(
     { error: `Source type "${source_type}" ingestion not yet implemented` },
     { status: 400 }
@@ -363,6 +421,24 @@ export async function DELETE(request: Request) {
   }
 
   const supabase = createAdminClient();
+
+  // For uploaded files, remove the original objects from Storage first.
+  if (source_type === "file") {
+    let metaQuery = supabase
+      .from("documents" as "products")
+      .select("metadata")
+      .eq("source_type", "file");
+    if (source_id) metaQuery = metaQuery.eq("source_id", source_id);
+    const { data: rows } = (await metaQuery) as { data: { metadata: Record<string, unknown> | null }[] | null };
+    const paths = [
+      ...new Set(
+        (rows ?? [])
+          .map((r) => r.metadata?.storage_path as string | undefined)
+          .filter((p): p is string => !!p),
+      ),
+    ];
+    if (paths.length) await supabase.storage.from("knowledge-files").remove(paths);
+  }
 
   let query = supabase
     .from("documents" as "products")

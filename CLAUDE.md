@@ -1,6 +1,9 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-09 (Ask Workspaces: multi-tenant /ask/<slug> with
+> Last updated: 2026-06-09 (Knowledge: Text Snippets + Files (PDF/Word) channels
+> opened — both index into `documents` via shared `lib/rag/chunk.ts`; files use
+> unpdf/mammoth + a private `knowledge-files` Storage bucket. Earlier same day:
+> Ask Workspaces: multi-tenant /ask/<slug> with
 > per-workspace passcode + 3 LLM modes (shared / workspace-BYOK / **user-BYOK**)
 > + scoped KB, via an optional `workspace` param on /api/ask. Frontend now
 > enforces `allow_switch` (locks selectors) and partitions chat history per
@@ -127,6 +130,9 @@ src/
       ingest-gitbook.ts                # Main chunks + focused LED chunks (chunk_index ≥ 10000)
       ingest-helpcenter.ts, ingest-google-doc.ts
       ingest-web.ts                    # Generic web page → Firecrawl→Jina→fetch cascade → chunk (source_type "web")
+      chunk.ts                         # SHARED chunkText() for manual/uploaded pipelines (snippet + file)
+      ingest-text-snippet.ts           # Manual markdown snippet → chunk → embed (source_type "text_snippet"; raw in chunk-0 meta)
+      ingest-file.ts                   # Uploaded PDF/.docx extracted text → chunk → embed (source_type "file"; original in knowledge-files bucket)
       ingest-wifi-regulations.ts       # WiFi RegHub API → per-country chunk, source_id = ISO code
       personas.ts                      # Persona + UserProfile
     google/
@@ -227,11 +233,17 @@ pointers so you know it exists:
 
 - **UX**: Navbar Ask → right-side slide panel; SSE streaming from
   `/api/ask`; inline `[1]` citations with `CitationTooltip`
-- **Knowledge sources**: 6 pipelines under `src/lib/rag/ingest-*` (product_spec,
-  gitbook, helpcenter, google_doc, wifi_regulation, **web**) → `documents` table
-  (pgvector); taxonomy meta on every chunk. Weekly `/api/cron/reindex-web`
-  refreshes gitbook/google_doc/helpcenter/web (derives sources from `documents`,
-  preserves taxonomy)
+- **Knowledge sources**: 8 pipelines under `src/lib/rag/ingest-*` (product_spec,
+  gitbook, helpcenter, google_doc, wifi_regulation, **web**, **text_snippet**,
+  **file**) → `documents` table (pgvector); taxonomy meta on every chunk.
+  text_snippet (manual markdown, raw kept in chunk-0 meta for re-edit) + file
+  (PDF via `unpdf` / .docx via `mammoth`, original in private `knowledge-files`
+  bucket, indexed text via shared `lib/rag/chunk.ts`) are manual/uploaded, so the
+  weekly `/api/cron/reindex-web` only refreshes gitbook/google_doc/helpcenter/web
+  (derives sources from `documents`, preserves taxonomy). Files upload via
+  multipart `POST /api/documents/upload`; `GET /api/documents/file-url` mints a
+  60s signed URL for "view original"; text snippets go through `POST /api/documents`
+  (source_type text_snippet) with a `?raw=1` GET to reload for editing
 - **Cross-lingual re-rank**: `/api/ask/route.ts` supplements embedding
   results with literal model/country lookups to compensate for
   `text-embedding-3-small` weakness on CJK query → EN chunk matching
@@ -286,7 +298,7 @@ pointers so you know it exists:
 
 **RAG**：
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
-2. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較）
+2. ~~Text Snippet CRUD~~ ✅ done（text_snippet + file 兩個 Knowledge 通道已打通）。可選後續：file 支援掃描檔 OCR、>4MB 走瀏覽器直傳 Storage（避開 Vercel body 限制）
 3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation 變動
 4. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
 

@@ -55,8 +55,8 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "google_doc", label: "Google Docs", icon: "📄", description: "Message guides, product briefs, marketing docs from Google Drive", status: "active", canIngest: true },
   { id: "wifi_regulation", label: "WiFi Regulations", icon: "📡", description: "Per-country WiFi regulation data (bands, channels, power, DFS) from RegHub — applies across all wireless products", status: "active", canIngest: true },
   { id: "web", label: "Web Pages", icon: "🌐", description: "Any web page — product pages, blog posts, competitor pages. Auto-extracts clean content (Firecrawl → Jina → fetch)", status: "active", canIngest: true },
-  { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
-  { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word documents", status: "planned", canIngest: false },
+  { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "active", canIngest: true },
+  { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word (.docx) documents — text is extracted and indexed", status: "active", canIngest: true },
 ];
 
 const SUMMARY_CARDS = [
@@ -106,6 +106,20 @@ export function KnowledgeBase() {
   const [webLabel, setWebLabel] = useState("");
   const [webIngesting, setWebIngesting] = useState(false);
   const [webTaxonomy, setWebTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
+  // Text snippet dialog (create + edit)
+  const [showSnippetDialog, setShowSnippetDialog] = useState(false);
+  const [snippetEditId, setSnippetEditId] = useState<string | null>(null);
+  const [snippetTitle, setSnippetTitle] = useState("");
+  const [snippetContent, setSnippetContent] = useState("");
+  const [snippetLabel, setSnippetLabel] = useState("");
+  const [snippetTaxonomy, setSnippetTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
+  const [snippetSaving, setSnippetSaving] = useState(false);
+  // File upload dialog
+  const [showFileDialog, setShowFileDialog] = useState(false);
+  const [fileToUpload, setFileToUpload] = useState<File | null>(null);
+  const [fileLabel, setFileLabel] = useState("");
+  const [fileTaxonomy, setFileTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
+  const [fileUploading, setFileUploading] = useState(false);
   const [editTaxonomyTarget, setEditTaxonomyTarget] = useState<SourceItem | null>(null);
   const [editTaxonomyValue, setEditTaxonomyValue] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [editTaxonomySaving, setEditTaxonomySaving] = useState(false);
@@ -492,6 +506,125 @@ export function KnowledgeBase() {
     }
   }
 
+  /** TaxonomyValue from a stored {solution, product_lines, models} meta. */
+  function taxValueFrom(t?: { solution: string | null; product_lines?: string[]; models?: string[] }): TaxonomyValue {
+    return {
+      solution: t?.solution ?? GLOBAL_SOLUTION_SLUG,
+      product_lines: t?.product_lines ?? [],
+      models: t?.models ?? [],
+    };
+  }
+
+  // ── Text snippets ───────────────────────────────────────────────────────────
+  function openCreateSnippet() {
+    setSnippetEditId(null);
+    setSnippetTitle("");
+    setSnippetContent("");
+    setSnippetLabel("");
+    setSnippetTaxonomy(EMPTY_TAXONOMY_VALUE);
+    setShowSnippetDialog(true);
+  }
+
+  async function openEditSnippet(source: SourceItem) {
+    try {
+      const res = await fetch(`/api/documents?source_type=text_snippet&source_id=${encodeURIComponent(source.source_id)}&raw=1`);
+      const d = await res.json();
+      if (!d.ok) { toast.error("Couldn't load snippet"); return; }
+      setSnippetEditId(source.source_id);
+      setSnippetTitle(d.title || "");
+      setSnippetContent(d.content || "");
+      setSnippetLabel(d.label || "");
+      setSnippetTaxonomy(taxValueFrom(d.taxonomy));
+      setShowSnippetDialog(true);
+    } catch {
+      toast.error("Couldn't load snippet");
+    }
+  }
+
+  async function handleSnippetSave() {
+    if (!snippetTitle.trim() || !snippetContent.trim()) {
+      toast.error("Enter a title and content");
+      return;
+    }
+    setSnippetSaving(true);
+    setIngesting("text_snippet");
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "text_snippet",
+          source_id: snippetEditId || undefined,
+          title: snippetTitle.trim(),
+          content: snippetContent,
+          label: snippetLabel.trim() || undefined,
+          taxonomy: taxonomyToPayload(snippetTaxonomy),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(snippetEditId ? "Snippet updated" : `Snippet saved (${data.chunks} chunk${data.chunks > 1 ? "s" : ""})`);
+        fetchData();
+        setShowSnippetDialog(false);
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSnippetSaving(false);
+      setIngesting(null);
+    }
+  }
+
+  // ── Files (PDF/Word) ──────────────────────────────────────────────────────────
+  function openUploadFile() {
+    setFileToUpload(null);
+    setFileLabel("");
+    setFileTaxonomy(EMPTY_TAXONOMY_VALUE);
+    setShowFileDialog(true);
+  }
+
+  async function handleFileUpload() {
+    if (!fileToUpload) { toast.error("Choose a file"); return; }
+    if (fileToUpload.size > 4 * 1024 * 1024) { toast.error("File too large (max 4 MB)"); return; }
+    setFileUploading(true);
+    setIngesting("file");
+    try {
+      const form = new FormData();
+      form.append("file", fileToUpload);
+      if (fileLabel.trim()) form.append("label", fileLabel.trim());
+      form.append("taxonomy", JSON.stringify(taxonomyToPayload(fileTaxonomy)));
+      const res = await fetch("/api/documents/upload", { method: "POST", body: form });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Indexed ${data.chunks} chunk${data.chunks > 1 ? "s" : ""}${data.stored ? "" : " (original not stored)"}`);
+        fetchData();
+        setShowFileDialog(false);
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setFileUploading(false);
+      setIngesting(null);
+    }
+  }
+
+  /** Open the original uploaded file via a short-lived signed URL. */
+  async function handleViewFile(source: SourceItem) {
+    try {
+      const res = await fetch(`/api/documents/file-url?source_id=${encodeURIComponent(source.source_id)}`);
+      const d = await res.json();
+      if (d.ok && d.url) window.open(d.url, "_blank", "noopener,noreferrer");
+      else toast.error(d.error || "Original file not available");
+    } catch {
+      toast.error("Couldn't open file");
+    }
+  }
+
   /** Open the Edit Taxonomy dialog for a given source */
   function openEditTaxonomy(source: SourceItem) {
     setEditTaxonomyTarget(source);
@@ -673,7 +806,17 @@ export function KnowledgeBase() {
                           {isIngesting ? "Indexing..." : "Add Page"}
                         </Button>
                       )}
-                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && config.id !== "web" && (
+                      {config.canIngest && config.id === "text_snippet" && (
+                        <Button size="sm" onClick={openCreateSnippet} disabled={!!ingesting} className="text-xs">
+                          {isIngesting ? "Saving..." : "New Snippet"}
+                        </Button>
+                      )}
+                      {config.canIngest && config.id === "file" && (
+                        <Button size="sm" onClick={openUploadFile} disabled={!!ingesting} className="text-xs">
+                          {isIngesting ? "Uploading..." : "Upload File"}
+                        </Button>
+                      )}
+                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && config.id !== "web" && config.id !== "text_snippet" && config.id !== "file" && (
                         <Button size="sm" onClick={() => handleIngest(config.id)} disabled={!!ingesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
@@ -895,13 +1038,32 @@ export function KnowledgeBase() {
                                       {isSyncing ? "Syncing…" : "Sync"}
                                     </button>
                                   )}
-                                  <button
-                                    onClick={() => openEditTaxonomy(s)}
-                                    className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors"
-                                    title="Edit taxonomy tags"
-                                  >
-                                    Edit
-                                  </button>
+                                  {s.source_type === "file" && (
+                                    <button
+                                      onClick={() => handleViewFile(s)}
+                                      className="text-xs font-medium text-engenius-blue hover:text-engenius-blue-dark transition-colors"
+                                      title="View the original uploaded file"
+                                    >
+                                      View
+                                    </button>
+                                  )}
+                                  {s.source_type === "text_snippet" ? (
+                                    <button
+                                      onClick={() => openEditSnippet(s)}
+                                      className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors"
+                                      title="Edit snippet text"
+                                    >
+                                      Edit
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => openEditTaxonomy(s)}
+                                      className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors"
+                                      title="Edit taxonomy tags"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
                                   <button
                                     onClick={() => handleDelete(s.source_type, s.source_id)}
                                     className="text-xs text-muted-foreground/50 hover:text-red-500 transition-colors"
@@ -1166,6 +1328,102 @@ export function KnowledgeBase() {
               <Button variant="outline" size="sm" onClick={() => setShowWebDialog(false)} disabled={webIngesting} className="text-xs">Cancel</Button>
               <Button size="sm" onClick={handleWebIngest} disabled={!webUrls.trim() || webIngesting} className="text-xs">
                 {webIngesting ? "Indexing..." : "Start Indexing"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Text Snippet Dialog (create + edit) */}
+      {showSnippetDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !snippetSaving && setShowSnippetDialog(false)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">{snippetEditId ? "Edit Snippet" : "New Text Snippet"}</h2>
+              <button onClick={() => !snippetSaving && setShowSnippetDialog(false)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={snippetSaving}>
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Title <span className="text-red-500">*</span></label>
+                <input type="text" value={snippetTitle} onChange={(e) => setSnippetTitle(e.target.value)}
+                  placeholder="e.g., ECW536 vs ECC500 — quick comparison"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={snippetSaving} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Content (Markdown) <span className="text-red-500">*</span></label>
+                <textarea value={snippetContent} onChange={(e) => setSnippetContent(e.target.value)}
+                  placeholder={"Write the answer / FAQ / comparison here.\nMarkdown supported: ## headings, - bullets, **bold**, tables."}
+                  rows={10}
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={snippetSaving} />
+                <p className="mt-1 text-[11px] text-muted-foreground/50">Long content is auto-split into chunks; Markdown headings (##) make good boundaries.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Label (optional)</label>
+                <input type="text" value={snippetLabel} onChange={(e) => setSnippetLabel(e.target.value)}
+                  placeholder="e.g., Sales FAQ"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={snippetSaving} />
+              </div>
+              <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
+                <p className="text-xs font-medium mb-2">Taxonomy <span className="font-normal text-muted-foreground/60">(optional, defaults to Global)</span></p>
+                <TaxonomyPicker value={snippetTaxonomy} onChange={setSnippetTaxonomy} allowGlobal required={false} disabled={snippetSaving} />
+              </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowSnippetDialog(false)} disabled={snippetSaving} className="text-xs">Cancel</Button>
+              <Button size="sm" onClick={handleSnippetSave} disabled={!snippetTitle.trim() || !snippetContent.trim() || snippetSaving} className="text-xs">
+                {snippetSaving ? "Saving..." : snippetEditId ? "Save" : "Create"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* File Upload Dialog */}
+      {showFileDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !fileUploading && setShowFileDialog(false)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Upload File (PDF / Word)</h2>
+              <button onClick={() => !fileUploading && setShowFileDialog(false)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={fileUploading}>
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">File <span className="text-red-500">*</span></label>
+                <input type="file"
+                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  onChange={(e) => setFileToUpload(e.target.files?.[0] ?? null)}
+                  disabled={fileUploading}
+                  className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-engenius-blue/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-engenius-blue hover:file:bg-engenius-blue/20" />
+                <p className="mt-1 text-[11px] text-muted-foreground/50">PDF or Word (.docx), max 4 MB. Text is extracted and indexed; scanned / image-only PDFs aren&apos;t supported.</p>
+                {fileToUpload && <p className="mt-1 text-[11px] text-muted-foreground">{fileToUpload.name} · {(fileToUpload.size / 1024).toFixed(0)} KB</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Label (optional)</label>
+                <input type="text" value={fileLabel} onChange={(e) => setFileLabel(e.target.value)}
+                  placeholder="e.g., ECW536 Datasheet"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={fileUploading} />
+              </div>
+              <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
+                <p className="text-xs font-medium mb-2">Taxonomy <span className="font-normal text-muted-foreground/60">(optional, defaults to Global)</span></p>
+                <TaxonomyPicker value={fileTaxonomy} onChange={setFileTaxonomy} allowGlobal required={false} disabled={fileUploading} />
+              </div>
+            </div>
+            {fileUploading && (
+              <div className="mt-4 rounded-lg bg-muted/50 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
+                  <span>Extracting text and generating embeddings...</span>
+                </div>
+              </div>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowFileDialog(false)} disabled={fileUploading} className="text-xs">Cancel</Button>
+              <Button size="sm" onClick={handleFileUpload} disabled={!fileToUpload || fileUploading} className="text-xs">
+                {fileUploading ? "Uploading..." : "Upload & Index"}
               </Button>
             </div>
           </div>

@@ -55,6 +55,8 @@ const SOURCE_TYPES = [
   { id: "google_doc", label: "Google Docs" },
   { id: "wifi_regulation", label: "WiFi Regulations" },
   { id: "web", label: "Web Pages" },
+  { id: "text_snippet", label: "Text Snippets" },
+  { id: "file", label: "Files (PDF/Word)" },
 ];
 
 function familyOf(p: string) {

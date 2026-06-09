@@ -207,6 +207,7 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
   text_snippet: "Knowledge Snippet",
   google_doc: "Internal Doc",
   web: "Web Page",
+  file: "Uploaded File",
 };
 
 /**
