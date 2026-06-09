@@ -1,10 +1,10 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-09 (External RAG Search API for departments:
-> /api/v1/search + api_keys + shared lib/rag/retrieve.ts core; consumed via
-> public docs/api-search.html OR the engenius-kb Claude Code skill
-> (github.com/terrelyeh/claude-skills). Shareable /docs via PUBLIC_EXACT_PATHS.
-> generic `web` source; topology SVG + separate ASCII box; shared chat engine)
+> Last updated: 2026-06-09 (Ask Workspaces Phase 1: multi-tenant /ask/<slug>
+> with per-workspace passcode + BYOK/shared LLM + scoped KB, via an optional
+> `workspace` param on /api/ask. External RAG Search API (/api/v1/search +
+> api_keys + shared lib/rag/retrieve.ts) consumed via public docs/api-search.html
+> OR the engenius-kb Claude Code skill. generic `web` source; shared chat engine)
 
 ## Project Overview
 
@@ -147,169 +147,17 @@ src/
 
 完整的同步機制、變更偵測、Telegram 通知流程詳見 [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md)。
 
-### Google Sheets → Supabase Sync
+### 同步、狀態、圖片 → [`docs/datasheet-sync.md`](docs/datasheet-sync.md)
 
-每個產品線有一個 Google Sheet，包含 Web Overview、Detail Specs、Comparison、Revision Log 頁籤。
+Google Sheets → Supabase 同步(欄位映射)、Product Status(active/upcoming/pending)、Smart Sync(Drive modifiedTime + deep diff)、sync 後 auto re-index RAG、locale-aware 圖片雙向同步(Drive 真源 ↔ Supabase 快取 ↔ MKT web upload write-through)。另見 [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md)。
 
-**Web Overview 重要欄位**：
-- `Model Name` → `products.full_name`
-- `Model Number` → `products.model_name` (primary key)
-- `Status` → `products.status`（Active / Upcoming / Pending）
-- `Single Overview` → `products.overview`
-- `Key Feature Lists` → `products.features` (JSON array, 自動 strip bullet 前綴)
+### Datasheet 渲染:PDF / 版面 / 多語言 → [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md)
 
-### Product Status
+PDF 生成(Regenerate/New Version、Puppeteer 自我認證、Drive folder auto-create/dedupe、locale Draft 阻擋)、動態 cover 版面 + spec 2 欄分頁(`lib/datasheet/`,**locale-aware metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet(兩層翻譯、Draft/Confirmed、per-locale typography、5 層 AI 翻譯 prompt)。**改 PDF/版面/翻譯前先讀該檔。**
 
-| Sheet 值 | DB 值 | Dashboard |
-|---|---|---|
-| 留空 / Active | `active` | 正常顯示 |
-| Upcoming | `upcoming` | 琥珀色 badge |
-| Pending | `pending` | 紅色 badge（暫不發布，統一狀態） |
+### Authentication & RBAC → [`docs/auth-rbac.md`](docs/auth-rbac.md)
 
-Dashboard 預設只顯示 Active，有 Active/All toggle。
-
-### Sync 機制
-
-- Vercel Cron 每天 01:00 UTC (09:00 Taiwan) → `POST /api/sync`
-- Smart Sync：Drive `modifiedTime` vs `product_lines.last_synced_at`
-- Dashboard Sync 按鈕只同步**當前 tab 的產品線**（`?force=true&line=Cloud+Camera`）
-- Deep diff 含 status 欄位 — status-only 變更也會觸發 upsert
-- **圖片同步**：即使內容無變更，若 product_image 或 hardware_image 缺失仍會從 Drive 拉取
-- `sheet_last_editor` fallback 到 Drive API `displayName`（Service Account 看不到 email）
-- **Auto re-index after sync**：sync 完成後，對 `allChanges` 中的每個 `product_name` 呼叫 `ingestProducts({ modelName })`，自動更新 RAG 向量。`content_hash` 去重確保未變更的 chunks 被 skip。失敗隔離不中斷 sync 回應，`response.reindex` 顯示 `{processed, skipped, errors}`
-
-### Image 雙向同步 (locale-aware)
-
-```
-Drive 真源 (authoritative)          Supabase (快取)          前端
-─────────────────────────            ────────────           ─────
-Cloud AP/DS Images/    ──(sync)──▶  images/<model>/...  ──▶  products.product_image
-                       ──(sync)──▶                      ──▶  products.hardware_image
-Cloud AP_ja/DS Images/ ──(sync)──▶  images/<model>/..._ja ▶  product_translations.hardware_image (locale=ja)
-Cloud AP_zh/DS Images/ ──(sync)──▶  images/<model>/..._zh ▶  product_translations.hardware_image (locale=zh-TW)
-
-MKT web upload (任一語言) ──write-through──▶ Supabase + 對應語言的 Drive DS Images
-```
-
-- **檔名**：英文 `{Model}_{type}.{ext}`；語言版 `{Model}_hardware_{locale}.{ext}`（只有 hardware 有語言變體；product 圖和 Radio Pattern 跨語言共用）
-- **Drive 資料夾**：每個 product line 有對應的 `<lineName>_<locale>` 兄弟資料夾。語言版的 `DS Images/` 子資料夾如果缺失，`resolveLocaleDsImagesFolder()` 會自動建立。語言版的 product line 資料夾必須 PM 事先建好（`Cloud AP_ja`），不會自動建
-- **寫入路徑**：`/api/upload-image` 收到 locale 參數 → `resolveLocaleDsImagesFolder` walk up EN 資料夾 → Model Datasheet root → 找 `<line>_<locale>` → 找 / 建 `DS Images/` 子資料夾 → 上傳
-- **同步路徑**：`syncLocalizedHardwareImage()` 在 sync cron 針對每個啟用的 locale 各跑一次，寫入 `product_translations.hardware_image`
-- **Locale 代碼**：`ja` 和 `zh`（zh-TW 簡寫），統一用 ISO 639-1 語言代碼。舊的 `_jp` / `_JP` 已在 2026-04-15 透過 `scripts/rename-jp-to-ja.mjs` 全面改名
-- Drive 上傳失敗不影響 Supabase（non-blocking）
-
-### PDF Generation
-
-- **Regenerate**（預設）：覆蓋當前版本 PDF，更新 versions 表同一筆記錄
-- **New Version**：minor +1（1.4→1.5），新建 versions 記錄
-- 前置條件檢查：Product Image + Hardware Image + Overview + Features 都齊全才能 Generate
-- Preview toolbar 和 Model page 都有相同的 Regenerate/New Version 選項
-- 版本偵測支援三層結構（Camera 用）：`DS_Cloud_ECC100/DS_Cloud_ECC100_v1.1/xxx.pdf`
-- **多語言 PDF**：`/api/generate-pdf?model=X&lang=ja&mode=new`，每語言獨立版本號
-- **Drive folder auto-create**：`uploadPdfToDrive` 透過 `resolveLocaleLineFolder()` 自動建立缺失的 sibling locale line folder（`Cloud Camera_zh`）。容忍 PM typo（`_zh-TW`、`_ZH`、`_jp` 等），找到任何一個就用 + warn
-- **Legacy folder migration**：找不到 canonical 的 `DS_Cloud_<model>_<suffix>` 時，會搜尋 legacy `_v<X>.<Y>` 後綴版本，把最高版號那個 rename 成 canonical，舊 PDF 留在裡面。EN/locale 雙路徑都生效
-- **Drive overwrite + dedupe**：同名 PDF 找到就 update content + trash 多餘重複（非 hard delete — Shared Drive 通常 `canTrash=true canDelete=false`，hard delete 會 404）
-- **Locale Draft 阻擋**：`product_translations.confirmed = false` 時 API 回 409；UI 也擋（顯示「⚠️ Translation in Draft」黃字警告）
-- **Role gating**：PM/Viewer 角色看 preview link 時，Regenerate 按鈕整塊隱藏，顯示「Preview only · PM」
-- **Puppeteer 自我認證**：`/api/generate-pdf` 內部的 Puppeteer 會 fetch 自己的 `/preview/[model]`，proxy 看 `x-vercel-protection-bypass` header（已存在的 `VERCEL_AUTOMATION_BYPASS_SECRET` env var）放行，否則 Puppeteer 會抓到 sign-in 頁印成 PDF
-- **UX**：PDF gen 全部用 `toast.loading` → `toast.success` with `Open PDF` action button（不直接 `window.open`，因為 popup blocker 會擋 async-after window.open）
-- **Resync versions from Drive**（Dashboard `Sync ▾` 第三個選項）：daily sync 只看 Sheet 內容 + 圖片，不掃 Drive 版本。PM 手動動 Drive PDF / generate-pdf 半途失敗時 DB 版號會落後。這顆按鈕對當前 tab 的每個 model 跑 `detectLatestVersion()` 把 DB 拉到跟 Drive 一致。`gate("sync.run")` 開放 admin+editor，當前只處理 EN 版號（未來可延伸 per-locale）
-
-### Datasheet Layout System（`lib/datasheet/`）
-
-Cover page 用 **動態版面**：features 依內容高度浮動（max 320pt），overview 吃剩下空間。Spec 自動 2 欄分頁 + 跨欄 mid-item split。所有估算 **locale-aware** — CJK metrics 不同於 EN。
-
-- **`cover-layout.ts`** — `estimateCoverLayout()` + `balanceFeatureColumns()`（**balanced column-first**：順序填左欄到 ~總高一半，剩下進右欄。保留閱讀順序又接近視覺平衡。舊的 greedy height-balance 已棄用 — 會交錯 1,3,5 / 2,4,6 破壞優先順序）。`LOCALE_METRICS` 表保存每 locale 的 `overviewCharsPerLine` / `featureCharsPerLine` / `overviewLineHeightPt` / `featureLineHeightPt` / `itemMarginPt` / `coverGapPt`。**features 字比 overview 小**（EN 10/11pt, JA 10.5/11.5pt, zh 11/12pt），兩個 line-height 必須分開估算。CJK 把 `coverGapPt` 從 20pt 降到 10pt 買回空間
-- **`pagination.ts`** — spec 分頁。常數必須跟 `preview/[model]/page.tsx` 的 CSS 對齊：`TOP_BAR_HEIGHT=22`（CSS 21.4pt）、`SPEC_TITLE_HEIGHT=62`（27pt padding-top + 16.8pt 行高 + 18pt margin-bottom）、`CATEGORY_HEADER_HEIGHT=22`（7.5pt 字 + padding 5pt + margin 8pt）、`BOTTOM_MARGIN=72`（1 inch 安全 buffer）。`AVAILABLE_HEIGHT = 792 - 22 - 62 - 72 = 636pt`。**Row metrics 是 locale-aware**：`LOCALE_ROW_METRICS` 表 EN baseRowHeight 23/lineExtra 10、JA 24/11、zh-TW 25/12 — CJK 字型 intrinsic leading 較大（~1.3 vs ~1.2）所以每行多 1-2pt。常數低估會讓 fitSection 以為還有空間實際塞爆 → 內容貼頁碼。每改 CSS 必須同步檢查這些常數（pitfall #50）
-- **`fitSection(allowForceFit)`** 只有空欄才能 force-fit（避免把尾巴 orphan 到新頁）。跨欄/跨頁用 `isContinuation` flag，renderer skip 重複 category header（不是拼 "(cont.)" 字串）。partial-split 分支必須 set `splitOccurred = true`，否則尾端 `balanceColumns` 會把好的版面覆寫掉（pitfall #51）
-- **`balanceColumns()`**（單頁美化重排）用**高度**不是 item 數選 split index — 枚舉所有切點挑 `|leftH - rightH|` + 溢位 penalty 最小者。原本 count-based 在 features 長度差異大時會爆（ESG 案例：19/17 items 看似平均但右欄高度 760pt > 可用 657pt）
-- **`layout-check.ts`** — 二元綠/紅燈（丟掉 amber）。`checkProductLayout({ overview, features, spec_sections, locale })` 接 locale 選擇 metrics。Overview overflow 判斷加 12pt safety buffer（避免估算 `wanted=145pt vs available=146pt` 剛好擠進去但實際 rendering 微差就被截）
-- **`layout-ack.ts`** — `products.layout_ack` JSONB，格式 `{ en: { acked: true, hash: "..." }, ja: ... }`。`computeContentHash(overview, features)` 產 16-char sha256；`isAckValid(ack, currentHash)` 比對。內容一改 hash mismatch → ack 自動失效，紅燈回來。Legacy `true` 向後相容（永遠視為有效）
-- **Layout warning UI**（`components/product/product-detail.tsx`）：`LayoutWarningBanner` 顯示 overflow + "Mark as Reviewed OK"；ack valid 時改顯示 `LayoutAckedNotice` 綠色細條 + Undo 按鈕。每 locale 獨立 banner
-- **空翻譯不檢查**：dashboard + product detail 在跑 per-locale layout check 前，先看 `t.overview` 和 `t.features` 是否都是 null/空。都空就 skip — 否則 EN fallback 內容被 CJK metrics 量到會假性紅燈
-- **Antennas Patterns 頁**（AP only）：`preview/[model]/page.tsx` 額外渲染一頁 polar plot grid，位於 spec pages 和 hardware overview 之間。偵測條件：`product_line.category === "APs"` 且有上傳任何 radio_pattern image。6GHz slots 由 Operating Frequency spec 含 `6 GHz` 自動加入。`.antenna-image img` 用**顯式 `width: 158pt; height: 158pt`**（has-6g 縮為 125pt），不用 max-width — 見 Common Pitfalls #31
-- **Spec footnote**（per-product-line, optional）：`product_lines.spec_footnote` (EN) + `spec_footnote_translations` (JSONB) 設定後，會在**最後一個 spec page** 的兩欄下方渲染（左對齊、6.5pt 灰字 + 頂部細線分隔）。VPN Firewall 用來標註效能數據是估計值。其他產品線 NULL 就不顯示。不需動 code，純 SQL 設定。Locale 解析：`translations[lang]` → EN fallback → 不顯示
-
-### Multi-Language Datasheet
-
-完整規則詳見 [`/docs/drive-folder-and-naming-rules.html#s9`](public/docs/drive-folder-and-naming-rules.html)。
-
-**架構要點**：
-- 翻譯分兩層：per-product（`product_translations`：headline/subtitle/overview/features/HW image/QR）+ per-product-line（`spec_label_translations`：spec labels 共用）
-- 兩種模式：**Light**（只翻標題+內容）vs **Full**（+規格表 label）
-- **Draft / Confirmed 流程**：Enable → 翻譯 → Preview（auto-save 為 Draft）→ Save & Confirm → Generate PDF。Save & Confirm 按鈕條件是「有內容 AND (Draft OR dirty)」— Draft 狀態下永遠可按避免使用者按 Preview 後卡死。Draft 時按鈕用 amber + pulse 動畫強調。Preview 對 Draft locale 跳 toast 提醒「請按 Save & Confirm」（pitfall #49）
-- 版本獨立：`products.current_versions` JSONB 存各語言版本（`{"en":"1.1","ja":"1.0"}`）
-- Drive 資料夾：PDF 在 `<lineName>_<locale>/DS_Cloud_<model>_<locale>/`，圖片在 `<lineName>_<locale>/DS Images/{model}_hardware_<locale>.ext`（`getLocaleSuffix()` 負責 zh-TW → zh 映射；日文統一用 `ja`，舊的 `_jp` 命名已於 2026-04-15 全部改掉）
-- Headline 支援 `**粗體**` markdown → 渲染為 `<strong>`（`parseHeadlineMarkup()` in preview）
-- CJK 排版：shared base（禁則處理+justify）+ per-locale CSS 動態從 DB 讀取（`typography_${lang}` in `app_settings`）
-- **Typography Settings**（`/settings/typography`）：字型選擇（Google Fonts）+ 字級/字重/顏色 per-locale，split layout 左設定右 preview
-- 自定義 Google Font：貼 URL 自動解析（`parseGoogleFontUrl()`），存 `app_settings` as `custom_fonts_${locale}`
-
-**AI 翻譯系統**：
-- 5 層 Prompt：base → locale → product-line → content-type → glossary（from DB）
-- 多 provider：Claude Sonnet/Opus、GPT-4o、Gemini 2.5 Pro
-- API Key 優先順序：`app_settings` DB 表 > env var
-- 回傳 JSON `{ translated, notes }` — notes 用繁中說明做了什麼優化
-- `translation_glossary` 表存公司詞庫，scope 分 global 和 per-product-line
-- 新增產品線 prompt：在 `src/lib/translate/prompts/product-lines/` 加檔案 + 在 `index.ts` 的 `productLinePrompts` 註冊
-
-
-### Authentication & RBAC
-
-Three-layer enforcement:
-
-1. **`src/proxy.ts`** (Next.js 16 — replaces `middleware.ts`) — refreshes
-   Supabase session cookie on every request and redirects unauthenticated
-   users to `/auth/sign-in`. `PUBLIC_PATH_PREFIXES`: `/auth/`, `/api/auth/`,
-   `/demo/`, `/api/v1/`; `SERVICE_PATHS`: `/api/sync`, `/api/cron`.
-   `PUBLIC_EXACT_PATHS` = individually-public files — `/api/demo-auth` + the
-   **shareable docs** (`/docs/api-search.html`, `/docs/ask-chat-ux-spec.html`,
-   `/docs/topology-icon-spec.html`). **To make a `/docs/*.html` shareable
-   (no login), add it to `PUBLIC_EXACT_PATHS`** — proxy DOES run on `.html`
-   (only listed static extensions bypass it), so other docs stay gated.
-   Wrapped in try/catch so any Edge runtime quirk falls through (defense in
-   depth — the page layer still gates).
-2. **`(main)/layout.tsx`** — server component runs `getCurrentUser()`. If
-   the user has a Supabase session but no `profiles` row (i.e. email not in
-   whitelist), signs them out and redirects to `/auth/no-access`.
-3. **Per-route gates**:
-   - API routes: `gate("permission")` returns 401/403 NextResponse on
-     failure. `gateOrCron()` variant lets Vercel cron through via the
-     `x-vercel-cron` header.
-   - Server pages: `adminOnly()` / `requirePagePermission()` redirect
-     non-authorised users to `/dashboard` before render.
-   - Client UI: `can(role, "permission")` controls conditional rendering
-     so PM/Viewer don't see buttons that would 403.
-
-**Roles + permission matrix** in `lib/auth/permissions.ts`:
-
-| Role | Capabilities |
-|---|---|
-| `admin` | Everything incl. user management, API keys, Personas, Ask Welcome |
-| `editor` | Edit content, sync, generate PDF, translate, knowledge edit, **Glossary + Typography settings** |
-| `pm` | Read-only + review workflow (no Ask, no Knowledge) |
-| `viewer` | Read-only + Ask SpecHub (sales / field) |
-
-Settings hub 用 `roles: ["admin"]` 過濾敏感卡片（API Keys、Ask Welcome、Ask Personas、Users）；Editor 只看到 Glossary + Typography 兩張。Settings 子頁守門用 `requirePagePermission("settings.edit_xxx")` 而非 `adminOnly()`，讓權限矩陣為單一真相來源。
-
-**Sign-in flow** uses PKCE via `@supabase/ssr` browser client. Caveats:
-- The post-login destination (`next`) is stashed in `sessionStorage`
-  before kicking off OAuth, NOT on the `redirectTo` query string.
-  Supabase validates `redirectTo` verbatim against allow-list — adding
-  `?next=...` makes it fail validation and silently fall back to
-  `site_url` (production). `/auth/callback` redirects to `/auth/redirecting`
-  which is a tiny client page that reads sessionStorage and navigates.
-- Whitelist match is case-insensitive (`LOWER(email)` in trigger).
-
-**Trigger**: `handle_new_user` (SECURITY DEFINER) fires on `auth.users`
-INSERT, looks up `email_whitelist`, creates `profiles` row with the
-listed role. If email not in whitelist, no profile is created — middleware
-handles that case downstream.
-
-**RLS recursion gotcha** (see Pitfalls): admin-check policies on `profiles`
-must use the `current_user_is_admin()` SECURITY DEFINER helper to bypass
-RLS, otherwise a SELECT triggers the policy which itself does a SELECT →
-infinite recursion → query fails.
+三層強制:`proxy.ts`(session refresh + 公開路由白名單 `PUBLIC_PATH_PREFIXES`/`PUBLIC_EXACT_PATHS` + demo/workspace cookie 放行)→ `(main)/layout.tsx`(whitelist 檢查)→ per-route gates(`gate()`/`gateOrCron()`/`adminOnly()`/`requirePagePermission()` + client `can()`)。4 角色(admin/editor/pm/viewer)矩陣在 `lib/auth/permissions.ts`。PKCE sign-in(next 存 sessionStorage)、`handle_new_user` trigger、RLS recursion 用 `current_user_is_admin()`。**改 auth/proxy/權限前先讀該檔。**
 
 ## Brand & Visual System
 
@@ -341,6 +189,7 @@ Key tables:
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
 - `app_settings` — key-value store: API keys, `typography_${locale}`, `custom_fonts_${locale}`, `persona_{id}`, `pdf_lock_{model}_{lang}`
 - `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash
+- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), llm_mode ('shared'|'byok'), provider, byok_provider, byok_key_encrypted (AES), scope JSONB `{solution,product_lines[],models[],source_types[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數. RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only
 - `api_keys` — 對外 Search API key：name, key_prefix, key_hash (sha256, 驗證用), **key_encrypted** (AES-256-GCM, 供 admin 列表複製), scope JSONB `{solution,product_lines[],models[],source_types[]}`, rate_limit_per_min, enabled, last_used_at, request_count, window_start/window_count (固定視窗限流). RLS on + 0 policies = 只走 service role。RPC `api_key_touch(p_hash)` 原子化 verify+限流+用量
 - `chat_sessions` — 對話持久化：user_id (default 'anonymous'), title, persona, provider, messages JSONB
 - `profiles` — id (FK auth.users), email, name, avatar_url, role (TEXT CHECK admin/editor/pm/viewer), last_sign_in_at, timestamps. **role values are TEXT not enum** (we DROPped the orphan `user_role` enum during migration cleanup)
@@ -407,6 +256,18 @@ pointers so you know it exists:
 - 給串接部門的完整對外規格見 [`docs/api-search.md`](docs/api-search.md)。
 - **對外消費(兩種)**：(a) 部門自寫 app → 讀 `docs/api-search.html`(已公開);(b) 同事用 Claude Code → 裝 `engenius-kb` skill(獨立公開 repo **github.com/terrelyeh/claude-skills**,一行 `install.sh`,讀 env `SPECHUB_API_KEY`)。`/settings/api-access` 頁面把「API 文件 + skill 安裝指令」兩張卡並排,admin 在此發 key 並一鍵複製連結給同事。skill 原始檔也在本機 `~/.claude/skills/engenius-kb/`。
 
+### Ask Workspaces（多租戶 /ask/&lt;slug&gt;，Phase 1）
+
+讓其他部門有**自己的 Ask 聊天入口**,共用同一個知識庫但各自 scope/key/角色。**沒有複製串流邏輯** —— `/api/ask` 用一個可選的 `workspace` 參數承載 workspace 模式。
+
+- **入口** `/ask/<slug>`(`app/(demo)/ask/[slug]/page.tsx`)：重用 demo 的 `EngenieGate`/`EngenieShell`/`EngenieChat`(都加了 `workspace`/`title` props)。shell GET `/api/ask?workspace=<slug>` 取設定、POST 帶 `workspace`。
+- **passcode**：`lib/auth/workspace-session.ts` —— cookie `ws_<slug>` = HMAC(`ws:<slug>`, key=`API_KEY_ENC_SECRET`),Edge+Node 皆可驗(免 DB,slug 在 cookie 名裡)。`/api/ws-auth` 驗 passcode(sha256 比對 `passcode_hash`)後發 cookie。
+- **`/api/ask` 擴充**：帶 `workspace` 時 → `loadWorkspaceBySlug` → 驗 ws cookie → `ask_workspace_touch` RPC(每分/每日配額)→ 用 ws 的 scope 檢索(`strictScope`)、persona/profile/provider 預設(`allow_switch=false` 則鎖定)、`llm_mode='byok'` 時 `decryptKey(byok_key_encrypted)` 當 `apiKeyOverride`。沒帶 `workspace` → 原本的 `gateAskOrDemo()`,行為不變。
+- **streamClaude/OpenAI/Gemini** 都加了選用 `apiKeyOverride`(BYOK 注入點;省略則 `getApiKey()`)。
+- **proxy**：`/ask/` + `/api/ws-auth` 公開;`/api/ask` 在帶**任一合法 `ws_*` cookie** 時放行(`hasAnyValidWorkspaceCookie`)。
+- **管理**：`/settings/ask-workspaces`(admin)+ `app/api/ask-workspaces/route.ts` CRUD。secrets(passcode/BYOK key)write-only。
+- 規劃 Phase 2(部門私有文件自助索引)見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)。
+
 ## Current Status
 
 功能清單詳見 [README.md](README.md)。
@@ -414,9 +275,10 @@ pointers so you know it exists:
 ### 🔜 Next Steps
 
 **RAG**：
-1. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較）
-2. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation 變動
-3. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
+1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
+2. **Text Snippet CRUD** — 手動文字片段（FAQ、競品比較）
+3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation 變動
+4. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
 
 **Datasheet 系統**：
 4. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
@@ -483,6 +345,10 @@ npm run lint   # ESLint check
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25（早期特定 feature 的踩雷紀錄）
 - [`docs/rag-context.md`](docs/rag-context.md) — Ask SpecHub / RAG 完整架構
 - [`docs/api-search.md`](docs/api-search.md) — 對外 RAG Search API 規格（給其他部門串接：認證、參數、回傳、scope、限流、錯誤碼、範例）
+- [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md) — Ask Workspaces Phase 2 計畫書（部門私有文件自助索引：資料模型、隔離、上傳/解析、權限、工時估）
 - [`docs/ask-chat-ux-spec.md`](docs/ask-chat-ux-spec.md) — Ask 聊天互動規範（兩介面共用引擎、動態效果、格式樣式、回答契約；給 RD/PM 參考。HTML 版 `public/docs/ask-chat-ux-spec.html`）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知流程
+- [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Google Sheets 同步、product status、locale-aware 圖片雙向同步（細節）
+- [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md) — PDF 生成、cover/spec 版面（lib/datasheet/）、多語言 datasheet + AI 翻譯（細節）
+- [`docs/auth-rbac.md`](docs/auth-rbac.md) — 認證/proxy/RBAC 三層、權限矩陣、sign-in flow、RLS（細節）
 - [`public/docs/drive-folder-and-naming-rules.html`](public/docs/drive-folder-and-naming-rules.html) — Drive 資料夾結構、檔名規則、Detail Specs 填寫規則

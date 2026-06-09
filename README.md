@@ -101,6 +101,13 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **一站分發** — `/settings/api-access` 並排顯示「API 文件」與「skill 安裝指令」兩張卡，管理員發完 key 即可一鍵複製連結給同事
 - 完整串接文件見 [`docs/api-search.md`](docs/api-search.md)（線上 HTML：`/docs/api-search.html`）
 
+### Ask Workspaces（部門專屬聊天入口）
+- **`/ask/<slug>`** — 每個部門有自己的 Ask 聊天頁，免登入（passcode 進入），UI 與 EnGenie demo 一致
+- **共用知識庫、各自範圍** — 同一個 EnGenius 知識庫，用 taxonomy + 來源類型 scope 限定每個 workspace 看得到的內容
+- **LLM 兩種模式** — `共用 key + 配額`（公司出錢、可設每分/每日上限）或 `BYOK`（部門自帶 Claude/GPT/Gemini key，AES 加密儲存、自付成本）
+- **可自訂** — 每個 workspace 自己的 persona / 對話對象 / 歡迎語 / 範例問題，可鎖定或開放使用者切換
+- **管理** — 管理員在 `/settings/ask-workspaces` 發/編 workspace、設範圍與上限、複製入口連結；passcode 與 BYOK key 為唯寫（hash / 加密儲存）
+
 ### WiFi Regulation Viewer
 - **`/wifi-regulation/[code]`** — 單一國家法規的乾淨 markdown 頁面（UNII 頻段、頻道清單、功率限制、DFS 要求）
 - Ask SpecHub 的法規引用會直接連到此頁面
