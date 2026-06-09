@@ -78,7 +78,7 @@ function guessRole(key) {
   if (/^ESG/.test(k)) return "gateway";                       // Cloud VPN Firewall / SD-WAN
   if (/^ECC/.test(k)) return "camera";                        // Cloud Camera
   if (/^EVS/.test(k)) return "nvs";                           // Cloud AI-NVS
-  if (/^ECP/.test(k)) return "pdu";                           // Cloud PDU
+  if (/^ECP|^EPC/.test(k)) return "pdu";                      // Cloud PDU (ECP + EPC lines)
   if (/^EOC|^ENSTATION/.test(k)) return "bridge";             // outdoor bridge / CPE
   return "device";                                            // unknown (e.g. EPC) — set manually
 }
