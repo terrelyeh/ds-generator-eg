@@ -97,6 +97,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ### 對外 RAG Search API（其他部門串接）
 - **`POST /api/v1/search`** — 讓其他部門的 app 查詢知識庫、取得最相關片段，接進自己的 LLM（RAG 檢索層）
 - **Scoped API key** — 管理員在 `/settings/api-access` 核發 key，可限定 Solution / 產品線 / 來源類型範圍與每分鐘速率；驗證走 hash、另以 AES-256-GCM 加密儲存供管理員從列表「Copy key」重新複製
+- **Claude Code Skill（`/engenius-kb`）** — 用 Claude Code 的同事可一行安裝 [`claude-skills`](https://github.com/terrelyeh/claude-skills) repo 的 skill，讓 AI 直接查 EnGenius 知識庫回答；key 走環境變數
+- **一站分發** — `/settings/api-access` 並排顯示「API 文件」與「skill 安裝指令」兩張卡，管理員發完 key 即可一鍵複製連結給同事
 - 完整串接文件見 [`docs/api-search.md`](docs/api-search.md)（線上 HTML：`/docs/api-search.html`）
 
 ### WiFi Regulation Viewer

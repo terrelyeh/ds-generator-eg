@@ -1,9 +1,10 @@
 # CLAUDE.md — Project Context
 
 > Last updated: 2026-06-09 (External RAG Search API for departments:
-> /api/v1/search + api_keys + shared lib/rag/retrieve.ts core; generic `web`
-> source type (Firecrawl→Jina→fetch); topology now SVG + separate ASCII box.
-> Earlier: shared useChatStream/CodeBlock chat engine, docs/ask-chat-ux-spec.md)
+> /api/v1/search + api_keys + shared lib/rag/retrieve.ts core; consumed via
+> public docs/api-search.html OR the engenius-kb Claude Code skill
+> (github.com/terrelyeh/claude-skills). Shareable /docs via PUBLIC_EXACT_PATHS.
+> generic `web` source; topology SVG + separate ASCII box; shared chat engine)
 
 ## Project Overview
 
@@ -259,9 +260,15 @@ Three-layer enforcement:
 
 1. **`src/proxy.ts`** (Next.js 16 — replaces `middleware.ts`) — refreshes
    Supabase session cookie on every request and redirects unauthenticated
-   users to `/auth/sign-in`. Public routes: `/auth/*`, `/api/auth/*`,
-   `/api/sync`, `/api/cron`. Wrapped in try/catch so any Edge runtime quirk
-   falls through (defense in depth — the page layer still gates).
+   users to `/auth/sign-in`. `PUBLIC_PATH_PREFIXES`: `/auth/`, `/api/auth/`,
+   `/demo/`, `/api/v1/`; `SERVICE_PATHS`: `/api/sync`, `/api/cron`.
+   `PUBLIC_EXACT_PATHS` = individually-public files — `/api/demo-auth` + the
+   **shareable docs** (`/docs/api-search.html`, `/docs/ask-chat-ux-spec.html`,
+   `/docs/topology-icon-spec.html`). **To make a `/docs/*.html` shareable
+   (no login), add it to `PUBLIC_EXACT_PATHS`** — proxy DOES run on `.html`
+   (only listed static extensions bypass it), so other docs stay gated.
+   Wrapped in try/catch so any Edge runtime quirk falls through (defense in
+   depth — the page layer still gates).
 2. **`(main)/layout.tsx`** — server component runs `getCurrentUser()`. If
    the user has a Supabase session but no `profiles` row (i.e. email not in
    whitelist), signs them out and redirects to `/auth/no-access`.
@@ -398,6 +405,7 @@ pointers so you know it exists:
 - **proxy**：`/api/v1/` 在 `PUBLIC_PATH_PREFIXES`（跳過 session gate，路由自己做 key auth + 回 JSON 401；**不能**讓 API client 吃到 HTML 導向）。**不開 CORS**（強制 server-to-server，避免 key 暴露在瀏覽器）。
 - **管理 UI**：`/settings/api-access`（admin，權限 `settings.manage_api_access`）發/設 scope/停用/刪除/看用量；CRUD 在 `app/api/api-keys/route.ts`。
 - 給串接部門的完整對外規格見 [`docs/api-search.md`](docs/api-search.md)。
+- **對外消費(兩種)**：(a) 部門自寫 app → 讀 `docs/api-search.html`(已公開);(b) 同事用 Claude Code → 裝 `engenius-kb` skill(獨立公開 repo **github.com/terrelyeh/claude-skills**,一行 `install.sh`,讀 env `SPECHUB_API_KEY`)。`/settings/api-access` 頁面把「API 文件 + skill 安裝指令」兩張卡並排,admin 在此發 key 並一鍵複製連結給同事。skill 原始檔也在本機 `~/.claude/skills/engenius-kb/`。
 
 ## Current Status
 
