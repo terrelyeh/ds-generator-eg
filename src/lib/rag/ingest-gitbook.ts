@@ -265,8 +265,50 @@ export async function ingestGitbook(
     };
   }
 
-  // Step 2: Fetch all pages
-  const pages = await fetchPagesWithConcurrency(sitemapEntries, FETCH_CONCURRENCY, errors);
+  // Step 1b: Incremental — drop sitemap entries whose lastModified is unchanged
+  // since the last index, so we don't re-fetch + re-Vision the whole space.
+  // This is what lets the weekly re-crawl cron fit Hobby's 60s budget. A page's
+  // sitemap lastModified is stored in its chunk metadata; if it matches we skip
+  // fetching (existing chunks stay). force=true bypasses → full re-crawl.
+  const spaceBase = spaceUrl.replace(/\/$/, "");
+  const toSourceId = (u: string) => {
+    try {
+      return new URL(u).pathname.replace(/^\//, "").replace(/\/$/, "") || "index";
+    } catch {
+      return u;
+    }
+  };
+  const lastModByUrl = new Map<string, string | undefined>(
+    sitemapEntries.map((e) => [e.url, e.lastModified]),
+  );
+
+  let entriesToFetch = sitemapEntries;
+  if (!force) {
+    const adminEarly = createAdminClient();
+    const { data: existingMeta } = (await adminEarly
+      .from("documents" as "products")
+      .select("source_id, space_url:metadata->>space_url, last_modified:metadata->>last_modified")
+      .eq("source_type", "gitbook")) as {
+      data: { source_id: string; space_url: string | null; last_modified: string | null }[] | null;
+    };
+    const prevLastMod = new Map<string, string>();
+    for (const d of existingMeta ?? []) {
+      if (d.space_url !== spaceBase || !d.last_modified) continue;
+      if (!prevLastMod.has(d.source_id)) prevLastMod.set(d.source_id, d.last_modified);
+    }
+    entriesToFetch = sitemapEntries.filter((e) => {
+      if (!e.lastModified) return true; // unknown freshness → fetch to be safe
+      const prev = prevLastMod.get(toSourceId(e.url));
+      if (prev && prev === e.lastModified) {
+        pagesSkipped++;
+        return false;
+      }
+      return true;
+    });
+  }
+
+  // Step 2: Fetch only new/changed pages (all pages when force=true)
+  const pages = await fetchPagesWithConcurrency(entriesToFetch, FETCH_CONCURRENCY, errors);
 
   // Step 3: Collect all image URLs across all pages for batch Vision processing
   const allImageUrls: string[] = [];
@@ -350,6 +392,7 @@ export async function ingestGitbook(
         metadata: {
           space_url: baseUrl,
           space_label: spaceLabel,
+          last_modified: lastModByUrl.get(url),
           breadcrumb,
           page_title: page.title,
           has_images: chunk.images.length > 0,
@@ -433,6 +476,7 @@ export async function ingestGitbook(
         metadata: {
           space_url: baseUrl,
           space_label: spaceLabel,
+          last_modified: lastModByUrl.get(url),
           breadcrumb,
           page_title: page.title,
           chunk_type: "focused_led_table",
