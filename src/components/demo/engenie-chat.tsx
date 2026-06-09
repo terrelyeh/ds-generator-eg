@@ -12,16 +12,21 @@ import {
   type ChatMessage as Message,
   type ChatSource as Source,
 } from "@/hooks/use-chat-stream";
+import { upsertConversation, newConversationId } from "@/lib/demo/history";
 
 const markdownComponents: Components = {
-  // Wrap tables in a horizontal-scroll container so wide comparison
-  // tables don't blow out the mobile viewport.
-  table: ({ children, ...props }) => (
-    <div className="my-5 -mx-5 overflow-x-auto px-5">
-      <table {...props} className="min-w-max border-collapse">
-        {children}
-      </table>
+  // Tables fit the container width (no horizontal scrollbar) and wrap inside
+  // cells — table-fixed gives even columns, break-words wraps long content.
+  table: ({ children }) => (
+    <div className="my-5 w-full">
+      <table className="w-full table-fixed border-collapse">{children}</table>
     </div>
+  ),
+  th: ({ children }) => (
+    <th className="whitespace-normal break-words align-top">{children}</th>
+  ),
+  td: ({ children }) => (
+    <td className="whitespace-normal break-words align-top">{children}</td>
   ),
   // Fenced blocks → CodeBlock, except ```topology → TopologyDiagram
   pre: ({ children }) => <ChatPre>{children}</ChatPre>,
@@ -34,6 +39,15 @@ export interface EngenieChatProps {
   welcomeSubtitle?: string | null;
   welcomeDescription?: string | null;
   exampleQuestions?: string[];
+  /** Labels for the bottom status bar (shows current model/persona/profile). */
+  modelLabel?: string;
+  personaLabel?: string;
+  profileLabel?: string;
+  /** Open the settings drawer (status bar is tappable so users can switch). */
+  onOpenSettings?: () => void;
+  /** Seed messages when resuming a saved conversation from history. */
+  initialMessages?: Message[];
+  initialConvId?: string | null;
 }
 
 const FALLBACK_QUESTIONS = [
@@ -50,18 +64,46 @@ export function EngenieChat({
   welcomeSubtitle,
   welcomeDescription,
   exampleQuestions,
+  modelLabel,
+  personaLabel,
+  profileLabel,
+  onOpenSettings,
+  initialMessages,
+  initialConvId,
 }: EngenieChatProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const convIdRef = useRef<string | null>(initialConvId ?? null);
 
   // Shared chat streaming engine — same logic as the desktop Ask panel.
   // Live status ("searching" → "generating") drives 搜尋相關資料中… / 整理回覆中…
-  const { messages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
+  const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
     getParams: () => ({ provider, persona, profile }),
     stoppedLabel: "_(已停止)_",
+    onComplete: (msgs) => {
+      // Persist this turn to per-browser history (localStorage).
+      const firstUser = msgs.find((m) => m.role === "user");
+      if (!firstUser) return;
+      if (!convIdRef.current) convIdRef.current = newConversationId();
+      upsertConversation({
+        id: convIdRef.current,
+        title: firstUser.content.slice(0, 60),
+        updatedAt: Date.now(),
+        provider,
+        persona,
+        profile,
+        messages: msgs,
+      });
+    },
   });
 
   const { ref: scrollRef, isAtBottom, scrollToBottom } = useStickToBottom<HTMLDivElement>([messages, loading]);
+
+  // Seed a resumed conversation (from history) once on mount.
+  useEffect(() => {
+    if (initialMessages && initialMessages.length) setMessages(initialMessages);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const t = setTimeout(() => textareaRef.current?.focus(), 120);
@@ -129,7 +171,7 @@ export function EngenieChat({
             </div>
           </div>
         ) : (
-          <div className="mx-auto w-full max-w-[720px] px-5 pt-6 pb-8">
+          <div className="mx-auto w-full max-w-[864px] px-5 pt-6 pb-8">
             {messages.map((m, i) => {
               const isLastAssistant =
                 m.role === "assistant" &&
@@ -168,7 +210,7 @@ export function EngenieChat({
         className="flex-shrink-0 px-3 pt-2"
         style={{ paddingBottom: "max(env(safe-area-inset-bottom), 12px)" }}
       >
-        <div className="mx-auto flex w-full max-w-[720px] items-end gap-2 rounded-[28px] border border-black/[0.08] bg-white px-4 py-2 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] transition-all focus-within:border-engenius-blue/50 focus-within:shadow-[0_4px_20px_-4px_rgba(3,169,244,0.15)]">
+        <div className="mx-auto flex w-full max-w-[864px] items-end gap-2 rounded-[28px] border border-black/[0.08] bg-white px-4 py-2 shadow-[0_2px_12px_-4px_rgba(0,0,0,0.06)] transition-all focus-within:border-engenius-blue/50 focus-within:shadow-[0_4px_20px_-4px_rgba(3,169,244,0.15)]">
           <textarea
             ref={textareaRef}
             value={input}
@@ -205,6 +247,18 @@ export function EngenieChat({
             </button>
           )}
         </div>
+        {(modelLabel || personaLabel || profileLabel) && (
+          <button
+            onClick={onOpenSettings}
+            title="點此切換 模型 / 角色 / 對象"
+            className="mx-auto mt-2 flex max-w-[864px] flex-wrap items-center justify-center gap-x-1.5 px-2 text-[11px] text-engenius-dark/45 transition-colors hover:text-engenius-dark/75"
+          >
+            {modelLabel && <span>{modelLabel}</span>}
+            {personaLabel && (<><span className="opacity-50">·</span><span>角色：{personaLabel}</span></>)}
+            {profileLabel && (<><span className="opacity-50">·</span><span>對象：{profileLabel}</span></>)}
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="ml-0.5 opacity-60"><polyline points="6 9 12 15 18 9" /></svg>
+          </button>
+        )}
       </div>
     </div>
   );
@@ -305,18 +359,33 @@ const MessageBubble = memo(function MessageBubble({
 /* ─── Small EnGenie avatar shown beside each assistant reply ─── */
 function EngenieAvatar({ thinking }: { thinking?: boolean }) {
   return (
-    <div
-      style={
-        thinking
-          ? { animation: "engenieThink 1.6s ease-in-out infinite", transformOrigin: "center", display: "inline-block" }
-          : undefined
-      }
-    >
-      <EngenieMark size={20} />
+    <div className="relative inline-flex items-center justify-center" style={{ width: 22, height: 22 }}>
+      {thinking && (
+        <span
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: "radial-gradient(circle, rgba(3,169,244,0.45), transparent 68%)",
+            animation: "engenieGlow 1.5s ease-in-out infinite",
+          }}
+        />
+      )}
+      <span
+        style={{
+          display: "inline-block",
+          transformOrigin: "center",
+          animation: thinking ? "engenieBreath 1.5s ease-in-out infinite" : undefined,
+        }}
+      >
+        <EngenieMark size={20} />
+      </span>
       <style>{`
-        @keyframes engenieThink {
-          0%, 100% { transform: scale(0.9); opacity: 0.75; }
-          50% { transform: scale(1.06); opacity: 1; }
+        @keyframes engenieBreath {
+          0%, 100% { transform: scale(0.82); opacity: 0.7; }
+          50% { transform: scale(1.16); opacity: 1; }
+        }
+        @keyframes engenieGlow {
+          0%, 100% { opacity: 0.2; transform: scale(0.75); }
+          50% { opacity: 0.75; transform: scale(1.35); }
         }
       `}</style>
     </div>

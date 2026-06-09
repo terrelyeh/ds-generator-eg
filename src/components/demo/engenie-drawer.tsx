@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EngenieMark } from "./engenie-mark";
+import { listConversations, deleteConversation, type DemoConversation } from "@/lib/demo/history";
 
 interface Model {
   id: string;
@@ -38,6 +39,18 @@ const MODEL_GROUPS: ModelGroup[] = [
   },
 ];
 
+export function modelLabelOf(id: string): string {
+  return MODEL_GROUPS.flatMap((g) => g.models).find((m) => m.id === id)?.label ?? id;
+}
+
+function fmtTime(ts: number): string {
+  try {
+    return new Date(ts).toLocaleString("zh-TW", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+}
+
 export interface PersonaOption {
   id: string;
   name: string;
@@ -62,11 +75,18 @@ export interface EngenieDrawerProps {
   profile: string;
   onProfileChange: (id: string) => void;
   profiles: ProfileOption[];
+  onLoadConversation: (c: DemoConversation) => void;
+  currentConvId?: string | null;
 }
 
 export function EngenieDrawer(props: EngenieDrawerProps) {
   const { open, onClose } = props;
   const [modelExpanded, setModelExpanded] = useState(false);
+  // Read history from localStorage on open / after a delete (no effect needed).
+  const [historyRefresh, setHistoryRefresh] = useState(0);
+  // historyRefresh is a deliberate re-read trigger (after delete), not used in body.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const convs = useMemo(() => (open ? listConversations() : []), [open, historyRefresh]);
 
   useEffect(() => {
     if (!open) return;
@@ -219,6 +239,43 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
                 />
               ))}
             </div>
+          </Section>
+
+          <div className="my-6 h-px bg-border/60" />
+
+          <Section title="History">
+            {convs.length === 0 ? (
+              <p className="text-[12.5px] font-medium text-engenius-dark/40">尚無對話紀錄</p>
+            ) : (
+              <div className="space-y-1.5">
+                {convs.map((c) => (
+                  <div
+                    key={c.id}
+                    className={`group flex items-center gap-2 rounded-2xl border px-3.5 py-3 transition-all ${
+                      c.id === props.currentConvId
+                        ? "border-engenius-blue/50 bg-engenius-blue/[0.06]"
+                        : "border-black/[0.08] bg-white hover:border-engenius-blue/30"
+                    }`}
+                  >
+                    <button onClick={() => props.onLoadConversation(c)} className="min-w-0 flex-1 text-left">
+                      <div className="truncate text-[14px] font-medium text-engenius-dark">{c.title || "對話"}</div>
+                      <div className="mt-0.5 text-[11.5px] font-medium text-engenius-dark/45">
+                        {fmtTime(c.updatedAt)} · {c.messages.filter((m) => m.role === "user").length} 則
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => { deleteConversation(c.id); setHistoryRefresh((r) => r + 1); }}
+                      aria-label="刪除"
+                      className="flex-shrink-0 text-engenius-dark/25 transition-colors hover:text-red-500"
+                    >
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2M19 6l-1 14a1 1 0 01-1 1H7a1 1 0 01-1-1L5 6" />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Section>
         </div>
 

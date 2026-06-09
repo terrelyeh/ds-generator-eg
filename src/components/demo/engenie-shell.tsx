@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { EngenieChat } from "./engenie-chat";
-import { EngenieDrawer, type PersonaOption, type ProfileOption } from "./engenie-drawer";
+import { EngenieDrawer, modelLabelOf, type PersonaOption, type ProfileOption } from "./engenie-drawer";
+import type { DemoConversation } from "@/lib/demo/history";
+import type { ChatMessage } from "@/hooks/use-chat-stream";
 
 export function EngenieShell() {
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -16,6 +18,25 @@ export function EngenieShell() {
   const [exampleQuestions, setExampleQuestions] = useState<string[] | undefined>(undefined);
   // Incrementing this remounts EngenieChat to reset messages + input state
   const [chatKey, setChatKey] = useState(0);
+  // Resume support: when loading a saved conversation we seed the chat + remount
+  const [initialMessages, setInitialMessages] = useState<ChatMessage[] | undefined>(undefined);
+  const [initialConvId, setInitialConvId] = useState<string | null>(null);
+
+  function newChat() {
+    setInitialMessages(undefined);
+    setInitialConvId(null);
+    setChatKey((k) => k + 1);
+  }
+
+  function loadConversation(c: DemoConversation) {
+    setProvider(c.provider);
+    setPersona(c.persona);
+    setProfile(c.profile);
+    setInitialMessages(c.messages);
+    setInitialConvId(c.id);
+    setChatKey((k) => k + 1);
+    setDrawerOpen(false);
+  }
 
   useEffect(() => {
     fetch("/api/ask")
@@ -54,7 +75,7 @@ export function EngenieShell() {
           EnGenie
         </h1>
         <button
-          onClick={() => setChatKey((k) => k + 1)}
+          onClick={newChat}
           aria-label="New chat"
           className="absolute right-3 flex h-10 w-10 items-center justify-center rounded-full text-engenius-dark/80 transition-colors hover:bg-black/[0.04] active:bg-black/[0.08]"
           style={{ top: "max(env(safe-area-inset-top), 10px)" }}
@@ -77,6 +98,12 @@ export function EngenieShell() {
           welcomeSubtitle={welcomeSubtitle}
           welcomeDescription={welcomeDescription}
           exampleQuestions={exampleQuestions}
+          modelLabel={modelLabelOf(provider)}
+          personaLabel={personas.find((p) => p.id === persona)?.name}
+          profileLabel={profiles.find((p) => p.id === profile)?.label}
+          onOpenSettings={() => setDrawerOpen(true)}
+          initialMessages={initialMessages}
+          initialConvId={initialConvId}
         />
       </div>
 
@@ -91,6 +118,8 @@ export function EngenieShell() {
         profile={profile}
         onProfileChange={setProfile}
         profiles={profiles}
+        onLoadConversation={loadConversation}
+        currentConvId={initialConvId}
       />
     </div>
   );
