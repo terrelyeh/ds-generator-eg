@@ -23,7 +23,7 @@ interface WorkspaceInput {
   name?: string;
   enabled?: boolean;
   passcode?: string; // plaintext; hashed here. "" = leave unchanged on PATCH
-  llm_mode?: "shared" | "byok";
+  llm_mode?: "shared" | "byok" | "user_byok";
   provider?: string;
   byok_key?: string; // plaintext; encrypted here. "" = leave unchanged on PATCH
   scope?: { solution?: string | null; product_lines?: string[]; models?: string[]; source_types?: string[] };
@@ -85,7 +85,14 @@ export async function POST(request: Request) {
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
 
   const provider = body.provider || "gemini-3.5-flash";
-  const llm_mode = body.llm_mode === "byok" ? "byok" : "shared";
+  const llm_mode = body.llm_mode === "byok" ? "byok" : body.llm_mode === "user_byok" ? "user_byok" : "shared";
+
+  // A workspace-level BYOK is unusable without a key — the chat endpoint refuses
+  // to generate (returns 400). Block creation so it never looks "ready" up front.
+  // (user_byok needs no admin key — each visitor brings their own.)
+  if (llm_mode === "byok" && !body.byok_key) {
+    return NextResponse.json({ error: "BYOK 模式需要填入 API key。" }, { status: 400 });
+  }
 
   const row: Record<string, unknown> = {
     slug,
@@ -93,7 +100,7 @@ export async function POST(request: Request) {
     enabled: body.enabled ?? true,
     llm_mode,
     provider,
-    byok_provider: llm_mode === "byok" ? familyOf(provider) : null,
+    byok_provider: llm_mode === "shared" ? null : familyOf(provider),
     scope: normalizeScope(body.scope),
     persona: body.persona || "default",
     profile: body.profile || "default",
@@ -131,7 +138,7 @@ export async function PATCH(request: Request) {
   const update: Record<string, unknown> = {};
   if (typeof body.name === "string") update.name = body.name.trim();
   if (typeof body.enabled === "boolean") update.enabled = body.enabled;
-  if (body.llm_mode) update.llm_mode = body.llm_mode === "byok" ? "byok" : "shared";
+  if (body.llm_mode) update.llm_mode = body.llm_mode === "byok" ? "byok" : body.llm_mode === "user_byok" ? "user_byok" : "shared";
   if (typeof body.provider === "string") update.provider = body.provider;
   if (body.scope) update.scope = normalizeScope(body.scope);
   if (typeof body.persona === "string") update.persona = body.persona;
@@ -146,15 +153,39 @@ export async function PATCH(request: Request) {
   // Secrets: only when a non-empty value is provided.
   if (body.passcode) update.passcode_hash = createHash("sha256").update(body.passcode).digest("hex");
   if (body.byok_key) update.byok_key_encrypted = encryptKey(body.byok_key);
-  // Keep byok_provider consistent with the (possibly updated) provider.
-  const effProvider = (update.provider as string) ?? undefined;
-  if (effProvider && (update.llm_mode === "byok" || body.llm_mode === "byok")) update.byok_provider = familyOf(effProvider);
 
   if (Object.keys(update).length === 0) {
     return NextResponse.json({ error: "Nothing to update" }, { status: 400 });
   }
 
   const supabase = createAdminClient();
+
+  // BYOK-readiness guard: an enabled BYOK workspace MUST have a key, otherwise
+  // the chat endpoint can't generate and the entry only looks usable. Compute
+  // the post-update state (current row + this patch) and refuse if it would end
+  // up enabled + byok + no key. Escape hatches: switch to shared, disable, or
+  // provide a key.
+  const { data: current } = (await supabase
+    .from("ask_workspaces" as "products")
+    .select("llm_mode, enabled, provider, byok_key_encrypted")
+    .eq("id", body.id)
+    .maybeSingle()) as { data: { llm_mode: string; enabled: boolean; provider: string; byok_key_encrypted: string | null } | null };
+  if (!current) return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+  const effMode = (update.llm_mode as string | undefined) ?? current.llm_mode;
+  const effEnabled = typeof update.enabled === "boolean" ? update.enabled : current.enabled;
+  // Only workspace-level BYOK needs an admin key; user_byok users bring their own.
+  const effHasKey = body.byok_key ? true : !!current.byok_key_encrypted;
+  if (effEnabled && effMode === "byok" && !effHasKey) {
+    return NextResponse.json(
+      { error: "BYOK workspace 需要先填入 API key 才能啟用（或改用 Shared key / User BYOK、或先停用）。" },
+      { status: 400 },
+    );
+  }
+  // Keep byok_provider in sync with the effective mode + provider.
+  const effProvider = (update.provider as string | undefined) ?? current.provider;
+  if (effMode === "shared") update.byok_provider = null;
+  else if (update.llm_mode || update.provider) update.byok_provider = familyOf(effProvider);
+
   const { error } = await supabase.from("ask_workspaces" as "products").update(update).eq("id", body.id);
   if (error) return NextResponse.json({ error: "Update failed" }, { status: 500 });
   return NextResponse.json({ ok: true });

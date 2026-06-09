@@ -15,7 +15,7 @@ interface Workspace {
   slug: string;
   name: string;
   enabled: boolean;
-  llm_mode: "shared" | "byok";
+  llm_mode: "shared" | "byok" | "user_byok";
   provider: string;
   byok_provider: string | null;
   scope: { solution?: string | null; product_lines?: string[]; models?: string[]; source_types?: string[] } | null;
@@ -75,7 +75,7 @@ export function AskWorkspacesManager() {
   const [slug, setSlug] = useState("");
   const [name, setName] = useState("");
   const [passcode, setPasscode] = useState("");
-  const [llmMode, setLlmMode] = useState<"shared" | "byok">("shared");
+  const [llmMode, setLlmMode] = useState<"shared" | "byok" | "user_byok">("shared");
   const [provider, setProvider] = useState("gemini-3.5-flash");
   const [byokKey, setByokKey] = useState("");
   const [tax, setTax] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
@@ -131,6 +131,11 @@ export function AskWorkspacesManager() {
   async function save() {
     if (!name.trim()) { toast.error("Enter a name"); return; }
     if (!editId && !/^[a-z0-9-]+$/.test(slug)) { toast.error("Slug: lowercase letters, numbers, hyphens"); return; }
+    // BYOK needs a key — either a newly entered one, or an existing saved one.
+    if (llmMode === "byok" && !byokKey.trim() && !(editId && editHasByok)) {
+      toast.error("BYOK 模式需要填入 API key");
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -221,7 +226,11 @@ export function AskWorkspacesManager() {
                     {!w.enabled && <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">disabled</span>}
                   </td>
                   <td className="px-3 py-2 text-[11px] text-muted-foreground">
-                    {w.llm_mode === "byok" ? <span>BYOK · {familyOf(w.provider)}{!w.has_byok_key && <span className="text-red-600"> (key missing)</span>}</span> : "Shared key"}
+                    {w.llm_mode === "byok"
+                      ? <span>BYOK · {familyOf(w.provider)}{!w.has_byok_key && <span className="text-red-600"> (key missing)</span>}</span>
+                      : w.llm_mode === "user_byok"
+                      ? <span>User BYOK · {familyOf(w.provider)}</span>
+                      : "Shared key"}
                     <div className="text-muted-foreground/60">{w.provider}</div>
                   </td>
                   <td className="max-w-[200px] px-3 py-2 text-[11px] text-muted-foreground">
@@ -277,11 +286,11 @@ export function AskWorkspacesManager() {
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
                 <p className="mb-2 text-xs font-medium">LLM 生成模式</p>
-                <div className="mb-2 flex gap-2">
-                  {(["shared", "byok"] as const).map((m) => (
+                <div className="mb-2 flex flex-wrap gap-2">
+                  {(["shared", "byok", "user_byok"] as const).map((m) => (
                     <button key={m} type="button" disabled={saving} onClick={() => setLlmMode(m)}
                       className={`rounded-md border px-3 py-1.5 text-xs ${llmMode === m ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>
-                      {m === "shared" ? "Shared key + quota" : "BYOK (own key)"}
+                      {m === "shared" ? "Shared key + quota" : m === "byok" ? "Workspace BYOK (一把共用)" : "User BYOK (各自輸入)"}
                     </button>
                   ))}
                 </div>
@@ -296,8 +305,13 @@ export function AskWorkspacesManager() {
                     </label>
                     <input value={byokKey} disabled={saving} onChange={(e) => setByokKey(e.target.value)} placeholder={editId && editHasByok ? "•••••• (unchanged)" : `${familyOf(provider)} key`}
                       className="w-full rounded-md border px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
-                    <p className="mt-1 text-[11px] text-muted-foreground/60">Key 須與所選模型同家族（Claude→Anthropic、GPT→OpenAI、Gemini→Google）。AES 加密儲存。</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground/60">Key 須與所選模型同家族（Claude→Anthropic、GPT→OpenAI、Gemini→Google）。AES 加密儲存，整個 workspace 共用這一把。</p>
                   </div>
+                )}
+                {llmMode === "user_byok" && (
+                  <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                    每位使用者第一次進來時，會在前台輸入自己的 {familyOf(provider)} API key（存在他自己的瀏覽器，不進資料庫）。你只需選好模型，這裡不用填 key。
+                  </p>
                 )}
               </div>
 

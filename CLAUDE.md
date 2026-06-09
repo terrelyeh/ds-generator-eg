@@ -1,10 +1,13 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-09 (Ask Workspaces Phase 1: multi-tenant /ask/<slug>
-> with per-workspace passcode + BYOK/shared LLM + scoped KB, via an optional
-> `workspace` param on /api/ask. External RAG Search API (/api/v1/search +
-> api_keys + shared lib/rag/retrieve.ts) consumed via public docs/api-search.html
-> OR the engenius-kb Claude Code skill. generic `web` source; shared chat engine)
+> Last updated: 2026-06-09 (Ask Workspaces: multi-tenant /ask/<slug> with
+> per-workspace passcode + 3 LLM modes (shared / workspace-BYOK / **user-BYOK**)
+> + scoped KB, via an optional `workspace` param on /api/ask. Frontend now
+> enforces `allow_switch` (locks selectors) and partitions chat history per
+> workspace; BYOK-without-key is blocked at admin + shown as "not ready" on the
+> public page. External RAG Search API (/api/v1/search + api_keys + shared
+> lib/rag/retrieve.ts) consumed via public docs/api-search.html OR the
+> engenius-kb Claude Code skill. generic `web` source; shared chat engine)
 
 ## Project Overview
 
@@ -189,7 +192,7 @@ Key tables:
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
 - `app_settings` — key-value store: API keys, `typography_${locale}`, `custom_fonts_${locale}`, `persona_{id}`, `pdf_lock_{model}_{lang}`
 - `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash
-- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), llm_mode ('shared'|'byok'), provider, byok_provider, byok_key_encrypted (AES), scope JSONB `{solution,product_lines[],models[],source_types[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數. RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only
+- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), **llm_mode ('shared'|'byok'|'user_byok')**（00018 加 user_byok 到 CHECK）, provider, byok_provider, byok_key_encrypted (AES; 只有 workspace-BYOK 用), scope JSONB `{solution,product_lines[],models[],source_types[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數. RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only
 - `api_keys` — 對外 Search API key：name, key_prefix, key_hash (sha256, 驗證用), **key_encrypted** (AES-256-GCM, 供 admin 列表複製), scope JSONB `{solution,product_lines[],models[],source_types[]}`, rate_limit_per_min, enabled, last_used_at, request_count, window_start/window_count (固定視窗限流). RLS on + 0 policies = 只走 service role。RPC `api_key_touch(p_hash)` 原子化 verify+限流+用量
 - `chat_sessions` — 對話持久化：user_id (default 'anonymous'), title, persona, provider, messages JSONB
 - `profiles` — id (FK auth.users), email, name, avatar_url, role (TEXT CHECK admin/editor/pm/viewer), last_sign_in_at, timestamps. **role values are TEXT not enum** (we DROPped the orphan `user_role` enum during migration cleanup)
@@ -256,16 +259,23 @@ pointers so you know it exists:
 - 給串接部門的完整對外規格見 [`docs/api-search.md`](docs/api-search.md)。
 - **對外消費(兩種)**：(a) 部門自寫 app → 讀 `docs/api-search.html`(已公開);(b) 同事用 Claude Code → 裝 `engenius-kb` skill(獨立公開 repo **github.com/terrelyeh/claude-skills**,一行 `install.sh`,讀 env `SPECHUB_API_KEY`)。`/settings/api-access` 頁面把「API 文件 + skill 安裝指令」兩張卡並排,admin 在此發 key 並一鍵複製連結給同事。skill 原始檔也在本機 `~/.claude/skills/engenius-kb/`。
 
-### Ask Workspaces（多租戶 /ask/&lt;slug&gt;，Phase 1）
+### Ask Workspaces（多租戶 /ask/&lt;slug&gt;）
 
 讓其他部門有**自己的 Ask 聊天入口**,共用同一個知識庫但各自 scope/key/角色。**沒有複製串流邏輯** —— `/api/ask` 用一個可選的 `workspace` 參數承載 workspace 模式。
 
 - **入口** `/ask/<slug>`(`app/(demo)/ask/[slug]/page.tsx`)：重用 demo 的 `EngenieGate`/`EngenieShell`/`EngenieChat`(都加了 `workspace`/`title` props)。shell GET `/api/ask?workspace=<slug>` 取設定、POST 帶 `workspace`。
 - **passcode**：`lib/auth/workspace-session.ts` —— cookie `ws_<slug>` = HMAC(`ws:<slug>`, key=`API_KEY_ENC_SECRET`),Edge+Node 皆可驗(免 DB,slug 在 cookie 名裡)。`/api/ws-auth` 驗 passcode(sha256 比對 `passcode_hash`)後發 cookie。
-- **`/api/ask` 擴充**：帶 `workspace` 時 → `loadWorkspaceBySlug` → 驗 ws cookie → `ask_workspace_touch` RPC(每分/每日配額)→ 用 ws 的 scope 檢索(`strictScope`)、persona/profile/provider 預設(`allow_switch=false` 則鎖定)、`llm_mode='byok'` 時 `decryptKey(byok_key_encrypted)` 當 `apiKeyOverride`。沒帶 `workspace` → 原本的 `gateAskOrDemo()`,行為不變。
+- **三種 LLM 模式**（`llm_mode`）：
+  - `shared` —— 用系統共用 key + 配額。
+  - `byok`（workspace-BYOK）—— admin 設**一把** key（`byok_key_encrypted`，AES），整個 workspace 共用；`/api/ask` 用 `decryptKey()` 當 override。
+  - `user_byok`（**使用者各自帶 key**）—— 每位訪客在前台輸入自己的 key，存在**自己的瀏覽器**(`lib/demo/byok.ts`,localStorage `engenie_byok_key_v1_<slug>`)，隨每次 POST 帶 `userKey` 給 `/api/ask`，**不落地/不寫 log/不進歷史**。沒帶 key 時 `/api/ask` 回 `{ code:'user_key_required' }`,前台鎖住輸入框並提示。
+- **`/api/ask` 擴充**：帶 `workspace` 時 → `loadWorkspaceBySlug` → 驗 ws cookie → `ask_workspace_touch` RPC(每分/每日配額)→ 用 ws 的 scope 檢索(`strictScope`)、persona/profile/provider 預設(`allow_switch=false` 則鎖定,**且前端 `EngenieShell`/`EngenieDrawer` 也會隱藏切換器並套用預設值**)、按 `llm_mode` 決定生成 key(`byok`→workspace key、`user_byok`→`body.userKey`)。沒帶 `workspace` → 原本的 `gateAskOrDemo()`,行為不變。
 - **streamClaude/OpenAI/Gemini** 都加了選用 `apiKeyOverride`(BYOK 注入點;省略則 `getApiKey()`)。
+- **歷史按 workspace 隔離**：`lib/demo/history.ts` 的 key 改成 `engenie_history_v1_<slug>`(/demo/ask 無 slug 維持原 `engenie_history_v1`)。仍是 per-browser localStorage(無痕關閉所有視窗才清,**不**同步伺服器)。
+- **BYOK 防呆**：`workspace-BYOK` 沒 key 不可建立/啟用(`app/api/ask-workspaces/route.ts` POST+PATCH 擋,逃生門=改 shared/user_byok、填 key、或先停用);執行期 `/ask/<slug>` 若 `byok` 且無 key → 顯示「尚未設定完成」notice 而非可打字的假聊天框。`user_byok` 不需要 admin key。
 - **proxy**：`/ask/` + `/api/ws-auth` 公開;`/api/ask` 在帶**任一合法 `ws_*` cookie** 時放行(`hasAnyValidWorkspaceCookie`)。
 - **管理**：`/settings/ask-workspaces`(admin)+ `app/api/ask-workspaces/route.ts` CRUD。secrets(passcode/BYOK key)write-only。
+- ⚠️ `user_byok` 若 `allow_switch=true`,使用者可能選到跟自己 key 不同家族的模型(provider 會報錯)——通常建議把模型鎖死(`allow_switch=false`)。per-workspace 配額對 user_byok 仍生效。
 - 規劃 Phase 2(部門私有文件自助索引)見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)。
 
 ## Current Status

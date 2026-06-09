@@ -77,17 +77,28 @@ export interface EngenieDrawerProps {
   profiles: ProfileOption[];
   onLoadConversation: (c: DemoConversation) => void;
   currentConvId?: string | null;
+  /** When false, the model/persona/profile selectors are locked (read-only). */
+  allowSwitch?: boolean;
+  /** Workspace slug — partitions history per workspace (undefined = demo). */
+  workspace?: string;
+  /** user_byok workspace: render a section for the user's own key. */
+  userByok?: boolean;
+  userKey?: string | null;
+  byokFamily?: string;
+  onSetUserKey?: (key: string) => void;
+  onClearUserKey?: () => void;
 }
 
 export function EngenieDrawer(props: EngenieDrawerProps) {
   const { open, onClose } = props;
+  const allowSwitch = props.allowSwitch !== false;
   const [modelExpanded, setModelExpanded] = useState(false);
   // Read history from localStorage on open / after a delete (no effect needed).
   const [tab, setTab] = useState<"settings" | "history">("settings");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   // historyRefresh is a deliberate re-read trigger (after delete), not used in body.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const convs = useMemo(() => (open ? listConversations() : []), [open, historyRefresh]);
+  const convs = useMemo(() => (open ? listConversations(props.workspace) : []), [open, historyRefresh, props.workspace]);
 
   useEffect(() => {
     if (!open) return;
@@ -155,7 +166,16 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
             </button>
           </div>
 
-          {tab === "settings" && (
+          {tab === "settings" && props.userByok && (
+            <UserKeySection
+              byokFamily={props.byokFamily}
+              hasKey={!!(props.userKey && props.userKey.trim())}
+              onSave={(k) => props.onSetUserKey?.(k)}
+              onClear={() => props.onClearUserKey?.()}
+            />
+          )}
+
+          {tab === "settings" && allowSwitch && (
           <>
           <Section title="Model">
             <button
@@ -262,6 +282,14 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
           </>
           )}
 
+          {tab === "settings" && !allowSwitch && (
+            <LockedSettings
+              modelLabel={currentModel?.label}
+              personaLabel={props.personas.find((p) => p.id === props.persona)?.name}
+              profileLabel={props.profiles.find((p) => p.id === props.profile)?.label}
+            />
+          )}
+
           {tab === "history" && (
           <Section title="History">
             {convs.length === 0 ? (
@@ -284,7 +312,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
                       </div>
                     </button>
                     <button
-                      onClick={() => { deleteConversation(c.id); setHistoryRefresh((r) => r + 1); }}
+                      onClick={() => { deleteConversation(c.id, props.workspace); setHistoryRefresh((r) => r + 1); }}
                       aria-label="刪除"
                       className="flex-shrink-0 text-engenius-dark/25 transition-colors hover:text-red-500"
                     >
@@ -307,6 +335,103 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
         </div>
       </aside>
     </>
+  );
+}
+
+/** User-supplied LLM key entry for a user_byok workspace (kept in this browser). */
+function UserKeySection({
+  byokFamily,
+  hasKey,
+  onSave,
+  onClear,
+}: {
+  byokFamily?: string;
+  hasKey: boolean;
+  onSave: (key: string) => void;
+  onClear: () => void;
+}) {
+  const [val, setVal] = useState("");
+  const [show, setShow] = useState(false);
+  return (
+    <Section title="你的 API key">
+      <div className="rounded-2xl border border-black/[0.08] bg-white px-3.5 py-3.5">
+        {hasKey && (
+          <div className="mb-2 flex items-center gap-1.5 text-[12px] font-medium text-emerald-600">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+            已設定（存在此瀏覽器）
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            type={show ? "text" : "password"}
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            placeholder={hasKey ? "輸入新的 key 以更換" : `${byokFamily || ""} API key`}
+            className="min-w-0 flex-1 rounded-lg border border-black/[0.1] bg-white px-3 py-2 font-mono text-[12px] text-engenius-dark outline-none focus:border-engenius-blue/50"
+          />
+          <button onClick={() => setShow((s) => !s)} className="flex-shrink-0 text-[11px] font-medium text-engenius-dark/45 hover:text-engenius-dark/70">
+            {show ? "隱藏" : "顯示"}
+          </button>
+        </div>
+        <div className="mt-2 flex gap-2">
+          <button
+            onClick={() => { if (val.trim()) { onSave(val.trim()); setVal(""); } }}
+            disabled={!val.trim()}
+            className="flex-1 rounded-lg bg-engenius-dark px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-engenius-dark/90 disabled:opacity-40"
+          >
+            儲存
+          </button>
+          {hasKey && (
+            <button onClick={onClear} className="rounded-lg border border-black/[0.1] px-3 py-2 text-[13px] font-medium text-engenius-dark/60 transition-colors hover:text-red-500">
+              移除
+            </button>
+          )}
+        </div>
+        <p className="mt-2 text-[11px] leading-snug text-engenius-dark/45">
+          只存在你目前的瀏覽器，不會上傳保存；每次提問時會用來呼叫 {byokFamily || "LLM"}。
+        </p>
+      </div>
+    </Section>
+  );
+}
+
+/** Read-only summary shown when the workspace locks model/persona/profile. */
+function LockedSettings({
+  modelLabel,
+  personaLabel,
+  profileLabel,
+}: {
+  modelLabel?: string;
+  personaLabel?: string;
+  profileLabel?: string;
+}) {
+  const rows = [
+    { label: "Model", value: modelLabel },
+    { label: "Persona", value: personaLabel },
+    { label: "Profile", value: profileLabel },
+  ].filter((r) => r.value);
+  return (
+    <Section title="Settings">
+      <div className="flex items-start gap-2 rounded-2xl border border-black/[0.08] bg-white px-3.5 py-3">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 flex-shrink-0 text-engenius-dark/40">
+          <rect x="3" y="11" width="18" height="11" rx="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+        <p className="text-[12.5px] font-medium leading-snug text-engenius-dark/55">
+          此工作區的模型／角色／對象已由管理員鎖定。
+        </p>
+      </div>
+      {rows.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {rows.map((r) => (
+            <div key={r.label} className="flex items-center justify-between rounded-xl bg-black/[0.03] px-3.5 py-2.5">
+              <span className="font-heading text-[10.5px] font-extrabold uppercase tracking-[0.16em] text-engenius-dark/50">{r.label}</span>
+              <span className="text-[13.5px] font-semibold tracking-tight text-engenius-dark">{r.value}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </Section>
   );
 }
 

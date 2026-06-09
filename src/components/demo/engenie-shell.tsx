@@ -4,7 +4,14 @@ import { useEffect, useState } from "react";
 import { EngenieChat } from "./engenie-chat";
 import { EngenieDrawer, modelLabelOf, type PersonaOption, type ProfileOption } from "./engenie-drawer";
 import type { DemoConversation } from "@/lib/demo/history";
+import { getUserKey, setUserKey as persistUserKey, clearUserKey } from "@/lib/demo/byok";
 import type { ChatMessage } from "@/hooks/use-chat-stream";
+
+/** Human label for the key family a user_byok workspace expects. */
+function familyLabel(byokProvider?: string | null, provider?: string): string {
+  const f = byokProvider ?? (provider?.startsWith("claude") ? "anthropic" : provider?.startsWith("gpt") ? "openai" : "google");
+  return f === "anthropic" ? "Anthropic" : f === "openai" ? "OpenAI" : "Google";
+}
 
 export function EngenieShell({
   workspace,
@@ -22,6 +29,13 @@ export function EngenieShell({
   const [welcomeSubtitle, setWelcomeSubtitle] = useState<string | null>(null);
   const [welcomeDescription, setWelcomeDescription] = useState<string | null>(null);
   const [exampleQuestions, setExampleQuestions] = useState<string[] | undefined>(undefined);
+  // Whether this workspace lets users switch model/persona/profile. Default
+  // true (the public demo); a workspace with allow_switch=false locks them.
+  const [allowSwitch, setAllowSwitch] = useState(true);
+  // LLM mode + user_byok key state (user brings their own key in the UI).
+  const [llmMode, setLlmMode] = useState<string>("shared");
+  const [byokFamily, setByokFamily] = useState<string>("");
+  const [userKey, setUserKey] = useState<string>("");
   // Incrementing this remounts EngenieChat to reset messages + input state
   const [chatKey, setChatKey] = useState(0);
   // Resume support: when loading a saved conversation we seed the chat + remount
@@ -56,9 +70,33 @@ export function EngenieShell({
         if (Array.isArray(d.welcome?.example_questions)) {
           setExampleQuestions(d.welcome.example_questions);
         }
+        // Workspace mode: adopt the workspace's configured defaults as the
+        // starting selection, and honour allow_switch (locks the selectors).
+        if (d.workspace) {
+          setAllowSwitch(d.workspace.allow_switch !== false);
+          if (d.workspace.provider) setProvider(d.workspace.provider);
+          if (d.workspace.persona) setPersona(d.workspace.persona);
+          if (d.workspace.profile) setProfile(d.workspace.profile);
+          const mode = d.workspace.llm_mode ?? "shared";
+          setLlmMode(mode);
+          setByokFamily(familyLabel(d.workspace.byok_provider, d.workspace.provider));
+          // user_byok: load this browser's saved key for the workspace (if any).
+          if (mode === "user_byok" && workspace) setUserKey(getUserKey(workspace));
+        }
       })
       .catch(() => {});
   }, [workspace]);
+
+  function handleSetUserKey(key: string) {
+    if (!workspace) return;
+    persistUserKey(workspace, key);
+    setUserKey(key);
+  }
+  function handleClearUserKey() {
+    if (!workspace) return;
+    clearUserKey(workspace);
+    setUserKey("");
+  }
 
   return (
     <div className="flex h-[100dvh] flex-col bg-[#faf9f5]">
@@ -111,6 +149,9 @@ export function EngenieShell({
           initialMessages={initialMessages}
           initialConvId={initialConvId}
           workspace={workspace}
+          userByok={llmMode === "user_byok"}
+          userKey={userKey}
+          byokFamily={byokFamily}
         />
       </div>
 
@@ -127,6 +168,13 @@ export function EngenieShell({
         profiles={profiles}
         onLoadConversation={loadConversation}
         currentConvId={initialConvId}
+        allowSwitch={allowSwitch}
+        workspace={workspace}
+        userByok={llmMode === "user_byok"}
+        userKey={userKey}
+        byokFamily={byokFamily}
+        onSetUserKey={handleSetUserKey}
+        onClearUserKey={handleClearUserKey}
       />
     </div>
   );

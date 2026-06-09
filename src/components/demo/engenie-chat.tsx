@@ -50,6 +50,11 @@ export interface EngenieChatProps {
   initialConvId?: string | null;
   /** Workspace slug — routes the chat through workspace mode on /api/ask. */
   workspace?: string;
+  /** user_byok workspace: the visitor must supply their own LLM key. */
+  userByok?: boolean;
+  userKey?: string | null;
+  /** Provider family label for the key the user must bring (e.g. "Google"). */
+  byokFamily?: string;
 }
 
 const FALLBACK_QUESTIONS = [
@@ -73,6 +78,9 @@ export function EngenieChat({
   initialMessages,
   initialConvId,
   workspace,
+  userByok,
+  userKey,
+  byokFamily,
 }: EngenieChatProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -81,7 +89,7 @@ export function EngenieChat({
   // Shared chat streaming engine — same logic as the desktop Ask panel.
   // Live status ("searching" → "generating") drives 搜尋相關資料中… / 整理回覆中…
   const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
-    getParams: () => ({ provider, persona, profile, ...(workspace ? { workspace } : {}) }),
+    getParams: () => ({ provider, persona, profile, ...(workspace ? { workspace } : {}), ...(userKey ? { userKey } : {}) }),
     stoppedLabel: "_(已停止)_",
     onComplete: (msgs) => {
       // Persist this turn to per-browser history (localStorage).
@@ -96,7 +104,7 @@ export function EngenieChat({
         persona,
         profile,
         messages: msgs,
-      });
+      }, workspace);
     },
   });
 
@@ -125,6 +133,7 @@ export function EngenieChat({
   function handleSubmit(question?: string) {
     const q = (question ?? input).trim();
     if (!q || loading) return;
+    if (needsKey) { onOpenSettings?.(); return; }
     setInput("");
     requestAnimationFrame(autosize);
     submit(q);
@@ -138,6 +147,8 @@ export function EngenieChat({
   }
 
   const isEmpty = messages.length === 0;
+  // user_byok workspace with no key yet → block chatting until the user adds one.
+  const needsKey = !!userByok && !(userKey && userKey.trim());
   const questions = exampleQuestions?.length ? exampleQuestions : FALLBACK_QUESTIONS;
 
   return (
@@ -161,17 +172,34 @@ export function EngenieChat({
                 {welcomeDescription}
               </p>
             )}
-            <div className="mt-10 flex w-full max-w-[320px] flex-col gap-2">
-              {questions.slice(0, 4).map((q, i) => (
+            {needsKey ? (
+              <div className="mt-9 w-full max-w-[320px]">
                 <button
-                  key={i}
-                  onClick={() => handleSubmit(q)}
-                  className="w-full rounded-2xl border border-black/[0.06] bg-white/60 px-4 py-3 text-left text-[13px] text-engenius-dark/90 transition-all hover:border-engenius-blue/40 hover:bg-white"
+                  onClick={onOpenSettings}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-engenius-blue/30 bg-engenius-blue/[0.06] px-4 py-3.5 text-left transition-all hover:border-engenius-blue/50"
                 >
-                  {q}
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#03a9f4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                    <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  <span className="min-w-0">
+                    <span className="block text-[14px] font-semibold tracking-tight text-engenius-dark">輸入你的 {byokFamily || ""} API key</span>
+                    <span className="mt-0.5 block text-[12px] leading-snug text-engenius-dark/55">這個工作區需要你自己的 key 才能開始（只存在你的瀏覽器）</span>
+                  </span>
                 </button>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div className="mt-10 flex w-full max-w-[320px] flex-col gap-2">
+                {questions.slice(0, 4).map((q, i) => (
+                  <button
+                    key={i}
+                    onClick={() => handleSubmit(q)}
+                    className="w-full rounded-2xl border border-black/[0.06] bg-white/60 px-4 py-3 text-left text-[13px] text-engenius-dark/90 transition-all hover:border-engenius-blue/40 hover:bg-white"
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
           <div className="mx-auto w-full max-w-[864px] px-5 pt-6 pb-8">
@@ -224,8 +252,8 @@ export function EngenieChat({
               autosize();
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Ask EnGenie..."
-            disabled={loading}
+            placeholder={needsKey ? `請先設定你的 ${byokFamily || ""} API key` : "Ask EnGenie..."}
+            disabled={loading || needsKey}
             className="flex-1 resize-none bg-transparent py-2 leading-[1.5] text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
             style={{ fontFamily: "inherit", fontSize: "16px" }}
           />
@@ -240,7 +268,7 @@ export function EngenieChat({
           ) : (
             <button
               onClick={() => handleSubmit()}
-              disabled={!input.trim()}
+              disabled={!input.trim() || needsKey}
               aria-label="Send"
               className="mb-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-engenius-dark text-white transition-all hover:bg-engenius-dark/90 disabled:bg-engenius-gray/30"
             >

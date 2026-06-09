@@ -108,6 +108,8 @@ interface AskRequest {
   history?: ChatMessage[];
   /** Workspace slug — when set, runs in per-department workspace mode (/ask/<slug>). */
   workspace?: string;
+  /** User-supplied LLM key for a `user_byok` workspace. Never stored/logged. */
+  userKey?: string;
 }
 
 /**
@@ -251,12 +253,24 @@ export async function POST(request: Request) {
   const profileId = ws && !ws.allow_switch ? ws.profile : (body.profile ?? ws?.profile ?? "default");
   const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? "gemini-3.5-flash");
 
-  // BYOK generation key (workspace brings its own LLM key).
+  // BYOK generation key. Two flavours:
+  //   byok      — the workspace carries ONE admin-set key (shared by all users).
+  //   user_byok — each visitor supplies their OWN key per request (body.userKey);
+  //               we never store or log it, just forward it to the provider.
   let llmKeyOverride: string | undefined;
   if (ws && ws.llm_mode === "byok") {
     const k = decryptKey(ws.byok_key_encrypted);
     if (!k) return NextResponse.json({ error: "Workspace BYOK key not set or unreadable" }, { status: 400 });
     llmKeyOverride = k;
+  } else if (ws && ws.llm_mode === "user_byok") {
+    const uk = body.userKey?.trim();
+    if (!uk) {
+      return NextResponse.json(
+        { error: "This workspace needs your own API key. Add it to start chatting.", code: "user_key_required" },
+        { status: 400 },
+      );
+    }
+    llmKeyOverride = uk;
   }
   // Retrieval (embed → vector search → taxonomy filter → cross-lingual
   // supplements → re-rank → trim) lives in the shared lib/rag/retrieve.ts so

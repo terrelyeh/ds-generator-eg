@@ -17,7 +17,7 @@ export interface AskWorkspace {
   name: string;
   enabled: boolean;
   passcode_hash: string | null;
-  llm_mode: "shared" | "byok";
+  llm_mode: "shared" | "byok" | "user_byok";
   provider: string;
   byok_provider: string | null;
   byok_key_encrypted: string | null;
@@ -56,6 +56,10 @@ export function publicWorkspace(w: AskWorkspace) {
     profile: w.profile,
     allow_switch: w.allow_switch,
     provider: w.provider,
+    // Mode + key family so the UI knows whether to prompt the user for their
+    // own key (user_byok) and which provider that key must belong to.
+    llm_mode: w.llm_mode,
+    byok_provider: w.byok_provider,
     welcome_subtitle: w.welcome_subtitle,
     welcome_description: w.welcome_description,
     example_questions: Array.isArray(w.example_questions) ? w.example_questions : null,
