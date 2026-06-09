@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>產品 Icon 生成規範(拓樸圖用)</title>
+  <style>
+    :root {
+      --blue: #03a9f4; --blue-dark: #0288d1; --gray-dark: #2C3345;
+      --gray: #58595B; --gray-light: #6f6f6f; --gray-bg: #f8f9fa;
+      --border: #e2e5e9; --amber: #d97706; --amber-bg: #fffbeb;
+      --green: #059669; --green-bg: #ecfdf5;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--gray-dark); font-size: 15px; line-height: 1.7; background: #fff;
+    }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 48px 32px 80px; }
+    h1 {
+      font-size: 28px; font-weight: 700; color: var(--blue-dark);
+      margin-bottom: 6px; border-bottom: 3px solid var(--blue); padding-bottom: 12px;
+    }
+    .subtitle { font-size: 14px; color: var(--gray-light); margin-bottom: 28px; }
+    h2 { font-size: 19px; font-weight: 700; color: var(--gray-dark); margin: 32px 0 14px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+    p { margin-bottom: 11px; }
+    ol, ul { margin: 0 0 16px; padding-left: 24px; }
+    li { margin-bottom: 6px; }
+    strong { color: var(--gray-dark); }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 22px; font-size: 14px; }
+    thead th { background: var(--gray-dark); color: #fff; font-weight: 600; padding: 8px 12px; text-align: left; }
+    tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+    code { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; background: #f0f2f5; padding: 2px 6px; border-radius: 4px; color: #c7254e; }
+    pre { background: #0d1117; color: #c9d1d9; padding: 16px 18px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.7; margin: 12px 0 22px; font-family: "SF Mono", "Fira Code", monospace; }
+    pre code { background: none; padding: 0; color: inherit; }
+    .callout { background: rgba(3,169,244,0.06); border-left: 4px solid var(--blue); padding: 13px 18px; border-radius: 0 8px 8px 0; margin: 12px 0 22px; font-size: 14px; }
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn { background: var(--amber-bg); border-left-color: var(--amber); }
+    .callout-warn strong { color: var(--amber); }
+    .lead { font-size: 15px; color: var(--gray); background: var(--gray-bg); border-radius: 12px; padding: 16px 20px; margin-bottom: 26px; }
+    .pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 10px; background: rgba(3,169,244,0.12); color: var(--blue-dark); }
+    @media (max-width: 640px) { .wrap { padding: 28px 18px 60px; } h1 { font-size: 24px; } h2 { font-size: 17px; } table { font-size: 13px; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>產品 Icon 生成規範</h1>
+<p class="subtitle">拓樸圖用(Topology Diagram Icons) &mdash; 給設計團隊 &middot; 2026-06-09</p>
+
+<div class="lead">
+  這些 icon 用於 <strong>Ask SpecHub 自動生成的網路拓樸圖</strong>。重點:<strong>透明 PNG、長邊 ≥ 512px、側視 iso 角度全產品統一</strong>(連線才會平行)。
+</div>
+
+<h2>核心規則</h2>
+<ol>
+  <li><strong>格式</strong>:PNG,<strong>透明背景</strong>(必須)。</li>
+  <li><strong>尺寸</strong>:<strong>長邊 ≥ 512px</strong>(理想 768–1024px)。判斷看<strong>長邊</strong>,不是寬。不必超過 ~1500px。</li>
+  <li><strong>兩個角度</strong>:<code>-a</code> 正面、<code>-b</code> 側視 iso(<span class="pill">拓樸用 -b,最重要</span>)、<code>-c</code> 選配。</li>
+  <li><strong>側視 iso 角度全產品統一</strong>:同一個 3/4 視角、同一光源方向 → 拓樸連接線才會<strong>彼此平行</strong>。</li>
+  <li><strong>命名</strong>:<code>{model}-{view}.png</code>,型號用官方名、大小寫一致;變體後綴保留(<code>-AC</code> / <code>-INT</code> / <code>-C18</code>)。</li>
+  <li><strong>四周留透明 padding ~5–10%</strong>,避免貼邊。</li>
+  <li><strong>同類設備視覺比例一致</strong>(所有 AP 差不多大、線條粗細一致)。</li>
+</ol>
+
+<h2>視角定義</h2>
+<table>
+  <thead><tr><th>後綴</th><th>視角</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><code>-a</code></td><td>正面</td><td>產品展示等其他用途</td></tr>
+    <tr><td><code>-b</code></td><td><strong>側視 iso</strong></td><td><strong>拓樸圖節點(統一角度)</strong></td></tr>
+    <tr><td><code>-c</code></td><td>額外角度</td><td>選配,拓樸不用</td></tr>
+  </tbody>
+</table>
+
+<h2>命名範例</h2>
+<pre>ECW220-a.png      正面
+ECW220-b.png      側視 iso（拓樸用）
+ECP106-INT-b.png  變體後綴 -INT 保留
+EOC655-C18-b.png  變體後綴 -C18 保留</pre>
+
+<h2>通用節點(非產品)</h2>
+<p>拓樸還需要非 EnGenius 的節點,同規則生成,放到對應 Drive 子資料夾:</p>
+<table>
+  <thead><tr><th>資料夾</th><th>內容</th><th>命名範例</th></tr></thead>
+  <tbody>
+    <tr><td><code>Cloud &amp; Internet/</code></td><td>Internet 雲、數據機/modem、ISP</td><td><code>internet-b.png</code></td></tr>
+    <tr><td><code>General/</code></td><td>Client / 筆電、手機、Server</td><td><code>client-b.png</code></td></tr>
+  </tbody>
+</table>
+
+<h2>提交方式</h2>
+<p>把 icon 放進共用 Drive 資料夾「Product Icons」(已分享給 service account <code>datasheet-sync-723@…</code>),系統會同步進 Ask SpecHub。</p>
+<div class="callout"><strong>產品 icon 放 root 即可,不用分類</strong> —— 系統依型號前綴自動歸類(ECW→AP、ECS→Switch、ESG→Gateway、ECC→Camera、EVS→NVS、EXT→Extender、ECP/EPC→PDU)。只有<strong>通用節點</strong>要放上表的子資料夾。</div>
+
+<h2>目前待重出清單 <span style="font-size:13px;font-weight:400;color:var(--gray-light)">(2026-06-09)</span></h2>
+<p>以下 <code>-b</code>(側視,拓樸要用)解析度太小,放大會糊,<strong>建議重出到長邊 ≥ 512px</strong>:</p>
+<table>
+  <thead><tr><th>型號</th><th>現況尺寸</th></tr></thead>
+  <tbody>
+    <tr><td>ECW120</td><td>201×259</td></tr>
+    <tr><td>ECW215</td><td>230×167</td></tr>
+    <tr><td>ECW220</td><td>185×279</td></tr>
+    <tr><td>ECW230</td><td>197×297</td></tr>
+    <tr><td>ECS1008P</td><td>313×183</td></tr>
+  </tbody>
+</table>
+<div class="callout callout-warn"><strong>可不用重出:</strong> ECW160-b(165×790)、ECW260-b(163×819)雖窄但長邊夠(高瘦型);<code>-c</code> 的低解析不影響拓樸(只用 <code>-b</code>)。</div>
+
+</div>
+</body>
+</html>
