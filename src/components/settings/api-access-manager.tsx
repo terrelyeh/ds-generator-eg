@@ -75,6 +75,14 @@ export function ApiAccessManager() {
   const [copied, setCopied] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // Shareable docs link (full integration spec, single source of truth)
+  const [docUrl, setDocUrl] = useState("/docs/api-search.html");
+  const [docOpen, setDocOpen] = useState(false);
+  const [docCopied, setDocCopied] = useState(false);
+  useEffect(() => {
+    if (typeof window !== "undefined") setDocUrl(`${window.location.origin}/docs/api-search.html`);
+  }, []);
+
   const fetchKeys = useCallback(async () => {
     setLoading(true);
     try {
@@ -207,7 +215,39 @@ export function ApiAccessManager() {
         <Button size="sm" onClick={openCreate} className="flex-shrink-0">+ New Key</Button>
       </div>
 
-      {/* Endpoint reference */}
+      {/* Full documentation (single source of truth — shareable with departments) */}
+      <Card className="mb-4 shadow-none">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center justify-between gap-2 text-sm">
+            <span>串接說明文件 (RAG Search API)</span>
+            <a href={docUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-engenius-blue hover:underline">開啟完整文件 ↗</a>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="mb-2 text-xs text-muted-foreground">
+            把這個連結給要串接的部門 — 含認證、參數、回傳格式、scope、限流、錯誤碼與 curl / JS / Python 範例。
+          </p>
+          <div className="flex items-center gap-2">
+            <input
+              readOnly
+              value={docUrl}
+              onFocus={(e) => e.currentTarget.select()}
+              className="flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-xs"
+            />
+            <Button size="sm" variant="outline" onClick={async () => {
+              try { await navigator.clipboard.writeText(docUrl); setDocCopied(true); setTimeout(() => setDocCopied(false), 1600); } catch { /* ignore */ }
+            }}>{docCopied ? "Copied" : "Copy link"}</Button>
+            <Button size="sm" variant="outline" onClick={() => setDocOpen((v) => !v)}>{docOpen ? "收合預覽" : "預覽"}</Button>
+          </div>
+          {docOpen && (
+            <div className="mt-3 overflow-hidden rounded-lg border">
+              <iframe src={docUrl} title="RAG Search API documentation" className="h-[600px] w-full" />
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Endpoint quick-start */}
       <Card className="mb-6 border-dashed shadow-none">
         <CardHeader className="pb-2">
           <CardTitle className="text-sm">How departments call it (server-to-server)</CardTitle>
