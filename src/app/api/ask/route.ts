@@ -34,15 +34,6 @@ async function buildTopologyHint(
 ): Promise<string> {
   if (!TOPOLOGY_RE.test(question)) return "";
 
-  // If the user explicitly wants a text/ASCII diagram, instruct that instead.
-  if (/ascii|文字版|純文字|text[\s-]*diagram|text[\s-]*only/i.test(question)) {
-    return `
-
----
-
-The user asked for a TEXT / ASCII diagram. Draw the architecture as an ASCII tree inside a plain \`\`\` code block. Use English (or short) labels inside boxes so monospace alignment holds (CJK characters are double-width and break box alignment). Do NOT output a \`topology\` block.`;
-  }
-
   const { data } = (await supabase
     .from("topology_icons" as "products")
     .select("key, role")) as { data: { key: string; role: string | null }[] | null };
