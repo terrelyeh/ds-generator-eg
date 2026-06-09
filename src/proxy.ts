@@ -29,7 +29,7 @@ const PUBLIC_EXACT_PATHS = ["/api/demo-auth"];
 const SERVICE_PATHS = ["/api/sync", "/api/cron"];
 // APIs the demo needs, reachable with a valid demo cookie (no Google login).
 // Kept tight: only the read + ask endpoints the EnGenie UI calls.
-const DEMO_API_PREFIXES = ["/api/ask", "/api/settings/providers"];
+const DEMO_API_PREFIXES = ["/api/ask", "/api/settings/providers", "/api/topology-icons"];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))) return true;

@@ -6,7 +6,7 @@ import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { Card } from "@/components/ui/card";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
-import { CodeBlock } from "@/components/chat/code-block";
+import { ChatPre } from "@/components/chat/chat-pre";
 import {
   useChatStream,
   type ChatMessage as Message,
@@ -264,8 +264,8 @@ function MarkdownWithCitations({ content, sources }: { content: string; sources?
       }
       return <strong {...props}>{processChildren(children, sources ?? [])}</strong>;
     },
-    // Fenced code blocks → shared CodeBlock (language label + copy + dark body)
-    pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
+    // Fenced blocks → CodeBlock, except ```topology → TopologyDiagram
+    pre: ({ children }) => <ChatPre>{children}</ChatPre>,
   };
 
   return (

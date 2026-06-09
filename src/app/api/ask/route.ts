@@ -22,6 +22,46 @@ async function gateAskOrDemo(): Promise<NextResponse | null> {
   return gate("ask.use");
 }
 
+// Diagram-intent detection — only then do we inject the (token-heavy) topology
+// instructions + device catalog, so normal asks stay cheap.
+const TOPOLOGY_RE = /拓[樸撲]|topolog|架構圖|網路圖|網路架構|網路拓|部署圖|deployment\s*(diagram|map)|application\s*diagram|network\s*(diagram|map)|draw.*(network|topology|diagram)|畫.*(圖|拓|架構|網路)/i;
+
+/** If the question asks for a diagram, return prompt text teaching the LLM to
+ *  emit a ```topology block using only models that have an icon. Else "". */
+async function buildTopologyHint(
+  supabase: ReturnType<typeof createAdminClient>,
+  question: string,
+): Promise<string> {
+  if (!TOPOLOGY_RE.test(question)) return "";
+  const { data } = (await supabase
+    .from("topology_icons" as "products")
+    .select("key, role")) as { data: { key: string; role: string | null }[] | null };
+  if (!data?.length) return "";
+  const seen = new Set<string>();
+  const byRole: Record<string, string[]> = {};
+  for (const r of data) {
+    if (seen.has(r.key)) continue;
+    seen.add(r.key);
+    (byRole[r.role ?? "device"] ||= []).push(r.key);
+  }
+  const catalog = Object.entries(byRole)
+    .map(([role, keys]) => `  ${role}: ${keys.sort().join(", ")}`)
+    .join("\n");
+  return `
+
+---
+
+DIAGRAM MODE: If a network / application topology would help answer this, ALSO output a fenced code block tagged \`topology\` with JSON of this shape:
+\`\`\`topology
+{"title":"…","nodes":[{"id":"n1","model":"ESG620","role":"gateway","label":"Firewall"}],"links":[{"from":"n1","to":"n2"}]}
+\`\`\`
+Rules:
+- Product nodes MUST use one of these exact model keys (pick what genuinely fits):
+${catalog}
+- Generic nodes (no model) use role ∈ internet, modem, server, client.
+- Each product node: {id, model, role, label}. Place the topology block AFTER your text answer and BEFORE the final "---" follow-up separator. Keep it ≤ ~12 nodes.`;
+}
+
 interface ChatMessage {
   role: "user" | "assistant";
   content: string;
@@ -429,13 +469,15 @@ export async function POST(request: Request) {
         // user message itself has highest attention weight and works reliably.
         const answerLanguageLabel = detectLanguageLabel(question);
 
+        const topoHint = await buildTopologyHint(supabase, question);
+
         const userMessage = `${historyText}Context documents:
 
 ${context}
 
 ---
 
-Current question: ${question}
+Current question: ${question}${topoHint}
 
 **ANSWER LANGUAGE: ${answerLanguageLabel}.** You MUST write your entire answer (including headings, lists, and follow-up questions) in ${answerLanguageLabel}. Do not default to another language.
 
