@@ -88,36 +88,6 @@ function nodeLabelLines(n: TopoNode): { t: string; b: boolean }[] {
   return wrapText(label, 14, 2).map((t, i) => ({ t, b: i === 0 }));
 }
 
-/** Build a CJK-safe indented tree from the same spec (for the text view). */
-function buildTextTree(sp: TopoSpec): string {
-  const byId = new Map(sp.nodes.map((n) => [n.id, n]));
-  const kids = new Map<string, { id: string; speed?: string }[]>();
-  const hasParent = new Set<string>();
-  for (const l of sp.links ?? []) {
-    if (!byId.has(l.from) || !byId.has(l.to)) continue;
-    (kids.get(l.from) ?? kids.set(l.from, []).get(l.from)!).push({ id: l.to, speed: l.speed });
-    hasParent.add(l.to);
-  }
-  const labelOf = (n: TopoNode) => `${n.model ? n.model + " " : ""}${n.label || n.role || n.id}`;
-  const visited = new Set<string>();
-  const lines: string[] = [];
-  const walk = (id: string, prefix: string, isLast: boolean, isRoot: boolean, speed?: string) => {
-    const n = byId.get(id);
-    if (!n) return;
-    lines.push(prefix + (isRoot ? "" : isLast ? "└─ " : "├─ ") + (speed ? `[${speed}] ` : "") + labelOf(n));
-    if (visited.has(id)) return;
-    visited.add(id);
-    const cs = kids.get(id) ?? [];
-    const cp = isRoot ? "" : prefix + (isLast ? "   " : "│  ");
-    cs.forEach((c, i) => walk(c.id, cp, i === cs.length - 1, false, c.speed));
-  };
-  const roots = sp.nodes.filter((n) => !hasParent.has(n.id));
-  (roots.length ? roots : sp.nodes.slice(0, 1)).forEach((r, i, a) => walk(r.id, "", i === a.length - 1, true));
-  const orphans = sp.nodes.filter((n) => !visited.has(n.id));
-  orphans.forEach((n, i, a) => walk(n.id, "", i === a.length - 1, true));
-  return lines.join("\n");
-}
-
 /** Return the substring from the first "{" to its matching "}", respecting
  *  string literals + escapes. Robust against trailing prose that has braces
  *  (lastIndexOf("}") over-includes such prose and breaks JSON.parse). */
@@ -200,8 +170,6 @@ function parseTopologySpec(input: string): TopoSpec | null {
 
 export function TopologyDiagram({ source }: { source: string }) {
   const [catalog, setCatalog] = useState<CatalogIcon[] | null>(null);
-  const [view, setView] = useState<"diagram" | "text">("diagram");
-  const [copied, setCopied] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   useEffect(() => { loadCatalog().then(setCatalog); }, []);
 
@@ -234,17 +202,6 @@ export function TopologyDiagram({ source }: { source: string }) {
     );
   }
   const sp = spec;
-  // Fallback so the 文字 view is never blank even for a degenerate spec.
-  const textTree =
-    buildTextTree(sp) ||
-    sp.nodes
-      .map((n) => `• ${n.model ? n.model + " " : ""}${n.label || n.role || n.id}`)
-      .join("\n") ||
-    "（無節點）";
-
-  async function copyText() {
-    try { await navigator.clipboard.writeText(textTree); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* ignore */ }
-  }
 
   function urlFor(n: TopoNode): string | null {
     if (n.model) {
@@ -342,32 +299,14 @@ export function TopologyDiagram({ source }: { source: string }) {
     <div className="chat-topology my-4 overflow-hidden rounded-xl border border-black/10 bg-white">
       <div className="flex items-center justify-between gap-2 border-b border-black/[0.06] bg-black/[0.015] px-3 py-1.5">
         <span className="min-w-0 truncate text-[12px] font-semibold text-engenius-dark/70">{sp.title || "Network Topology"}</span>
-        <div className="flex flex-shrink-0 items-center gap-2">
-          <div className="flex overflow-hidden rounded-md border border-black/10 text-[11px]">
-            <button onClick={() => setView("diagram")}
-              className={`px-2 py-0.5 transition-colors ${view === "diagram" ? "bg-engenius-blue text-white" : "text-muted-foreground hover:bg-muted"}`}>圖</button>
-            <button onClick={() => setView("text")}
-              className={`px-2 py-0.5 transition-colors ${view === "text" ? "bg-engenius-blue text-white" : "text-muted-foreground hover:bg-muted"}`}>文字</button>
-          </div>
-          {view === "diagram" ? (
-            <button onClick={download}
-              className="inline-flex items-center gap-1 text-[11px] text-engenius-blue hover:text-engenius-blue-dark transition-colors" title="Download SVG">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
-              </svg>
-              SVG
-            </button>
-          ) : (
-            <button onClick={copyText}
-              className="inline-flex items-center gap-1 text-[11px] text-engenius-blue hover:text-engenius-blue-dark transition-colors" title="Copy">
-              {copied ? "已複製" : "複製"}
-            </button>
-          )}
-        </div>
+        <button onClick={download}
+          className="inline-flex flex-shrink-0 items-center gap-1 text-[11px] text-engenius-blue hover:text-engenius-blue-dark transition-colors" title="Download SVG">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+          </svg>
+          SVG
+        </button>
       </div>
-      {view === "text" ? (
-        <pre className="m-2 overflow-x-auto rounded-lg bg-[#0d1117] p-3 text-[12px] leading-[1.6] text-slate-100">{textTree}</pre>
-      ) : (
       <div className="overflow-x-auto p-2">
         <svg ref={svgRef} viewBox={`0 0 ${width} ${height}`} width={width} height={height}
           style={{ maxWidth: "100%", height: "auto" }} xmlns="http://www.w3.org/2000/svg"
@@ -448,7 +387,6 @@ export function TopologyDiagram({ source }: { source: string }) {
           })()}
         </svg>
       </div>
-      )}
     </div>
   );
 }
