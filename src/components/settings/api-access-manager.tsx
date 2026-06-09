@@ -79,9 +79,15 @@ export function ApiAccessManager() {
   const [docUrl, setDocUrl] = useState("/docs/api-search.html");
   const [docOpen, setDocOpen] = useState(false);
   const [docCopied, setDocCopied] = useState(false);
+  const [skillCopied, setSkillCopied] = useState(false);
   useEffect(() => {
     if (typeof window !== "undefined") setDocUrl(`${window.location.origin}/docs/api-search.html`);
   }, []);
+
+  // Claude Code skill (for colleagues who use Claude Code)
+  const SKILL_INSTALL = "curl -fsSL https://raw.githubusercontent.com/terrelyeh/claude-skills/main/install.sh | bash";
+  const SKILL_GUIDE_URL = "https://github.com/terrelyeh/claude-skills/blob/main/安裝說明.md";
+  const SKILL_REPO_URL = "https://github.com/terrelyeh/claude-skills";
 
   const fetchKeys = useCallback(async () => {
     setLoading(true);
@@ -215,37 +221,76 @@ export function ApiAccessManager() {
         <Button size="sm" onClick={openCreate} className="flex-shrink-0">+ New Key</Button>
       </div>
 
-      {/* Full documentation (single source of truth — shareable with departments) */}
-      <Card className="mb-4 shadow-none">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between gap-2 text-sm">
-            <span>串接說明文件 (RAG Search API)</span>
-            <a href={docUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-engenius-blue hover:underline">開啟完整文件 ↗</a>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="mb-2 text-xs text-muted-foreground">
-            把這個連結給要串接的部門 — 含認證、參數、回傳格式、scope、限流、錯誤碼與 curl / JS / Python 範例。
-          </p>
-          <div className="flex items-center gap-2">
-            <input
-              readOnly
-              value={docUrl}
-              onFocus={(e) => e.currentTarget.select()}
-              className="flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-xs"
-            />
-            <Button size="sm" variant="outline" onClick={async () => {
-              try { await navigator.clipboard.writeText(docUrl); setDocCopied(true); setTimeout(() => setDocCopied(false), 1600); } catch { /* ignore */ }
-            }}>{docCopied ? "Copied" : "Copy link"}</Button>
-            <Button size="sm" variant="outline" onClick={() => setDocOpen((v) => !v)}>{docOpen ? "收合預覽" : "預覽"}</Button>
-          </div>
-          {docOpen && (
-            <div className="mt-3 overflow-hidden rounded-lg border">
-              <iframe src={docUrl} title="RAG Search API documentation" className="h-[600px] w-full" />
+      {/* Share resources — two audiences, side by side:
+          (A) API docs for departments building their own apps;
+          (B) Claude Code skill for colleagues who use Claude Code. */}
+      <div className="mb-4 grid gap-4 md:grid-cols-2">
+        {/* A — API documentation */}
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between gap-2 text-sm">
+              <span>① 對外 API 文件</span>
+              <a href={docUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-engenius-blue hover:underline">開啟 ↗</a>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-2 text-xs text-muted-foreground">
+              給要自己寫 app 串接的部門 — 認證、參數、回傳、scope、限流、錯誤碼 + curl/JS/Python 範例。
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={docUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="min-w-0 flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-xs"
+              />
+              <Button size="sm" variant="outline" className="flex-shrink-0" onClick={async () => {
+                try { await navigator.clipboard.writeText(docUrl); setDocCopied(true); setTimeout(() => setDocCopied(false), 1600); } catch { /* ignore */ }
+              }}>{docCopied ? "Copied" : "Copy"}</Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <button onClick={() => setDocOpen((v) => !v)} className="mt-2 text-xs text-engenius-blue hover:underline">
+              {docOpen ? "收合預覽" : "預覽文件"}
+            </button>
+          </CardContent>
+        </Card>
+
+        {/* B — Claude Code skill */}
+        <Card className="shadow-none">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center justify-between gap-2 text-sm">
+              <span>② Claude Code Skill（/engenius-kb）</span>
+              <a href={SKILL_GUIDE_URL} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-engenius-blue hover:underline">安裝說明 ↗</a>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="mb-2 text-xs text-muted-foreground">
+              給用 Claude Code 的同事 — 一行安裝,AI 就能直接查 EnGenius 知識庫回答。
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                readOnly
+                value={SKILL_INSTALL}
+                onFocus={(e) => e.currentTarget.select()}
+                className="min-w-0 flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-xs"
+              />
+              <Button size="sm" variant="outline" className="flex-shrink-0" onClick={async () => {
+                try { await navigator.clipboard.writeText(SKILL_INSTALL); setSkillCopied(true); setTimeout(() => setSkillCopied(false), 1600); } catch { /* ignore */ }
+              }}>{skillCopied ? "Copied" : "Copy"}</Button>
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground/70">
+              裝完設 <code className="rounded bg-muted px-1">SPECHUB_API_KEY</code>(下方各發一把)→ 重開 Claude Code。
+              <a href={SKILL_REPO_URL} target="_blank" rel="noopener noreferrer" className="ml-1 text-engenius-blue hover:underline">Repo ↗</a>
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Full-width preview of the API doc (kept out of the grid so the cards stay compact) */}
+      {docOpen && (
+        <div className="mb-4 overflow-hidden rounded-lg border">
+          <iframe src={docUrl} title="RAG Search API documentation" className="h-[600px] w-full" />
+        </div>
+      )}
 
       {/* Endpoint quick-start */}
       <Card className="mb-6 border-dashed shadow-none">
