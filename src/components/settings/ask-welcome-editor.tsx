@@ -100,16 +100,16 @@ export function AskWelcomeEditor() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link href="/settings" className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M10 3L5 8l5 5" /></svg>
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ask Welcome</h1>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            Customize the greeting shown when users open the Ask panel.
-          </p>
-        </div>
+      <div>
+        <nav className="flex items-center gap-1.5 text-sm mb-4">
+          <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
+          <span className="text-muted-foreground/40">/</span>
+          <span className="font-medium text-foreground">Ask Welcome</span>
+        </nav>
+        <h1 className="text-2xl font-bold tracking-tight">Ask Welcome</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Customize the greeting shown when users open the Ask panel.
+        </p>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -186,9 +187,14 @@ export function AskWorkspacesManager() {
 
   return (
     <div>
+      <nav className="flex items-center gap-1.5 text-sm mb-4">
+        <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
+        <span className="text-muted-foreground/40">/</span>
+        <span className="font-medium text-foreground">Ask Workspaces</span>
+      </nav>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-engenius-dark">Ask Workspaces</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Ask Workspaces</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Give a department its own <code className="rounded bg-muted px-1">/ask/&lt;slug&gt;</code> chat — own passcode,
             LLM key (BYOK or shared+quota), knowledge scope, and persona/welcome. Retrieval uses the shared KB, scoped.

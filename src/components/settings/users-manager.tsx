@@ -13,6 +13,7 @@
  *   - The last admin can't be demoted/removed
  */
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { ROLE_LABELS, type Role, ROLES } from "@/lib/auth/permissions";
@@ -184,6 +185,11 @@ export function UsersManager({ currentUserId }: UsersManagerProps) {
   return (
     <div className="space-y-6">
       <div>
+        <nav className="flex items-center gap-1.5 text-sm mb-4">
+          <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
+          <span className="text-muted-foreground/40">/</span>
+          <span className="font-medium text-foreground">Users</span>
+        </nav>
         <h1 className="text-2xl font-bold tracking-tight">Users</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Manage who can access Product SpecHub. Admin-only.

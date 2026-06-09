@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -210,9 +211,14 @@ export function ApiAccessManager() {
 
   return (
     <div>
+      <nav className="flex items-center gap-1.5 text-sm mb-4">
+        <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
+        <span className="text-muted-foreground/40">/</span>
+        <span className="font-medium text-foreground">API Access</span>
+      </nav>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-engenius-dark">API Access (Departments)</h1>
+          <h1 className="text-2xl font-bold tracking-tight">API Access (Departments)</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Issue scoped API keys so other teams&apos; apps can query the RAG knowledge base via the
             Search API. Each key is limited to the Solution / Product Lines / source types you set here.
