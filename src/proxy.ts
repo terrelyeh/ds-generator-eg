@@ -18,6 +18,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
+import { hasAnyValidWorkspaceCookie } from "@/lib/auth/workspace-session";
 
 // Routes accessible without a session.
 // /demo/ is the passcode-gated EnGenie surface — the page renders the
@@ -26,13 +27,17 @@ import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 // /api/v1/ is the external (department) API surface — it authenticates via its
 // own API-key Bearer check and returns JSON errors, so it must bypass the
 // session redirect (an HTML 307 to sign-in would break machine clients).
-const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/"];
+// /ask/ are the per-department workspace chat entries — each renders its own
+// passcode gate (like /demo/), so the page route is public; the chat API
+// (/api/ask) is authorised below via the workspace cookie.
+const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/", "/ask/"];
 // Publicly-shareable docs — handed to people without a SpecHub login (other
 // departments, RD/PM, the design team), so they bypass the session redirect.
 // Add a doc here only when it's meant to be shared and contains no secrets.
 // (Other /docs/*.html stay gated — internal process docs.)
 const PUBLIC_EXACT_PATHS = [
   "/api/demo-auth",
+  "/api/ws-auth",              // workspace passcode → cookie (self-verifies)
   "/docs/api-search.html",      // external RAG Search API spec (integrators)
   "/docs/ask-chat-ux-spec.html", // Ask chat UX spec (RD / PM)
   "/docs/topology-icon-spec.html", // topology icon spec (design team)
@@ -113,13 +118,14 @@ export async function proxy(request: NextRequest) {
     }
 
     // Not signed in with Google. Before redirecting, allow demo-permitted
-    // APIs through if the request carries a valid passcode demo cookie —
-    // this is how external (non-account) users reach /api/ask from the
-    // EnGenie demo. The handlers re-verify the cookie too (defense in depth).
+    // APIs (/api/ask, …) through if the request carries a valid passcode demo
+    // cookie OR any valid workspace cookie (per-department /ask/<slug>). The
+    // handlers re-verify the specific cookie too (defense in depth).
     if (!user) {
       if (
         isDemoApi(pathname) &&
-        (await isValidDemoToken(request.cookies.get(DEMO_COOKIE)?.value))
+        ((await isValidDemoToken(request.cookies.get(DEMO_COOKIE)?.value)) ||
+          (await hasAnyValidWorkspaceCookie(request.cookies.getAll())))
       ) {
         return response;
       }

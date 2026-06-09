@@ -3,9 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { EngenieMark } from "./engenie-mark";
 
-const STORAGE_KEY = "engenie_auth";
-
-export function EngenieGate({ children }: { children: React.ReactNode }) {
+/**
+ * Passcode gate. Default = EnGenie demo (/api/demo-auth). When `workspace` is
+ * set, it gates a department workspace (/ask/<slug>) via /api/ws-auth instead.
+ */
+export function EngenieGate({
+  children,
+  workspace,
+  title = "EnGenie",
+  subtitle = "Your EnGenius Product Genius",
+}: {
+  children: React.ReactNode;
+  workspace?: string;
+  title?: string;
+  subtitle?: string;
+}) {
+  const STORAGE_KEY = workspace ? `ws_auth_${workspace}` : "engenie_auth";
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [value, setValue] = useState("");
   const [loading, setLoading] = useState(false);
@@ -15,7 +28,7 @@ export function EngenieGate({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     setAuthed(window.sessionStorage.getItem(STORAGE_KEY) === "1");
-  }, []);
+  }, [STORAGE_KEY]);
 
   useEffect(() => {
     if (authed === false) {
@@ -29,10 +42,10 @@ export function EngenieGate({ children }: { children: React.ReactNode }) {
     setLoading(true);
     setError(false);
     try {
-      const res = await fetch("/api/demo-auth", {
+      const res = await fetch(workspace ? "/api/ws-auth" : "/api/demo-auth", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ key: value.trim() }),
+        body: JSON.stringify(workspace ? { slug: workspace, key: value.trim() } : { key: value.trim() }),
       });
       if (res.ok) {
         window.sessionStorage.setItem(STORAGE_KEY, "1");
@@ -64,10 +77,10 @@ export function EngenieGate({ children }: { children: React.ReactNode }) {
       <div className="flex w-full max-w-[320px] flex-col items-center">
         <EngenieMark size={56} />
         <h1 className="mt-5 font-heading text-[28px] font-bold tracking-tight text-engenius-dark">
-          EnGenie
+          {title}
         </h1>
         <p className="mt-1 text-[13px] text-engenius-gray">
-          Your EnGenius Product Genius
+          {subtitle}
         </p>
 
         <form onSubmit={handleSubmit} className="mt-10 flex w-full flex-col gap-3">

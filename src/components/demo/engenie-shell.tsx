@@ -6,7 +6,13 @@ import { EngenieDrawer, modelLabelOf, type PersonaOption, type ProfileOption } f
 import type { DemoConversation } from "@/lib/demo/history";
 import type { ChatMessage } from "@/hooks/use-chat-stream";
 
-export function EngenieShell() {
+export function EngenieShell({
+  workspace,
+  title = "EnGenie",
+}: {
+  workspace?: string;
+  title?: string;
+} = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [provider, setProvider] = useState("gemini-3.5-flash");
   const [persona, setPersona] = useState("default");
@@ -39,7 +45,7 @@ export function EngenieShell() {
   }
 
   useEffect(() => {
-    fetch("/api/ask")
+    fetch(workspace ? `/api/ask?workspace=${encodeURIComponent(workspace)}` : "/api/ask")
       .then((r) => r.json())
       .then((d) => {
         if (!d.ok) return;
@@ -52,7 +58,7 @@ export function EngenieShell() {
         }
       })
       .catch(() => {});
-  }, []);
+  }, [workspace]);
 
   return (
     <div className="flex h-[100dvh] flex-col bg-[#faf9f5]">
@@ -72,7 +78,7 @@ export function EngenieShell() {
           </svg>
         </button>
         <h1 className="font-heading text-[17px] font-bold tracking-tight text-engenius-dark">
-          EnGenie
+          {title}
         </h1>
         <button
           onClick={newChat}
@@ -104,6 +110,7 @@ export function EngenieShell() {
           onOpenSettings={() => setDrawerOpen(true)}
           initialMessages={initialMessages}
           initialConvId={initialConvId}
+          workspace={workspace}
         />
       </div>
 

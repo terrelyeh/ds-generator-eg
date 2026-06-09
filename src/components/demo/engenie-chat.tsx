@@ -48,6 +48,8 @@ export interface EngenieChatProps {
   /** Seed messages when resuming a saved conversation from history. */
   initialMessages?: Message[];
   initialConvId?: string | null;
+  /** Workspace slug — routes the chat through workspace mode on /api/ask. */
+  workspace?: string;
 }
 
 const FALLBACK_QUESTIONS = [
@@ -70,6 +72,7 @@ export function EngenieChat({
   onOpenSettings,
   initialMessages,
   initialConvId,
+  workspace,
 }: EngenieChatProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -78,7 +81,7 @@ export function EngenieChat({
   // Shared chat streaming engine — same logic as the desktop Ask panel.
   // Live status ("searching" → "generating") drives 搜尋相關資料中… / 整理回覆中…
   const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
-    getParams: () => ({ provider, persona, profile }),
+    getParams: () => ({ provider, persona, profile, ...(workspace ? { workspace } : {}) }),
     stoppedLabel: "_(已停止)_",
     onComplete: (msgs) => {
       // Persist this turn to per-browser history (localStorage).

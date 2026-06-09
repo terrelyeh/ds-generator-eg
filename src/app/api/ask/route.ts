@@ -7,6 +7,9 @@ import { retrieveDocuments } from "@/lib/rag/retrieve";
 import { gate } from "@/lib/auth/session";
 import { cookies } from "next/headers";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
+import { loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
+import { workspaceCookieName, isValidWorkspaceToken } from "@/lib/auth/workspace-session";
+import { decryptKey } from "@/lib/auth/api-key";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
 export const maxDuration = 60;
@@ -103,58 +106,58 @@ interface AskRequest {
   persona?: string;
   profile?: string;
   history?: ChatMessage[];
+  /** Workspace slug — when set, runs in per-department workspace mode (/ask/<slug>). */
+  workspace?: string;
 }
 
 /**
  * GET /api/ask
  * Returns list of available personas.
  */
-export async function GET() {
-  const denied = await gateAskOrDemo();
-  if (denied) return denied;
+export async function GET(request: Request) {
+  // Workspace mode: ?workspace=<slug> — gate by the workspace cookie and return
+  // that workspace's welcome/defaults. Otherwise the standard demo/RBAC gate.
+  const slug = new URL(request.url).searchParams.get("workspace");
+  const ws = slug ? await loadWorkspaceBySlug(slug) : null;
+  if (slug) {
+    if (!ws || !ws.enabled) return NextResponse.json({ ok: false, error: "Workspace not found" }, { status: 404 });
+    const c = await cookies();
+    const ok = await isValidWorkspaceToken(ws.slug, c.get(workspaceCookieName(ws.slug))?.value);
+    if (!ok) return NextResponse.json({ ok: false, error: "Workspace passcode required" }, { status: 401 });
+  } else {
+    const denied = await gateAskOrDemo();
+    if (denied) return denied;
+  }
+
   const personas = await listPersonas();
 
-  // Fetch welcome config from app_settings
-  const supabase = createAdminClient();
-  const { data: welcomeTitle } = await supabase
-    .from("app_settings" as "products")
-    .select("value")
-    .eq("key", "ask_welcome_subtitle")
-    .single() as { data: { value: string } | null };
-  const { data: welcomeDesc } = await supabase
-    .from("app_settings" as "products")
-    .select("value")
-    .eq("key", "ask_welcome_description")
-    .single() as { data: { value: string } | null };
-  const { data: welcomeQuestions } = await supabase
-    .from("app_settings" as "products")
-    .select("value")
-    .eq("key", "ask_example_questions")
-    .single() as { data: { value: string } | null };
-
-  let exampleQuestions: string[] | null = null;
-  if (welcomeQuestions?.value) {
-    try { exampleQuestions = JSON.parse(welcomeQuestions.value); } catch { /* ignore */ }
+  let welcome: { subtitle: string | null; description: string | null; example_questions: string[] | null };
+  if (ws) {
+    welcome = {
+      subtitle: ws.welcome_subtitle,
+      description: ws.welcome_description,
+      example_questions: Array.isArray(ws.example_questions) ? ws.example_questions : null,
+    };
+  } else {
+    const supabase = createAdminClient();
+    const get = async (key: string) =>
+      ((await supabase.from("app_settings" as "products").select("value").eq("key", key).single()) as { data: { value: string } | null }).data?.value || null;
+    const [subtitle, description, questionsRaw] = await Promise.all([
+      get("ask_welcome_subtitle"),
+      get("ask_welcome_description"),
+      get("ask_example_questions"),
+    ]);
+    let exampleQuestions: string[] | null = null;
+    if (questionsRaw) { try { exampleQuestions = JSON.parse(questionsRaw); } catch { /* ignore */ } }
+    welcome = { subtitle, description, example_questions: exampleQuestions };
   }
 
   return NextResponse.json({
     ok: true,
-    personas: personas.map((p) => ({
-      id: p.id,
-      name: p.name,
-      description: p.description,
-      icon: p.icon,
-    })),
-    profiles: USER_PROFILES.map((p) => ({
-      id: p.id,
-      label: p.label,
-      description: p.description,
-    })),
-    welcome: {
-      subtitle: welcomeTitle?.value || null,
-      description: welcomeDesc?.value || null,
-      example_questions: exampleQuestions,
-    },
+    personas: personas.map((p) => ({ id: p.id, name: p.name, description: p.description, icon: p.icon })),
+    profiles: USER_PROFILES.map((p) => ({ id: p.id, label: p.label, description: p.description })),
+    welcome,
+    workspace: ws ? publicWorkspace(ws) : null,
   });
 }
 
@@ -209,13 +212,51 @@ const SOURCE_TYPE_LABELS: Record<string, string> = {
  * RAG endpoint with SSE streaming: embed question -> vector search -> stream LLM answer with sources.
  */
 export async function POST(request: Request) {
-  const denied = await gateAskOrDemo();
-  if (denied) return denied;
   const body = (await request.json()) as AskRequest;
-  const { question, source_type, product_line, taxonomy, provider = "gemini-3.5-flash", persona: personaId = "default", profile: profileId = "default", history = [] } = body;
+  const { question, source_type, product_line, taxonomy, history = [] } = body;
 
   if (!question?.trim()) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
+  }
+
+  // ── Auth + per-request config: workspace mode (/ask/<slug>) vs standard ──
+  const ws = body.workspace ? await loadWorkspaceBySlug(body.workspace) : null;
+  if (body.workspace) {
+    if (!ws || !ws.enabled) {
+      return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    }
+    const c = await cookies();
+    const ok = await isValidWorkspaceToken(ws.slug, c.get(workspaceCookieName(ws.slug))?.value);
+    if (!ok) return NextResponse.json({ error: "Workspace passcode required" }, { status: 401 });
+    // Per-minute / daily quota (atomic; protects shared key, harmless for BYOK).
+    const { data: touch } = (await createAdminClient().rpc("ask_workspace_touch", { p_slug: ws.slug })) as {
+      data: { allowed: boolean; reason: string | null }[] | null;
+    };
+    const t = touch?.[0];
+    if (t && !t.allowed) {
+      const msg =
+        t.reason === "daily_limit" ? "Daily limit reached for this workspace."
+        : t.reason === "rate_limit" ? "Too many requests — try again shortly."
+        : "This workspace is disabled.";
+      return NextResponse.json({ error: msg }, { status: 429 });
+    }
+  } else {
+    const denied = await gateAskOrDemo();
+    if (denied) return denied;
+  }
+
+  // Effective persona / profile / provider — a workspace can fix these when
+  // allow_switch=false; otherwise the request (or workspace default) wins.
+  const personaId = ws && !ws.allow_switch ? ws.persona : (body.persona ?? ws?.persona ?? "default");
+  const profileId = ws && !ws.allow_switch ? ws.profile : (body.profile ?? ws?.profile ?? "default");
+  const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? "gemini-3.5-flash");
+
+  // BYOK generation key (workspace brings its own LLM key).
+  let llmKeyOverride: string | undefined;
+  if (ws && ws.llm_mode === "byok") {
+    const k = decryptKey(ws.byok_key_encrypted);
+    if (!k) return NextResponse.json({ error: "Workspace BYOK key not set or unreadable" }, { status: 400 });
+    llmKeyOverride = k;
   }
   // Retrieval (embed → vector search → taxonomy filter → cross-lingual
   // supplements → re-rank → trim) lives in the shared lib/rag/retrieve.ts so
@@ -239,14 +280,22 @@ export async function POST(request: Request) {
 
         let docs;
         try {
-          docs = await retrieveDocuments({
-            question,
-            history,
-            sourceType: source_type,
-            productLine: product_line,
-            taxonomy,
-            finalLimit: 12,
-          });
+          docs = await retrieveDocuments(
+            ws
+              ? {
+                  question,
+                  history,
+                  finalLimit: 12,
+                  strictScope: true,
+                  taxonomy: {
+                    solution: ws.scope?.solution ?? null,
+                    product_lines: ws.scope?.product_lines ?? [],
+                    models: ws.scope?.models ?? [],
+                  },
+                  sourceTypes: ws.scope?.source_types ?? null,
+                }
+              : { question, history, sourceType: source_type, productLine: product_line, taxonomy, finalLimit: 12 },
+          );
         } catch (searchError) {
           console.error("Vector search error:", searchError);
           sendEvent(JSON.stringify({ type: "chunk", content: "Error: Search failed. " + String(searchError) }));
@@ -352,14 +401,14 @@ IMPORTANT formatting rules:
 
         switch (mapped.fn) {
           case "claude":
-            await streamClaude(systemPrompt, userMessage, mapped.model, sendEvent);
+            await streamClaude(systemPrompt, userMessage, mapped.model, sendEvent, llmKeyOverride);
             break;
           case "openai":
-            await streamOpenAI(systemPrompt, userMessage, mapped.model, sendEvent);
+            await streamOpenAI(systemPrompt, userMessage, mapped.model, sendEvent, llmKeyOverride);
             break;
           case "gemini":
           default:
-            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent);
+            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent, llmKeyOverride);
             break;
         }
 
@@ -401,9 +450,10 @@ async function streamClaude(
   systemPrompt: string,
   userMessage: string,
   model: string,
-  sendEvent: (data: string) => void
+  sendEvent: (data: string) => void,
+  apiKeyOverride?: string
 ): Promise<void> {
-  const apiKey = await getApiKey("anthropic_api_key", API_KEY_MAP.anthropic_api_key);
+  const apiKey = apiKeyOverride || await getApiKey("anthropic_api_key", API_KEY_MAP.anthropic_api_key);
   if (!apiKey) throw new Error("Anthropic API key not configured");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -463,9 +513,10 @@ async function streamOpenAI(
   systemPrompt: string,
   userMessage: string,
   model: string,
-  sendEvent: (data: string) => void
+  sendEvent: (data: string) => void,
+  apiKeyOverride?: string
 ): Promise<void> {
-  const apiKey = await getApiKey("openai_api_key", API_KEY_MAP.openai_api_key);
+  const apiKey = apiKeyOverride || await getApiKey("openai_api_key", API_KEY_MAP.openai_api_key);
   if (!apiKey) throw new Error("OpenAI API key not configured");
 
   const { default: OpenAI } = await import("openai");
@@ -495,9 +546,10 @@ async function streamGemini(
   systemPrompt: string,
   userMessage: string,
   model: string,
-  sendEvent: (data: string) => void
+  sendEvent: (data: string) => void,
+  apiKeyOverride?: string
 ): Promise<void> {
-  const apiKey = await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
+  const apiKey = apiKeyOverride || await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
   if (!apiKey) throw new Error("Google AI API key not configured");
 
   const res = await fetch(
