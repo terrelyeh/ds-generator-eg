@@ -103,6 +103,7 @@ export function KnowledgeBase() {
   const [editTaxonomyValue, setEditTaxonomyValue] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [editTaxonomySaving, setEditTaxonomySaving] = useState(false);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
+  const [syncingSpace, setSyncingSpace] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -199,6 +200,45 @@ export function KnowledgeBase() {
     } finally {
       setGitbookIngesting(false);
       setIngesting(null);
+    }
+  }
+
+  /** Re-crawl ONE GitBook space (per-space Sync). Uses a per-space spinner so
+   *  only the clicked row shows "Syncing…" (not every space). Incremental —
+   *  only pages whose sitemap lastModified changed are re-fetched. */
+  async function handleGitbookSpaceSync(spaceUrl: string, spaceLabel: string) {
+    if (!spaceUrl) { toast.error("Space URL not found"); return; }
+    setSyncingSpace(spaceLabel);
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "gitbook",
+          space_url: spaceUrl,
+          space_label: spaceLabel,
+          enable_vision: gitbookVision,
+          force: false,
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const parts = [
+          `${data.processed} updated`,
+          `${data.skipped} unchanged`,
+          `${data.pages_fetched} pages fetched`,
+          data.pages_skipped > 0 ? `${data.pages_skipped} pages skipped` : null,
+        ].filter(Boolean);
+        toast.success(`${spaceLabel}: ${parts.join(", ")}`);
+        fetchData();
+      } else {
+        toast.error(`Sync failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncingSpace(null);
     }
   }
 
@@ -581,14 +621,16 @@ export function KnowledgeBase() {
                                   <td className="px-3 py-2 text-right">
                                     <div className="flex items-center justify-end gap-3">
                                       <button
-                                        onClick={() => {
-                                          if (!info.url) { toast.error("Space URL not found"); return; }
-                                          handleGitbookIngest(info.url, label, gitbookVision);
-                                        }}
-                                        disabled={gitbookIngesting}
-                                        className="text-xs text-muted-foreground/50 hover:text-engenius-blue transition-colors disabled:opacity-30"
+                                        onClick={() => handleGitbookSpaceSync(info.url, label)}
+                                        disabled={syncingSpace !== null}
+                                        className="inline-flex items-center gap-1 text-xs font-medium text-engenius-blue hover:text-engenius-blue-dark transition-colors disabled:opacity-40"
+                                        title="Re-crawl this space (incremental — only changed pages)"
                                       >
-                                        {gitbookIngesting ? "Syncing..." : "Sync"}
+                                        <svg className={`h-3 w-3 ${syncingSpace === label ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M23 4v6h-6M1 20v-6h6" />
+                                          <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                                        </svg>
+                                        {syncingSpace === label ? "Syncing…" : "Sync"}
                                       </button>
                                       <button
                                         onClick={() => {
@@ -727,9 +769,13 @@ export function KnowledgeBase() {
                                     <button
                                       onClick={() => handleGoogleDocSync(s)}
                                       disabled={isSyncing}
-                                      className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors disabled:opacity-40"
-                                      title="Re-fetch from Drive and re-index"
+                                      className="inline-flex items-center gap-1 text-xs font-medium text-engenius-blue hover:text-engenius-blue-dark transition-colors disabled:opacity-40"
+                                      title="Re-fetch this doc from Drive and re-index"
                                     >
+                                      <svg className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M23 4v6h-6M1 20v-6h6" />
+                                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                                      </svg>
                                       {isSyncing ? "Syncing…" : "Sync"}
                                     </button>
                                   )}
