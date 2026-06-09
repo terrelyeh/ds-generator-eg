@@ -83,6 +83,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
   const { open, onClose } = props;
   const [modelExpanded, setModelExpanded] = useState(false);
   // Read history from localStorage on open / after a delete (no effect needed).
+  const [tab, setTab] = useState<"settings" | "history">("settings");
   const [historyRefresh, setHistoryRefresh] = useState(0);
   // historyRefresh is a deliberate re-read trigger (after delete), not used in body.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,6 +139,24 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto px-5 pb-6">
+          {/* Tabs: 設定 / 歷史 */}
+          <div className="mb-5 flex rounded-xl bg-black/[0.05] p-1 text-[13px] font-semibold">
+            <button
+              onClick={() => setTab("settings")}
+              className={`flex-1 rounded-lg py-1.5 transition-colors ${tab === "settings" ? "bg-white text-engenius-dark shadow-sm" : "text-engenius-dark/50 hover:text-engenius-dark/70"}`}
+            >
+              設定
+            </button>
+            <button
+              onClick={() => setTab("history")}
+              className={`flex-1 rounded-lg py-1.5 transition-colors ${tab === "history" ? "bg-white text-engenius-dark shadow-sm" : "text-engenius-dark/50 hover:text-engenius-dark/70"}`}
+            >
+              歷史
+            </button>
+          </div>
+
+          {tab === "settings" && (
+          <>
           <Section title="Model">
             <button
               onClick={() => setModelExpanded((v) => !v)}
@@ -240,9 +259,10 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
               ))}
             </div>
           </Section>
+          </>
+          )}
 
-          <div className="my-6 h-px bg-border/60" />
-
+          {tab === "history" && (
           <Section title="History">
             {convs.length === 0 ? (
               <p className="text-[12.5px] font-medium text-engenius-dark/40">尚無對話紀錄</p>
@@ -277,6 +297,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
               </div>
             )}
           </Section>
+          )}
         </div>
 
         {/* Footer */}
