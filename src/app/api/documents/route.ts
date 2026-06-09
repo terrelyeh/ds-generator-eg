@@ -6,6 +6,7 @@ import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 import { ingestWifiRegulations } from "@/lib/rag/ingest-wifi-regulations";
+import { ingestWeb } from "@/lib/rag/ingest-web";
 import { fetchGoogleDoc } from "@/lib/google/docs";
 import { normalizeTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
 
@@ -122,6 +123,9 @@ export async function GET(request: Request) {
       collection: (meta?.collection as string) ?? null,
       doc_label: (meta?.doc_label as string) ?? null,
       tab_name: (meta?.tab_name as string) ?? null,
+      // Web source fields (for per-row re-fetch / display)
+      page_url: (meta?.page_url as string) ?? null,
+      web_label: (meta?.web_label as string) ?? null,
       // Unified taxonomy fields
       solution: (meta?.solution as string) ?? null,
       product_lines: Array.isArray(meta?.product_lines) ? (meta?.product_lines as string[]) : [],
@@ -304,7 +308,36 @@ export async function POST(request: Request) {
     }
   }
 
-  // Future source types: web, file, text_snippet
+  if (source_type === "web") {
+    const { page_urls, label: webLabel } = body as {
+      page_urls?: string[];
+      label?: string;
+    };
+
+    if (!page_urls?.length) {
+      return NextResponse.json(
+        { error: "Missing page_urls for web ingestion" },
+        { status: 400 }
+      );
+    }
+
+    try {
+      const result = await ingestWeb({
+        pageUrls: page_urls,
+        label: webLabel,
+        force,
+        taxonomy,
+      });
+      return NextResponse.json({ ok: true, ...result });
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Web ingest failed: ${err instanceof Error ? err.message : String(err)}` },
+        { status: 500 }
+      );
+    }
+  }
+
+  // Future source types: file, text_snippet
   return NextResponse.json(
     { error: `Source type "${source_type}" ingestion not yet implemented` },
     { status: 400 }

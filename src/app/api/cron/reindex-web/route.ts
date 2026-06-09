@@ -4,6 +4,7 @@ import { gateOrCron } from "@/lib/auth/session";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
+import { ingestWeb } from "@/lib/rag/ingest-web";
 import { fetchGoogleDoc } from "@/lib/google/docs";
 import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
 
@@ -21,6 +22,7 @@ export const maxDuration = 300;
  *                    NEW pages in an existing space are auto-discovered)
  *   - google_doc   → re-fetch each known doc (content updates)
  *   - helpcenter   → re-fetch the known article URLs
+ *   - web          → re-fetch each indexed page (Firecrawl → Jina → fetch)
  *
  * product_spec is intentionally EXCLUDED — it already auto-reindexes on every
  * /api/sync (daily). NEW sources (a new GitBook space, a new Google Doc, a new
@@ -32,7 +34,7 @@ export const maxDuration = 300;
  * never wipes manually-assigned Solution/Product-Line/Model tags.
  *
  * Auth: Vercel cron (x-vercel-cron) / CRON_SECRET bearer / editor+admin.
- * `?only=gitbook|google_doc|helpcenter` narrows it for manual/targeted runs.
+ * `?only=gitbook|google_doc|helpcenter|web` narrows it for manual/targeted runs.
  */
 type TaxRow = {
   solution?: string | null;
@@ -168,6 +170,45 @@ async function handle(request: Request) {
       }
     }
     summary.helpcenter = results;
+  }
+
+  // ── Web pages (re-fetch each indexed page; preserves per-page taxonomy) ───
+  // Grouped by (label + taxonomy signature) so one ingestWeb call refreshes a
+  // batch while keeping its label and Solution/Product-Line/Model tags.
+  if (want("web")) {
+    const { data } = (await supabase
+      .from("documents" as "products")
+      .select(
+        "source_id, source_url, label:metadata->>web_label, solution:metadata->>solution, product_lines:metadata->product_lines, models:metadata->models",
+      )
+      .eq("source_type", "web")) as {
+      data: ({ source_id: string; source_url: string | null; label: string | null } & TaxRow)[] | null;
+    };
+    const seen = new Set<string>();
+    const groups = new Map<string, { label: string | null; tax: Partial<TaxonomyMeta>; urls: string[] }>();
+    for (const r of data ?? []) {
+      if (!r.source_url || seen.has(r.source_id)) continue;
+      seen.add(r.source_id);
+      const tax = taxFrom(r);
+      const key = `${r.label ?? ""}::${JSON.stringify(tax)}`;
+      if (!groups.has(key)) groups.set(key, { label: r.label, tax, urls: [] });
+      groups.get(key)!.urls.push(r.source_url);
+    }
+    const results: unknown[] = [];
+    for (const { label, tax, urls } of groups.values()) {
+      try {
+        const r = await ingestWeb({
+          pageUrls: urls,
+          label: label || undefined,
+          force: false,
+          taxonomy: tax,
+        });
+        results.push({ pages: urls.length, processed: r.processed, skipped: r.skipped, methods: r.methods });
+      } catch (e) {
+        results.push({ pages: urls.length, error: e instanceof Error ? e.message : String(e) });
+      }
+    }
+    summary.web = results;
   }
 
   return NextResponse.json({ ok: true, timestamp: new Date().toISOString(), summary });

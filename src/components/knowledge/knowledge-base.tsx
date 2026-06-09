@@ -24,6 +24,8 @@ interface SourceItem {
   space_url?: string | null;
   doc_label?: string | null;
   tab_name?: string | null;
+  page_url?: string | null;
+  web_label?: string | null;
   // Unified taxonomy
   solution?: string | null;
   product_lines?: string[];
@@ -52,7 +54,7 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "helpcenter", label: "Help Center", icon: "💡", description: "Technical articles from Intercom Help Center — best practices, feature guides", status: "active", canIngest: true },
   { id: "google_doc", label: "Google Docs", icon: "📄", description: "Message guides, product briefs, marketing docs from Google Drive", status: "active", canIngest: true },
   { id: "wifi_regulation", label: "WiFi Regulations", icon: "📡", description: "Per-country WiFi regulation data (bands, channels, power, DFS) from RegHub — applies across all wireless products", status: "active", canIngest: true },
-  { id: "web", label: "Web Pages", icon: "🌐", description: "Website content, product pages, landing pages", status: "planned", canIngest: false },
+  { id: "web", label: "Web Pages", icon: "🌐", description: "Any web page — product pages, blog posts, competitor pages. Auto-extracts clean content (Firecrawl → Jina → fetch)", status: "active", canIngest: true },
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "planned", canIngest: false },
   { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word documents", status: "planned", canIngest: false },
 ];
@@ -99,6 +101,11 @@ export function KnowledgeBase() {
   const [googleDocLabel, setGoogleDocLabel] = useState("");
   const [googleDocIngesting, setGoogleDocIngesting] = useState(false);
   const [googleDocTaxonomy, setGoogleDocTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
+  const [showWebDialog, setShowWebDialog] = useState(false);
+  const [webUrls, setWebUrls] = useState("");
+  const [webLabel, setWebLabel] = useState("");
+  const [webIngesting, setWebIngesting] = useState(false);
+  const [webTaxonomy, setWebTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [editTaxonomyTarget, setEditTaxonomyTarget] = useState<SourceItem | null>(null);
   const [editTaxonomyValue, setEditTaxonomyValue] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [editTaxonomySaving, setEditTaxonomySaving] = useState(false);
@@ -395,6 +402,96 @@ export function KnowledgeBase() {
     }
   }
 
+  /** Index one or more web pages (URLs split on newline / comma). */
+  async function handleWebIngest() {
+    const urls = webUrls
+      .split(/[\n,]+/)
+      .map((u) => u.trim())
+      .filter(Boolean);
+    if (urls.length === 0) {
+      toast.error("Paste at least one URL");
+      return;
+    }
+    setWebIngesting(true);
+    setIngesting("web");
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "web",
+          page_urls: urls,
+          label: webLabel.trim() || undefined,
+          force: false,
+          taxonomy: taxonomyToPayload(webTaxonomy),
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        const methodStr = data.methods
+          ? Object.entries(data.methods).map(([m, n]) => `${n} ${m}`).join(", ")
+          : "";
+        const errMsg = data.errors?.length ? ` · ${data.errors.length} errors` : "";
+        toast.success(
+          `Web: ${data.processed} chunks from ${data.pages_fetched} page(s)` +
+            (methodStr ? ` (${methodStr})` : "") + errMsg,
+        );
+        fetchData();
+        setShowWebDialog(false);
+        setWebUrls("");
+        setWebLabel("");
+        setWebTaxonomy(EMPTY_TAXONOMY_VALUE);
+      } else {
+        toast.error(`Failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setWebIngesting(false);
+      setIngesting(null);
+    }
+  }
+
+  /** Re-fetch and re-index a single web page (per-row Sync), keeping its tags. */
+  async function handleWebSync(source: SourceItem) {
+    const url = source.page_url;
+    if (!url) {
+      toast.error("No URL stored for this page");
+      return;
+    }
+    setSyncingSourceId(source.source_id);
+    try {
+      const res = await fetch("/api/documents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "ingest",
+          source_type: "web",
+          page_urls: [url],
+          label: source.web_label || undefined,
+          force: true,
+          taxonomy: {
+            solution: source.solution ?? null,
+            product_lines: source.product_lines ?? [],
+            models: source.models ?? [],
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        toast.success(`Synced: ${data.processed} updated, ${data.skipped} unchanged`);
+        fetchData();
+      } else {
+        toast.error(`Sync failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setSyncingSourceId(null);
+    }
+  }
+
   /** Open the Edit Taxonomy dialog for a given source */
   function openEditTaxonomy(source: SourceItem) {
     setEditTaxonomyTarget(source);
@@ -571,7 +668,12 @@ export function KnowledgeBase() {
                           {isIngesting ? "Indexing..." : "Add Doc"}
                         </Button>
                       )}
-                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && (
+                      {config.canIngest && config.id === "web" && (
+                        <Button size="sm" onClick={() => setShowWebDialog(true)} disabled={!!ingesting} className="text-xs">
+                          {isIngesting ? "Indexing..." : "Add Page"}
+                        </Button>
+                      )}
+                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && config.id !== "web" && (
                         <Button size="sm" onClick={() => handleIngest(config.id)} disabled={!!ingesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
@@ -771,6 +873,20 @@ export function KnowledgeBase() {
                                       disabled={isSyncing}
                                       className="inline-flex items-center gap-1 text-xs font-medium text-engenius-blue hover:text-engenius-blue-dark transition-colors disabled:opacity-40"
                                       title="Re-fetch this doc from Drive and re-index"
+                                    >
+                                      <svg className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M23 4v6h-6M1 20v-6h6" />
+                                        <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                                      </svg>
+                                      {isSyncing ? "Syncing…" : "Sync"}
+                                    </button>
+                                  )}
+                                  {s.source_type === "web" && s.page_url && (
+                                    <button
+                                      onClick={() => handleWebSync(s)}
+                                      disabled={isSyncing}
+                                      className="inline-flex items-center gap-1 text-xs font-medium text-engenius-blue hover:text-engenius-blue-dark transition-colors disabled:opacity-40"
+                                      title="Re-fetch this page and re-index"
                                     >
                                       <svg className={`h-3 w-3 ${isSyncing ? "animate-spin" : ""}`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M23 4v6h-6M1 20v-6h6" />
@@ -987,6 +1103,69 @@ export function KnowledgeBase() {
               <Button variant="outline" size="sm" onClick={() => setShowGoogleDocDialog(false)} disabled={googleDocIngesting} className="text-xs">Cancel</Button>
               <Button size="sm" onClick={handleGoogleDocIngest} disabled={!googleDocUrl.trim() || !googleDocTaxonomy.solution || googleDocIngesting} className="text-xs">
                 {googleDocIngesting ? "Indexing..." : "Start Indexing"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Web Page Dialog */}
+      {showWebDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !webIngesting && setShowWebDialog(false)}>
+          <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Index Web Page(s)</h2>
+              <button onClick={() => !webIngesting && setShowWebDialog(false)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={webIngesting}>
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Page URL(s) <span className="text-red-500">*</span></label>
+                <textarea
+                  value={webUrls}
+                  onChange={(e) => setWebUrls(e.target.value)}
+                  placeholder={"https://www.engenius.com/product/...\nhttps://www.engenius.com/blog/...\n(one URL per line)"}
+                  rows={4}
+                  className="w-full rounded-md border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                  disabled={webIngesting}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground/50">One URL per line (or comma-separated). Content is auto-extracted: Firecrawl → Jina → fetch.</p>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-muted-foreground mb-1">Label (optional)</label>
+                <input type="text" value={webLabel} onChange={(e) => setWebLabel(e.target.value)}
+                  placeholder="e.g., EnGenius Website"
+                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50"
+                  disabled={webIngesting} />
+              </div>
+
+              <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
+                <p className="text-xs font-medium mb-2">Taxonomy — where do these pages belong? <span className="font-normal text-muted-foreground/60">(optional, defaults to Global)</span></p>
+                <TaxonomyPicker
+                  value={webTaxonomy}
+                  onChange={setWebTaxonomy}
+                  allowGlobal
+                  required={false}
+                  disabled={webIngesting}
+                />
+              </div>
+            </div>
+
+            {webIngesting && (
+              <div className="mt-4 rounded-lg bg-muted/50 p-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <div className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
+                  <span>Extracting page content and generating embeddings...</span>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="outline" size="sm" onClick={() => setShowWebDialog(false)} disabled={webIngesting} className="text-xs">Cancel</Button>
+              <Button size="sm" onClick={handleWebIngest} disabled={!webUrls.trim() || webIngesting} className="text-xs">
+                {webIngesting ? "Indexing..." : "Start Indexing"}
               </Button>
             </div>
           </div>
