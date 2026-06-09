@@ -82,16 +82,22 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 
 ### Knowledge Base
 - **索引管理**（`/knowledge`）— 查看已索引的內容、source 數量、chunk 數、token 數
-- **5 種已實作來源類型**：
+- **6 種已實作來源類型**：
   - **Product Specs** — 66 product × 2 chunks，從 DB 自動 tag taxonomy
   - **Gitbook Docs** — 含 Vision API 圖片描述；QSG 空間會自動抽出 **LED behavior table** 成為專屬 chunks
   - **Help Center** — Intercom 技術文章（含 Type-level Re-index All 按鈕）
   - **Google Docs** — Drive API 或公開連結；per-row **Sync** 按鈕一鍵重抓
   - **WiFi Regulations** — 93 國 WiFi 法規資料（頻段、頻道、功率、DFS），來自 EnGenius WiFi RegHub API
+  - **Web Pages** — 貼任意網址即可索引；內容自動萃取（Firecrawl → Jina Reader → fetch 層疊），per-row **Sync** 重抓
 - **統一 Taxonomy（Solution > Product Line > Model）** — 所有 source 共用的三層分類。Ask 查詢時可以按任一層 filter，未指定 product line 的內容自動套用整個 solution
 - **Edit Taxonomy** — 每個 source 都有 Edit 按鈕，可事後補 tag 而不用重跑 ingest
 - **Re-index / Force Re-index / Delete** — 按來源類型管理
 - **Last Indexed 時間** — 每個來源顯示最後索引時間
+
+### 對外 RAG Search API（其他部門串接）
+- **`POST /api/v1/search`** — 讓其他部門的 app 查詢知識庫、取得最相關片段，接進自己的 LLM（RAG 檢索層）
+- **Scoped API key** — 管理員在 `/settings/api-access` 核發 key，可限定 Solution / 產品線 / 來源類型範圍與每分鐘速率；驗證走 hash、另以 AES-256-GCM 加密儲存供管理員從列表「Copy key」重新複製
+- 完整串接文件見 [`docs/api-search.md`](docs/api-search.md)（線上 HTML：`/docs/api-search.html`）
 
 ### WiFi Regulation Viewer
 - **`/wifi-regulation/[code]`** — 單一國家法規的乾淨 markdown 頁面（UNII 頻段、頻道清單、功率限制、DFS 要求）

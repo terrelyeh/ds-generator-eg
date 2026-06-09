@@ -9,9 +9,43 @@
  * but never broaden it (see `effectiveScope`).
  */
 
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
+
+// ── Encryption-at-rest (so admins can re-copy a key from the list) ────────────
+// AES-256-GCM. The 32-byte key is derived from API_KEY_ENC_SECRET (env, NOT in
+// the DB) — a DB dump alone can't recover keys. Verification still uses the
+// hash; this is only decrypted on an explicit admin reveal.
+function encSecret(): Buffer | null {
+  const s = process.env.API_KEY_ENC_SECRET;
+  if (!s) return null;
+  return createHash("sha256").update(s).digest(); // 32 bytes from any-length secret
+}
+
+export function encryptKey(plaintext: string): string | null {
+  const key = encSecret();
+  if (!key) return null;
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const enc = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return [iv.toString("base64"), tag.toString("base64"), enc.toString("base64")].join(":");
+}
+
+export function decryptKey(ciphertext: string | null | undefined): string | null {
+  const key = encSecret();
+  if (!key || !ciphertext) return null;
+  try {
+    const [ivB, tagB, dataB] = ciphertext.split(":");
+    if (!ivB || !tagB || !dataB) return null;
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivB, "base64"));
+    decipher.setAuthTag(Buffer.from(tagB, "base64"));
+    return Buffer.concat([decipher.update(Buffer.from(dataB, "base64")), decipher.final()]).toString("utf8");
+  } catch {
+    return null;
+  }
+}
 
 export interface ApiKeyScope {
   /** null/absent = all solutions. */

@@ -1,9 +1,9 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-09 (Ask chat UX overhaul: shared useChatStream /
-> useStickToBottom / CodeBlock engine across desktop panel + EnGenie demo;
-> ChatGPT-grade typography, stop/regenerate, structured-answer prompt;
-> docs/ask-chat-ux-spec.md added)
+> Last updated: 2026-06-09 (External RAG Search API for departments:
+> /api/v1/search + api_keys + shared lib/rag/retrieve.ts core; generic `web`
+> source type (Firecrawl→Jina→fetch); topology now SVG + separate ASCII box.
+> Earlier: shared useChatStream/CodeBlock chat engine, docs/ask-chat-ux-spec.md)
 
 ## Project Overview
 
@@ -70,8 +70,10 @@ src/
       preview/[model]/page.tsx        # Datasheet HTML preview (?lang=ja&mode=full&toolbar=false); fetches image_assets for Antennas Patterns page
     api/
       sync/route.ts                   # Sheets → Supabase sync + auto re-index products
-      ask/route.ts                    # RAG SSE stream + taxonomy/model/country re-rank
-      documents/route.ts              # RAG index mgmt (GET/POST/PATCH/DELETE, paginates via range())
+      ask/route.ts                    # RAG SSE stream (uses lib/rag/retrieve.ts) + persona/profile + topology hint
+      v1/search/route.ts              # PUBLIC external Search API (Bearer sk_live_ key, JSON, scoped, rate-limited)
+      api-keys/route.ts               # Admin CRUD for external API keys (settings.manage_api_access)
+      documents/route.ts              # RAG index mgmt (GET/POST/PATCH/DELETE; web/gitbook/helpcenter/google_doc/wifi/product_spec)
       taxonomy/route.ts               # Returns solutions + product_lines + products for dropdowns
       generate-pdf/route.ts           # Puppeteer PDF + generation lock
       resync-versions/route.ts        # Re-scan Drive → update products.current_versions (admin/editor)
@@ -111,13 +113,16 @@ src/
       permissions.ts                  # Role + Permission types + matrix; can() / assertCan() / isRole()
       session.ts                      # getCurrentUser / requireUser / requirePermission + gate() / gateOrCron() helpers
       page-guards.ts                  # adminOnly / requirePagePermission / requireRoles for server pages
+      api-key.ts                      # External API keys: generateApiKey / verifyApiKey / effectiveScope (sk_live_, sha256 at rest)
     rag/
       embeddings.ts                    # OpenAI embedding + contentHash + estimateTokens
       taxonomy.ts                      # TaxonomyMeta types + matchesTaxonomyFilter (inheritance rule)
+      retrieve.ts                      # SHARED retrieval core (retrieveDocuments) — used by /api/ask + /api/v1/search
       vision.ts                        # Gemini Vision — full-table extraction, 2000 max tokens
       ingest-products.ts               # Auto-derives taxonomy from product_lines.solution_id FK
       ingest-gitbook.ts                # Main chunks + focused LED chunks (chunk_index ≥ 10000)
       ingest-helpcenter.ts, ingest-google-doc.ts
+      ingest-web.ts                    # Generic web page → Firecrawl→Jina→fetch cascade → chunk (source_type "web")
       ingest-wifi-regulations.ts       # WiFi RegHub API → per-country chunk, source_id = ISO code
       personas.ts                      # Persona + UserProfile
     google/
@@ -329,6 +334,7 @@ Key tables:
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
 - `app_settings` — key-value store: API keys, `typography_${locale}`, `custom_fonts_${locale}`, `persona_{id}`, `pdf_lock_{model}_{lang}`
 - `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash
+- `api_keys` — 對外 Search API key：name, key_prefix, key_hash (sha256, 驗證用), **key_encrypted** (AES-256-GCM, 供 admin 列表複製), scope JSONB `{solution,product_lines[],models[],source_types[]}`, rate_limit_per_min, enabled, last_used_at, request_count, window_start/window_count (固定視窗限流). RLS on + 0 policies = 只走 service role。RPC `api_key_touch(p_hash)` 原子化 verify+限流+用量
 - `chat_sessions` — 對話持久化：user_id (default 'anonymous'), title, persona, provider, messages JSONB
 - `profiles` — id (FK auth.users), email, name, avatar_url, role (TEXT CHECK admin/editor/pm/viewer), last_sign_in_at, timestamps. **role values are TEXT not enum** (we DROPped the orphan `user_role` enum during migration cleanup)
 - `email_whitelist` — admin-managed pre-authorisation list. email (PK, lowercase), role, invited_by (FK profiles), invited_at, note. Trigger reads this on first sign-in to create matching profile
@@ -362,8 +368,11 @@ pointers so you know it exists:
 
 - **UX**: Navbar Ask → right-side slide panel; SSE streaming from
   `/api/ask`; inline `[1]` citations with `CitationTooltip`
-- **Knowledge sources**: 5 pipelines under `src/lib/rag/ingest-*` →
-  `documents` table (pgvector); taxonomy meta on every chunk
+- **Knowledge sources**: 6 pipelines under `src/lib/rag/ingest-*` (product_spec,
+  gitbook, helpcenter, google_doc, wifi_regulation, **web**) → `documents` table
+  (pgvector); taxonomy meta on every chunk. Weekly `/api/cron/reindex-web`
+  refreshes gitbook/google_doc/helpcenter/web (derives sources from `documents`,
+  preserves taxonomy)
 - **Cross-lingual re-rank**: `/api/ask/route.ts` supplements embedding
   results with literal model/country lookups to compensate for
   `text-embedding-3-small` weakness on CJK query → EN chunk matching
@@ -377,6 +386,18 @@ pointers so you know it exists:
 
 **串流核心只有一份**：`hooks/use-chat-stream.ts`（`useChatStream`）擁有 messages/loading/loadingStatus、rAF 批次串流、停止(AbortController)、重新生成、最終解析，回傳 referentially-stable 的 `submit`/`stop`/`regenerate`（可直接傳給 memoized 訊息列）。配 `hooks/use-stick-to-bottom.ts`（貼底才跟，距底 80px 閾值）+ `components/chat/code-block.tsx`（語言標籤+複製+hljs 高亮，當 react-markdown 的 `pre`）。**改串流行為只改 hook，兩版同步生效；新增聊天 surface 一律複用這三個檔，不要再複製串流邏輯**。回答結構由 `/api/ask` 的 FINAL OUTPUT CONTRACT 強制（開門見山、表格比較、粗體型號、語言對齊）。完整規範見 [`docs/ask-chat-ux-spec.md`](docs/ask-chat-ux-spec.md)（HTML 好讀版 `public/docs/ask-chat-ux-spec.html`，服務於 `/docs/ask-chat-ux-spec.html`）。
 - 桌機 markdown 樣式 = `globals.css` 的 `.ask-markdown`（15px/1.75，inline code 用 `:not(pre) > code` 才套）；demo = Tailwind `prose`（需 `@tailwindcss/typography` plugin）。`@import "highlight.js/styles/github-dark.css"` 提供 code token 配色
+
+### 對外 RAG Search API（其他部門 app 串接）
+
+檢索核心抽成 **`lib/rag/retrieve.ts`（`retrieveDocuments`）**，`/api/ask` 與對外 API **共用同一份**（不要再各寫一份）：embed → `match_documents` RPC → taxonomy filter → 跨語言 literal-match 補強（型號/國家）→ re-rank → trim。`sourceTypes`(allow-list) 與 `strictScope` 是給 API 的（聊天不開，保留原行為）。
+
+- **`POST /api/v1/search`**（`app/api/v1/search/route.ts`，maxDuration 30）：對外、機器對機器、回 **JSON**（非 SSE，無 LLM 成本）。body `{ query(≤2000), top_k?(1–20,預設8), source_types?, taxonomy? }` → `{ ok, count, results:[{content,title,source_type,source_id,source_url,score,taxonomy}], scope }`。
+- **認證**：`Authorization: Bearer sk_live_…`。驗證用 sha256 `key_hash`（不需解密）。`api_key_touch(p_hash)` RPC **原子化**做 驗證 + 固定視窗(60s)限流 + 用量累加；`verifyApiKey()` 回 401(無/錯 key)/403(停用)/429(超量)。
+- **可從列表複製 key**：另存 `key_encrypted`（AES-256-GCM，金鑰由 env `API_KEY_ENC_SECRET` 派生、**不在 DB**）。admin 按列表「Copy key」→ `GET /api/api-keys?reveal=<id>` 解密回傳一次。`encryptKey`/`decryptKey` 在 `lib/auth/api-key.ts`。沒設 env 或舊 key 無 `key_encrypted` → reveal 回 409（要求重發）。
+- **Scope = 每把 key 的天花板，server 端強制**：`effectiveScope()` 把請求範圍 ∩ key scope，請求**只能縮小不能放大**（選到範圍外 fallback 回 ceiling，不外洩）。scope 各欄留空 = 全部。`strictScope:true` 在 retrieve 末端再過濾一次，防補強的 literal match 漏出範圍外 chunk。
+- **proxy**：`/api/v1/` 在 `PUBLIC_PATH_PREFIXES`（跳過 session gate，路由自己做 key auth + 回 JSON 401；**不能**讓 API client 吃到 HTML 導向）。**不開 CORS**（強制 server-to-server，避免 key 暴露在瀏覽器）。
+- **管理 UI**：`/settings/api-access`（admin，權限 `settings.manage_api_access`）發/設 scope/停用/刪除/看用量；CRUD 在 `app/api/api-keys/route.ts`。
+- 給串接部門的完整對外規格見 [`docs/api-search.md`](docs/api-search.md)。
 
 ## Current Status
 
@@ -422,7 +443,8 @@ npm run lint   # ESLint check
 - Vercel Cron: `vercel.json` → `"0 1 * * *"` (每天 09:00 台灣時間)
 - **⚠️ Vercel function region 釘在 `hnd1`（東京）** — `vercel.json` 的 `"regions": ["hnd1"]`。**不要改掉**。Supabase 在 `ap-northeast-1`（東京），function 一定要同區，否則每個 DB query 跨太平洋 ~170ms（之前預設 iad1 美東，一個頁面 3-5 個 query 浪費 600-900ms）。同區後 ~5ms。改 region 前先確認 Supabase 也在哪
 - **Server component query 並行化** — 高流量頁面（product detail、dashboard）已用 `Promise.all` 把互相獨立的 Supabase query 並行（避免 waterfall）。加新 query 前先想「這個 query 依賴前面的結果嗎？不依賴就塞進同一個 Promise.all」
-- 需要的 env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CRON_SECRET`
+- 需要的 env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CRON_SECRET`, `API_KEY_ENC_SECRET`（對外 API key 加密；未設則無法從列表複製 key）
+- 可選 env vars: `FIRECRAWL_API_KEY`（web 來源優先用 Firecrawl 萃取；未設則退到 Jina Reader），`JINA_API_KEY`（提高 Jina rate limit）
 - AI 翻譯 env vars（可選，也可在 Settings 頁面設定）：`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`
 
 ## Common Pitfalls
@@ -452,6 +474,7 @@ npm run lint   # ESLint check
 
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25（早期特定 feature 的踩雷紀錄）
 - [`docs/rag-context.md`](docs/rag-context.md) — Ask SpecHub / RAG 完整架構
+- [`docs/api-search.md`](docs/api-search.md) — 對外 RAG Search API 規格（給其他部門串接：認證、參數、回傳、scope、限流、錯誤碼、範例）
 - [`docs/ask-chat-ux-spec.md`](docs/ask-chat-ux-spec.md) — Ask 聊天互動規範（兩介面共用引擎、動態效果、格式樣式、回答契約；給 RD/PM 參考。HTML 版 `public/docs/ask-chat-ux-spec.html`）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知流程
 - [`public/docs/drive-folder-and-naming-rules.html`](public/docs/drive-folder-and-naming-rules.html) — Drive 資料夾結構、檔名規則、Detail Specs 填寫規則

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { gate, getCurrentUser } from "@/lib/auth/session";
-import { generateApiKey, type ApiKeyScope } from "@/lib/auth/api-key";
+import { generateApiKey, encryptKey, decryptKey, type ApiKeyScope } from "@/lib/auth/api-key";
 
 /**
  * Admin management of external API keys (department RAG Search access).
@@ -21,20 +21,48 @@ function normalizeScope(input: unknown): ApiKeyScope {
   };
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const denied = await gate(PERMISSION);
   if (denied) return denied;
 
   const supabase = createAdminClient();
+  const revealId = new URL(request.url).searchParams.get("reveal");
+
+  // Reveal: decrypt and return ONE key's plaintext (explicit admin action).
+  if (revealId) {
+    const { data, error } = (await supabase
+      .from("api_keys" as "products")
+      .select("key_encrypted")
+      .eq("id", revealId)
+      .single()) as { data: { key_encrypted: string | null } | null; error: unknown };
+    if (error || !data) return NextResponse.json({ error: "Key not found" }, { status: 404 });
+    const key = decryptKey(data.key_encrypted);
+    if (!key) {
+      return NextResponse.json(
+        { error: "This key can't be recovered (created before copy-from-list was enabled). Create a new one." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ ok: true, key });
+  }
+
   const { data, error } = (await supabase
     .from("api_keys" as "products")
     .select(
-      "id, name, key_prefix, scope, rate_limit_per_min, enabled, created_at, last_used_at, request_count, note",
+      "id, name, key_prefix, scope, rate_limit_per_min, enabled, created_at, last_used_at, request_count, note, key_encrypted",
     )
-    .order("created_at", { ascending: false })) as { data: unknown[] | null; error: unknown };
+    .order("created_at", { ascending: false })) as {
+    data: { key_encrypted: string | null; [k: string]: unknown }[] | null;
+    error: unknown;
+  };
 
   if (error) return NextResponse.json({ error: "Failed to list keys" }, { status: 500 });
-  return NextResponse.json({ ok: true, keys: data ?? [] });
+  // Don't ship ciphertext to the client; just flag whether reveal is possible.
+  const keys = (data ?? []).map(({ key_encrypted, ...rest }) => ({
+    ...rest,
+    recoverable: !!key_encrypted,
+  }));
+  return NextResponse.json({ ok: true, keys });
 }
 
 export async function POST(request: Request) {
@@ -61,6 +89,7 @@ export async function POST(request: Request) {
       name,
       key_prefix: prefix,
       key_hash: hash,
+      key_encrypted: encryptKey(plaintext),
       scope: normalizeScope(body.scope),
       rate_limit_per_min: rate,
       note: body.note?.trim() || null,

@@ -29,6 +29,7 @@ interface ApiKeyRow {
   last_used_at: string | null;
   request_count: number;
   note: string | null;
+  recoverable?: boolean;
 }
 
 const SOURCE_TYPE_OPTIONS = [
@@ -72,6 +73,7 @@ export function ApiAccessManager() {
   // freshly-created plaintext key (shown once)
   const [newKey, setNewKey] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const fetchKeys = useCallback(async () => {
     setLoading(true);
@@ -162,6 +164,20 @@ export function ApiAccessManager() {
     else toast.error(`Failed: ${data.error}`);
   }
 
+  async function handleCopyKey(k: ApiKeyRow) {
+    try {
+      const res = await fetch(`/api/api-keys?reveal=${encodeURIComponent(k.id)}`);
+      const data = await res.json();
+      if (!data.ok || !data.key) { toast.error(data.error || "Could not retrieve key"); return; }
+      await navigator.clipboard.writeText(data.key);
+      setCopiedId(k.id);
+      setTimeout(() => setCopiedId((c) => (c === k.id ? null : c)), 1800);
+      toast.success("API key copied to clipboard");
+    } catch (err) {
+      toast.error(`Copy failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
   async function handleDelete(k: ApiKeyRow) {
     if (!confirm(`Permanently delete the key "${k.name}"? Apps using it will stop working immediately.`)) return;
     const res = await fetch("/api/api-keys", {
@@ -250,6 +266,11 @@ export function ApiAccessManager() {
                   <td className="px-3 py-2 text-muted-foreground">{fmtDate(k.last_used_at)}</td>
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
+                      {k.recoverable && (
+                        <button onClick={() => handleCopyKey(k)} className="text-engenius-blue hover:underline" title="Copy the full API key">
+                          {copiedId === k.id ? "Copied" : "Copy key"}
+                        </button>
+                      )}
                       <button onClick={() => openEdit(k)} className="text-engenius-blue hover:underline">Edit</button>
                       <button onClick={() => toggleEnabled(k)} className="text-muted-foreground hover:text-engenius-dark">
                         {k.enabled ? "Disable" : "Enable"}
@@ -332,7 +353,8 @@ export function ApiAccessManager() {
           <div className="w-full max-w-lg rounded-xl bg-background p-6 shadow-xl mx-4">
             <h2 className="text-lg font-semibold">API key created</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Copy it now — for security it&apos;s <strong>shown only once</strong> and cannot be retrieved later.
+              Copy it and share with the department. You can also copy it again later via
+              <strong> Copy key</strong> in the list. Keep it server-side only.
             </p>
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#0d1117] p-3">
               <code className="flex-1 break-all font-mono text-[12px] text-slate-100">{newKey}</code>

@@ -26,6 +26,7 @@
 | `helpcenter` | `ingest-helpcenter.ts` | Intercom SPA fallback 用 `KNOWN_ARTICLES` |
 | `google_doc` | `ingest-google-doc.ts` | Service Account Drive API → public export fallback。Tab split by `\[vX.X\]` markers |
 | `wifi_regulation` | `ingest-wifi-regulations.ts` | WiFi RegHub API → 1 chunk per country (ISO code = source_id)，markdown 已預格式化 |
+| `web` | `ingest-web.ts` | 任意網頁 → Firecrawl(有 `FIRECRAWL_API_KEY` 時)→ Jina Reader → 純 fetch 清洗 的層疊萃取 → markdown chunk。source_id = hostname+pathname（無 colon），source_url 存完整網址。`/knowledge` Add Page 加入；每週 cron 重抓 |
 
 ## Unified Taxonomy (Solution > Product Line > Model)
 
@@ -60,3 +61,9 @@ question + history → searchQuery embed → match_documents RPC (top 40)
 ```
 
 資料表：`documents`（向量索引，metadata JSONB 含 taxonomy + source-specific fields）、`chat_sessions`（對話持久化）
+
+## 共用檢索核心 + 對外 Search API
+
+檢索（embed → match_documents → taxonomy filter → 跨語言補強 → re-rank → trim）抽在 **`lib/rag/retrieve.ts`（`retrieveDocuments`）**，`/api/ask`（聊天 SSE）與 **`/api/v1/search`**（對外 JSON）共用同一份。
+
+對外 API 供其他部門 app 串接（**只給檢索片段，不生成回答**）：`POST /api/v1/search`，`Authorization: Bearer sk_live_…`，每把 key 綁 server 端強制的 scope（solution/product_lines/models/source_types，請求只能縮小）+ 固定視窗限流。管理在 `/settings/api-access`。完整規格見 [`api-search.md`](api-search.md)。
