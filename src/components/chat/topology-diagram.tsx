@@ -40,12 +40,45 @@ function loadCatalog(): Promise<CatalogIcon[]> {
 }
 
 /* ── geometry ── */
-const NODE_W = 128;
+const NODE_W = 156;
 const ICON_W = 96;
 const ICON_H = 64;
-const TIER_H = 152;
+const TIER_H = 156;
 const PAD = 28;
-const LABEL_DY = 16;
+
+/** Wrap text to <= maxLines lines of ~maxChars each (CJK hard-cuts; ellipsis if longer). */
+function wrapText(text: string, maxChars: number, maxLines: number): string[] {
+  const t = (text || "").trim();
+  if (!t) return [];
+  const lines: string[] = [];
+  let rest = t;
+  while (rest.length && lines.length < maxLines) {
+    if (rest.length <= maxChars) { lines.push(rest); rest = ""; break; }
+    let cut = rest.lastIndexOf(" ", maxChars);
+    if (cut <= 0) cut = maxChars;
+    lines.push(rest.slice(0, cut).trim());
+    rest = rest.slice(cut).trim();
+  }
+  if (rest.length && lines.length) {
+    lines[lines.length - 1] = lines[lines.length - 1].replace(/.$/, "…");
+  }
+  return lines;
+}
+
+/** Label as a bold model line + greyer wrapped description line(s). */
+function nodeLabelLines(n: TopoNode): { t: string; b: boolean }[] {
+  const label = n.label || n.model || n.role || n.id;
+  if (n.model) {
+    const desc =
+      label === n.model
+        ? ""
+        : label.toUpperCase().startsWith(n.model.toUpperCase())
+          ? label.slice(n.model.length).trim()
+          : label;
+    return [{ t: n.model, b: true }, ...wrapText(desc, 13, 2).map((t) => ({ t, b: false }))];
+  }
+  return wrapText(label, 13, 2).map((t, i) => ({ t, b: i === 0 }));
+}
 
 export function TopologyDiagram({ source }: { source: string }) {
   const [catalog, setCatalog] = useState<CatalogIcon[] | null>(null);
@@ -176,7 +209,8 @@ export function TopologyDiagram({ source }: { source: string }) {
             const p = pos.get(n.id);
             if (!p) return null;
             const url = urlFor(n);
-            const label = n.label || n.model || n.role || n.id;
+            const lines = nodeLabelLines(n);
+            const baseY = p.y + ICON_H / 2 + 16;
             return (
               <g key={n.id}>
                 {url ? (
@@ -185,12 +219,11 @@ export function TopologyDiagram({ source }: { source: string }) {
                 ) : (
                   <FallbackShape role={n.role} cx={p.x} cy={p.y} />
                 )}
-                <text x={p.x} y={p.y + ICON_H / 2 + LABEL_DY} textAnchor="middle"
-                  fontSize={11.5} fontWeight={600} fill="#2C3345">{label}</text>
-                {n.role && (
-                  <text x={p.x} y={p.y + ICON_H / 2 + LABEL_DY + 13} textAnchor="middle"
-                    fontSize={9.5} fill="#8a93a3">{n.role}</text>
-                )}
+                {lines.map((ln, i) => (
+                  <text key={i} x={p.x} y={baseY + i * 13} textAnchor="middle"
+                    fontSize={ln.b ? 11.5 : 10} fontWeight={ln.b ? 600 : 400}
+                    fill={ln.b ? "#2C3345" : "#8a93a3"}>{ln.t}</text>
+                ))}
               </g>
             );
           })}
