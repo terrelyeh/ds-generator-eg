@@ -135,14 +135,45 @@ export function TopologyDiagram({ source }: { source: string }) {
     (tiers.get(t) ?? tiers.set(t, []).get(t)!).push(n);
   }
   const tierKeys = [...tiers.keys()].sort((a, b) => a - b);
-  const maxRow = Math.max(1, ...tierKeys.map((t) => tiers.get(t)!.length));
-  const width = PAD * 2 + maxRow * NODE_W;
+
+  // Zone-aware ordering: cluster same-zone nodes within each tier (and add a
+  // gap between zone groups) so zone boxes form separate columns and don't
+  // overlap each other / their connectors.
+  const ZONE_GAP = 30;
+  const zoneOrder = new Map<string, number>();
+  (sp.zones ?? []).forEach((z, zi) => (z.nodes ?? []).forEach((id) => {
+    if (!zoneOrder.has(id)) zoneOrder.set(id, zi);
+  }));
+  for (const row of tiers.values()) {
+    row.sort((a, b) => (zoneOrder.get(a.id) ?? 999) - (zoneOrder.get(b.id) ?? 999));
+  }
+  const rowWidth = (row: TopoNode[]) => {
+    let w = 0; let prev: number | undefined;
+    row.forEach((n, i) => {
+      const z = zoneOrder.get(n.id);
+      if (i > 0 && z !== prev) w += ZONE_GAP;
+      w += NODE_W;
+      prev = z;
+    });
+    return w;
+  };
+  const tierWidths = new Map(tierKeys.map((t) => [t, rowWidth(tiers.get(t)!)]));
+  const contentW = Math.max(NODE_W, ...tierWidths.values());
+  const width = PAD * 2 + contentW;
+
   const pos = new Map<string, { x: number; y: number }>();
   tierKeys.forEach((t, ti) => {
     const row = tiers.get(t)!;
-    const startX = (width - row.length * NODE_W) / 2;
     const y = PAD + ti * TIER_H + ICON_H / 2 + 4;
-    row.forEach((n, i) => pos.set(n.id, { x: startX + i * NODE_W + NODE_W / 2, y }));
+    let x = PAD + (contentW - tierWidths.get(t)!) / 2;
+    let prev: number | undefined;
+    row.forEach((n, i) => {
+      const z = zoneOrder.get(n.id);
+      if (i > 0 && z !== prev) x += ZONE_GAP;
+      pos.set(n.id, { x: x + NODE_W / 2, y });
+      x += NODE_W;
+      prev = z;
+    });
   });
 
   // legend entries actually used
@@ -204,7 +235,11 @@ export function TopologyDiagram({ source }: { source: string }) {
                 fill="#03a9f4" fillOpacity={0.03} stroke="#03a9f4" strokeOpacity={0.35}
                 strokeWidth={1.2} strokeDasharray="6 4" />
               {z.label && (
-                <text x={z.x + 10} y={z.y + 15} fontSize={10.5} fontWeight={700} fill="#0288d1">{z.label}</text>
+                <>
+                  <rect x={z.x + 8} y={z.y + 4} width={z.label.length * 8 + 10} height={15} rx={3}
+                    fill="#ffffff" fillOpacity={0.92} />
+                  <text x={z.x + 13} y={z.y + 15} fontSize={10.5} fontWeight={700} fill="#0288d1">{z.label}</text>
+                </>
               )}
             </g>
           ))}
