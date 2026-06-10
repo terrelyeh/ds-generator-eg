@@ -9,6 +9,9 @@ import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
 
 export interface WorkspaceScope extends Partial<TaxonomyMeta> {
   source_types?: string[];
+  /** Extra kind='knowledge' areas (solution slugs) to include on top of the
+   *  product scope, e.g. a department's SOP/onboarding area. */
+  knowledge_areas?: string[];
 }
 
 export interface AskWorkspace {

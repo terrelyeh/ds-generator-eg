@@ -9,6 +9,7 @@ import {
   TaxonomyPicker,
   EMPTY_TAXONOMY_VALUE,
   GLOBAL_SOLUTION_SLUG,
+  fetchTaxonomy,
   type TaxonomyValue,
 } from "@/components/knowledge/taxonomy-picker";
 
@@ -20,7 +21,7 @@ interface Workspace {
   llm_mode: "shared" | "byok" | "user_byok";
   provider: string;
   byok_provider: string | null;
-  scope: { solution?: string | null; product_lines?: string[]; models?: string[]; source_types?: string[] } | null;
+  scope: { solution?: string | null; product_lines?: string[]; models?: string[]; source_types?: string[]; knowledge_areas?: string[] } | null;
   persona: string;
   profile: string;
   allow_switch: boolean;
@@ -84,6 +85,8 @@ export function AskWorkspacesManager() {
   const [byokKey, setByokKey] = useState("");
   const [tax, setTax] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [sourceTypes, setSourceTypes] = useState<string[]>([]);
+  const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
+  const [areaOptions, setAreaOptions] = useState<{ slug: string; label: string }[]>([]);
   const [persona, setPersona] = useState("default");
   const [profile, setProfile] = useState("default");
   const [allowSwitch, setAllowSwitch] = useState(true);
@@ -110,11 +113,14 @@ export function AskWorkspacesManager() {
     fetch("/api/ask").then((r) => r.json()).then((d) => {
       if (d.ok) { setPersonas(d.personas ?? []); setProfiles(d.profiles ?? []); }
     }).catch(() => {});
+    fetchTaxonomy()
+      .then((t) => setAreaOptions(t.solutions.filter((s) => (s.kind ?? "product") === "knowledge").map((s) => ({ slug: s.slug, label: s.label }))))
+      .catch(() => {});
   }, []);
 
   function resetForm() {
     setSlug(""); setName(""); setPasscode(""); setLlmMode("shared"); setProvider("gemini-3.5-flash");
-    setByokKey(""); setTax(EMPTY_TAXONOMY_VALUE); setSourceTypes([]); setPersona("default"); setProfile("default");
+    setByokKey(""); setTax(EMPTY_TAXONOMY_VALUE); setSourceTypes([]); setKnowledgeAreas([]); setPersona("default"); setProfile("default");
     setAllowSwitch(true); setWelcomeSubtitle(""); setWelcomeDescription(""); setExamples(""); setRate(30); setDaily("");
     setEditId(null); setEditHasPasscode(false); setEditHasByok(false);
   }
@@ -124,6 +130,7 @@ export function AskWorkspacesManager() {
     setProvider(w.provider); setByokKey("");
     setTax({ solution: w.scope?.solution ?? GLOBAL_SOLUTION_SLUG, product_lines: w.scope?.product_lines ?? [], models: w.scope?.models ?? [] });
     setSourceTypes(w.scope?.source_types ?? []);
+    setKnowledgeAreas(w.scope?.knowledge_areas ?? []);
     setPersona(w.persona); setProfile(w.profile); setAllowSwitch(w.allow_switch);
     setWelcomeSubtitle(w.welcome_subtitle ?? ""); setWelcomeDescription(w.welcome_description ?? "");
     setExamples((w.example_questions ?? []).join("\n")); setRate(w.rate_limit_per_min);
@@ -155,6 +162,7 @@ export function AskWorkspacesManager() {
           product_lines: tax.product_lines,
           models: tax.models,
           source_types: sourceTypes,
+          knowledge_areas: knowledgeAreas,
         },
         persona, profile, allow_switch: allowSwitch,
         welcome_subtitle: welcomeSubtitle,
@@ -335,9 +343,21 @@ export function AskWorkspacesManager() {
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium">知識範圍（共用 KB，scope 過濾）</p>
-                <TaxonomyPicker value={tax} onChange={setTax} allowGlobal required={false} disabled={saving} />
-                <p className="mb-1 mt-2 text-xs font-medium">來源類型 <span className="font-normal text-muted-foreground/60">(未選=全部)</span></p>
+                <p className="mb-2 text-xs font-medium">產品知識範圍（共用 KB，scope 過濾）</p>
+                <TaxonomyPicker value={tax} onChange={setTax} allowGlobal required={false} disabled={saving} productOnly />
+                {areaOptions.length > 0 && (
+                  <>
+                    <p className="mb-1 mt-3 text-xs font-medium">額外納入的知識領域 <span className="font-normal text-muted-foreground/60">(部門 SOP / 平台等；可複選)</span></p>
+                    <div className="flex flex-wrap gap-2">
+                      {areaOptions.map((a) => (
+                        <button key={a.slug} type="button" disabled={saving} onClick={() => setKnowledgeAreas((p) => p.includes(a.slug) ? p.filter((x) => x !== a.slug) : [...p, a.slug])}
+                          className={`rounded-md border px-2.5 py-1 text-xs ${knowledgeAreas.includes(a.slug) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{a.label}</button>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[11px] text-muted-foreground/60">知識領域預設不會被產品 scope 撈到；勾選後才會併入這個 workspace。</p>
+                  </>
+                )}
+                <p className="mb-1 mt-3 text-xs font-medium">來源類型 <span className="font-normal text-muted-foreground/60">(未選=全部)</span></p>
                 <div className="flex flex-wrap gap-2">
                   {SOURCE_TYPES.map((st) => (
                     <button key={st.id} type="button" disabled={saving} onClick={() => setSourceTypes((p) => p.includes(st.id) ? p.filter((x) => x !== st.id) : [...p, st.id])}

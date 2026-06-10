@@ -20,7 +20,7 @@ export async function GET() {
   const [solutionsRes, productLinesRes, productsRes] = await Promise.all([
     supabase
       .from("solutions")
-      .select("id, slug, label, sort_order")
+      .select("id, slug, label, sort_order, kind")
       .order("sort_order"),
     supabase
       .from("product_lines")
@@ -53,6 +53,7 @@ export async function GET() {
       slug: s.slug,
       label: s.label,
       sort_order: s.sort_order,
+      kind: (s as { kind?: string }).kind ?? "product",
     })),
     product_lines: productLines.map((pl) => ({
       name: pl.name,

@@ -204,7 +204,7 @@ Key tables:
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
 - `app_settings` — key-value store: API keys, `typography_${locale}`, `custom_fonts_${locale}`, `persona_{id}`, `pdf_lock_{model}_{lang}`
 - `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash
-- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), **llm_mode ('shared'|'byok'|'user_byok')**（00018 加 user_byok 到 CHECK）, provider, byok_provider, byok_key_encrypted (AES; 只有 workspace-BYOK 用), scope JSONB `{solution,product_lines[],models[],source_types[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數. RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only
+- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), **llm_mode ('shared'|'byok'|'user_byok')**（00018 加 user_byok 到 CHECK）, provider, byok_provider, byok_key_encrypted (AES; 只有 workspace-BYOK 用), scope JSONB `{solution,product_lines[],models[],source_types[],knowledge_areas[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數. RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only。**`scope.knowledge_areas`** = 額外納入的 `kind='knowledge'` 領域 slug（產品 scope + 部門領域的加總，見下方檢索規則）
 - `api_keys` — 對外 Search API key：name, key_prefix, key_hash (sha256, 驗證用), **key_encrypted** (AES-256-GCM, 供 admin 列表複製), scope JSONB `{solution,product_lines[],models[],source_types[]}`, rate_limit_per_min, enabled, last_used_at, request_count, window_start/window_count (固定視窗限流). RLS on + 0 policies = 只走 service role。RPC `api_key_touch(p_hash)` 原子化 verify+限流+用量
 - `chat_sessions` — 對話持久化：user_id (default 'anonymous'), title, persona, provider, messages JSONB
 - `profiles` — id (FK auth.users), email, name, avatar_url, role (TEXT CHECK admin/editor/pm/viewer), last_sign_in_at, timestamps. **role values are TEXT not enum** (we DROPped the orphan `user_role` enum during migration cleanup)
@@ -268,6 +268,8 @@ pointers so you know it exists:
 ### 對外 RAG Search API（其他部門 app 串接）
 
 檢索核心抽成 **`lib/rag/retrieve.ts`（`retrieveDocuments`）**，`/api/ask` 與對外 API **共用同一份**（不要再各寫一份）：embed → `match_documents` RPC → taxonomy filter → 跨語言 literal-match 補強（型號/國家）→ re-rank → trim。`sourceTypes`(allow-list) 與 `strictScope` 是給 API 的（聊天不開，保留原行為）。
+
+- **知識領域預設「私有」（`knowledgeAreasAllowed` 選項）**：`kind='knowledge'` 的 solution（部門 SOP/onboarding/平台）**不會**被產品或 Global scope 撈到。retrieve 帶 `knowledgeAreasAllowed`（陣列，含空陣列）時 = workspace 模式：凡 doc 的 solution 屬於某 knowledge 領域,**只有**該 slug 在 allow-list 內才保留。`undefined`（內部 Ask / Search API）= 不過濾,全看得到。`/api/ask` workspace 分支把 `scope.knowledge_areas` + (若 `scope.solution` 本身就是 knowledge 領域則含它) 當 allow-list。⇒ 「全產品 + 行銷」= 產品 scope Global + `knowledge_areas:['marketing']`；純 onboarding bot = `solution:'marketing'`。TaxonomyPicker 的 `productOnly` 讓 workspace 產品 scope 只列 `kind='product'`,部門領域改用「額外納入的知識領域」多選勾。
 
 - **`POST /api/v1/search`**（`app/api/v1/search/route.ts`，maxDuration 30）：對外、機器對機器、回 **JSON**（非 SSE，無 LLM 成本）。body `{ query(≤2000), top_k?(1–20,預設8), source_types?, taxonomy? }` → `{ ok, count, results:[{content,title,source_type,source_id,source_url,score,taxonomy}], scope }`。
 - **認證**：`Authorization: Bearer sk_live_…`。驗證用 sha256 `key_hash`（不需解密）。`api_key_touch(p_hash)` RPC **原子化**做 驗證 + 固定視窗(60s)限流 + 用量累加；`verifyApiKey()` 回 401(無/錯 key)/403(停用)/429(超量)。

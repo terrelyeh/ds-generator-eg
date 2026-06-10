@@ -26,7 +26,7 @@ interface WorkspaceInput {
   llm_mode?: "shared" | "byok" | "user_byok";
   provider?: string;
   byok_key?: string; // plaintext; encrypted here. "" = leave unchanged on PATCH
-  scope?: { solution?: string | null; product_lines?: string[]; models?: string[]; source_types?: string[] };
+  scope?: { solution?: string | null; product_lines?: string[]; models?: string[]; source_types?: string[]; knowledge_areas?: string[] };
   persona?: string;
   profile?: string;
   allow_switch?: boolean;
@@ -68,6 +68,7 @@ function normalizeScope(s: WorkspaceInput["scope"]) {
     product_lines: Array.isArray(v.product_lines) ? v.product_lines : [],
     models: Array.isArray(v.models) ? v.models : [],
     source_types: Array.isArray(v.source_types) ? v.source_types : [],
+    knowledge_areas: Array.isArray(v.knowledge_areas) ? v.knowledge_areas : [],
   };
 }
 

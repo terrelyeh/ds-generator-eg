@@ -6,7 +6,7 @@ import { useEffect, useMemo, useState } from "react";
  * Unified taxonomy data shape served by /api/taxonomy.
  */
 export interface TaxonomyData {
-  solutions: { slug: string; label: string; sort_order: number }[];
+  solutions: { slug: string; label: string; sort_order: number; kind?: string }[];
   product_lines: {
     name: string;
     label: string;
@@ -42,6 +42,9 @@ interface TaxonomyPickerProps {
   /** If true, Solution is required (disables submit until picked) */
   required?: boolean;
   disabled?: boolean;
+  /** If true, only product solutions are listed (knowledge areas are excluded —
+   *  used for the workspace product scope, where areas are picked separately). */
+  productOnly?: boolean;
 }
 
 /**
@@ -50,7 +53,7 @@ interface TaxonomyPickerProps {
 let taxonomyCache: TaxonomyData | null = null;
 let taxonomyPromise: Promise<TaxonomyData> | null = null;
 
-async function fetchTaxonomy(): Promise<TaxonomyData> {
+export async function fetchTaxonomy(): Promise<TaxonomyData> {
   if (taxonomyCache) return taxonomyCache;
   if (taxonomyPromise) return taxonomyPromise;
   taxonomyPromise = fetch("/api/taxonomy")
@@ -72,6 +75,7 @@ export function TaxonomyPicker({
   allowGlobal = false,
   required = true,
   disabled = false,
+  productOnly = false,
 }: TaxonomyPickerProps) {
   const [data, setData] = useState<TaxonomyData | null>(taxonomyCache);
 
@@ -147,11 +151,13 @@ export function TaxonomyPicker({
           className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50 bg-background"
         >
           <option value="">— Select solution —</option>
-          {data.solutions.map((s) => (
-            <option key={s.slug} value={s.slug}>
-              {s.label}
-            </option>
-          ))}
+          {data.solutions
+            .filter((s) => !productOnly || (s.kind ?? "product") === "product")
+            .map((s) => (
+              <option key={s.slug} value={s.slug}>
+                {s.label}
+              </option>
+            ))}
           {allowGlobal && (
             <option value={GLOBAL_SOLUTION_SLUG}>🌐 Global (cross-solution)</option>
           )}

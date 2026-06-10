@@ -48,6 +48,14 @@ export interface RetrieveOptions {
    * existing behaviour where literal model matches can override the filter.
    */
   strictScope?: boolean;
+  /**
+   * Workspace mode: knowledge-kind solutions (department SOPs, onboarding,
+   * platform how-to) are PRIVATE by default. When this is defined, any doc whose
+   * solution is a `kind='knowledge'` area is dropped UNLESS its slug is in this
+   * allow-list. `undefined` = not workspace mode → no exclusion (internal Ask /
+   * Search API see everything). An empty array = exclude ALL knowledge areas.
+   */
+  knowledgeAreasAllowed?: string[] | null;
 }
 
 const MODEL_MENTION_RE =
@@ -108,6 +116,7 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
     finalLimit = 12,
     matchThreshold = 0.3,
     strictScope = false,
+    knowledgeAreasAllowed = null,
   } = opts;
 
   const hasTaxonomyFilter = !!(
@@ -230,6 +239,25 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
     }
   } else if (allowTypes) {
     docs = docs.filter((d) => allowTypes.has(d.source_type));
+  }
+
+  // Knowledge areas are opt-in: in workspace mode, drop any doc tagged to a
+  // kind='knowledge' solution unless that area was explicitly included. This
+  // keeps department SOPs / onboarding / platform docs out of product (and
+  // Global) scopes unless a workspace deliberately pulls them in.
+  if (knowledgeAreasAllowed != null) {
+    const { data: kRows } = (await supabase
+      .from("solutions" as "products")
+      .select("slug")
+      .eq("kind", "knowledge")) as { data: { slug: string }[] | null };
+    const knowledgeSlugs = new Set((kRows ?? []).map((r) => r.slug));
+    if (knowledgeSlugs.size > 0) {
+      const allowed = new Set(knowledgeAreasAllowed);
+      docs = docs.filter((d) => {
+        const sol = (d.metadata?.solution as string) ?? null;
+        return !sol || !knowledgeSlugs.has(sol) || allowed.has(sol);
+      });
+    }
   }
 
   return docs.slice(0, finalLimit);

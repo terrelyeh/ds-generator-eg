@@ -320,6 +320,13 @@ export async function POST(request: Request) {
                     models: ws.scope?.models ?? [],
                   },
                   sourceTypes: ws.scope?.source_types ?? null,
+                  // Knowledge areas are private by default; include the ones this
+                  // workspace selected (plus its own solution if it IS an area,
+                  // e.g. an onboarding bot scoped directly to a department).
+                  knowledgeAreasAllowed: [
+                    ...(Array.isArray(ws.scope?.knowledge_areas) ? ws.scope.knowledge_areas : []),
+                    ...(ws.scope?.solution ? [ws.scope.solution] : []),
+                  ],
                 }
               : { question, history, sourceType: source_type, productLine: product_line, taxonomy, finalLimit: 12 },
           );
