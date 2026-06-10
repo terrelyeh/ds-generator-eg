@@ -147,6 +147,9 @@ export function EngenieChat({
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // Don't submit while an IME is composing (e.g. 注音 selecting a candidate
+    // with Enter) — that Enter confirms the candidate, it isn't "send".
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();

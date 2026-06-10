@@ -223,8 +223,9 @@
         </ol>
 
         <div class="try">
-          <h3>👉 想先試用？</h3>
-          <p style="margin-bottom:0">這個頁面右下角<span class="arrow"> ↘ </span>就有一個<strong>活的 demo widget</strong>（EnGenie Demo）。點開直接問「<em>哪些 AP 支援 WiFi 7？</em>」或「<em>ECW536 的規格是什麼？</em>」試試看。</p>
+          <h3>👉 想先試用？兩種形式都能直接玩</h3>
+          <p>① <strong>浮動 Widget</strong> — 這個頁面右下角<span class="arrow"> ↘ </span>就有一個活的 demo widget（EnGenie Demo）。點開直接問「<em>哪些 AP 支援 WiFi 7？</em>」或「<em>ECW536 的規格是什麼？</em>」。</p>
+          <p style="margin-bottom:0">② <strong>整頁入口</strong> — 開這條連結看完整頁版（同一套知識、同一個 demo workspace）：<a href="/ask/demo-widget" target="_blank" rel="noopener noreferrer"><strong>開啟 /ask/demo-widget ↗</strong></a></p>
         </div>
 
         <h2 id="snippets"><span class="num">6</span>複製即用</h2>
@@ -238,6 +239,7 @@
 
         <h3>② 整頁入口（直接分享連結）</h3>
         <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>https://ds-generator-eg.vercel.app/ask/你的代號</code></pre>
+        <p style="font-size:13.5px;color:var(--gray-light)">實際範例（demo workspace）：<a href="/ask/demo-widget" target="_blank" rel="noopener noreferrer">開啟 /ask/demo-widget ↗</a></p>
 
         <h3>③ Search API（程式串接）</h3>
         <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>curl -X POST https://ds-generator-eg.vercel.app/api/v1/search \
@@ -257,6 +259,15 @@
         <p>可以。透過 scope 限定 Solution／產品線／型號／來源類型；也能上傳你部門自己的 PDF 與文字片段。</p>
         <h3>回答的語言？</h3>
         <p>跟著提問語言走——中文問中文答、英文問英文答、日文問日文答。</p>
+        <h3>對話歷史存在哪裡？保留多久？</h3>
+        <p>對話歷史只存在<strong>使用者自己的瀏覽器</strong>（localStorage），<strong>不會上傳伺服器、也不與他人共享</strong>。重點規則：</p>
+        <ul>
+          <li>每個入口（workspace）<strong>各自獨立</strong>，彼此看不到對方的歷史。</li>
+          <li>最多保留<strong>最近約 30 筆</strong>對話（超過自動汰舊）。</li>
+          <li>換裝置、換瀏覽器、清除瀏覽資料、或無痕視窗全部關閉後就會<strong>消失</strong>。</li>
+          <li>嵌入式 widget 的歷史是<strong>依「所在網站」分開</strong>存的——同一個入口放在不同網站，歷史不互通。</li>
+          <li>因為存在前端，<strong>不適合當長期/正式紀錄</strong>；需要稽核或跨裝置保存請另循正式管道。</li>
+        </ul>
       </div>
 
       <div class="doc-footer">

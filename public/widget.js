@@ -106,6 +106,17 @@
   window.addEventListener("message", function (e) {
     if (e.origin === origin && e.data && e.data.type === "engenie:close") setOpen(false);
   });
+  // Click anywhere on the host page outside the panel + button closes the widget.
+  // (Clicks inside the cross-origin iframe never reach here, so chatting is safe.)
+  document.addEventListener("pointerdown", function (e) {
+    if (!open) return;
+    if (btn.contains(e.target) || panel.contains(e.target)) return;
+    setOpen(false);
+  }, true);
+  // Esc also closes.
+  document.addEventListener("keydown", function (e) {
+    if (open && e.key === "Escape") setOpen(false);
+  });
 
   function mount() {
     document.body.appendChild(panel);

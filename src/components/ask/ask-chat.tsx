@@ -594,6 +594,8 @@ export function AskChat({ compact = false }: AskChatProps) {
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
+    // Skip while an IME is composing (e.g. 注音 confirming a candidate with Enter).
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSubmit(); }
   }
 
