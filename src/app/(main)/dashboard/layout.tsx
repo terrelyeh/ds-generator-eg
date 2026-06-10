@@ -27,10 +27,15 @@ export default async function DashboardLayout({
     countMap.set(pl.solution_id, (countMap.get(pl.solution_id) ?? 0) + 1);
   }
 
-  const solutionItems = (solutions ?? []).map((s) => ({
-    ...s,
-    product_line_count: countMap.get(s.id) ?? 0,
-  }));
+  const solutionItems = (solutions ?? [])
+    .map((s) => ({
+      ...s,
+      product_line_count: countMap.get(s.id) ?? 0,
+    }))
+    // Hide product solutions that have no product lines yet (e.g. a
+    // datasheet-less "platform" solution) — they'd be dead dashboard tabs, but
+    // remain usable for knowledge tagging + Ask retrieval.
+    .filter((s) => s.product_line_count > 0);
 
   return (
     <div className="flex flex-1">

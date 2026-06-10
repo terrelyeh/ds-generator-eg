@@ -10,6 +10,7 @@ import {
   EMPTY_TAXONOMY_VALUE,
   GLOBAL_SOLUTION_SLUG,
   fetchTaxonomy,
+  clearTaxonomyCache,
   type TaxonomyValue,
 } from "@/components/knowledge/taxonomy-picker";
 
@@ -87,6 +88,8 @@ export function AskWorkspacesManager() {
   const [sourceTypes, setSourceTypes] = useState<string[]>([]);
   const [knowledgeAreas, setKnowledgeAreas] = useState<string[]>([]);
   const [areaOptions, setAreaOptions] = useState<{ slug: string; label: string }[]>([]);
+  const [newAreaLabel, setNewAreaLabel] = useState("");
+  const [addingArea, setAddingArea] = useState(false);
   const [persona, setPersona] = useState("default");
   const [profile, setProfile] = useState("default");
   const [allowSwitch, setAllowSwitch] = useState(true);
@@ -182,6 +185,30 @@ export function AskWorkspacesManager() {
       setOpen(false); resetForm(); fetchList();
     } catch (e) { toast.error(`Failed: ${e instanceof Error ? e.message : String(e)}`); }
     finally { setSaving(false); }
+  }
+
+  async function createArea() {
+    const label = newAreaLabel.trim();
+    if (!label) return;
+    setAddingArea(true);
+    try {
+      const r = await fetch("/api/knowledge-areas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label }),
+      });
+      const d = await r.json();
+      if (!d.ok) { toast.error(`Failed: ${d.error}`); return; }
+      setAreaOptions((prev) => [...prev, { slug: d.slug, label: d.label }]);
+      setKnowledgeAreas((prev) => [...prev, d.slug]); // auto-select the new area
+      clearTaxonomyCache(); // so the Knowledge page picker sees it for tagging
+      setNewAreaLabel("");
+      toast.success(`已新增知識領域「${d.label}」`);
+    } catch (e) {
+      toast.error(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setAddingArea(false);
+    }
   }
 
   async function toggle(w: Workspace) {
@@ -345,18 +372,27 @@ export function AskWorkspacesManager() {
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
                 <p className="mb-2 text-xs font-medium">產品知識範圍（共用 KB，scope 過濾）</p>
                 <TaxonomyPicker value={tax} onChange={setTax} allowGlobal required={false} disabled={saving} productOnly />
+                <p className="mb-1 mt-3 text-xs font-medium">額外納入的知識領域 <span className="font-normal text-muted-foreground/60">(部門 SOP / 平台等；可複選)</span></p>
                 {areaOptions.length > 0 && (
-                  <>
-                    <p className="mb-1 mt-3 text-xs font-medium">額外納入的知識領域 <span className="font-normal text-muted-foreground/60">(部門 SOP / 平台等；可複選)</span></p>
-                    <div className="flex flex-wrap gap-2">
-                      {areaOptions.map((a) => (
-                        <button key={a.slug} type="button" disabled={saving} onClick={() => setKnowledgeAreas((p) => p.includes(a.slug) ? p.filter((x) => x !== a.slug) : [...p, a.slug])}
-                          className={`rounded-md border px-2.5 py-1 text-xs ${knowledgeAreas.includes(a.slug) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{a.label}</button>
-                      ))}
-                    </div>
-                    <p className="mt-1 text-[11px] text-muted-foreground/60">知識領域預設不會被產品 scope 撈到；勾選後才會併入這個 workspace。</p>
-                  </>
+                  <div className="flex flex-wrap gap-2">
+                    {areaOptions.map((a) => (
+                      <button key={a.slug} type="button" disabled={saving} onClick={() => setKnowledgeAreas((p) => p.includes(a.slug) ? p.filter((x) => x !== a.slug) : [...p, a.slug])}
+                        className={`rounded-md border px-2.5 py-1 text-xs ${knowledgeAreas.includes(a.slug) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{a.label}</button>
+                    ))}
+                  </div>
                 )}
+                <div className="mt-2 flex items-center gap-2">
+                  <input value={newAreaLabel} disabled={saving || addingArea}
+                    onChange={(e) => setNewAreaLabel(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createArea(); } }}
+                    placeholder="新增領域（如：業務部門）"
+                    className="flex-1 rounded-md border px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/40" />
+                  <button type="button" onClick={createArea} disabled={saving || addingArea || !newAreaLabel.trim()}
+                    className="flex-shrink-0 rounded-md border border-engenius-blue/40 px-2.5 py-1 text-xs text-engenius-blue hover:bg-engenius-blue/10 disabled:opacity-40">
+                    {addingArea ? "新增中…" : "+ 新增領域"}
+                  </button>
+                </div>
+                <p className="mt-1 text-[11px] text-muted-foreground/60">知識領域預設不會被產品 scope 撈到；勾選後才會併入此 workspace。新增後到 Knowledge 頁把內容 tag 到該領域。</p>
                 <p className="mb-1 mt-3 text-xs font-medium">來源類型 <span className="font-normal text-muted-foreground/60">(未選=全部)</span></p>
                 <div className="flex flex-wrap gap-2">
                   {SOURCE_TYPES.map((st) => (

@@ -53,6 +53,12 @@ interface TaxonomyPickerProps {
 let taxonomyCache: TaxonomyData | null = null;
 let taxonomyPromise: Promise<TaxonomyData> | null = null;
 
+/** Bust the module cache (call after creating/deleting a solution/area). */
+export function clearTaxonomyCache() {
+  taxonomyCache = null;
+  taxonomyPromise = null;
+}
+
 export async function fetchTaxonomy(): Promise<TaxonomyData> {
   if (taxonomyCache) return taxonomyCache;
   if (taxonomyPromise) return taxonomyPromise;
