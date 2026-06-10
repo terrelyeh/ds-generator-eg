@@ -24,7 +24,13 @@ Rules:
 - Keep model numbers, spec values and units EXACTLY as written.
 - Output ONLY the Markdown — no preamble such as "Here is the markdown".`;
 
-export async function extractPdfMarkdown(pdf: Buffer): Promise<string | null> {
+export interface PdfExtractResult {
+  markdown: string;
+  /** True if Gemini hit the output-token cap and the tail of the PDF was cut off. */
+  truncated: boolean;
+}
+
+export async function extractPdfMarkdown(pdf: Buffer): Promise<PdfExtractResult | null> {
   const apiKey = await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
   if (!apiKey) {
     console.warn("Google AI API key not configured — skipping AI PDF extraction");
@@ -47,7 +53,7 @@ export async function extractPdfMarkdown(pdf: Buffer): Promise<string | null> {
               ],
             },
           ],
-          generationConfig: { maxOutputTokens: 16384, temperature: 0.1 },
+          generationConfig: { maxOutputTokens: 32768, temperature: 0.1 },
         }),
       },
     );
@@ -58,14 +64,16 @@ export async function extractPdfMarkdown(pdf: Buffer): Promise<string | null> {
     }
 
     const data = await res.json();
-    const parts = data.candidates?.[0]?.content?.parts as { text?: string; thought?: boolean }[] | undefined;
+    const cand = data.candidates?.[0] as { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string } | undefined;
+    const parts = cand?.content?.parts;
     if (!parts) return null;
     const text = parts
       .filter((p) => p.text !== undefined && !p.thought)
       .map((p) => p.text)
       .join("")
       .trim();
-    return text || null;
+    if (!text) return null;
+    return { markdown: text, truncated: cand?.finishReason === "MAX_TOKENS" };
   } catch (err) {
     console.warn("Gemini PDF extract failed:", err);
     return null;

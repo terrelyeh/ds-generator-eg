@@ -605,6 +605,9 @@ export function KnowledgeBase() {
       const data = await res.json();
       if (data.ok) {
         toast.success(`Indexed ${data.chunks} chunk${data.chunks > 1 ? "s" : ""}${data.stored ? "" : " (original not stored)"}`);
+        if (data.truncated) {
+          toast.warning("這份 PDF 較長，AI 抽取可能在中途截斷（後段未完整索引）。建議拆分後再上傳。", { duration: 8000 });
+        }
         fetchData();
         setShowFileDialog(false);
       } else {

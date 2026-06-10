@@ -67,6 +67,9 @@ export async function POST(request: Request) {
       sourceTypes: eff.sourceTypes,
       finalLimit: topK,
       strictScope: true,
+      // Knowledge areas (department SOPs / onboarding / internal docs) are NOT
+      // exposed via the external API. Empty allow-list = exclude them all.
+      knowledgeAreasAllowed: [],
     });
   } catch (err) {
     return NextResponse.json(

@@ -180,6 +180,9 @@ export function useChatStream(config: UseChatStreamConfig) {
               streamFollowUps = event.follow_ups ?? [];
               streamImageMap = event.image_map ?? {};
               streamProvider = event.provider ?? provider;
+            } else if (event.type === "error") {
+              // Backend signalled a structured error mid-stream.
+              fullContent += (fullContent ? "\n\n" : "") + (event.content || event.message || "（伺服器發生錯誤，請稍後再試）");
             }
           } catch {
             /* skip unparseable */
@@ -189,6 +192,16 @@ export function useChatStream(config: UseChatStreamConfig) {
 
       // Final flush — cancel any pending rAF; final state committed below.
       if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
+
+      // Stream finished cleanly but produced nothing (provider returned no text,
+      // or the connection closed after only status events) — show a friendly
+      // message instead of committing a blank assistant bubble.
+      if (!fullContent.trim()) {
+        const empty: ChatMessage[] = [...base, { role: "assistant", content: "抱歉，這次沒有收到回覆，請再試一次。", isStreaming: false }];
+        setMessages(empty);
+        cfg.onComplete?.(empty);
+        return;
+      }
 
       const { answer, followUps: parsed } = parseFollowUps(fullContent);
       const finalFollowUps = parsed.length > 0 ? parsed : streamFollowUps;
@@ -220,7 +233,20 @@ export function useChatStream(config: UseChatStreamConfig) {
         setMessages(finalMessages);
         cfg.onComplete?.(finalMessages);
       } else {
-        setMessages([...base, { role: "assistant", content: `Error: ${err instanceof Error ? err.message : String(err)}` }]);
+        // Network drop / server crash mid-stream. Keep whatever already streamed
+        // (don't make the user lose a half-read answer) and mark the interruption;
+        // otherwise show a friendly retryable message rather than a raw TypeError.
+        const { answer } = parseFollowUps(fullContent);
+        const partial = (answer || fullContent).trim();
+        const finalMessages: ChatMessage[] = [...base, {
+          role: "assistant",
+          content: partial ? `${partial}\n\n_(連線中斷，回覆可能未完成)_` : "連線中斷，請再試一次。",
+          sources: streamSources,
+          provider: streamProvider,
+          isStreaming: false,
+        }];
+        setMessages(finalMessages);
+        cfg.onComplete?.(finalMessages);
       }
     } finally {
       setLoading(false);

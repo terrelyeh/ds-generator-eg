@@ -69,12 +69,14 @@ export async function POST(request: Request) {
   // unavailable, so clean-text PDFs never hard-fail.
   let text = "";
   let extractMethod: "gemini" | "text" = "text";
+  let truncated = false;
   try {
     const { extractPdfMarkdown } = await import("@/lib/rag/extract-pdf-ai");
     const md = await extractPdfMarkdown(buf);
-    if (md && md.length >= 20) {
-      text = md;
+    if (md && md.markdown.length >= 20) {
+      text = md.markdown;
       extractMethod = "gemini";
+      truncated = md.truncated;
     } else {
       const { extractText, getDocumentProxy } = await import("unpdf");
       const pdf = await getDocumentProxy(new Uint8Array(buf));
@@ -122,7 +124,7 @@ export async function POST(request: Request) {
       taxonomy,
       extractMethod,
     });
-    return NextResponse.json({ ok: true, source_id: sourceId, stored: !!storedPath, extract_method: extractMethod, ...result });
+    return NextResponse.json({ ok: true, source_id: sourceId, stored: !!storedPath, extract_method: extractMethod, truncated, ...result });
   } catch (err) {
     return NextResponse.json(
       { error: `File ingest failed: ${err instanceof Error ? err.message : String(err)}` },

@@ -105,6 +105,25 @@ interface RawDoc extends Omit<RetrievedDoc, "similarity" | "metadata"> {
   metadata: Record<string, unknown> | null;
 }
 
+// kind='knowledge' solution slugs change rarely; cache them in-process so the
+// scope resolver doesn't hit the DB on every workspace/API request.
+let knowledgeSlugCache: { slugs: Set<string>; at: number } | null = null;
+const KNOWLEDGE_SLUG_TTL_MS = 60_000;
+
+async function getKnowledgeSlugs(supabase: ReturnType<typeof createAdminClient>): Promise<Set<string>> {
+  const now = Date.now();
+  if (knowledgeSlugCache && now - knowledgeSlugCache.at < KNOWLEDGE_SLUG_TTL_MS) {
+    return knowledgeSlugCache.slugs;
+  }
+  const { data } = (await supabase
+    .from("solutions" as "products")
+    .select("slug")
+    .eq("kind", "knowledge")) as { data: { slug: string }[] | null };
+  const slugs = new Set((data ?? []).map((r) => r.slug));
+  knowledgeSlugCache = { slugs, at: now };
+  return slugs;
+}
+
 export async function retrieveDocuments(opts: RetrieveOptions): Promise<RetrievedDoc[]> {
   const {
     question,
@@ -114,7 +133,9 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
     productLine = null,
     taxonomy = null,
     finalLimit = 12,
-    matchThreshold = 0.3,
+    // text-embedding-3-small scores CJK-query↔EN-chunk pairs low (~0.15–0.3),
+    // so keep the floor low and lean on finalLimit + re-rank for precision.
+    matchThreshold = 0.2,
     strictScope = false,
     knowledgeAreasAllowed = null,
   } = opts;
@@ -161,9 +182,25 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
 
   let docs: RetrievedDoc[] = (matches ?? []).map((d) => ({ ...d, metadata: d.metadata ?? {} }));
 
-  // Taxonomy filter (solution-inheritance aware).
-  if (hasTaxonomyFilter && taxonomy) {
-    docs = docs.filter((d) => matchesTaxonomyFilter(extractTaxonomy(d.metadata), taxonomy));
+  // Unified scope resolver. A doc is in scope if EITHER:
+  //  - it's a knowledge-area doc (solution ∈ kind='knowledge') AND that area is
+  //    in the caller's allow-list — gated SOLELY by the allow-list, bypassing the
+  //    product taxonomy (so "Cloud AP products + marketing area" works); OR
+  //  - it's a product/global doc that matches the product taxonomy filter.
+  // `knowledgeAreasAllowed` defined (workspace / Search API) ⇒ scoped mode:
+  // knowledge areas are private unless allow-listed (empty array = none).
+  // `null` (internal Ask) ⇒ not scoped: areas pass via the taxonomy path as before.
+  const scoped = knowledgeAreasAllowed != null;
+  const knowledgeSlugs = scoped ? await getKnowledgeSlugs(supabase) : null;
+  const inScope = (meta: Partial<TaxonomyMeta>): boolean => {
+    const sol = meta.solution ?? null;
+    if (scoped && knowledgeSlugs && sol && knowledgeSlugs.has(sol)) {
+      return knowledgeAreasAllowed!.includes(sol);
+    }
+    return hasTaxonomyFilter && taxonomy ? matchesTaxonomyFilter(meta, taxonomy) : true;
+  };
+  if (hasTaxonomyFilter || scoped) {
+    docs = docs.filter((d) => inScope(extractTaxonomy(d.metadata)));
   }
 
   // Cross-lingual literal-match supplements + unified re-rank.
@@ -230,34 +267,17 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
 
   // Airtight scope: re-apply taxonomy + source-type allow-list at the very end
   // so supplements can never leak out-of-scope chunks (API path only).
+  // Airtight scope: re-apply the same resolver + source-type allow-list at the
+  // very end so the cross-lingual supplements can never leak out-of-scope chunks.
   if (strictScope) {
-    if (hasTaxonomyFilter && taxonomy) {
-      docs = docs.filter((d) => matchesTaxonomyFilter(extractTaxonomy(d.metadata), taxonomy));
+    if (hasTaxonomyFilter || scoped) {
+      docs = docs.filter((d) => inScope(extractTaxonomy(d.metadata)));
     }
     if (allowTypes) {
       docs = docs.filter((d) => allowTypes.has(d.source_type));
     }
   } else if (allowTypes) {
     docs = docs.filter((d) => allowTypes.has(d.source_type));
-  }
-
-  // Knowledge areas are opt-in: in workspace mode, drop any doc tagged to a
-  // kind='knowledge' solution unless that area was explicitly included. This
-  // keeps department SOPs / onboarding / platform docs out of product (and
-  // Global) scopes unless a workspace deliberately pulls them in.
-  if (knowledgeAreasAllowed != null) {
-    const { data: kRows } = (await supabase
-      .from("solutions" as "products")
-      .select("slug")
-      .eq("kind", "knowledge")) as { data: { slug: string }[] | null };
-    const knowledgeSlugs = new Set((kRows ?? []).map((r) => r.slug));
-    if (knowledgeSlugs.size > 0) {
-      const allowed = new Set(knowledgeAreasAllowed);
-      docs = docs.filter((d) => {
-        const sol = (d.metadata?.solution as string) ?? null;
-        return !sol || !knowledgeSlugs.has(sol) || allowed.has(sol);
-      });
-    }
   }
 
   return docs.slice(0, finalLimit);
