@@ -1,7 +1,8 @@
 /**
- * Uploaded File ingestion — PDF / Word (.docx). Text extraction happens in the
- * upload route (unpdf / mammoth); this takes the already-extracted text and
- * runs the standard chunk → embed → upsert (source_type "file"). The original
+ * Uploaded File ingestion — PDF only. Text extraction happens in the upload
+ * route (Gemini AI extraction, unpdf text-layer fallback); this takes the
+ * already-extracted text and runs the standard chunk → embed → upsert
+ * (source_type "file"). The original
  * file lives in the private `knowledge-files` Storage bucket; its path is kept
  * in metadata.storage_path for the "view original" signed-URL link.
  *
@@ -19,13 +20,13 @@ const MAX_EMBED_CHARS = 21000;
 export interface IngestFileOptions {
   sourceId: string;
   fileName: string;
-  fileType: string; // "pdf" | "docx"
+  fileType: string; // "pdf"
   fileSize: number;
   storagePath: string | null;
   text: string;
   label?: string;
   taxonomy?: Partial<TaxonomyMeta>;
-  /** How the text was obtained: "gemini" (AI), "text" (PDF text layer), "docx". */
+  /** How the text was obtained: "gemini" (AI) or "text" (PDF text-layer fallback). */
   extractMethod?: string;
 }
 

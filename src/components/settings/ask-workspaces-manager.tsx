@@ -56,7 +56,7 @@ const SOURCE_TYPES = [
   { id: "wifi_regulation", label: "WiFi Regulations" },
   { id: "web", label: "Web Pages" },
   { id: "text_snippet", label: "Text Snippets" },
-  { id: "file", label: "Files (PDF/Word)" },
+  { id: "file", label: "Files (PDF)" },
 ];
 
 function familyOf(p: string) {

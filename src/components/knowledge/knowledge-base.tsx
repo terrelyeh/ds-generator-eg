@@ -56,7 +56,7 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "wifi_regulation", label: "WiFi Regulations", icon: "📡", description: "Per-country WiFi regulation data (bands, channels, power, DFS) from RegHub — applies across all wireless products", status: "active", canIngest: true },
   { id: "web", label: "Web Pages", icon: "🌐", description: "Any web page — product pages, blog posts, competitor pages. Auto-extracts clean content (Firecrawl → Jina → fetch)", status: "active", canIngest: true },
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "active", canIngest: true },
-  { id: "file", label: "Files (PDF/Word)", icon: "📎", description: "Uploaded PDF and Word (.docx) documents — text is extracted and indexed", status: "active", canIngest: true },
+  { id: "file", label: "Files (PDF)", icon: "📎", description: "Uploaded PDF documents — read by AI (tables, figures, scanned OCR) and indexed", status: "active", canIngest: true },
 ];
 
 const SUMMARY_CARDS = [
@@ -578,7 +578,7 @@ export function KnowledgeBase() {
     }
   }
 
-  // ── Files (PDF/Word) ──────────────────────────────────────────────────────────
+  // ── Files (PDF) ───────────────────────────────────────────────────────────────
   function openUploadFile() {
     setFileToUpload(null);
     setFileLabel("");
@@ -813,7 +813,7 @@ export function KnowledgeBase() {
                       )}
                       {config.canIngest && config.id === "file" && (
                         <Button size="sm" onClick={openUploadFile} disabled={!!ingesting} className="text-xs">
-                          {isIngesting ? "Uploading..." : "Upload File"}
+                          {isIngesting ? "Uploading..." : "Upload PDF"}
                         </Button>
                       )}
                       {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && config.id !== "web" && config.id !== "text_snippet" && config.id !== "file" && (
@@ -1385,7 +1385,7 @@ export function KnowledgeBase() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !fileUploading && setShowFileDialog(false)}>
           <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">Upload File (PDF / Word)</h2>
+              <h2 className="text-lg font-semibold">Upload PDF</h2>
               <button onClick={() => !fileUploading && setShowFileDialog(false)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={fileUploading}>
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
               </button>
@@ -1394,11 +1394,11 @@ export function KnowledgeBase() {
               <div>
                 <label className="block text-xs font-medium text-muted-foreground mb-1">File <span className="text-red-500">*</span></label>
                 <input type="file"
-                  accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  accept=".pdf,application/pdf"
                   onChange={(e) => setFileToUpload(e.target.files?.[0] ?? null)}
                   disabled={fileUploading}
                   className="w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-engenius-blue/10 file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-engenius-blue hover:file:bg-engenius-blue/20" />
-                <p className="mt-1 text-[11px] text-muted-foreground/50">PDF or Word (.docx), max 4 MB. PDFs are read by AI (tables → Markdown, figures described, scanned pages OCR&apos;d); .docx extracts text.</p>
+                <p className="mt-1 text-[11px] text-muted-foreground/50">PDF only, max 4 MB. Read by AI: tables → Markdown, figures described, scanned pages OCR&apos;d.</p>
                 {fileToUpload && <p className="mt-1 text-[11px] text-muted-foreground">{fileToUpload.name} · {(fileToUpload.size / 1024).toFixed(0)} KB</p>}
               </div>
               <div>

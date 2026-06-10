@@ -1,8 +1,10 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-09 (Knowledge: Text Snippets + Files (PDF/Word) channels
-> opened — both index into `documents` via shared `lib/rag/chunk.ts`; files use
-> unpdf/mammoth + a private `knowledge-files` Storage bucket. Earlier same day:
+> Last updated: 2026-06-10 (Knowledge: Text Snippets + Files (PDF-only) channels
+> opened — both index into `documents` via shared `lib/rag/chunk.ts`; PDFs are
+> read by Gemini (tables→Markdown, figures described, scanned OCR) with an unpdf
+> text-layer fallback, original kept in a private `knowledge-files` Storage
+> bucket. (Word/.docx dropped — no AI-extraction benefit.) Earlier:
 > Ask Workspaces: multi-tenant /ask/<slug> with
 > per-workspace passcode + 3 LLM modes (shared / workspace-BYOK / **user-BYOK**)
 > + scoped KB, via an optional `workspace` param on /api/ask. Frontend now
@@ -132,7 +134,8 @@ src/
       ingest-web.ts                    # Generic web page → Firecrawl→Jina→fetch cascade → chunk (source_type "web")
       chunk.ts                         # SHARED chunkText() for manual/uploaded pipelines (snippet + file)
       ingest-text-snippet.ts           # Manual markdown snippet → chunk → embed (source_type "text_snippet"; raw in chunk-0 meta)
-      ingest-file.ts                   # Uploaded PDF/.docx extracted text → chunk → embed (source_type "file"; original in knowledge-files bucket)
+      ingest-file.ts                   # Uploaded PDF extracted text → chunk → embed (source_type "file"; original in knowledge-files bucket)
+      extract-pdf-ai.ts                # Gemini PDF→Markdown (tables/figures/scanned OCR); unpdf text-layer is the fallback
       ingest-wifi-regulations.ts       # WiFi RegHub API → per-country chunk, source_id = ISO code
       personas.ts                      # Persona + UserProfile
     google/
@@ -237,8 +240,9 @@ pointers so you know it exists:
   gitbook, helpcenter, google_doc, wifi_regulation, **web**, **text_snippet**,
   **file**) → `documents` table (pgvector); taxonomy meta on every chunk.
   text_snippet (manual markdown, raw kept in chunk-0 meta for re-edit) + file
-  (PDF via `unpdf` / .docx via `mammoth`, original in private `knowledge-files`
-  bucket, indexed text via shared `lib/rag/chunk.ts`) are manual/uploaded, so the
+  (PDF-only: Gemini AI extraction in `lib/rag/extract-pdf-ai.ts` → tables/figures/
+  scanned OCR, unpdf text-layer fallback; original in private `knowledge-files`
+  bucket; indexed text via shared `lib/rag/chunk.ts`) are manual/uploaded, so the
   weekly `/api/cron/reindex-web` only refreshes gitbook/google_doc/helpcenter/web
   (derives sources from `documents`, preserves taxonomy). Files upload via
   multipart `POST /api/documents/upload`; `GET /api/documents/file-url` mints a
@@ -298,7 +302,7 @@ pointers so you know it exists:
 
 **RAG**：
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
-2. ~~Text Snippet CRUD~~ ✅ done（text_snippet + file 兩個 Knowledge 通道已打通）。可選後續：file 支援掃描檔 OCR、>4MB 走瀏覽器直傳 Storage（避開 Vercel body 限制）
+2. ~~Text Snippet CRUD~~ ✅ done（text_snippet + file(PDF) 兩個 Knowledge 通道已打通；PDF 走 Gemini 抽取，含表格/圖片/掃描 OCR）。可選後續：>4MB 走瀏覽器直傳 Storage（避開 Vercel body 限制）；Word 支援（需先轉 PDF，或 docx→PDF 後再走同一條）
 3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation 變動
 4. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
 
