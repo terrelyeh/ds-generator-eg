@@ -41,6 +41,7 @@ const PUBLIC_EXACT_PATHS = [
   "/docs/api-search.html",      // external RAG Search API spec (integrators)
   "/docs/ask-chat-ux-spec.html", // Ask chat UX spec (RD / PM)
   "/docs/topology-icon-spec.html", // topology icon spec (design team)
+  "/docs/ask-integration.html", // Ask Workspace integration service intro (departments)
 ];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/sync", "/api/cron"];
