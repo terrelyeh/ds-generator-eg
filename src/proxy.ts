@@ -42,6 +42,7 @@ const PUBLIC_EXACT_PATHS = [
   "/docs/ask-chat-ux-spec.html", // Ask chat UX spec (RD / PM)
   "/docs/topology-icon-spec.html", // topology icon spec (design team)
   "/docs/ask-integration.html", // Ask Workspace integration service intro (departments)
+  "/docs/widget-demo.html",     // standalone widget showcase (fake-data demo page)
 ];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/sync", "/api/cron"];

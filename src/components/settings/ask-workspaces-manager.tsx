@@ -263,6 +263,15 @@ export function AskWorkspacesManager() {
         </div>
       )}
 
+      <div className="mt-6 border-t pt-4 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground">給其他部門的資源：</span>{" "}
+        <a href="/docs/ask-integration.html" target="_blank" rel="noopener noreferrer" className="text-engenius-blue hover:underline">整合服務介紹</a>
+        {" · "}
+        <a href="/docs/widget-demo.html" target="_blank" rel="noopener noreferrer" className="text-engenius-blue hover:underline">Widget 展示頁</a>
+        {" · "}
+        <a href="/docs/api-search.html" target="_blank" rel="noopener noreferrer" className="text-engenius-blue hover:underline">Search API 文件</a>
+      </div>
+
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !saving && setOpen(false)}>
           <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-xl bg-background p-6 shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
