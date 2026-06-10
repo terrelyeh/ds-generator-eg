@@ -47,6 +47,31 @@ export async function isValidWorkspaceToken(slug: string, value: string | undefi
 }
 
 /**
+ * Embeddable widgets run in a cross-site iframe where third-party cookies are
+ * blocked, so they carry the workspace token in an Authorization header instead:
+ *   `Authorization: Bearer <slug>.<token>`
+ * The slug travels with the token (a bare token can't be validated without it,
+ * since the token is HMAC(slug)). Parse + verify helpers below.
+ */
+export function parseWorkspaceBearer(authHeader: string | null | undefined): { slug: string; token: string } | null {
+  if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
+  const v = authHeader.slice(7).trim();
+  const dot = v.indexOf(".");
+  if (dot <= 0) return null;
+  const slug = v.slice(0, dot);
+  const token = v.slice(dot + 1);
+  if (!/^[a-z0-9-]+$/.test(slug) || !token) return null;
+  return { slug, token };
+}
+
+/** True if the Authorization header carries a valid `<slug>.<token>` bearer. */
+export async function isValidWorkspaceBearer(authHeader: string | null | undefined): Promise<boolean> {
+  const parsed = parseWorkspaceBearer(authHeader);
+  if (!parsed) return false;
+  return isValidWorkspaceToken(parsed.slug, parsed.token);
+}
+
+/**
  * True if any `ws_<slug>` cookie in the list carries a valid token. Used by the
  * Edge proxy to let /api/ask through for workspace visitors (the route handler
  * then re-verifies the SPECIFIC workspace named in the request body).

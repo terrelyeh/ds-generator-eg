@@ -16,9 +16,12 @@ function familyLabel(byokProvider?: string | null, provider?: string): string {
 export function EngenieShell({
   workspace,
   title = "EnGenie",
+  authToken,
 }: {
   workspace?: string;
   title?: string;
+  /** Workspace bearer (`<slug>.<token>`) for embedded widgets (no cookies). */
+  authToken?: string;
 } = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [provider, setProvider] = useState("gemini-3.5-flash");
@@ -59,7 +62,10 @@ export function EngenieShell({
   }
 
   useEffect(() => {
-    fetch(workspace ? `/api/ask?workspace=${encodeURIComponent(workspace)}` : "/api/ask")
+    fetch(
+      workspace ? `/api/ask?workspace=${encodeURIComponent(workspace)}` : "/api/ask",
+      authToken ? { headers: { Authorization: `Bearer ${authToken}` } } : undefined,
+    )
       .then((r) => r.json())
       .then((d) => {
         if (!d.ok) return;
@@ -85,7 +91,7 @@ export function EngenieShell({
         }
       })
       .catch(() => {});
-  }, [workspace]);
+  }, [workspace, authToken]);
 
   function handleSetUserKey(key: string) {
     if (!workspace) return;
@@ -149,6 +155,7 @@ export function EngenieShell({
           initialMessages={initialMessages}
           initialConvId={initialConvId}
           workspace={workspace}
+          authToken={authToken}
           userByok={llmMode === "user_byok"}
           userKey={userKey}
           byokFamily={byokFamily}

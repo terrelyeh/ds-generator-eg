@@ -33,7 +33,9 @@ export async function POST(request: Request) {
   }
 
   const token = await computeWorkspaceToken(slug);
-  const res = NextResponse.json({ ok: true, name: ws.name });
+  // Return the token in the body too: embeddable widgets run in a cross-site
+  // iframe (third-party cookies blocked) and store it to send as a bearer header.
+  const res = NextResponse.json({ ok: true, name: ws.name, token });
   if (token) {
     res.cookies.set(workspaceCookieName(slug), token, {
       httpOnly: true,

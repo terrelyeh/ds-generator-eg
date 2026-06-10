@@ -250,6 +250,7 @@ export function AskWorkspacesManager() {
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button onClick={() => { navigator.clipboard?.writeText(`${origin}/ask/${w.slug}`); toast.success("Entry URL copied"); }} className="text-engenius-blue hover:underline">Copy URL</button>
+                      <button onClick={() => { navigator.clipboard?.writeText(`<script src="${origin}/widget.js" data-workspace="${w.slug}" data-title="${w.name.replace(/"/g, "&quot;")}" async></script>`); toast.success("Embed snippet copied — paste before </body>"); }} className="text-engenius-blue hover:underline" title="Copy a floating chat widget snippet for other sites">Embed</button>
                       <button onClick={() => openEdit(w)} className="text-engenius-blue hover:underline">Edit</button>
                       <button onClick={() => toggle(w)} className="text-muted-foreground hover:text-engenius-dark">{w.enabled ? "Disable" : "Enable"}</button>
                       <button onClick={() => remove(w)} className="text-muted-foreground/60 hover:text-red-500">Delete</button>

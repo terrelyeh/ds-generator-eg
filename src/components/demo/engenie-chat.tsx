@@ -50,6 +50,8 @@ export interface EngenieChatProps {
   initialConvId?: string | null;
   /** Workspace slug — routes the chat through workspace mode on /api/ask. */
   workspace?: string;
+  /** Workspace bearer (`<slug>.<token>`) for embedded widgets (no cookies). */
+  authToken?: string;
   /** user_byok workspace: the visitor must supply their own LLM key. */
   userByok?: boolean;
   userKey?: string | null;
@@ -78,6 +80,7 @@ export function EngenieChat({
   initialMessages,
   initialConvId,
   workspace,
+  authToken,
   userByok,
   userKey,
   byokFamily,
@@ -90,6 +93,7 @@ export function EngenieChat({
   // Live status ("searching" → "generating") drives 搜尋相關資料中… / 整理回覆中…
   const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
     getParams: () => ({ provider, persona, profile, ...(workspace ? { workspace } : {}), ...(userKey ? { userKey } : {}) }),
+    authToken,
     stoppedLabel: "_(已停止)_",
     onComplete: (msgs) => {
       // Persist this turn to per-browser history (localStorage).

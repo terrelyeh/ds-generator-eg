@@ -1,6 +1,9 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-10 (Knowledge: Text Snippets + Files (PDF-only) channels
+> Last updated: 2026-06-10 (Ask Workspaces: embeddable floating chat widget —
+> `public/widget.js` snippet → iframe `/embed/<slug>`, bearer-token auth (no
+> cross-site cookies) via `Authorization: Bearer <slug>.<token>`. Earlier:
+> Knowledge: Text Snippets + Files (PDF-only) channels
 > opened — both index into `documents` via shared `lib/rag/chunk.ts`; PDFs are
 > read by Gemini (tables→Markdown, figures described, scanned OCR) with an unpdf
 > text-layer fallback, original kept in a private `knowledge-files` Storage
@@ -290,7 +293,8 @@ pointers so you know it exists:
 - **歷史按 workspace 隔離**：`lib/demo/history.ts` 的 key 改成 `engenie_history_v1_<slug>`(/demo/ask 無 slug 維持原 `engenie_history_v1`)。仍是 per-browser localStorage(無痕關閉所有視窗才清,**不**同步伺服器)。
 - **BYOK 防呆**：`workspace-BYOK` 沒 key 不可建立/啟用(`app/api/ask-workspaces/route.ts` POST+PATCH 擋,逃生門=改 shared/user_byok、填 key、或先停用);執行期 `/ask/<slug>` 若 `byok` 且無 key → 顯示「尚未設定完成」notice 而非可打字的假聊天框。`user_byok` 不需要 admin key。
 - **proxy**：`/ask/` + `/api/ws-auth` 公開;`/api/ask` 在帶**任一合法 `ws_*` cookie** 時放行(`hasAnyValidWorkspaceCookie`)。
-- **管理**：`/settings/ask-workspaces`(admin)+ `app/api/ask-workspaces/route.ts` CRUD。secrets(passcode/BYOK key)write-only。
+- **管理**：`/settings/ask-workspaces`(admin)+ `app/api/ask-workspaces/route.ts` CRUD。secrets(passcode/BYOK key)write-only。「Copy URL」「Embed」並排:Embed 複製浮動 widget 的 `<script src=".../widget.js" data-workspace=…>` snippet。
+- **嵌入式浮動 widget(Intercom 式)**:其他部門在自己網站貼一段 `public/widget.js` snippet → 右下角浮動按鈕 → 開啟 iframe 載入 `/embed/<slug>`(`app/(demo)/embed/[slug]/page.tsx` → `components/demo/engenie-embed.tsx`)。**跨站 iframe 第三方 cookie 會被擋**,所以 embed 改用 **bearer token**:`/api/ws-auth` 回傳 token → 存 iframe localStorage(`lib/demo/ws-token.ts`)→ 每次呼叫 `/api/ask` 帶 `Authorization: Bearer <slug>.<token>`。後端 `workspace-session.ts` 的 `parseWorkspaceBearer`/`isValidWorkspaceBearer` 驗證;`/api/ask` GET+POST 與 proxy 都接受 cookie **或** bearer。沒設 passcode 的 workspace 會自動進入(無摩擦對外 widget)。CORS 不用開(iframe 內同源呼叫)。v1 不限制嵌入網域。
 - ⚠️ `user_byok` 若 `allow_switch=true`,使用者可能選到跟自己 key 不同家族的模型(provider 會報錯)——通常建議把模型鎖死(`allow_switch=false`)。per-workspace 配額對 user_byok 仍生效。
 - 規劃 Phase 2(部門私有文件自助索引)見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)。
 

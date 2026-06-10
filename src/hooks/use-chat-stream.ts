@@ -47,6 +47,9 @@ export interface UseChatStreamConfig {
   stoppedLabel?: string;
   /** Endpoint, defaults to /api/ask. */
   endpoint?: string;
+  /** Workspace bearer (`<slug>.<token>`) for embedded widgets — sent as
+   *  `Authorization: Bearer …` since cross-site iframes can't use cookies. */
+  authToken?: string;
 }
 
 /** Split trailing "--- \n followups" off the answer body. */
@@ -127,7 +130,10 @@ export function useChatStream(config: UseChatStreamConfig) {
     try {
       const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(cfg.authToken ? { Authorization: `Bearer ${cfg.authToken}` } : {}),
+        },
         signal: controller.signal,
         body: JSON.stringify({
           // ...params carries provider/persona/profile PLUS any caller extras

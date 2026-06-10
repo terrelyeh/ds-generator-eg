@@ -18,7 +18,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
-import { hasAnyValidWorkspaceCookie } from "@/lib/auth/workspace-session";
+import { hasAnyValidWorkspaceCookie, isValidWorkspaceBearer } from "@/lib/auth/workspace-session";
 
 // Routes accessible without a session.
 // /demo/ is the passcode-gated EnGenie surface — the page renders the
@@ -30,7 +30,7 @@ import { hasAnyValidWorkspaceCookie } from "@/lib/auth/workspace-session";
 // /ask/ are the per-department workspace chat entries — each renders its own
 // passcode gate (like /demo/), so the page route is public; the chat API
 // (/api/ask) is authorised below via the workspace cookie.
-const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/", "/ask/"];
+const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/", "/ask/", "/embed/"];
 // Publicly-shareable docs — handed to people without a SpecHub login (other
 // departments, RD/PM, the design team), so they bypass the session redirect.
 // Add a doc here only when it's meant to be shared and contains no secrets.
@@ -125,7 +125,9 @@ export async function proxy(request: NextRequest) {
       if (
         isDemoApi(pathname) &&
         ((await isValidDemoToken(request.cookies.get(DEMO_COOKIE)?.value)) ||
-          (await hasAnyValidWorkspaceCookie(request.cookies.getAll())))
+          (await hasAnyValidWorkspaceCookie(request.cookies.getAll())) ||
+          // Embedded widgets (cross-site iframe, no cookies) carry a bearer token.
+          (await isValidWorkspaceBearer(request.headers.get("authorization"))))
       ) {
         return response;
       }
