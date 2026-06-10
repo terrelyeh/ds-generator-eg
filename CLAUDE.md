@@ -308,7 +308,14 @@ pointers so you know it exists:
 
 ### 🔜 Next Steps
 
-**RAG**：
+**RAG / Ask 全面 review — 第二批（第一批 #1–#5 已完成：HNSW、統一 scope resolver、threshold 0.2、PDF 截斷偵測、串流錯誤處理）**。剩餘 review 項目，按建議順序：
+- **#6 Gemini key 移出 URL** — `ask/route.ts` `streamGemini` 目前 `?key=` 在 URL，fetch/DNS 錯誤訊息可能把 key 帶進 SSE error chunk + `console.error`（破壞 user_byok「不落地」）。改用 `x-goog-api-key` header；錯誤訊息回前端/記 log 前先 redact（去掉 `key=`、`sk-…`、bearer）。
+- **#8 `documents` GET 改 GROUP BY RPC** — 目前撈最多 5 萬列、JS 做 O(sources×docs) 統計，還 select 沒用到的 `content_hash`。改一支 `group by source_type, source_id` 的 RPC 回 count/sum(token)/max(updated_at)/一筆代表 metadata。
+- **#10 桌機 markdown O(n²) 串流渲染** — `ask-chat.tsx` 的 `components` 物件每 frame 重建、ReactMarkdown 每 frame 重跑整段；hoist/`useMemo`（demo 版 `engenie-chat.tsx` 已正確 hoist 可參照）。
+- **#11 拆 `knowledge-base.tsx`（~1500 行、~45 useState）** — 各對話框（Gitbook/GoogleDoc/Web/Snippet/File/EditTaxonomy）拆成獨立元件各自管 state，11 個近乎一樣的 ingest handler 收斂成一個 `ingestSource(body)`；只把 `onSuccess: fetchData` 提上去。
+- 🟢 安全強化（用量上來再做）：widget `allowed_origins` + `frame-ancestors`、passcode 改 argon2/scrypt、modal 改用 shadcn Dialog（focus trap/Esc/aria）、web/google_doc ingest 擋內網/metadata IP（SSRF）、上傳檔驗 `%PDF-` magic bytes、workspace bearer 加到期/可撤銷、型號清單三份合一。
+
+**RAG（功能）**：
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
 2. **Knowledge 上傳優化（可選）** — >4MB PDF 走瀏覽器直傳 Storage（避開 Vercel ~4.5MB body 限制）；Word 支援（先轉 PDF 再走 Gemini 抽取那條）
 3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation + text_snippet/file 來源 + 嵌入式 widget
