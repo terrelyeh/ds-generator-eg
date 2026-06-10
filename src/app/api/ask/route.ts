@@ -15,6 +15,22 @@ import { decryptKey } from "@/lib/auth/api-key";
 export const maxDuration = 60;
 
 /**
+ * Strip anything that looks like a credential before it's logged or streamed to
+ * the client. Defence in depth: provider error bodies / stack traces can echo
+ * back the request URL or auth headers, which may carry the API key (esp. the
+ * legacy `?key=` form). Order matters — match the most specific prefix first.
+ */
+function redactSecrets(input: string): string {
+  return input
+    .replace(/([?&]key=)[^&\s"']+/gi, "$1***")               // ?key= / &key= query param
+    .replace(/AIza[0-9A-Za-z_-]{20,}/g, "AIza***")            // Google API keys
+    .replace(/sk-ant-[A-Za-z0-9_-]{10,}/g, "sk-ant-***")      // Anthropic keys
+    .replace(/sk-[A-Za-z0-9_-]{10,}/g, "sk-***")              // OpenAI keys
+    .replace(/(Bearer\s+)[A-Za-z0-9._-]+/gi, "$1***")         // bearer tokens
+    .replace(/(x-(?:goog-)?api-key"?\s*[:=]\s*"?)[^\s",}]+/gi, "$1***"); // header echoes
+}
+
+/**
  * Ask is reachable two ways: a logged-in user with the `ask.use` permission,
  * OR a passcode demo session (EnGenie public entry). Returns a denial
  * NextResponse, or null if allowed.
@@ -331,8 +347,9 @@ export async function POST(request: Request) {
               : { question, history, sourceType: source_type, productLine: product_line, taxonomy, finalLimit: 12 },
           );
         } catch (searchError) {
-          console.error("Vector search error:", searchError);
-          sendEvent(JSON.stringify({ type: "chunk", content: "Error: Search failed. " + String(searchError) }));
+          const safe = redactSecrets(String(searchError));
+          console.error("Vector search error:", safe);
+          sendEvent(JSON.stringify({ type: "chunk", content: "Error: Search failed. " + safe }));
           sendEvent("[DONE]");
           controller.close();
           return;
@@ -459,8 +476,9 @@ IMPORTANT formatting rules:
         }));
         sendEvent("[DONE]");
       } catch (err) {
-        console.error("Ask SSE error:", err);
-        sendEvent(JSON.stringify({ type: "chunk", content: `\n\nError: ${err instanceof Error ? err.message : String(err)}` }));
+        const safe = redactSecrets(err instanceof Error ? err.message : String(err));
+        console.error("Ask SSE error:", safe);
+        sendEvent(JSON.stringify({ type: "chunk", content: `\n\nError: ${safe}` }));
         sendEvent("[DONE]");
       } finally {
         controller.close();
@@ -587,10 +605,11 @@ async function streamGemini(
   if (!apiKey) throw new Error("Google AI API key not configured");
 
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${apiKey}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // Key in a header (not the URL) so it can't leak via logs / error echoes.
+      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
@@ -232,7 +232,12 @@ function ReferenceList({ sources }: { sources: Source[] }) {
 
 /* ─── Markdown with inline citations ─── */
 function MarkdownWithCitations({ content, sources }: { content: string; sources?: Source[] }) {
-  const markdownComponents: Components = {
+  // Memoize the components map so it keeps a stable identity across streaming
+  // frames. Defining it inline would hand ReactMarkdown brand-new component
+  // functions every tick, forcing React to remount the entire rendered prefix
+  // each frame (O(n²) over the stream). `sources` only changes once — at the
+  // final commit — so the map stays stable while the answer streams in.
+  const markdownComponents = useMemo<Components>(() => ({
     // Intercept text nodes to find [N] patterns
     p: ({ children, ...props }) => {
       return <p {...props}>{processChildren(children, sources ?? [])}</p>;
@@ -267,7 +272,7 @@ function MarkdownWithCitations({ content, sources }: { content: string; sources?
     },
     // Fenced blocks → CodeBlock, except ```topology → TopologyDiagram
     pre: ({ children }) => <ChatPre>{children}</ChatPre>,
-  };
+  }), [sources]);
 
   return (
     <ReactMarkdown

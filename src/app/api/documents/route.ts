@@ -61,97 +61,61 @@ export async function GET(request: Request) {
 
   const supabase = createAdminClient();
 
-  // Get stats per source_type.
-  //
-  // Supabase/PostgREST has a server-side row cap (default 1000) that overrides
-  // any client-side `.limit()`. To reliably fetch the full documents index
-  // regardless of how many chunks exist, paginate with `.range()` until the
-  // batch is smaller than the page size.
-  type DocRow = {
+  // One aggregating round-trip instead of streaming every chunk row to the app
+  // and grouping in JS. knowledge_sources() does GROUP BY (source_type,
+  // source_id) server-side and returns one row per logical source with its
+  // chunk count, token total, latest update, and a representative title +
+  // metadata (from the lowest chunk_index). Replaces the old path that loaded
+  // up to 50k heavy rows and ran an O(sources × chunks) scan on every load.
+  type SourceRow = {
     source_type: string;
     source_id: string;
-    title: string;
-    chunk_index: number;
-    token_count: number | null;
-    updated_at: string;
-    content_hash: string;
+    title: string | null;
+    chunks: number | string; // bigint → may arrive as a string over the wire
+    total_tokens: number | string;
+    last_updated: string;
     metadata: Record<string, unknown> | null;
   };
 
-  const PAGE_SIZE = 1000;
-  const MAX_PAGES = 50; // hard safety stop at 50000 rows
-  const allRows: DocRow[] = [];
-
-  for (let page = 0; page < MAX_PAGES; page++) {
-    let pageQuery = supabase
-      .from("documents" as "products")
-      .select("source_type, source_id, title, chunk_index, token_count, updated_at, content_hash, metadata")
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-
-    if (sourceType) {
-      pageQuery = pageQuery.eq("source_type", sourceType);
-    }
-
-    const { data: pageData, error: pageError } = await pageQuery as {
-      data: DocRow[] | null;
-      error: unknown;
-    };
-
-    if (pageError) {
-      return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
-    }
-
-    const batch = pageData ?? [];
-    allRows.push(...batch);
-
-    if (batch.length < PAGE_SIZE) break;
-  }
-
-  const data = allRows;
-  const error = null;
+  const { data: rows, error } = (await supabase.rpc("knowledge_sources", {
+    p_source_type: sourceType ?? null,
+  })) as { data: SourceRow[] | null; error: unknown };
 
   if (error) {
     return NextResponse.json({ error: "Failed to fetch documents" }, { status: 500 });
   }
 
-  const docs = data ?? [];
+  // Coerce bigint-as-string to numbers, and sort newest-first within each
+  // channel so the list keeps a stable order across loads (the RPC join order
+  // is otherwise unspecified).
+  const rowsArr = (rows ?? [])
+    .map((r) => ({ ...r, chunks: Number(r.chunks) || 0, total_tokens: Number(r.total_tokens) || 0 }))
+    .sort((a, b) =>
+      a.source_type !== b.source_type
+        ? a.source_type.localeCompare(b.source_type)
+        : (b.last_updated ?? "").localeCompare(a.last_updated ?? ""),
+    );
 
-  // Group by source_type for stats
+  // Stats per source_type (count = total chunks, sources = distinct source_id).
   const stats: Record<string, { count: number; sources: number; total_tokens: number; last_updated: string | null }> = {};
-
-  const sourceSet = new Map<string, Set<string>>();
-
-  for (const doc of docs) {
-    if (!stats[doc.source_type]) {
-      stats[doc.source_type] = { count: 0, sources: 0, total_tokens: 0, last_updated: null };
-      sourceSet.set(doc.source_type, new Set());
-    }
-    stats[doc.source_type].count++;
-    stats[doc.source_type].total_tokens += doc.token_count ?? 0;
-    sourceSet.get(doc.source_type)!.add(doc.source_id);
-
-    if (!stats[doc.source_type].last_updated || doc.updated_at > stats[doc.source_type].last_updated!) {
-      stats[doc.source_type].last_updated = doc.updated_at;
-    }
+  for (const r of rowsArr) {
+    const s = (stats[r.source_type] ||= { count: 0, sources: 0, total_tokens: 0, last_updated: null });
+    s.count += r.chunks;
+    s.sources += 1;
+    s.total_tokens += r.total_tokens;
+    if (!s.last_updated || r.last_updated > s.last_updated) s.last_updated = r.last_updated;
   }
 
-  for (const [type, set] of sourceSet) {
-    stats[type].sources = set.size;
-  }
-
-  // Build source list (grouped by source_id)
-  const sources = [...new Set(docs.map((d) => `${d.source_type}:${d.source_id}`))].map((key) => {
-    const [type, id] = key.split(":", 2);
-    const chunks = docs.filter((d) => d.source_type === type && d.source_id === id);
-    const meta = chunks[0]?.metadata as Record<string, unknown> | null;
+  // Source list — already grouped by the RPC (one row per source, no JS join).
+  const sources = rowsArr.map((r) => {
+    const meta = r.metadata;
     return {
-      source_type: type,
-      source_id: id,
-      title: chunks[0]?.title ?? id,
-      chunks: chunks.length,
-      total_tokens: chunks.reduce((s, c) => s + (c.token_count ?? 0), 0),
-      last_updated: chunks.reduce((latest, c) =>
-        !latest || c.updated_at > latest ? c.updated_at : latest, "" as string),
+      source_type: r.source_type,
+      source_id: r.source_id,
+      title: r.title ?? r.source_id,
+      chunks: r.chunks,
+      total_tokens: r.total_tokens,
+      last_updated: r.last_updated,
       product_line: (meta?.product_line_label as string) ?? (meta?.product_line as string) ?? null,
       space_label: (meta?.space_label as string) ?? null,
       space_url: (meta?.space_url as string) ?? null,
@@ -169,7 +133,9 @@ export async function GET(request: Request) {
     };
   });
 
-  return NextResponse.json({ ok: true, stats, sources, total: docs.length });
+  const total = rowsArr.reduce((sum, r) => sum + r.chunks, 0);
+
+  return NextResponse.json({ ok: true, stats, sources, total });
 }
 
 /**

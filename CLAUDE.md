@@ -308,12 +308,9 @@ pointers so you know it exists:
 
 ### 🔜 Next Steps
 
-**RAG / Ask 全面 review — 第二批（第一批 #1–#5 已完成：HNSW、統一 scope resolver、threshold 0.2、PDF 截斷偵測、串流錯誤處理）**。剩餘 review 項目，按建議順序：
-- **#6 Gemini key 移出 URL** — `ask/route.ts` `streamGemini` 目前 `?key=` 在 URL，fetch/DNS 錯誤訊息可能把 key 帶進 SSE error chunk + `console.error`（破壞 user_byok「不落地」）。改用 `x-goog-api-key` header；錯誤訊息回前端/記 log 前先 redact（去掉 `key=`、`sk-…`、bearer）。
-- **#8 `documents` GET 改 GROUP BY RPC** — 目前撈最多 5 萬列、JS 做 O(sources×docs) 統計，還 select 沒用到的 `content_hash`。改一支 `group by source_type, source_id` 的 RPC 回 count/sum(token)/max(updated_at)/一筆代表 metadata。
-- **#10 桌機 markdown O(n²) 串流渲染** — `ask-chat.tsx` 的 `components` 物件每 frame 重建、ReactMarkdown 每 frame 重跑整段；hoist/`useMemo`（demo 版 `engenie-chat.tsx` 已正確 hoist 可參照）。
-- **#11 拆 `knowledge-base.tsx`（~1500 行、~45 useState）** — 各對話框（Gitbook/GoogleDoc/Web/Snippet/File/EditTaxonomy）拆成獨立元件各自管 state，11 個近乎一樣的 ingest handler 收斂成一個 `ingestSource(body)`；只把 `onSuccess: fetchData` 提上去。
-- 🟢 安全強化（用量上來再做）：widget `allowed_origins` + `frame-ancestors`、passcode 改 argon2/scrypt、modal 改用 shadcn Dialog（focus trap/Esc/aria）、web/google_doc ingest 擋內網/metadata IP（SSRF）、上傳檔驗 `%PDF-` magic bytes、workspace bearer 加到期/可撤銷、型號清單三份合一。
+**RAG / Ask 全面 review — 第一、二批已完成**。#1–#5：HNSW index、統一 `inScope` scope resolver、match_threshold 0.2、PDF 截斷偵測、串流錯誤/空回覆處理。#6/#8/#10/#11：Gemini key 移到 `x-goog-api-key` header + `redactSecrets`、`documents` GET 改 `knowledge_sources` RPC、`ask-chat.tsx` markdown components `useMemo`、`knowledge-base.tsx` 拆檔（1511→753 行）。
+
+剩餘 **🟢 安全強化（用量上來再做，非必做）**：widget `allowed_origins` + `frame-ancestors`、passcode 改 argon2/scrypt（目前無鹽 SHA-256）、modal 改用 shadcn Dialog（focus trap/Esc/aria）、web/google_doc ingest 擋內網/metadata IP（SSRF）、上傳檔驗 `%PDF-` magic bytes、workspace bearer 加到期/可撤銷（且 signing key 與 `API_KEY_ENC_SECRET` 分開）、型號清單三份合一。
 
 **RAG（功能）**：
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
@@ -382,6 +379,12 @@ npm run lint   # ESLint check
 53. **新產品線設定容易把 `drive_folder_id` 跟 `ds_images_folder_id` 填反** — PM 給的 Drive folder URL 如果是 DS Images 子資料夾，填到 `drive_folder_id` 會讓 PDF 上傳失敗 + 圖片進錯位置。L3 Switch 上線時就踩過：DB 寫 `drive_folder_id = NULL` + `ds_images_folder_id = <root_id>`，正確應該是 root → drive_folder_id、DS Images → ds_images_folder_id。設定新產品線時必須跟 PM 確認**這兩個欄位指的是不同層級**：drive_folder_id 是「產品線」資料夾、ds_images_folder_id 是裡面的「DS Images」子資料夾
 
 54. **`useChatStream` 組 POST body 一律用 `...getParams()` 展開，別寫死欄位清單** — `hooks/use-chat-stream.ts` 曾把 body 寫死成 `{question, provider, persona, profile, history}`，但 `getParams()` 回傳的額外欄位（`workspace`、`userKey`、未來的 `taxonomy` 等）因此**被靜默丟掉**，從沒送到 `/api/ask`。後果：每個 workspace 提問都掉進 `else`（一般 RBAC `gateAskOrDemo()`）→ 無痕未登入回 `401 "Unauthorized — sign in required"`，且 scope/BYOK/persona 鎖定全被繞過。**最毒的是它「看起來能用」**——GET（welcome/personas 走 query param）正常、頁面照載、輸入框能打字，只有真的送出才壞；又因為 `ask_workspace_touch` 在 workspace 分支內才呼叫，`request_count` 一直是 0（debug 時這就是「POST 從沒進過 workspace 分支」的鐵證）。Phase 1 當時只用登入的 admin 測（else 分支剛好 gate 通過）才沒抓到。修法：`const params = getParams(); body: {question, ...params, history}`，並把 `getParams` 型別加 index signature，讓新增欄位不用再動 hook。**新增任何 per-request 欄位時，確認它真的進了 body，別只加進 getParams。**
+
+55. **Postgres RPC 的 `bigint`（`count()`/`sum()`）經 PostgREST 回來是「字串」不是數字** — `documents` GET 改用 `knowledge_sources()` RPC（GROUP BY source 聚合，取代舊的撈 5 萬列 + O(sources×docs) JS 統計）後，`chunks`/`total_tokens` 在 JSON 是 `"2906"` 而非 `2906`。直接 `+`/`reduce` 會字串相接或 NaN。慣例：RPC 的數值欄位拿到先 `Number(x) || 0` 再用（route 已在 `rowsArr.map` 統一轉）。想在 SQL 端 `::int` 也行，但 `create or replace function` **不能改 return type**（要先 `drop function`）。
+
+56. **Gemini 一律用 `x-goog-api-key` header，永遠別把 key 放 `?key=` URL** — 4 處呼叫（`ask/route.ts` `streamGemini`、`extract-pdf-ai.ts`、`vision.ts`、`translate/providers/gemini.ts`）都已改 header。URL 帶 key 會被 fetch/DNS 錯誤訊息與 log echo 出去（含 user_byok 使用者自帶的 key），所以 `ask/route.ts` 的 search-error 與 SSE 外層 catch 都先過 `redactSecrets()`（遮 `key=`/`sk-`/`sk-ant-`/`AIza`/`Bearer`）再回前端與 `console.error`。新增任何 provider 呼叫沿用 header 形式、錯誤訊息回前端前先 redact。
+
+57. **`knowledge-base.tsx` 是 orchestrator，對話框在 `knowledge/dialogs/`、共用邏輯在 `knowledge/shared.ts`** — 每個對話框元件自管 form state；parent 只用一個 `dialog` discriminated-union（`{kind:'gitbook'|'googleDoc'|'web'|'snippet'|'file'|'editTax', editSource?/target?/space?}`）決定開哪個 + 帶種子資料，並把 `onClose=closeDialog`、`onSuccess=fetchData` 傳下去。所有 JSON ingest 走 `shared.ts` 的 `postIngest(body)`（自動補 `action:'ingest'`），各 caller 自己組 success toast；檔案上傳走 multipart `/api/documents/upload`（不經 postIngest）。新增來源類型/對話框照這結構加，別把 state 塞回 parent。
 
 ## 詳細文件
 
