@@ -8,10 +8,13 @@ export default async function DashboardLayout({
 }) {
   const supabase = createAdminClient();
 
-  // Fetch solutions with product line counts
+  // Fetch product solutions for the sidebar. Non-product "knowledge areas"
+  // (kind='knowledge' — platform features, dept SOPs, onboarding) are excluded
+  // here; they're only for tagging knowledge + scoping Ask workspaces.
   const { data: solutions } = await supabase
     .from("solutions")
     .select("id, slug, label, icon, color_primary")
+    .eq("kind", "product")
     .order("sort_order");
 
   const { data: productLines } = await supabase

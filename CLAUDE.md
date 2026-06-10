@@ -193,7 +193,7 @@ auth.users → profiles ← email_whitelist.invited_by
 ```
 
 Key tables:
-- `solutions` — id, name, slug, label, color_primary, ds_template, sort_order
+- `solutions` — id, name, slug, label, color_primary, ds_template, sort_order, **kind** ('product'|'knowledge', 00021). `kind='product'` = 真實產品 solution（出現在 dashboard sidebar）；`kind='knowledge'` = 非產品「知識領域」（平台軟體 how-to、部門 SOP、新人 onboarding…），**不出現在產品 dashboard**（`dashboard/layout.tsx` 篩 `kind='product'`），但可在 TaxonomyPicker tag 知識 + Ask workspace scope 選用。已建：`marketing`(行銷部門)、`cloud-platform`(Cloud 平台)。把文件 tag 到該 solution(不指定 product line)＝整個領域都檢索得到。部門用一個 scope 到該 solution 的 workspace（如 `/ask/mkt`）做 SOP/onboarding 查詢
 - `product_lines` — solution_id (FK), ds_prefix, ds_images_folder_id, drive_folder_id, sort_order, **spec_footnote** (TEXT, NULL=不顯示) + **spec_footnote_translations** (JSONB `{ja, zh-TW, ...}`) — 渲染在最後一個 spec page 兩欄下方的備註（如 VPN Firewall 的 `*Note: Performance figures…` 註腳）。**qr_url_template** (TEXT, NULL=用 dict default) — 該產品線的 QSG URL 模板，`{model}` 會替換成 lowercase model_name。已設定：Cloud VPN FW / NVS / Switch / **L3 Switch** / Extender 都用 `doc.engenius.ai/.../<model>` 結構（L3 Switch 跟 Cloud Switch 共用 `.../cloud-switch/{model}` 路徑）。**Cloud AP / Camera 維持短連結** `qr.engenius.ai/qsg/<model>`（PM 確認過）。Unmanaged Switch 待 PM 確認 QSG URL 結構。Resolution priority：`product_translations.qr_url` (per-locale override) → `product_lines.qr_url_template` → `dict.defaultQrUrl`
 - `products` — status, current_version, **current_versions** (JSONB: `{"en":"1.1","ja":"1.0"}`)
 - `versions` — version, **locale**, pdf_storage_path, changes, generated_at. **UNIQUE (product_id, version, locale)**（00013 migration 修；之前漏 locale 會 silent fail，見 pitfall #45）
