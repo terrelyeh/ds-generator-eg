@@ -82,13 +82,15 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 
 ### Knowledge Base
 - **索引管理**（`/knowledge`）— 查看已索引的內容、source 數量、chunk 數、token 數
-- **6 種已實作來源類型**：
+- **8 種已實作來源類型**：
   - **Product Specs** — 66 product × 2 chunks，從 DB 自動 tag taxonomy
   - **Gitbook Docs** — 含 Vision API 圖片描述；QSG 空間會自動抽出 **LED behavior table** 成為專屬 chunks
   - **Help Center** — Intercom 技術文章（含 Type-level Re-index All 按鈕）
   - **Google Docs** — Drive API 或公開連結；per-row **Sync** 按鈕一鍵重抓
   - **WiFi Regulations** — 93 國 WiFi 法規資料（頻段、頻道、功率、DFS），來自 EnGenius WiFi RegHub API
   - **Web Pages** — 貼任意網址即可索引；內容自動萃取（Firecrawl → Jina Reader → fetch 層疊），per-row **Sync** 重抓
+  - **Text Snippets** — 手動新增文字片段（FAQ、競品比較、標準答案）；Markdown 編輯、可事後 Edit 重新索引
+  - **Files (PDF)** — 上傳 PDF，由 **AI（Gemini）讀取**：表格轉 Markdown、圖片/圖表描述、掃描檔 OCR；原檔存私有 bucket，列表可「View」檢視原檔
 - **統一 Taxonomy（Solution > Product Line > Model）** — 所有 source 共用的三層分類。Ask 查詢時可以按任一層 filter，未指定 product line 的內容自動套用整個 solution
 - **Edit Taxonomy** — 每個 source 都有 Edit 按鈕，可事後補 tag 而不用重跑 ingest
 - **Re-index / Force Re-index / Delete** — 按來源類型管理
@@ -102,11 +104,15 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - 完整串接文件見 [`docs/api-search.md`](docs/api-search.md)（線上 HTML：`/docs/api-search.html`）
 
 ### Ask Workspaces（部門專屬聊天入口）
-- **`/ask/<slug>`** — 每個部門有自己的 Ask 聊天頁，免登入（passcode 進入），UI 與 EnGenie demo 一致
+- **三種對外形式** — 同一個 workspace、同一套知識，任選或並用：
+  - **整頁入口** `/ask/<slug>` — 每個部門有自己的 Ask 聊天頁，免登入（passcode 進入）
+  - **嵌入式浮動 widget** — 像 Intercom 的右下角聊天泡泡，貼一段 `<script>` snippet 就能放進任何網站；樣式隔離、手機自動全螢幕、跨站安全（token 認證，不靠第三方 cookie）
+  - **Search API** — 機器對機器的 JSON 檢索（見下方對外 RAG Search API）
 - **共用知識庫、各自範圍** — 同一個 EnGenius 知識庫，用 taxonomy + 來源類型 scope 限定每個 workspace 看得到的內容
-- **LLM 兩種模式** — `共用 key + 配額`（公司出錢、可設每分/每日上限）或 `BYOK`（部門自帶 Claude/GPT/Gemini key，AES 加密儲存、自付成本）
+- **LLM 三種模式** — `共用 key + 配額`（公司出錢、可設每分/每日上限）、`Workspace BYOK`（管理員為整個 workspace 設一把 key）、或 `User BYOK`（每位使用者自己在前台輸入 key，只存在他的瀏覽器、自付成本）
 - **可自訂** — 每個 workspace 自己的 persona / 對話對象 / 歡迎語 / 範例問題，可鎖定或開放使用者切換
-- **管理** — 管理員在 `/settings/ask-workspaces` 發/編 workspace、設範圍與上限、複製入口連結；passcode 與 BYOK key 為唯寫（hash / 加密儲存）
+- **管理** — 管理員在 `/settings/ask-workspaces` 發/編 workspace、設範圍與上限、複製入口連結或 **Embed snippet**；passcode 與 BYOK key 為唯寫（hash / 加密儲存）
+- **整合資源頁**（公開、可分享給部門）— [整合服務介紹](https://ds-generator-eg.vercel.app/docs/ask-integration.html)、[Widget 展示頁](https://ds-generator-eg.vercel.app/docs/widget-demo.html)
 
 ### WiFi Regulation Viewer
 - **`/wifi-regulation/[code]`** — 單一國家法規的乾淨 markdown 頁面（UNII 頻段、頻道清單、功率限制、DFS 要求）
@@ -152,6 +158,9 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - `/docs/sync` — 資料同步與通知機制說明頁
 - `/docs/drive-folder-and-naming-rules.html` — Drive 資料夾結構與命名規則（含 left panel TOC）
 - `/docs/rag-system.html` — Ask SpecHub RAG 系統完整說明（含 left panel TOC）
+- `/docs/ask-integration.html` — Ask Workspace 部門整合服務介紹（公開、可分享）
+- `/docs/widget-demo.html` — 浮動 widget 展示頁（假資料示意，含活的 widget）
+- `/docs/api-search.html` — 對外 RAG Search API 串接規格
 
 ## Tech Stack
 

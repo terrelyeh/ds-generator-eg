@@ -306,8 +306,8 @@ pointers so you know it exists:
 
 **RAG**：
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
-2. ~~Text Snippet CRUD~~ ✅ done（text_snippet + file(PDF) 兩個 Knowledge 通道已打通；PDF 走 Gemini 抽取，含表格/圖片/掃描 OCR）。可選後續：>4MB 走瀏覽器直傳 Storage（避開 Vercel body 限制）；Word 支援（需先轉 PDF，或 docx→PDF 後再走同一條）
-3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation 變動
+2. **Knowledge 上傳優化（可選）** — >4MB PDF 走瀏覽器直傳 Storage（避開 Vercel ~4.5MB body 限制）；Word 支援（先轉 PDF 再走 Gemini 抽取那條）
+3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation + text_snippet/file 來源 + 嵌入式 widget
 4. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
 
 **Datasheet 系統**：
