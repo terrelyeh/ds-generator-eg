@@ -310,7 +310,7 @@ pointers so you know it exists:
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
 2. **Knowledge 上傳優化（可選）** — >4MB PDF 走瀏覽器直傳 Storage（避開 Vercel ~4.5MB body 限制）；Word 支援（先轉 PDF 再走 Gemini 抽取那條）
 3. **更新 `docs/rag-system.md`** — 反映 SSE/citations/taxonomy/wifi_regulation + text_snippet/file 來源 + 嵌入式 widget
-4. **回頭補 gitbook / helpcenter 的 taxonomy tag**（目前都是 null，透過 Edit Taxonomy dialog backfill）
+4. **回頭補 helpcenter 的 taxonomy tag**（gitbook 已可標：Add Space 對話框有 TaxonomyPicker、展開檢視每個 space 有「Edit tags」套用到整個 space；helpcenter 的自訂檢視仍缺 Edit tags，可比照 gitbook 補上）
 
 **Datasheet 系統**：
 4. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt

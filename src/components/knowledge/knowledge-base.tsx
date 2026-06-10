@@ -94,6 +94,7 @@ export function KnowledgeBase() {
   const [gitbookUrl, setGitbookUrl] = useState("");
   const [gitbookLabel, setGitbookLabel] = useState("");
   const [gitbookVision, setGitbookVision] = useState(true);
+  const [gitbookTaxonomy, setGitbookTaxonomy] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [gitbookIngesting, setGitbookIngesting] = useState(false);
   const [newArticleUrl, setNewArticleUrl] = useState("");
   const [showGoogleDocDialog, setShowGoogleDocDialog] = useState(false);
@@ -123,6 +124,8 @@ export function KnowledgeBase() {
   const [editTaxonomyTarget, setEditTaxonomyTarget] = useState<SourceItem | null>(null);
   const [editTaxonomyValue, setEditTaxonomyValue] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [editTaxonomySaving, setEditTaxonomySaving] = useState(false);
+  // Space-level taxonomy edit (Gitbook): apply tags to every source in a space.
+  const [editTaxonomySpace, setEditTaxonomySpace] = useState<{ label: string; sources: SourceItem[] } | null>(null);
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
   const [syncingSpace, setSyncingSpace] = useState<string | null>(null);
 
@@ -193,6 +196,7 @@ export function KnowledgeBase() {
           space_label: spaceLabel,
           enable_vision: enableVision,
           force,
+          taxonomy: taxonomyToPayload(gitbookTaxonomy),
         }),
       });
       const data = await res.json();
@@ -213,6 +217,7 @@ export function KnowledgeBase() {
         setShowGitbookDialog(false);
         setGitbookUrl("");
         setGitbookLabel("");
+        setGitbookTaxonomy(EMPTY_TAXONOMY_VALUE);
       } else {
         toast.error(`Ingestion failed: ${data.error}`);
       }
@@ -635,27 +640,45 @@ export function KnowledgeBase() {
     });
   }
 
-  /** Save taxonomy edits via PATCH /api/documents */
+  /** Open the Edit Taxonomy dialog for a whole Gitbook space (all its sources). */
+  function openEditSpaceTaxonomy(label: string, sources: SourceItem[]) {
+    setEditTaxonomySpace({ label, sources });
+    const first = sources[0];
+    setEditTaxonomyValue({
+      solution: first?.solution ?? null,
+      product_lines: first?.product_lines ?? [],
+      models: first?.models ?? [],
+    });
+  }
+
+  /** Save taxonomy edits via PATCH /api/documents — one source, or a whole space. */
   async function handleSaveTaxonomy() {
-    if (!editTaxonomyTarget) return;
+    const targets = editTaxonomySpace
+      ? editTaxonomySpace.sources.map((s) => ({ source_type: s.source_type, source_id: s.source_id }))
+      : editTaxonomyTarget
+        ? [{ source_type: editTaxonomyTarget.source_type, source_id: editTaxonomyTarget.source_id }]
+        : [];
+    if (targets.length === 0) return;
     setEditTaxonomySaving(true);
     try {
-      const res = await fetch("/api/documents", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          source_type: editTaxonomyTarget.source_type,
-          source_id: editTaxonomyTarget.source_id,
-          taxonomy: taxonomyToPayload(editTaxonomyValue),
-        }),
-      });
-      const data = await res.json();
-      if (data.ok) {
-        toast.success(`Updated taxonomy on ${data.updated} chunk${data.updated === 1 ? "" : "s"}`);
+      const payload = taxonomyToPayload(editTaxonomyValue);
+      const results = await Promise.all(
+        targets.map((t) =>
+          fetch("/api/documents", {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ source_type: t.source_type, source_id: t.source_id, taxonomy: payload }),
+          }).then((r) => r.json()).catch(() => ({ ok: false })),
+        ),
+      );
+      const okCount = results.filter((r) => r.ok).length;
+      if (okCount > 0) {
+        toast.success(`Updated taxonomy on ${okCount} source${okCount === 1 ? "" : "s"}`);
         fetchData();
         setEditTaxonomyTarget(null);
+        setEditTaxonomySpace(null);
       } else {
-        toast.error(`Failed: ${data.error}`);
+        toast.error("Failed to update taxonomy");
       }
     } catch (err) {
       toast.error(`Failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -876,6 +899,13 @@ export function KnowledgeBase() {
                                           <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
                                         </svg>
                                         {syncingSpace === label ? "Syncing…" : "Sync"}
+                                      </button>
+                                      <button
+                                        onClick={() => openEditSpaceTaxonomy(label, typeSources.filter((s) => (s.space_label || "Unknown") === label))}
+                                        className="text-xs text-muted-foreground/60 hover:text-engenius-blue transition-colors"
+                                        title="設定這個 space 的領域標籤（產品線 / 知識領域），套用到所有頁面"
+                                      >
+                                        Edit tags
                                       </button>
                                       <button
                                         onClick={() => {
@@ -1177,6 +1207,11 @@ export function KnowledgeBase() {
               </div>
             </div>
 
+            <div className="mt-3 rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
+              <p className="text-xs font-medium mb-2">這個 space 屬於哪個領域？ <span className="font-normal text-muted-foreground/60">(可選 — 產品線或知識領域，預設 Global)</span></p>
+              <TaxonomyPicker value={gitbookTaxonomy} onChange={setGitbookTaxonomy} allowGlobal required={false} disabled={gitbookIngesting} />
+            </div>
+
             {gitbookIngesting && (
               <div className="mt-4 rounded-lg bg-muted/50 p-3">
                 <div className="flex items-center gap-2 text-sm">
@@ -1430,16 +1465,21 @@ export function KnowledgeBase() {
         </div>
       )}
 
-      {/* Edit Taxonomy Dialog */}
-      {editTaxonomyTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !editTaxonomySaving && setEditTaxonomyTarget(null)}>
+      {/* Edit Taxonomy Dialog (single source OR a whole Gitbook space) */}
+      {(editTaxonomyTarget || editTaxonomySpace) && (() => {
+        const closeEdit = () => { setEditTaxonomyTarget(null); setEditTaxonomySpace(null); };
+        const subtitle = editTaxonomySpace
+          ? `${editTaxonomySpace.label} · ${editTaxonomySpace.sources.length} 個來源`
+          : (editTaxonomyTarget?.tab_name || editTaxonomyTarget?.source_id);
+        return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !editTaxonomySaving && closeEdit()}>
           <div className="bg-background rounded-xl shadow-xl max-w-lg w-full mx-4 p-6 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <div>
                 <h2 className="text-lg font-semibold">Edit Taxonomy</h2>
-                <p className="text-[11px] text-muted-foreground mt-0.5">{editTaxonomyTarget.tab_name || editTaxonomyTarget.source_id}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">{subtitle}</p>
               </div>
-              <button onClick={() => !editTaxonomySaving && setEditTaxonomyTarget(null)} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={editTaxonomySaving}>
+              <button onClick={() => !editTaxonomySaving && closeEdit()} className="rounded-md p-1 hover:bg-muted transition-colors" disabled={editTaxonomySaving}>
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
               </button>
             </div>
@@ -1453,14 +1493,15 @@ export function KnowledgeBase() {
             />
 
             <div className="mt-4 flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => setEditTaxonomyTarget(null)} disabled={editTaxonomySaving} className="text-xs">Cancel</Button>
+              <Button variant="outline" size="sm" onClick={closeEdit} disabled={editTaxonomySaving} className="text-xs">Cancel</Button>
               <Button size="sm" onClick={handleSaveTaxonomy} disabled={editTaxonomySaving} className="text-xs">
                 {editTaxonomySaving ? "Saving..." : "Save"}
               </Button>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
