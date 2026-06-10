@@ -5,6 +5,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeHighlight from "rehype-highlight";
 import { Card } from "@/components/ui/card";
+import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
 import {
@@ -857,7 +858,8 @@ export function AskChat({ compact = false }: AskChatProps) {
               {/* Row 2: Persona (left) + Profile (right) */}
               <div className="flex items-center justify-between">
                 {personas.length > 0 && (
-                  <div className="flex gap-1.5">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    <InfoHint text={PERSONA_HINT} />
                     {personas.map((p) => (
                       <button
                         key={p.id}
@@ -875,15 +877,18 @@ export function AskChat({ compact = false }: AskChatProps) {
                   </div>
                 )}
                 {profiles.length > 1 && (
-                  <select
-                    value={profile}
-                    onChange={(e) => setProfile(e.target.value)}
-                    className="rounded-md border border-input bg-background px-2 py-1 text-[11px] text-muted-foreground cursor-pointer focus:outline-none"
-                  >
-                    {profiles.map((p) => (
-                      <option key={p.id} value={p.id}>{p.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <InfoHint text={PROFILE_HINT} align="right" />
+                    <select
+                      value={profile}
+                      onChange={(e) => setProfile(e.target.value)}
+                      className="rounded-md border border-input bg-background px-2 py-1 text-[11px] text-muted-foreground cursor-pointer focus:outline-none"
+                    >
+                      {profiles.map((p) => (
+                        <option key={p.id} value={p.id}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 )}
               </div>
             </>
@@ -905,7 +910,7 @@ export function AskChat({ compact = false }: AskChatProps) {
               <div className="flex items-center justify-between">
                 {personas.length > 0 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground flex-shrink-0">Persona:</span>
+                    <span className="flex flex-shrink-0 items-center gap-1 text-xs text-muted-foreground">Persona: <InfoHint text={PERSONA_HINT} /></span>
                     <div className="flex gap-1.5">
                       {personas.map((p) => (
                         <button key={p.id} onClick={() => setPersona(p.id)} title={p.description}
@@ -918,7 +923,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                 )}
                 {profiles.length > 1 && (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Profile:</span>
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">Profile: <InfoHint text={PROFILE_HINT} align="right" /></span>
                     <select value={profile} onChange={(e) => setProfile(e.target.value)}
                       className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30">
                       {profiles.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}

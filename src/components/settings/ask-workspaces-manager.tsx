@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import {
   TaxonomyPicker,
   EMPTY_TAXONOMY_VALUE,
@@ -347,13 +348,13 @@ export function AskWorkspacesManager() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">預設 Persona</label>
+                  <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">預設 Persona <InfoHint text={PERSONA_HINT} /></label>
                   <select value={persona} disabled={saving} onChange={(e) => setPersona(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm">
                     {(personas.length ? personas : [{ id: "default", name: "Default" }]).map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">預設對象 Profile</label>
+                  <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">預設對象 Profile <InfoHint text={PROFILE_HINT} align="right" /></label>
                   <select value={profile} disabled={saving} onChange={(e) => setProfile(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm">
                     {(profiles.length ? profiles : [{ id: "default", label: "Default" }]).map((p) => <option key={p.id} value={p.id}>{p.label || p.id}</option>)}
                   </select>

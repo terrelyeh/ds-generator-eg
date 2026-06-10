@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { EngenieMark } from "./engenie-mark";
+import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { listConversations, deleteConversation, type DemoConversation } from "@/lib/demo/history";
 
 interface Model {
@@ -249,7 +250,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 
           <div className="my-6 h-px bg-border/60" />
 
-          <Section title="Persona">
+          <Section title="Persona" hint={PERSONA_HINT}>
             <div className="space-y-1.5">
               {props.personas.map((p) => (
                 <RadioCard
@@ -266,7 +267,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 
           <div className="my-6 h-px bg-border/60" />
 
-          <Section title="Profile">
+          <Section title="Profile" hint={PROFILE_HINT}>
             <div className="space-y-1.5">
               {props.profiles.map((p) => (
                 <RadioCard
@@ -435,11 +436,12 @@ function LockedSettings({
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="mt-2">
-      <h3 className="mb-3 font-heading text-[11.5px] font-extrabold uppercase tracking-[0.16em] text-engenius-dark/75">
+      <h3 className="mb-3 flex items-center gap-1.5 font-heading text-[11.5px] font-extrabold uppercase tracking-[0.16em] text-engenius-dark/75">
         {title}
+        {hint && <InfoHint text={hint} />}
       </h3>
       {children}
     </section>
