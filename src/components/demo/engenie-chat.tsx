@@ -52,6 +52,8 @@ export interface EngenieChatProps {
   workspace?: string;
   /** Workspace bearer (`<slug>.<token>`) for embedded widgets (no cookies). */
   authToken?: string;
+  /** Compact typography for the embedded widget (smaller default text). */
+  compact?: boolean;
   /** user_byok workspace: the visitor must supply their own LLM key. */
   userByok?: boolean;
   userKey?: string | null;
@@ -81,6 +83,7 @@ export function EngenieChat({
   initialConvId,
   workspace,
   authToken,
+  compact,
   userByok,
   userKey,
   byokFamily,
@@ -163,7 +166,7 @@ export function EngenieChat({
           <div className="flex h-full flex-col items-center justify-center px-6 pb-8">
             <EngenieMark size={56} />
             <h2
-              className="mt-7 text-center text-[30px] font-normal leading-[1.2] tracking-[-0.015em] text-engenius-dark"
+              className={`mt-7 text-center font-normal leading-[1.2] tracking-[-0.015em] text-engenius-dark ${compact ? "text-[22px]" : "text-[30px]"}`}
               style={{
                 fontFamily:
                   "var(--font-serif-display), ui-serif, Georgia, 'Times New Roman', serif",
@@ -216,6 +219,7 @@ export function EngenieChat({
                 <MessageBubble
                   key={i}
                   message={m}
+                  compact={compact}
                   loadingStatus={m.isStreaming ? loadingStatus : null}
                   onFollowUp={isLastAssistant ? submit : undefined}
                   onRegenerate={isLastAssistant && !loading ? regenerate : undefined}
@@ -259,7 +263,7 @@ export function EngenieChat({
             placeholder={needsKey ? `請先設定你的 ${byokFamily || ""} API key` : "Ask EnGenie..."}
             disabled={loading || needsKey}
             className="flex-1 resize-none bg-transparent py-2 leading-[1.5] text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
-            style={{ fontFamily: "inherit", fontSize: "16px" }}
+            style={{ fontFamily: "inherit", fontSize: compact ? "14.5px" : "16px" }}
           />
           {loading ? (
             <button
@@ -302,19 +306,22 @@ export function EngenieChat({
 /* ─── Message bubble (memoized to prevent re-render of prior messages during streaming) ─── */
 const MessageBubble = memo(function MessageBubble({
   message,
+  compact = false,
   loadingStatus = null,
   onFollowUp,
   onRegenerate,
 }: {
   message: Message;
+  compact?: boolean;
   loadingStatus?: "searching" | "generating" | null;
   onFollowUp?: (q: string) => void;
   onRegenerate?: () => void;
 }) {
+  const bodySize = compact ? "text-[13.5px]" : "text-[15px]";
   if (message.role === "user") {
     return (
       <div className="mb-8 flex justify-end animate-in fade-in slide-in-from-bottom-1 duration-300">
-        <div className="max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-3 text-[15px] leading-[1.6] text-engenius-dark">
+        <div className={`max-w-[85%] rounded-[22px] rounded-br-md bg-engenius-blue/[0.09] px-4 py-3 leading-[1.6] text-engenius-dark ${bodySize}`}>
           {message.content}
         </div>
       </div>
@@ -337,7 +344,7 @@ const MessageBubble = memo(function MessageBubble({
       <div className="min-w-0 flex-1">
         {message.content ? (
           <div
-            className={`prose max-w-none text-[15px] text-engenius-dark
+            className={`prose max-w-none ${bodySize} text-engenius-dark
               prose-p:my-5 prose-p:leading-[1.75]
               prose-headings:mb-3.5 prose-headings:font-semibold prose-headings:text-engenius-dark prose-headings:tracking-tight
               prose-h1:mt-9 prose-h1:text-[21px]

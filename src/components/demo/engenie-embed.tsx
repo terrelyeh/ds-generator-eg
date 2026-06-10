@@ -95,7 +95,7 @@ export function EngenieEmbed({
   }
 
   if (status === "ready" && token) {
-    return <EngenieShell workspace={slug} title={title} authToken={`${slug}.${token}`} />;
+    return <EngenieShell workspace={slug} title={title} authToken={`${slug}.${token}`} compact />;
   }
 
   if (status === "need-pass") {

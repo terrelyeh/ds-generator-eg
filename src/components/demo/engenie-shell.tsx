@@ -17,11 +17,14 @@ export function EngenieShell({
   workspace,
   title = "EnGenie",
   authToken,
+  compact,
 }: {
   workspace?: string;
   title?: string;
   /** Workspace bearer (`<slug>.<token>`) for embedded widgets (no cookies). */
   authToken?: string;
+  /** Compact typography for the embedded widget (smaller default text). */
+  compact?: boolean;
 } = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [provider, setProvider] = useState("gemini-3.5-flash");
@@ -156,6 +159,7 @@ export function EngenieShell({
           initialConvId={initialConvId}
           workspace={workspace}
           authToken={authToken}
+          compact={compact}
           userByok={llmMode === "user_byok"}
           userKey={userKey}
           byokFamily={byokFamily}

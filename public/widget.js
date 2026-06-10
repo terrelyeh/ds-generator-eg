@@ -77,9 +77,9 @@
       panel.style.borderRadius = "0";
     } else {
       panel.style.width = "400px";
-      panel.style.height = "640px";
+      panel.style.height = "min(760px, calc(100vh - 104px))";
       panel.style.maxWidth = "calc(100vw - 40px)";
-      panel.style.maxHeight = "calc(100vh - 120px)";
+      panel.style.maxHeight = "calc(100vh - 104px)";
       panel.style.bottom = "88px";
       panel.style[side] = "20px";
       panel.style[side === "left" ? "right" : "left"] = "auto";
