@@ -836,7 +836,7 @@ export function AskChat({ compact = false }: AskChatProps) {
       {/* ===== Main area ===== */}
       <div className="flex-1 flex flex-col min-w-0 min-h-0">
         {/* Header */}
-        <div className={`flex-shrink-0 ${compact ? "px-5 pt-3 pb-2" : "mb-3"}`}>
+        <div className={`flex-shrink-0 ${compact ? "px-5 pt-3 pb-2" : "mx-auto w-full max-w-3xl px-4 pt-4 pb-3"}`}>
           {compact ? (
             <>
               {/* Row 1: Session title + history/new */}
@@ -941,10 +941,11 @@ export function AskChat({ compact = false }: AskChatProps) {
         </div>
 
 
-        {/* Chat card */}
-        <Card className={`relative flex flex-col flex-1 min-h-0 shadow-sm overflow-hidden ${compact ? "border-0 rounded-none shadow-none" : ""}`}>
+        {/* Conversation — ChatGPT-style: no card box, content centered, the
+            message area is the only scroller (sits at the viewport edge). */}
+        <Card className="relative flex flex-col flex-1 min-h-0 overflow-hidden border-0 rounded-none shadow-none bg-transparent">
           <div className="relative flex-1 min-h-0">
-          <div ref={scrollRef} className={`h-full overflow-y-auto space-y-5 ${compact ? "px-5 py-3" : "px-5 py-4"}`}>
+          <div ref={scrollRef} className={`h-full overflow-y-auto ${compact ? "px-5 py-3" : "px-4 py-6"}`}>
             {isEmpty ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-4">
                 <AssistantIcon size={compact ? 48 : 60} />
@@ -965,21 +966,23 @@ export function AskChat({ compact = false }: AskChatProps) {
                 </div>
               </div>
             ) : (
-              messages.map((msg, i) => (
-                <AskMessage
-                  key={i}
-                  message={msg}
-                  isLast={i === messages.length - 1}
-                  compact={compact}
-                  loadingStatus={msg.isStreaming ? loadingStatus : null}
-                  onFollowUp={submit}
-                  onRegenerate={
-                    i === messages.length - 1 && msg.role === "assistant" && !msg.isStreaming && !loading
-                      ? regenerate
-                      : undefined
-                  }
-                />
-              ))
+              <div className={compact ? "space-y-5" : "mx-auto w-full max-w-3xl space-y-5"}>
+                {messages.map((msg, i) => (
+                  <AskMessage
+                    key={i}
+                    message={msg}
+                    isLast={i === messages.length - 1}
+                    compact={compact}
+                    loadingStatus={msg.isStreaming ? loadingStatus : null}
+                    onFollowUp={submit}
+                    onRegenerate={
+                      i === messages.length - 1 && msg.role === "assistant" && !msg.isStreaming && !loading
+                        ? regenerate
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
             )}
           </div>
 
@@ -998,8 +1001,9 @@ export function AskChat({ compact = false }: AskChatProps) {
           )}
           </div>
 
-          {/* Input area */}
-          <div className={`border-t space-y-2 flex-shrink-0 ${compact ? "px-5 py-2.5" : "px-4 py-3"}`}>
+          {/* Input area — open bar pinned at the bottom (no enclosing box) */}
+          <div className={`border-t flex-shrink-0 ${compact ? "px-5 py-2.5" : "py-3"}`}>
+            <div className={compact ? "space-y-2" : "mx-auto w-full max-w-3xl px-4 space-y-2"}>
             {/* Model selector */}
             <div className="flex items-center gap-1.5" ref={dropdownRef}>
               <span className="text-xs text-muted-foreground/50 flex-shrink-0">AI:</span>
@@ -1100,6 +1104,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                 </span>
               </div>
             )}
+            </div>
           </div>
         </Card>
       </div>
