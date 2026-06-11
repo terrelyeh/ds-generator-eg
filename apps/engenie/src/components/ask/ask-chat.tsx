@@ -902,9 +902,9 @@ export function AskChat({ compact = false }: AskChatProps) {
               {/* Full page: hamburger + persona (left) | profile + new (right).
                   No page title — the navbar's "Ask" already names the view. */}
               <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-2">
-                  <button onClick={() => setShowSidebar(!showSidebar)} className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="History">
-                    <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
+                <div className="flex min-w-0 items-center gap-5">
+                  <button onClick={() => setShowSidebar(!showSidebar)} className="flex-shrink-0 rounded-md p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="History">
+                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
                   </button>
                   {personas.length > 0 && (
                     <div className="flex items-center gap-2">
