@@ -3,7 +3,16 @@
 import { useEffect, useRef, useState } from "react";
 import { EngenieShell } from "./engenie-shell";
 import { EngenieMark } from "./engenie-mark";
-import { getWsToken, setWsToken } from "@/lib/demo/ws-token";
+import { getWsToken, setWsToken, clearWsToken } from "@/lib/demo/ws-token";
+
+/** True if a cached token is well-formed (version.exp.sig) and at least a minute
+ *  from expiry; otherwise we drop it and re-authenticate for a fresh one. */
+function tokenFresh(token: string): boolean {
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  const exp = Number(parts[1]);
+  return Number.isFinite(exp) && exp * 1000 > Date.now() + 60_000;
+}
 
 /**
  * Embedded-widget entry for /embed/<slug>. Token-based auth (no cookies, since
@@ -29,11 +38,12 @@ export function EngenieEmbed({
 
   useEffect(() => {
     const existing = getWsToken(slug);
-    if (existing) {
+    if (existing && tokenFresh(existing)) {
       setToken(existing);
       setStatus("ready");
       return;
     }
+    if (existing) clearWsToken(slug); // expired / revoked → re-authenticate
     if (hasPasscode) {
       setStatus("need-pass");
       return;

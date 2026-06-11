@@ -310,7 +310,7 @@ pointers so you know it exists:
 
 **RAG / Ask 全面 review — 第一、二批已完成**。#1–#5：HNSW index、統一 `inScope` scope resolver、match_threshold 0.2、PDF 截斷偵測、串流錯誤/空回覆處理。#6/#8/#10/#11：Gemini key 移到 `x-goog-api-key` header + `redactSecrets`、`documents` GET 改 `knowledge_sources` RPC、`ask-chat.tsx` markdown components `useMemo`、`knowledge-base.tsx` 拆檔（1511→753 行）。
 
-剩餘 **🟢 安全強化（用量上來再做，非必做）**：widget `allowed_origins` + `frame-ancestors`、passcode 改 argon2/scrypt（目前無鹽 SHA-256）、modal 改用 shadcn Dialog（focus trap/Esc/aria）、web/google_doc ingest 擋內網/metadata IP（SSRF）、上傳檔驗 `%PDF-` magic bytes、workspace bearer 加到期/可撤銷（且 signing key 與 `API_KEY_ENC_SECRET` 分開）、型號清單三份合一。
+**🟢 安全強化 — tier 3 ①⑥ 已完成**：① widget `allowed_origins` + CSP `frame-ancestors`、⑥ workspace token 加「版本撤銷 + 到期 + 獨立 signing key」（見 pitfall #58）。剩餘（用量上來再做，非必做）：passcode 改 argon2/scrypt（目前無鹽 SHA-256）、modal 改用 shadcn Dialog（focus trap/Esc/aria）、web/google_doc ingest 擋內網/metadata IP（SSRF）、上傳檔驗 `%PDF-` magic bytes、型號清單三份合一。
 
 **RAG（功能）**：
 1. **Ask Workspaces Phase 2** — 部門私有文件「自助」上傳 + 自動索引 + 隔離。完整計畫書見 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)
@@ -352,7 +352,7 @@ npm run lint   # ESLint check
 - **⚠️ Vercel function region 釘在 `hnd1`（東京）** — `vercel.json` 的 `"regions": ["hnd1"]`。**不要改掉**。Supabase 在 `ap-northeast-1`（東京），function 一定要同區，否則每個 DB query 跨太平洋 ~170ms（之前預設 iad1 美東，一個頁面 3-5 個 query 浪費 600-900ms）。同區後 ~5ms。改 region 前先確認 Supabase 也在哪
 - **Server component query 並行化** — 高流量頁面（product detail、dashboard）已用 `Promise.all` 把互相獨立的 Supabase query 並行（避免 waterfall）。加新 query 前先想「這個 query 依賴前面的結果嗎？不依賴就塞進同一個 Promise.all」
 - 需要的 env vars: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `GOOGLE_SERVICE_ACCOUNT_KEY`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `CRON_SECRET`, `API_KEY_ENC_SECRET`（對外 API key 加密；未設則無法從列表複製 key）
-- 可選 env vars: `FIRECRAWL_API_KEY`（web 來源優先用 Firecrawl 萃取；未設則退到 Jina Reader），`JINA_API_KEY`（提高 Jina rate limit）
+- 可選 env vars: `FIRECRAWL_API_KEY`（web 來源優先用 Firecrawl 萃取；未設則退到 Jina Reader），`JINA_API_KEY`（提高 Jina rate limit），`WORKSPACE_TOKEN_SECRET`（workspace/widget session token 的簽章 key；未設則退回 `API_KEY_ENC_SECRET`。建議在 prod 設一把獨立的，把 token 簽章與 AES 加密金鑰分開）
 - AI 翻譯 env vars（可選，也可在 Settings 頁面設定）：`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_AI_API_KEY`
 
 ## Common Pitfalls
@@ -385,6 +385,8 @@ npm run lint   # ESLint check
 56. **Gemini 一律用 `x-goog-api-key` header，永遠別把 key 放 `?key=` URL** — 4 處呼叫（`ask/route.ts` `streamGemini`、`extract-pdf-ai.ts`、`vision.ts`、`translate/providers/gemini.ts`）都已改 header。URL 帶 key 會被 fetch/DNS 錯誤訊息與 log echo 出去（含 user_byok 使用者自帶的 key），所以 `ask/route.ts` 的 search-error 與 SSE 外層 catch 都先過 `redactSecrets()`（遮 `key=`/`sk-`/`sk-ant-`/`AIza`/`Bearer`）再回前端與 `console.error`。新增任何 provider 呼叫沿用 header 形式、錯誤訊息回前端前先 redact。
 
 57. **`knowledge-base.tsx` 是 orchestrator，對話框在 `knowledge/dialogs/`、共用邏輯在 `knowledge/shared.ts`** — 每個對話框元件自管 form state；parent 只用一個 `dialog` discriminated-union（`{kind:'gitbook'|'googleDoc'|'web'|'snippet'|'file'|'editTax', editSource?/target?/space?}`）決定開哪個 + 帶種子資料，並把 `onClose=closeDialog`、`onSuccess=fetchData` 傳下去。所有 JSON ingest 走 `shared.ts` 的 `postIngest(body)`（自動補 `action:'ingest'`），各 caller 自己組 success toast；檔案上傳走 multipart `/api/documents/upload`（不經 postIngest）。新增來源類型/對話框照這結構加，別把 state 塞回 parent。
+
+58. **Workspace session token = `<version>.<exp>.<sig>`（HMAC；`lib/auth/workspace-session.ts`）** — 簽章綁 `ws:<slug>:<version>:<exp>`，key 取 `WORKSPACE_TOKEN_SECRET`（未設退回 `API_KEY_ENC_SECRET`）。`verifyWorkspaceToken()` 只驗「簽章 + 到期」(DB-free，給 Edge proxy 粗篩用)；**版本撤銷的權威檢查在 route handler** — `workspaceAuthorized(slug, req, ws.token_version)` 比對 token 內嵌 version 是否等於 workspace 現值。撤銷 = `ask_workspaces.token_version` +1（admin manager「撤銷連線」按鈕，走 PATCH `{revoke_tokens:true}`）。⚠️ **改 token 格式或換 signing secret 會讓所有現存 token 失效**：widget 無密碼會自動重發（`engenie-embed` 的 `tokenFresh()` 載入時就丟掉壞/過期 token 再 re-auth）、有密碼要重新輸入、`/ask/<slug>` cookie 會重新要 passcode（一次性）。① 嵌入網域白名單用 **CSP `frame-ancestors`**（瀏覽器強制，唯一可靠擋 iframe 父站的方式；API 看不到父站 origin）：在 **proxy** 對 `/embed/<slug>` 讀 `allowed_origins` 後設 header（輕量 PostgREST fetch、**fail-open**——查不到就不設＝不限制，絕不擋掉 widget）。空清單＝不限制（v1 預設）。
 
 ## 詳細文件
 

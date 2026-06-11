@@ -36,6 +36,8 @@ interface WorkspaceInput {
   rate_limit_per_min?: number;
   daily_limit?: number | null;
   note?: string | null;
+  allowed_origins?: string[]; // sites allowed to embed the widget (empty = any)
+  revoke_tokens?: boolean;    // bump token_version → invalidate outstanding tokens
 }
 
 export async function GET() {
@@ -45,7 +47,7 @@ export async function GET() {
   const { data, error } = (await supabase
     .from("ask_workspaces" as "products")
     .select(
-      "id, slug, name, enabled, llm_mode, provider, byok_provider, scope, persona, profile, allow_switch, welcome_subtitle, welcome_description, example_questions, rate_limit_per_min, daily_limit, request_count, last_used_at, note, passcode_hash, byok_key_encrypted, created_at",
+      "id, slug, name, enabled, llm_mode, provider, byok_provider, scope, persona, profile, allow_switch, welcome_subtitle, welcome_description, example_questions, rate_limit_per_min, daily_limit, allowed_origins, token_version, request_count, last_used_at, note, passcode_hash, byok_key_encrypted, created_at",
     )
     .order("created_at", { ascending: false })) as {
     data: ({ passcode_hash: string | null; byok_key_encrypted: string | null; [k: string]: unknown }[]) | null;
@@ -70,6 +72,23 @@ function normalizeScope(s: WorkspaceInput["scope"]) {
     source_types: Array.isArray(v.source_types) ? v.source_types : [],
     knowledge_areas: Array.isArray(v.knowledge_areas) ? v.knowledge_areas : [],
   };
+}
+
+/** Keep only valid http(s) origins (scheme://host[:port]); drop paths + dupes. */
+function normalizeOrigins(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  const out: string[] = [];
+  for (const v of input) {
+    if (typeof v !== "string") continue;
+    const s = v.trim();
+    if (!s) continue;
+    try {
+      const u = new URL(s);
+      if (u.protocol !== "http:" && u.protocol !== "https:") continue;
+      out.push(u.origin);
+    } catch { /* skip invalid entries */ }
+  }
+  return [...new Set(out)];
 }
 
 export async function POST(request: Request) {
@@ -112,6 +131,7 @@ export async function POST(request: Request) {
     rate_limit_per_min: Math.min(Math.max(Math.floor(Number(body.rate_limit_per_min) || 30), 1), 6000),
     daily_limit: body.daily_limit != null ? Math.max(Math.floor(Number(body.daily_limit)), 1) : null,
     note: body.note?.trim() || null,
+    allowed_origins: normalizeOrigins(body.allowed_origins),
     created_by: user?.id ?? null,
   };
   if (body.passcode) row.passcode_hash = createHash("sha256").update(body.passcode).digest("hex");
@@ -136,6 +156,23 @@ export async function PATCH(request: Request) {
   const body = (await request.json()) as WorkspaceInput;
   if (!body.id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
+  // ⑥ Revoke every outstanding token for this workspace by bumping token_version.
+  // Self-contained action (no other fields needed), so handle it before the
+  // normal field diff + the "nothing to update" guard.
+  if (body.revoke_tokens) {
+    const supabase = createAdminClient();
+    const { data: cur } = (await supabase
+      .from("ask_workspaces" as "products")
+      .select("token_version")
+      .eq("id", body.id)
+      .maybeSingle()) as { data: { token_version: number } | null };
+    if (!cur) return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    const next = (cur.token_version ?? 1) + 1;
+    const { error } = await supabase.from("ask_workspaces" as "products").update({ token_version: next }).eq("id", body.id);
+    if (error) return NextResponse.json({ error: "Revoke failed" }, { status: 500 });
+    return NextResponse.json({ ok: true, token_version: next });
+  }
+
   const update: Record<string, unknown> = {};
   if (typeof body.name === "string") update.name = body.name.trim();
   if (typeof body.enabled === "boolean") update.enabled = body.enabled;
@@ -151,6 +188,7 @@ export async function PATCH(request: Request) {
   if (body.rate_limit_per_min != null) update.rate_limit_per_min = Math.min(Math.max(Math.floor(Number(body.rate_limit_per_min)), 1), 6000);
   if (body.daily_limit !== undefined) update.daily_limit = body.daily_limit != null ? Math.max(Math.floor(Number(body.daily_limit)), 1) : null;
   if (body.note !== undefined) update.note = body.note?.trim() || null;
+  if (body.allowed_origins !== undefined) update.allowed_origins = normalizeOrigins(body.allowed_origins);
   // Secrets: only when a non-empty value is provided.
   if (body.passcode) update.passcode_hash = createHash("sha256").update(body.passcode).digest("hex");
   if (body.byok_key) update.byok_key_encrypted = encryptKey(body.byok_key);

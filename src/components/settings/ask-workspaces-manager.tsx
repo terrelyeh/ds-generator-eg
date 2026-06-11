@@ -36,6 +36,8 @@ interface Workspace {
   note: string | null;
   has_passcode: boolean;
   has_byok_key: boolean;
+  allowed_origins?: string[];
+  token_version?: number;
 }
 
 interface Opt { id: string; name?: string; label?: string }
@@ -98,6 +100,7 @@ export function AskWorkspacesManager() {
   const [examples, setExamples] = useState("");
   const [rate, setRate] = useState(30);
   const [daily, setDaily] = useState("");
+  const [allowedOrigins, setAllowedOrigins] = useState("");
   const [editHasPasscode, setEditHasPasscode] = useState(false);
   const [editHasByok, setEditHasByok] = useState(false);
 
@@ -124,7 +127,7 @@ export function AskWorkspacesManager() {
   function resetForm() {
     setSlug(""); setName(""); setPasscode(""); setLlmMode("shared"); setProvider("gemini-3.5-flash");
     setByokKey(""); setTax(EMPTY_TAXONOMY_VALUE); setSourceTypes([]); setKnowledgeAreas([]); setPersona("default"); setProfile("default");
-    setAllowSwitch(true); setWelcomeSubtitle(""); setWelcomeDescription(""); setExamples(""); setRate(30); setDaily("");
+    setAllowSwitch(true); setWelcomeSubtitle(""); setWelcomeDescription(""); setExamples(""); setRate(30); setDaily(""); setAllowedOrigins("");
     setEditId(null); setEditHasPasscode(false); setEditHasByok(false);
   }
   function openCreate() { resetForm(); setOpen(true); }
@@ -138,6 +141,7 @@ export function AskWorkspacesManager() {
     setWelcomeSubtitle(w.welcome_subtitle ?? ""); setWelcomeDescription(w.welcome_description ?? "");
     setExamples((w.example_questions ?? []).join("\n")); setRate(w.rate_limit_per_min);
     setDaily(w.daily_limit != null ? String(w.daily_limit) : "");
+    setAllowedOrigins((w.allowed_origins ?? []).join("\n"));
     setEditHasPasscode(w.has_passcode); setEditHasByok(w.has_byok_key);
     setOpen(true);
   }
@@ -173,6 +177,7 @@ export function AskWorkspacesManager() {
         example_questions: examples.split("\n").map((s) => s.trim()).filter(Boolean),
         rate_limit_per_min: rate,
         daily_limit: daily.trim() ? Number(daily) : null,
+        allowed_origins: allowedOrigins.split(/[\n,]+/).map((s) => s.trim()).filter(Boolean),
       };
       const r = await fetch("/api/ask-workspaces", {
         method: editId ? "PATCH" : "POST",
@@ -221,6 +226,14 @@ export function AskWorkspacesManager() {
     const r = await fetch("/api/ask-workspaces", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: w.id }) });
     const d = await r.json();
     if (d.ok) { toast.success("Deleted"); fetchList(); } else toast.error(d.error);
+  }
+  async function revokeTokens(id: string, label: string) {
+    if (!confirm(`撤銷「${label}」所有已發出的 token？\n已開著的 widget／ /ask 連線需要重新驗證（無密碼會自動重連；有密碼要重新輸入）。`)) return;
+    try {
+      const r = await fetch("/api/ask-workspaces", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, revoke_tokens: true }) });
+      const d = await r.json();
+      if (d.ok) { toast.success("已撤銷 — 既有 token 全部失效"); fetchList(); } else toast.error(d.error || "撤銷失敗");
+    } catch (e) { toast.error(`Failed: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
   return (
@@ -446,6 +459,24 @@ export function AskWorkspacesManager() {
                   <label className="mb-1 block text-xs font-medium text-muted-foreground">每日上限 <span className="font-normal text-muted-foreground/60">(空=無限)</span></label>
                   <input type="number" min={1} value={daily} disabled={saving} onChange={(e) => setDaily(e.target.value)} placeholder="∞" className="w-full rounded-md border px-3 py-2 text-sm" />
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
+                <p className="mb-2 text-xs font-medium">嵌入 Widget 安全</p>
+                <label className="mb-1 block text-xs font-medium text-muted-foreground">允許嵌入的網域 <span className="font-normal text-muted-foreground/60">(一行一個；空=不限制)</span></label>
+                <textarea value={allowedOrigins} disabled={saving} onChange={(e) => setAllowedOrigins(e.target.value)} rows={3}
+                  placeholder={"https://partner.example.com\nhttps://intranet.engenius.com"}
+                  className="w-full rounded-md border px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                <p className="mt-1 text-[11px] text-muted-foreground/60">只有這些網站能用 widget snippet 嵌入此 chat（瀏覽器以 CSP frame-ancestors 強制）。留空＝任何網站都能嵌入。</p>
+                {editId && (
+                  <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
+                    <p className="text-[11px] text-muted-foreground/60">撤銷所有已發出的 token；widget 與 /ask 連線需重新驗證。</p>
+                    <button type="button" onClick={() => revokeTokens(editId, name)} disabled={saving}
+                      className="flex-shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-40">
+                      撤銷連線
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 

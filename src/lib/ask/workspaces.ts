@@ -33,10 +33,14 @@ export interface AskWorkspace {
   example_questions: string[] | null;
   rate_limit_per_min: number;
   daily_limit: number | null;
+  /** Sites allowed to embed the widget (CSP frame-ancestors). Empty = any. */
+  allowed_origins: string[];
+  /** Bump to revoke all outstanding session tokens for this workspace. */
+  token_version: number;
 }
 
 const FIELDS =
-  "id, slug, name, enabled, passcode_hash, llm_mode, provider, byok_provider, byok_key_encrypted, scope, persona, profile, allow_switch, welcome_subtitle, welcome_description, example_questions, rate_limit_per_min, daily_limit";
+  "id, slug, name, enabled, passcode_hash, llm_mode, provider, byok_provider, byok_key_encrypted, scope, persona, profile, allow_switch, welcome_subtitle, welcome_description, example_questions, rate_limit_per_min, daily_limit, allowed_origins, token_version";
 
 /** Load a workspace by slug (returns null if not found). Caller checks `enabled`. */
 export async function loadWorkspaceBySlug(slug: string): Promise<AskWorkspace | null> {

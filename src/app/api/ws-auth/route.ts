@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     }
   }
 
-  const token = await computeWorkspaceToken(slug);
+  const token = await computeWorkspaceToken(slug, ws.token_version);
   // Return the token in the body too: embeddable widgets run in a cross-site
   // iframe (third-party cookies blocked) and store it to send as a bearer header.
   const res = NextResponse.json({ ok: true, name: ws.name, token });

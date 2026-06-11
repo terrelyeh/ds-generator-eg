@@ -67,6 +67,33 @@ function isDemoApi(pathname: string): boolean {
   );
 }
 
+/**
+ * ① Widget origin allow-list. Look up a workspace's allowed_origins via a
+ * lightweight PostgREST GET (service key). Kept tiny and fail-open: any error /
+ * timeout returns null → no CSP set → unrestricted (the prior behaviour), never
+ * a blocked widget. Only runs for /embed/<slug> (rare traffic).
+ */
+async function embedAllowedOrigins(slug: string): Promise<string[] | null> {
+  try {
+    const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!base || !key || !/^[a-z0-9-]+$/.test(slug)) return null;
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2000);
+    const r = await fetch(
+      `${base}/rest/v1/ask_workspaces?slug=eq.${slug}&select=allowed_origins&limit=1`,
+      { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: ctrl.signal },
+    );
+    clearTimeout(t);
+    if (!r.ok) return null;
+    const rows = (await r.json()) as { allowed_origins?: unknown }[];
+    const ao = rows?.[0]?.allowed_origins;
+    return Array.isArray(ao) ? ao.filter((s): s is string => typeof s === "string" && !!s) : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -114,6 +141,17 @@ export async function proxy(request: NextRequest) {
     const {
       data: { user },
     } = await supabase.auth.getUser();
+
+    // ① Restrict which parent sites may iframe the widget. Browser-enforced via
+    // CSP frame-ancestors on the /embed/<slug> document; empty allow-list →
+    // no header → unrestricted (v1 default).
+    if (pathname.startsWith("/embed/")) {
+      const slug = pathname.slice("/embed/".length).split("/")[0];
+      const origins = slug ? await embedAllowedOrigins(slug) : null;
+      if (origins && origins.length > 0) {
+        response.headers.set("Content-Security-Policy", `frame-ancestors 'self' ${origins.join(" ")}`);
+      }
+    }
 
     if (isPublic(pathname)) {
       return response;

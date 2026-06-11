@@ -1,30 +1,45 @@
 /**
- * Per-workspace passcode session (for /ask/<slug> department entries).
+ * Per-workspace session token (for /ask/<slug> entries and embeddable widgets).
  *
- * Same idea as demo-session, but keyed per workspace: after a visitor enters a
- * workspace's correct passcode (verified server-side against passcode_hash),
- * /api/ws-auth issues an httpOnly cookie `ws_<slug>` whose value is an HMAC of
- * `ws:<slug>` keyed by a server secret (API_KEY_ENC_SECRET). The cookie proves
- * "this visitor passed workspace <slug>'s passcode" and can't be forged.
+ * Token format: `<version>.<exp>.<sig>` where
+ *   version = ask_workspaces.token_version (bump it to REVOKE every outstanding
+ *             token for a workspace without rotating the global secret),
+ *   exp     = unix-second expiry (defence-in-depth — a leaked token dies),
+ *   sig     = HMAC-SHA256(secret, `ws:<slug>:<version>:<exp>`).
  *
- * Verifiable in BOTH the Edge proxy and Node route handlers (Web Crypto), with
- * no DB lookup — the slug is in the cookie name and the token is HMAC(slug).
+ * The signature uses WORKSPACE_TOKEN_SECRET (falls back to API_KEY_ENC_SECRET
+ * if unset, so existing deploys keep working — set a dedicated secret in prod to
+ * actually separate the signing key from the AES key-encryption secret).
+ *
+ * Cookie path (/ask/<slug>): the token is stored in the httpOnly `ws_<slug>`
+ * cookie. Widget path (cross-site iframe, third-party cookies blocked): the
+ * token rides in `Authorization: Bearer <slug>.<token>`.
+ *
+ * verifyWorkspaceToken() is DB-free (signature + expiry only) so the Edge proxy
+ * can do a coarse gate; the route handler then ALSO checks the embedded version
+ * against the workspace's current token_version (the authoritative revocation
+ * check — it has the loaded workspace anyway).
  */
 
 export const WS_COOKIE_PREFIX = "ws_";
 
+/** Default token lifetime. The widget bearer (localStorage) lives this long;
+ *  the /ask cookie is additionally capped by its own 12h maxAge in ws-auth. */
+export const WS_TOKEN_TTL_SEC = 7 * 24 * 60 * 60; // 7 days
+
 export function workspaceCookieName(slug: string): string {
   return `${WS_COOKIE_PREFIX}${slug}`;
+}
+
+function tokenSecret(): string | null {
+  return process.env.WORKSPACE_TOKEN_SECRET || process.env.API_KEY_ENC_SECRET || null;
 }
 
 function toHex(buf: ArrayBuffer): string {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** HMAC token for a workspace slug, or null if no server secret is configured. */
-export async function computeWorkspaceToken(slug: string): Promise<string | null> {
-  const secret = process.env.API_KEY_ENC_SECRET;
-  if (!secret) return null;
+async function hmacHex(secret: string, msg: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),
@@ -32,26 +47,61 @@ export async function computeWorkspaceToken(slug: string): Promise<string | null
     false,
     ["sign"],
   );
-  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`ws:${slug}`));
+  const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(msg));
   return toHex(sig);
 }
 
-/** Constant-time-ish comparison of a cookie value to the expected token. */
-export async function isValidWorkspaceToken(slug: string, value: string | undefined | null): Promise<boolean> {
-  if (!value) return false;
-  const expected = await computeWorkspaceToken(slug);
-  if (!expected || value.length !== expected.length) return false;
+/**
+ * Issue a workspace token for the given slug + token_version. Returns null if no
+ * signing secret is configured. `nowMs` is injectable for tests.
+ */
+export async function computeWorkspaceToken(
+  slug: string,
+  version: number,
+  ttlSec: number = WS_TOKEN_TTL_SEC,
+  nowMs: number = Date.now(),
+): Promise<string | null> {
+  const secret = tokenSecret();
+  if (!secret) return null;
+  const exp = Math.floor(nowMs / 1000) + ttlSec;
+  const sig = await hmacHex(secret, `ws:${slug}:${version}:${exp}`);
+  return `${version}.${exp}.${sig}`;
+}
+
+/**
+ * Verify a token's signature + expiry (DB-free). Returns the embedded
+ * { version } so callers can compare it to the workspace's current token_version
+ * (revocation), or null if malformed / expired / forged.
+ */
+export async function verifyWorkspaceToken(
+  slug: string,
+  value: string | undefined | null,
+  nowMs: number = Date.now(),
+): Promise<{ version: number } | null> {
+  if (!value) return null;
+  const secret = tokenSecret();
+  if (!secret) return null;
+  const parts = value.split(".");
+  if (parts.length !== 3) return null;
+  const [vStr, expStr, sig] = parts;
+  const version = Number(vStr);
+  const exp = Number(expStr);
+  if (!Number.isInteger(version) || version < 1 || !Number.isFinite(exp)) return null;
+  if (exp * 1000 <= nowMs) return null; // expired
+  const expected = await hmacHex(secret, `ws:${slug}:${version}:${exp}`);
+  if (sig.length !== expected.length) return null;
   let diff = 0;
-  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ value.charCodeAt(i);
-  return diff === 0;
+  for (let i = 0; i < expected.length; i++) diff |= expected.charCodeAt(i) ^ sig.charCodeAt(i);
+  return diff === 0 ? { version } : null;
 }
 
 /**
  * Embeddable widgets run in a cross-site iframe where third-party cookies are
- * blocked, so they carry the workspace token in an Authorization header instead:
+ * blocked, so they carry the token in an Authorization header instead:
  *   `Authorization: Bearer <slug>.<token>`
- * The slug travels with the token (a bare token can't be validated without it,
- * since the token is HMAC(slug)). Parse + verify helpers below.
+ * The slug travels with the token (a token can't be verified without it). Parse
+ * helper below; the bearer's token part may itself contain dots (version.exp.sig),
+ * so we split only on the FIRST dot.
  */
 export function parseWorkspaceBearer(authHeader: string | null | undefined): { slug: string; token: string } | null {
   if (!authHeader || !authHeader.startsWith("Bearer ")) return null;
@@ -64,17 +114,18 @@ export function parseWorkspaceBearer(authHeader: string | null | undefined): { s
   return { slug, token };
 }
 
-/** True if the Authorization header carries a valid `<slug>.<token>` bearer. */
+/** Coarse, DB-free bearer check (signature + expiry, version-agnostic). The
+ *  route handler re-checks the version against the workspace. Used by the proxy. */
 export async function isValidWorkspaceBearer(authHeader: string | null | undefined): Promise<boolean> {
   const parsed = parseWorkspaceBearer(authHeader);
   if (!parsed) return false;
-  return isValidWorkspaceToken(parsed.slug, parsed.token);
+  return !!(await verifyWorkspaceToken(parsed.slug, parsed.token));
 }
 
 /**
- * True if any `ws_<slug>` cookie in the list carries a valid token. Used by the
- * Edge proxy to let /api/ask through for workspace visitors (the route handler
- * then re-verifies the SPECIFIC workspace named in the request body).
+ * Coarse, DB-free check: does any `ws_<slug>` cookie carry a signature-valid,
+ * unexpired token? Used by the Edge proxy to let /api/ask through for workspace
+ * visitors; the route handler then re-verifies the SPECIFIC workspace + version.
  */
 export async function hasAnyValidWorkspaceCookie(
   cookies: { name: string; value: string }[],
@@ -82,7 +133,7 @@ export async function hasAnyValidWorkspaceCookie(
   for (const c of cookies) {
     if (!c.name.startsWith(WS_COOKIE_PREFIX)) continue;
     const slug = c.name.slice(WS_COOKIE_PREFIX.length);
-    if (await isValidWorkspaceToken(slug, c.value)) return true;
+    if (await verifyWorkspaceToken(slug, c.value)) return true;
   }
   return false;
 }

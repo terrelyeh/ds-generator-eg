@@ -8,7 +8,7 @@ import { gate } from "@/lib/auth/session";
 import { cookies } from "next/headers";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 import { loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
-import { workspaceCookieName, isValidWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
+import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
 import { decryptKey } from "@/lib/auth/api-key";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
@@ -46,11 +46,14 @@ async function gateAskOrDemo(): Promise<NextResponse | null> {
  * bearer header. Embeddable widgets run in a cross-site iframe where third-party
  * cookies are blocked, so they authenticate via the bearer header instead.
  */
-async function workspaceAuthorized(slug: string, request: Request): Promise<boolean> {
+async function workspaceAuthorized(slug: string, request: Request, expectedVersion: number): Promise<boolean> {
   const c = await cookies();
-  if (await isValidWorkspaceToken(slug, c.get(workspaceCookieName(slug))?.value)) return true;
+  const ck = await verifyWorkspaceToken(slug, c.get(workspaceCookieName(slug))?.value);
+  if (ck && ck.version === expectedVersion) return true;
   const bearer = parseWorkspaceBearer(request.headers.get("authorization"));
-  return !!bearer && bearer.slug === slug && (await isValidWorkspaceToken(slug, bearer.token));
+  if (!bearer || bearer.slug !== slug) return false;
+  const bk = await verifyWorkspaceToken(slug, bearer.token);
+  return !!bk && bk.version === expectedVersion;
 }
 
 // Diagram-intent detection — only then do we inject the (token-heavy) topology
@@ -151,7 +154,7 @@ export async function GET(request: Request) {
   const ws = slug ? await loadWorkspaceBySlug(slug) : null;
   if (slug) {
     if (!ws || !ws.enabled) return NextResponse.json({ ok: false, error: "Workspace not found" }, { status: 404 });
-    if (!(await workspaceAuthorized(ws.slug, request))) {
+    if (!(await workspaceAuthorized(ws.slug, request, ws.token_version))) {
       return NextResponse.json({ ok: false, error: "Workspace passcode required" }, { status: 401 });
     }
   } else {
@@ -256,7 +259,7 @@ export async function POST(request: Request) {
     if (!ws || !ws.enabled) {
       return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
     }
-    if (!(await workspaceAuthorized(ws.slug, request))) {
+    if (!(await workspaceAuthorized(ws.slug, request, ws.token_version))) {
       return NextResponse.json({ error: "Workspace passcode required" }, { status: 401 });
     }
     // Per-minute / daily quota (atomic; protects shared key, harmless for BYOK).
