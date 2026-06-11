@@ -4,10 +4,6 @@
     {
       "path": "/api/sync",
       "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/reindex-web",
-      "schedule": "0 18 * * 0"
     }
   ]
 }

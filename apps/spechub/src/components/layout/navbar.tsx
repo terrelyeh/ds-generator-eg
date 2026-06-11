@@ -6,8 +6,12 @@ import type { Role } from "@eg/auth/permissions";
 import { can } from "@eg/auth/permissions";
 import { UserMenu } from "./user-menu";
 
+// After the monorepo split, Ask + Knowledge live on the EnGenie app.
+// Build-time inlined; when unset (e.g. local dev without EnGenie running)
+// the nav items are hidden and only the floating widget entry applies.
+const ENGENIE_URL = (process.env.NEXT_PUBLIC_ENGENIE_URL ?? "").replace(/\/$/, "");
+
 interface NavbarProps {
-  onAskClick?: () => void;
   user: {
     email: string;
     name: string | null;
@@ -16,10 +20,10 @@ interface NavbarProps {
   } | null;
 }
 
-export function Navbar({ onAskClick, user }: NavbarProps) {
+export function Navbar({ user }: NavbarProps) {
   const role = user?.role;
-  const showAsk = can(role, "ask.use");
-  const showKnowledge = can(role, "knowledge.view");
+  const showAsk = can(role, "ask.use") && !!ENGENIE_URL;
+  const showKnowledge = can(role, "knowledge.view") && !!ENGENIE_URL;
   const showSettings = can(role, "settings.view");
 
   return (
@@ -39,9 +43,10 @@ export function Navbar({ onAskClick, user }: NavbarProps) {
         </span>
         <div className="ml-auto flex items-center gap-1">
           {showAsk && (
-            <button
-              type="button"
-              onClick={onAskClick}
+            <a
+              href={`${ENGENIE_URL}/ask`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -52,18 +57,20 @@ export function Navbar({ onAskClick, user }: NavbarProps) {
                 />
               </svg>
               Ask
-            </button>
+            </a>
           )}
           {showKnowledge && (
-            <Link
-              href="/knowledge"
+            <a
+              href={`${ENGENIE_URL}/knowledge`}
+              target="_blank"
+              rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
             >
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path d="M9 4.804A7.968 7.968 0 005.5 4c-1.255 0-2.443.29-3.5.804v10A7.969 7.969 0 015.5 14c1.669 0 3.218.51 4.5 1.385A7.962 7.962 0 0114.5 14c1.255 0 2.443.29 3.5.804v-10A7.968 7.968 0 0014.5 4c-1.255 0-2.443.29-3.5.804V12a1 1 0 11-2 0V4.804z" />
               </svg>
               Knowledge
-            </Link>
+            </a>
           )}
           {showSettings && (
             <Link

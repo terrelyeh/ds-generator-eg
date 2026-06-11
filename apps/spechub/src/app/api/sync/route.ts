@@ -13,7 +13,6 @@ import {
   loadComparison,
   loadCloudComparison,
 } from "@/lib/google/sheets-extra";
-import { ingestProducts } from "@/lib/rag/ingest-products";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
 import type { ProductLine } from "@eg/db/types";
@@ -564,33 +563,48 @@ export async function POST(request: Request) {
     }
   }
 
-  // Auto re-index RAG embeddings for products that changed.
-  // ingestProducts uses content_hash to skip unchanged chunks so even a
-  // full re-ingest is cheap — we just narrow to changed models for speed.
+  // Auto re-index RAG embeddings for products that changed. The RAG
+  // pipeline lives in apps/engenie (monorepo split), so we trigger its
+  // internal endpoint with the shared CRON_SECRET, narrowed to the changed
+  // models. Failure must not break the sync response — EnGenie's daily
+  // backstop cron (09:30 TW) re-indexes everything with hash-skip anyway.
   let reindexResult: { processed: number; skipped: number; errors: number } | null = null;
   if (allChanges.length > 0) {
     try {
-      const changedModels = [...new Set(allChanges.map((c) => c.product_name))];
-      let processed = 0;
-      let skipped = 0;
-      const reindexErrors: string[] = [];
-      for (const modelName of changedModels) {
-        const r = await ingestProducts({ modelName, force: false });
-        processed += r.processed;
-        skipped += r.skipped;
-        reindexErrors.push(...r.errors);
-      }
-      reindexResult = {
-        processed,
-        skipped,
-        errors: reindexErrors.length,
-      };
-      if (reindexErrors.length > 0) {
-        console.warn("RAG re-index errors:", reindexErrors);
+      const base = process.env.ENGENIE_INTERNAL_URL;
+      const secret = process.env.CRON_SECRET;
+      if (!base || !secret) {
+        console.warn(
+          "EnGenie re-index skipped: ENGENIE_INTERNAL_URL / CRON_SECRET not set (daily backstop cron will catch up)"
+        );
+      } else {
+        const changedModels = [...new Set(allChanges.map((c) => c.product_name))];
+        const r = await fetch(`${base.replace(/\/$/, "")}/api/cron/reindex-products`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${secret}`,
+          },
+          body: JSON.stringify({ models: changedModels }),
+        });
+        if (r.ok) {
+          const data = (await r.json()) as {
+            processed?: number;
+            skipped?: number;
+            errors?: number;
+          };
+          reindexResult = {
+            processed: data.processed ?? 0,
+            skipped: data.skipped ?? 0,
+            errors: data.errors ?? 0,
+          };
+        } else {
+          console.warn("EnGenie re-index trigger failed:", r.status, await r.text());
+        }
       }
     } catch (err) {
       // Re-index failure should not break the sync response
-      console.warn("RAG re-index failed:", err);
+      console.warn("EnGenie re-index trigger failed:", err);
     }
   }
 

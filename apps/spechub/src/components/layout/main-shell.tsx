@@ -1,18 +1,17 @@
 "use client";
 
 /**
- * Client wrapper that holds Ask-panel open/close state and renders the
- * Navbar + Footer + AskPanel chrome around `(main)/*` pages. The user
- * object is fetched server-side in (main)/layout.tsx and passed down so
- * the navbar can show the right items without needing a client-side
+ * Client wrapper that renders the Navbar + Footer chrome around `(main)/*`
+ * pages, plus the EnGenie floating Ask widget for roles with ask.use. The
+ * user object is fetched server-side in (main)/layout.tsx and passed down
+ * so the navbar can show the right items without needing a client-side
  * /api/me call (which would flash the wrong UI).
  */
 
-import { useState } from "react";
 import Link from "next/link";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/layout/navbar";
-import { AskPanel } from "@/components/ask/ask-panel";
+import { EngenieWidget } from "@/components/layout/engenie-widget";
 import { can, type Role } from "@eg/auth/permissions";
 
 interface MainShellProps {
@@ -26,15 +25,11 @@ interface MainShellProps {
 }
 
 export function MainShell({ children, user }: MainShellProps) {
-  const [askPanelOpen, setAskPanelOpen] = useState(false);
   const showAsk = can(user?.role, "ask.use");
 
   return (
     <div className="flex min-h-full flex-col">
-      <Navbar
-        user={user}
-        onAskClick={showAsk ? () => setAskPanelOpen(true) : undefined}
-      />
+      <Navbar user={user} />
       <main className="flex-1">{children}</main>
       <footer className="border-t">
         <div className="mx-auto max-w-[1400px] px-6 py-4 text-center text-xs text-muted-foreground">
@@ -55,9 +50,7 @@ export function MainShell({ children, user }: MainShellProps) {
         </div>
       </footer>
       <Toaster />
-      {showAsk && (
-        <AskPanel isOpen={askPanelOpen} onClose={() => setAskPanelOpen(false)} />
-      )}
+      {showAsk && <EngenieWidget />}
     </div>
   );
 }
