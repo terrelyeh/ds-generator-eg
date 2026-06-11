@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { sendNotifications } from "@/lib/notifications";
-import { gateOrCron } from "@/lib/auth/session";
+import { gateOrCron } from "@eg/auth/session";
 import type { ChangeEntry } from "@/lib/notifications";
 
 /**

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { getApiKey, API_KEY_MAP } from "@/lib/settings";
+import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 
 export const dynamic = "force-dynamic";
 

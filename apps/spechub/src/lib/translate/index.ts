@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { claudeSonnet, claudeOpus } from "./providers/claude";
 import { gpt4o } from "./providers/openai";
 import { gemini25Pro } from "./providers/gemini";

@@ -6,8 +6,8 @@
  */
 
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePermission, AuthError } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { requirePermission, AuthError } from "@eg/auth/session";
 
 export async function GET() {
   try {

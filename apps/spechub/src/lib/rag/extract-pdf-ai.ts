@@ -9,7 +9,7 @@
  * extraction (unpdf) rather than losing the upload.
  */
 
-import { getApiKey, API_KEY_MAP } from "@/lib/settings";
+import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 
 const MODEL = "gemini-3.5-flash";
 

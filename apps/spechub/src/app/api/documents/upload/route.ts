@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gate } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
 import { ingestFile } from "@/lib/rag/ingest-file";
 import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
 

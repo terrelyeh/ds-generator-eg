@@ -9,9 +9,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { requirePermission, AuthError } from "@/lib/auth/session";
-import { isRole } from "@/lib/auth/permissions";
+import { createAdminClient } from "@eg/db/admin";
+import { requirePermission, AuthError } from "@eg/auth/session";
+import { isRole } from "@eg/auth/permissions";
 
 export async function POST(request: NextRequest) {
   try {

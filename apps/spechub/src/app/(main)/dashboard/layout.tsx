@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { SolutionSidebar } from "@/components/layout/solution-sidebar";
 
 export default async function DashboardLayout({

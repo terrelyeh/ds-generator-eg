@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 
 export interface Persona {
   id: string;          // slug: 'default', 'sales', 'support', etc.

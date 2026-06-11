@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@eg/db/server";
 
 async function handler(request: NextRequest): Promise<Response> {
   const supabase = await createClient();

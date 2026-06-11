@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { Role } from "@/lib/auth/permissions";
+import type { Role } from "@eg/auth/permissions";
 
 interface SettingsSection {
   title: string;

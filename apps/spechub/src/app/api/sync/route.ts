@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gateOrCron } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gateOrCron } from "@eg/auth/session";
 import {
   loadAllProductsFromSheet,
   loadProductFromSheets,
@@ -16,7 +16,7 @@ import {
 import { ingestProducts } from "@/lib/rag/ingest-products";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
-import type { ProductLine } from "@/types/database";
+import type { ProductLine } from "@eg/db/types";
 
 // Hobby plan limit: 60s. Pro plan: up to 300s. Setting to plan-safe 60s.
 // The locale folder resolution cache (below) keeps per-product-line sync

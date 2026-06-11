@@ -13,7 +13,7 @@
  */
 
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@eg/db/server";
 import { isRole, can, type Permission, type Role } from "./permissions";
 
 export type AuthUser = {

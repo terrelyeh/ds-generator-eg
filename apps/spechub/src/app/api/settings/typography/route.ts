@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { TYPOGRAPHY_DEFAULTS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
-import { gate } from "@/lib/auth/session";
+import { gate } from "@eg/auth/session";
 
 /**
  * GET /api/settings/typography?locale=ja

@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import type { Role } from "@/lib/auth/permissions";
-import { can } from "@/lib/auth/permissions";
+import type { Role } from "@eg/auth/permissions";
+import { can } from "@eg/auth/permissions";
 import { UserMenu } from "./user-menu";
 
 interface NavbarProps {

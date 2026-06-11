@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@eg/db/server";
 import { Badge } from "@/components/ui/badge";
 import { LocalTime } from "@/components/changelog/local-time";
-import type { ProductLine } from "@/types/database";
+import type { ProductLine } from "@eg/db/types";
 
 interface ChangeDetail {
   field: string;

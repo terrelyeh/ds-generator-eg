@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getCurrentUser } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { getCurrentUser } from "@eg/auth/session";
 import { DashboardContent } from "@/components/dashboard/dashboard-content";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import { filterRenderableSections } from "@/lib/datasheet/pagination";
@@ -10,7 +10,7 @@ import {
   type LayoutAckMap,
   type LayoutAckValue,
 } from "@/lib/datasheet/layout-ack";
-import type { ProductLine } from "@/types/database";
+import type { ProductLine } from "@eg/db/types";
 
 interface ProductRow {
   id: string;

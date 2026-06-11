@@ -15,7 +15,7 @@
  * was unavailable or rate-limited.
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { hasSubstantialContent } from "./gitbook-fetcher";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";

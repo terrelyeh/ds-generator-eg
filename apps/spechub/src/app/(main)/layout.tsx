@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { createClient } from "@eg/db/server";
+import { getCurrentUser } from "@eg/auth/session";
 import { MainShell } from "@/components/layout/main-shell";
 
 export default async function MainLayout({

@@ -1,4 +1,4 @@
-import { getCurrentUser } from "@/lib/auth/session";
+import { getCurrentUser } from "@eg/auth/session";
 import { SettingsPage } from "@/components/settings/settings-page";
 
 export default async function Settings() {

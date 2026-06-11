@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gate } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
 import {
   detectLatestVersion,
   detectLocaleVersion,
@@ -8,7 +8,7 @@ import {
   uploadPdfToDrive,
   getLocaleSuffix,
 } from "@/lib/google/drive-versions";
-import type { ProductLine } from "@/types/database";
+import type { ProductLine } from "@eg/db/types";
 
 // Chromium binary URL for @sparticuz/chromium-min (downloaded at runtime).
 // Must match the @sparticuz/chromium-min version in package.json — Vercel is

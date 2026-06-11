@@ -1,6 +1,6 @@
 import OpenAI from "openai";
 import { createHash } from "crypto";
-import { getApiKey, API_KEY_MAP } from "@/lib/settings";
+import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { detectLatestVersion } from "@/lib/google/drive-versions";
-import { gate } from "@/lib/auth/session";
+import { gate } from "@eg/auth/session";
 
 /**
  * POST /api/resync-versions?line=Cloud%20VPN%20Firewall

@@ -1,4 +1,4 @@
-import { getApiKey } from "@/lib/settings";
+import { getApiKey } from "@eg/db/settings";
 import type { TranslateProvider } from "../types";
 
 // id stays "gpt-4o" — it's the internal registry/availability key wired

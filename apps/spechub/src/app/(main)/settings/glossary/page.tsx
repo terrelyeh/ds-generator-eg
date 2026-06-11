@@ -1,4 +1,4 @@
-import { requirePagePermission } from "@/lib/auth/page-guards";
+import { requirePagePermission } from "@eg/auth/page-guards";
 import { GlossaryEditor } from "@/components/settings/glossary-editor";
 
 export default async function GlossaryPage() {

@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
-import { requirePagePermission } from "@/lib/auth/page-guards";
+import { createClient } from "@eg/db/server";
+import { requirePagePermission } from "@eg/auth/page-guards";
 import { SpecLabelTranslationsEditor } from "@/components/translations/spec-label-editor";
-import type { ProductLine } from "@/types/database";
+import type { ProductLine } from "@eg/db/types";
 
 interface SpecLabelRow {
   original_label: string;

@@ -13,7 +13,7 @@ import Link from "next/link";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/layout/navbar";
 import { AskPanel } from "@/components/ask/ask-panel";
-import { can, type Role } from "@/lib/auth/permissions";
+import { can, type Role } from "@eg/auth/permissions";
 
 interface MainShellProps {
   children: React.ReactNode;

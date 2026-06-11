@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gate, getCurrentUser } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gate, getCurrentUser } from "@eg/auth/session";
 import { generateApiKey, encryptKey, decryptKey, type ApiKeyScope } from "@/lib/auth/api-key";
 
 /**

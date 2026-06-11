@@ -1,4 +1,4 @@
-import { requirePagePermission } from "@/lib/auth/page-guards";
+import { requirePagePermission } from "@eg/auth/page-guards";
 import { TypographyEditor } from "@/components/settings/typography-editor";
 
 export default async function TypographyPage() {

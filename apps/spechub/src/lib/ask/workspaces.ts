@@ -4,7 +4,7 @@
  * knowledge scope, persona/profile, welcome.
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
 
 export interface WorkspaceScope extends Partial<TaxonomyMeta> {

@@ -15,9 +15,9 @@
  * API docs: https://wifi-reghub.vercel.app/docs/wifi-regs-api.html
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
-import { getApiKey, API_KEY_MAP } from "@/lib/settings";
+import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 
 const API_BASE = "https://wifi-reghub.vercel.app/api/wifi-regs/v1";

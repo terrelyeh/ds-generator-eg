@@ -1,4 +1,4 @@
-import { adminOnly } from "@/lib/auth/page-guards";
+import { adminOnly } from "@eg/auth/page-guards";
 import { ApiKeysEditor } from "@/components/settings/api-keys-editor";
 
 export default async function ApiKeysPage() {

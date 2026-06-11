@@ -1,4 +1,4 @@
-import { adminOnly } from "@/lib/auth/page-guards";
+import { adminOnly } from "@eg/auth/page-guards";
 import { ApiAccessManager } from "@/components/settings/api-access-manager";
 
 export default async function ApiAccessPage() {

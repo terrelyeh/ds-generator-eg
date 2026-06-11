@@ -14,8 +14,8 @@
  * Request body: { locale: "en" | "ja" | "zh-TW", ack: boolean }
  */
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gate } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
 import {
   computeContentHash,
   type LayoutAckValue,

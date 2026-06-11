@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gate, getCurrentUser } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gate, getCurrentUser } from "@eg/auth/session";
 import { encryptKey } from "@/lib/auth/api-key";
 
 /**

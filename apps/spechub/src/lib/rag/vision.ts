@@ -3,7 +3,7 @@
  * Used to make images searchable in the RAG vector database.
  */
 
-import { getApiKey, API_KEY_MAP } from "@/lib/settings";
+import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 
 const VISION_MODEL = "gemini-3.5-flash";
 

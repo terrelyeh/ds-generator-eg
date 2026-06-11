@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { syncLocalizedHardwareImage, syncProductImages } from "@/lib/google/drive-images";
-import { gate } from "@/lib/auth/session";
+import { gate } from "@eg/auth/session";
 
 /**
  * POST /api/resync-product?model=ECC500Z

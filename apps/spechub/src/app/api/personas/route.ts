@@ -6,7 +6,7 @@ import {
   DEFAULT_PERSONAS,
 } from "@/lib/rag/personas";
 import type { Persona } from "@/lib/rag/personas";
-import { gate } from "@/lib/auth/session";
+import { gate } from "@eg/auth/session";
 
 /**
  * GET /api/personas

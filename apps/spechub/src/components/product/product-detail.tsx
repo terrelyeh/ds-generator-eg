@@ -17,10 +17,10 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
-import { can, type Role } from "@/lib/auth/permissions";
+import { can, type Role } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
-import type { ProductWithSpecs, Version, ProductTranslation } from "@/types/database";
+import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
 
 interface LongFeature {
   index: number;

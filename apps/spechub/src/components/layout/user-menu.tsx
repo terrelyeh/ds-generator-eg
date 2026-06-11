@@ -10,8 +10,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import type { Role } from "@/lib/auth/permissions";
-import { ROLE_LABELS } from "@/lib/auth/permissions";
+import type { Role } from "@eg/auth/permissions";
+import { ROLE_LABELS } from "@eg/auth/permissions";
 
 interface UserMenuProps {
   email: string;

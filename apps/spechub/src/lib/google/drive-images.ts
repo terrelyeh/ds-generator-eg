@@ -472,7 +472,7 @@ export async function syncLocalizedHardwareImage(params: {
   locale: string;
   lineName: string;
   enDsImagesFolderId: string;
-  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>;
+  supabase: ReturnType<typeof import("@eg/db/admin").createAdminClient>;
 }): Promise<LocalizedImageSyncResult> {
   const { modelName, productId, locale, lineName, enDsImagesFolderId, supabase } = params;
 
@@ -574,7 +574,7 @@ export async function syncLocalizedHardwareImage(params: {
 
 export async function syncProductImages(
   modelName: string,
-  supabase: ReturnType<typeof import("@/lib/supabase/admin").createAdminClient>,
+  supabase: ReturnType<typeof import("@eg/db/admin").createAdminClient>,
   dsImagesFolderId?: string | null,
   options?: ImageSyncOptions
 ): Promise<ImageSyncResult> {

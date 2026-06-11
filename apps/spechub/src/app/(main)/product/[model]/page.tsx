@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { createClient } from "@eg/db/server";
+import { getCurrentUser } from "@eg/auth/session";
 import { ProductDetail } from "@/components/product/product-detail";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import { filterRenderableSections } from "@/lib/datasheet/pagination";
@@ -19,7 +19,7 @@ import type {
   ImageAsset,
   Version,
   ProductTranslation,
-} from "@/types/database";
+} from "@eg/db/types";
 
 interface ProductQueryRow extends Product {
   product_lines: ProductLine;

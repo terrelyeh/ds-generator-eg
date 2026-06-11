@@ -10,7 +10,7 @@
  */
 
 import { createHash, randomBytes, createCipheriv, createDecipheriv } from "crypto";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
 
 // ── Encryption-at-rest (so admins can re-copy a key from the list) ────────────

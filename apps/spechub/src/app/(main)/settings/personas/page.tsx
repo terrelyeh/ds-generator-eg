@@ -1,4 +1,4 @@
-import { adminOnly } from "@/lib/auth/page-guards";
+import { adminOnly } from "@eg/auth/page-guards";
 import { PersonasEditor } from "@/components/settings/personas-editor";
 
 export default async function PersonasPage() {

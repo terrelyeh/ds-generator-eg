@@ -1,4 +1,4 @@
-import { adminOnly } from "@/lib/auth/page-guards";
+import { adminOnly } from "@eg/auth/page-guards";
 import { AskWelcomeEditor } from "@/components/settings/ask-welcome-editor";
 
 export default async function AskWelcomePage() {

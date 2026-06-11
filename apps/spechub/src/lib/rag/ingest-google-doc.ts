@@ -7,7 +7,7 @@
  * Each tab in the doc becomes an independent source for better search precision.
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 

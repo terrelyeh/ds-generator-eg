@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { translate, AVAILABLE_PROVIDERS } from "@/lib/translate";
 import type { ProviderId } from "@/lib/translate";
-import { gate } from "@/lib/auth/session";
+import { gate } from "@eg/auth/session";
 
 export const maxDuration = 30;
 

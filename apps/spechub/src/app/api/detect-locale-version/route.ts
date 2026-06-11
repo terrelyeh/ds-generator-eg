@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { detectLocaleVersion } from "@/lib/google/drive-versions";
-import type { ProductLine } from "@/types/database";
+import type { ProductLine } from "@eg/db/types";
 
 /**
  * GET /api/detect-locale-version?model=ECC100&lang=ja

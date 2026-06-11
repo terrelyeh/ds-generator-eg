@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getApiKey, API_KEY_MAP } from "@/lib/settings";
+import { createAdminClient } from "@eg/db/admin";
+import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
 import { retrieveDocuments } from "@/lib/rag/retrieve";
-import { gate } from "@/lib/auth/session";
+import { gate } from "@eg/auth/session";
 import { cookies } from "next/headers";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 import { loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";

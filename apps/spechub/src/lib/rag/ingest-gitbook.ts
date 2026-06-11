@@ -9,7 +9,7 @@
  * - Source URL for citation
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import {
   fetchGitbookSitemap,

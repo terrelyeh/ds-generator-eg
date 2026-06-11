@@ -16,7 +16,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ROLE_LABELS, type Role, ROLES } from "@/lib/auth/permissions";
+import { ROLE_LABELS, type Role, ROLES } from "@eg/auth/permissions";
 
 interface ActiveUser {
   id: string;

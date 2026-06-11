@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { can, type Role } from "@/lib/auth/permissions";
+import { can, type Role } from "@eg/auth/permissions";
 
 interface PrintToolbarProps {
   model: string;

@@ -20,8 +20,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Columns2, History, Languages } from "lucide-react";
-import type { ProductLine } from "@/types/database";
-import { can, type Role } from "@/lib/auth/permissions";
+import type { ProductLine } from "@eg/db/types";
+import { can, type Role } from "@eg/auth/permissions";
 
 interface ProductSummary {
   id: string;

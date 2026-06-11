@@ -9,7 +9,7 @@
  * Re-uploading the same source_id is a clean replace (old chunks deleted first).
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";

@@ -11,7 +11,7 @@
  * (optional strict scope enforcement) → trim.
  */
 
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "@eg/db/admin";
 import { generateEmbedding } from "./embeddings";
 import { matchesTaxonomyFilter, extractTaxonomy, type TaxonomyMeta } from "./taxonomy";
 

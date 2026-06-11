@@ -1,4 +1,4 @@
-import { adminOnly } from "@/lib/auth/page-guards";
+import { adminOnly } from "@eg/auth/page-guards";
 import { UsersManager } from "@/components/settings/users-manager";
 
 export default async function UsersSettingsPage() {

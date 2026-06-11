@@ -1,4 +1,4 @@
-import { requirePagePermission } from "@/lib/auth/page-guards";
+import { requirePagePermission } from "@eg/auth/page-guards";
 import { KnowledgeBase } from "@/components/knowledge/knowledge-base";
 
 export default async function KnowledgePage() {

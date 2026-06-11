@@ -1,4 +1,4 @@
-import { getApiKey } from "@/lib/settings";
+import { getApiKey } from "@eg/db/settings";
 import type { TranslateProvider } from "../types";
 
 function createClaudeProvider(modelId: string, name: string): TranslateProvider {

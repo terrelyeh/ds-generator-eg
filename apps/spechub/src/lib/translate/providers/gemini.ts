@@ -1,4 +1,4 @@
-import { getApiKey } from "@/lib/settings";
+import { getApiKey } from "@eg/db/settings";
 import type { TranslateProvider } from "../types";
 
 // id stays "gemini-2.5-pro" — internal registry/availability key wired

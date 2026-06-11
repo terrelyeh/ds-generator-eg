@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { gate } from "@/lib/auth/session";
+import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
 
 /**
  * GET /api/settings?keys=anthropic_api_key,openai_api_key,...

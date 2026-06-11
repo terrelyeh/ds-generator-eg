@@ -1,4 +1,4 @@
-import { adminOnly } from "@/lib/auth/page-guards";
+import { adminOnly } from "@eg/auth/page-guards";
 import { AskWorkspacesManager } from "@/components/settings/ask-workspaces-manager";
 
 export default async function AskWorkspacesPage() {

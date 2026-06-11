@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createClient } from "@eg/db/server";
 import { splitIntoPages, filterRenderableSections } from "@/lib/datasheet/pagination";
 import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
@@ -12,7 +12,7 @@ import type {
   SpecSection,
   SpecItem,
   ImageAsset,
-} from "@/types/database";
+} from "@eg/db/types";
 
 interface ProductQueryRow extends Product {
   product_lines: ProductLine;
@@ -83,7 +83,7 @@ export default async function PreviewPage({
   // Fetch current user — preview is gated by middleware so this should
   // always be present, but tolerate null (e.g. Puppeteer self-fetch
   // bypasses auth via the protection-bypass header).
-  const { getCurrentUser } = await import("@/lib/auth/session");
+  const { getCurrentUser } = await import("@eg/auth/session");
   const currentUser = await getCurrentUser();
   const userRole = currentUser?.role ?? null;
 

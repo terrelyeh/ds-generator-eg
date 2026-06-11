@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient } from "./admin";
 
 /**
  * Read an API key: first from Supabase app_settings, then from env var.
