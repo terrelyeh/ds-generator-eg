@@ -899,42 +899,41 @@ export function AskChat({ compact = false }: AskChatProps) {
             </>
           ) : (
             <>
-              {/* Full page: Title + new */}
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-3">
-                  <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="History">
+              {/* Full page: hamburger + persona (left) | profile + new (right).
+                  No page title — the navbar's "Ask" already names the view. */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-2">
+                  <button onClick={() => setShowSidebar(!showSidebar)} className="flex-shrink-0 rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="History">
                     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
                   </button>
-                  <h1 className="text-lg font-bold tracking-tight">Ask</h1>
-                </div>
-                {messages.length > 0 && (
-                  <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">+ New</button>
-                )}
-              </div>
-              {/* Full page: Persona (left) + Profile (right) */}
-              <div className="flex items-center justify-between">
-                {personas.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="flex flex-shrink-0 items-center gap-1 text-xs text-muted-foreground">Persona: <InfoHint text={PERSONA_HINT} /></span>
-                    <div className="flex gap-1.5">
-                      {personas.map((p) => (
-                        <button key={p.id} onClick={() => setPersona(p.id)} title={p.description}
-                          className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${persona === p.id ? "bg-engenius-blue text-white shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}>
-                          {p.name}
-                        </button>
-                      ))}
+                  {personas.length > 0 && (
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="flex flex-shrink-0 items-center gap-1 text-xs text-muted-foreground">Persona: <InfoHint text={PERSONA_HINT} /></span>
+                      <div className="flex gap-1.5">
+                        {personas.map((p) => (
+                          <button key={p.id} onClick={() => setPersona(p.id)} title={p.description}
+                            className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${persona === p.id ? "bg-engenius-blue text-white shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}>
+                            {p.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {profiles.length > 1 && (
-                  <div className="flex items-center gap-2">
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">Profile: <InfoHint text={PROFILE_HINT} align="right" /></span>
-                    <select value={profile} onChange={(e) => setProfile(e.target.value)}
-                      className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30">
-                      {profiles.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
-                    </select>
-                  </div>
-                )}
+                  )}
+                </div>
+                <div className="flex flex-shrink-0 items-center gap-2">
+                  {profiles.length > 1 && (
+                    <div className="flex items-center gap-2">
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground">Profile: <InfoHint text={PROFILE_HINT} align="right" /></span>
+                      <select value={profile} onChange={(e) => setProfile(e.target.value)}
+                        className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30">
+                        {profiles.map((p) => (<option key={p.id} value={p.id}>{p.label}</option>))}
+                      </select>
+                    </div>
+                  )}
+                  {messages.length > 0 && (
+                    <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">+ New</button>
+                  )}
+                </div>
               </div>
             </>
           )}
