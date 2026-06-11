@@ -678,8 +678,6 @@ export function AskChat({ compact = false }: AskChatProps) {
   const currentModelLabel = PROVIDERS.flatMap((g) => g.models).find((m) => m.id === provider)?.label ?? provider;
   const currentPersonaLabel = personas.find((p) => p.id === persona);
   const currentProfileLabel = profiles.find((p) => p.id === profile);
-  const lastAssistantMsg = [...messages].reverse().find((m) => m.role === "assistant" && m.provider);
-  const lastUsedModel = lastAssistantMsg?.provider;
 
   // Current session title
   const currentSessionTitle = messages.length > 0
@@ -754,7 +752,7 @@ export function AskChat({ compact = false }: AskChatProps) {
   }
 
   return (
-    <div className={compact ? "flex flex-col h-full overflow-hidden" : "flex h-[calc(100vh-120px)] gap-0"}>
+    <div className={compact ? "flex flex-col h-full overflow-hidden" : "flex h-full min-h-0 gap-0"}>
       {/* ===== Sidebar (non-compact mode only) ===== */}
       {!compact && (
         <div
@@ -907,7 +905,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                   <button onClick={() => setShowSidebar(!showSidebar)} className="rounded-md p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="History">
                     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
                   </button>
-                  <h1 className="text-lg font-bold tracking-tight">Ask SpecHub</h1>
+                  <h1 className="text-lg font-bold tracking-tight">Ask</h1>
                 </div>
                 {messages.length > 0 && (
                   <button onClick={handleNewChat} className="rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">+ New</button>
@@ -1090,17 +1088,18 @@ export function AskChat({ compact = false }: AskChatProps) {
                 )}
               </div>
             </div>
-            {/* Current model info */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground/30 px-1">
-              <span className="truncate">
-                {currentModelLabel}
-                {currentPersonaLabel ? ` · ${currentPersonaLabel.name}` : ""}
-                {currentProfileLabel && currentProfileLabel.id !== "default" ? ` · ${currentProfileLabel.label}` : ""}
-              </span>
-              {!compact && lastUsedModel && (
-                <span>Last via {lastUsedModel}</span>
-              )}
-            </div>
+            {/* Current model info — only in the compact widget; in the full
+                page the model selector (above) and persona pills (header)
+                already show this, so the extra bar is just noise. */}
+            {compact && (
+              <div className="flex items-center justify-between text-xs text-muted-foreground/30 px-1">
+                <span className="truncate">
+                  {currentModelLabel}
+                  {currentPersonaLabel ? ` · ${currentPersonaLabel.name}` : ""}
+                  {currentProfileLabel && currentProfileLabel.id !== "default" ? ` · ${currentProfileLabel.label}` : ""}
+                </span>
+              </div>
+            )}
           </div>
         </Card>
       </div>

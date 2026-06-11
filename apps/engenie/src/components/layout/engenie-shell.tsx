@@ -11,6 +11,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Toaster } from "@/components/ui/sonner";
 import { can, type Role } from "@eg/auth/permissions";
 import { UserMenu } from "./user-menu";
@@ -31,9 +32,18 @@ export function EngenieShell({ children, user }: EngenieShellProps) {
   const showKnowledge = can(role, "knowledge.view");
   const showSettings = can(role, "settings.view");
 
+  // The full-page Ask is chat-first: it fills the viewport itself (its own
+  // message area scrolls), so we drop the footer there to give the reply
+  // area every pixel. Content pages keep the footer + normal scroll.
+  const pathname = usePathname();
+  const isFullBleed = pathname === "/ask";
+
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-50 bg-engenius-blue text-white shadow-md">
+    // Fixed app-shell height so the page never grows a second (window-level)
+    // scrollbar: header + footer are flex-shrink-0, <main> takes the rest and
+    // owns the only scroll. Chat fills it; content pages scroll inside it.
+    <div className="flex h-dvh flex-col overflow-hidden">
+      <header className="flex-shrink-0 z-50 bg-engenius-blue text-white shadow-md">
         <div className="mx-auto flex h-14 max-w-[1400px] items-center gap-4 px-6">
           <Link href="/ask" className="flex items-center gap-3">
             <Image
@@ -102,12 +112,14 @@ export function EngenieShell({ children, user }: EngenieShellProps) {
           </div>
         </div>
       </header>
-      <main className="flex-1">{children}</main>
-      <footer className="border-t">
-        <div className="mx-auto max-w-[1400px] px-6 py-4 text-center text-xs text-muted-foreground">
-          EnGenie — EnGenius Knowledge Platform
-        </div>
-      </footer>
+      <main className="flex-1 min-h-0 overflow-y-auto">{children}</main>
+      {!isFullBleed && (
+        <footer className="flex-shrink-0 border-t">
+          <div className="mx-auto max-w-[1400px] px-6 py-4 text-center text-xs text-muted-foreground">
+            EnGenie — EnGenius Knowledge Platform
+          </div>
+        </footer>
+      )}
       <Toaster />
     </div>
   );
