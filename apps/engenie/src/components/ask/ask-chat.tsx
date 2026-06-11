@@ -907,16 +907,13 @@ export function AskChat({ compact = false }: AskChatProps) {
                     <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" /></svg>
                   </button>
                   {personas.length > 0 && (
-                    <div className="flex min-w-0 items-center gap-2">
+                    <div className="flex items-center gap-2">
                       <span className="flex flex-shrink-0 items-center gap-1 text-xs text-muted-foreground">Persona: <InfoHint text={PERSONA_HINT} /></span>
-                      <div className="flex gap-1.5">
-                        {personas.map((p) => (
-                          <button key={p.id} onClick={() => setPersona(p.id)} title={p.description}
-                            className={`cursor-pointer rounded-lg px-2.5 py-1 text-xs font-medium whitespace-nowrap transition-all ${persona === p.id ? "bg-engenius-blue text-white shadow-sm" : "bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80"}`}>
-                            {p.name}
-                          </button>
-                        ))}
-                      </div>
+                      <select value={persona} onChange={(e) => setPersona(e.target.value)}
+                        title={personas.find((p) => p.id === persona)?.description}
+                        className="rounded-lg border border-input bg-background px-2 py-1 text-xs text-foreground cursor-pointer focus:outline-none focus:ring-2 focus:ring-engenius-blue/30">
+                        {personas.map((p) => (<option key={p.id} value={p.id}>{p.name}</option>))}
+                      </select>
                     </div>
                   )}
                 </div>
