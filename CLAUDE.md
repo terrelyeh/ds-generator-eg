@@ -1,21 +1,16 @@
 # CLAUDE.md — Project Context
 
-> Last updated: 2026-06-10 (Ask Workspaces: embeddable floating chat widget —
-> `public/widget.js` snippet → iframe `/embed/<slug>`, bearer-token auth (no
-> cross-site cookies) via `Authorization: Bearer <slug>.<token>`. Earlier:
-> Knowledge: Text Snippets + Files (PDF-only) channels
-> opened — both index into `documents` via shared `lib/rag/chunk.ts`; PDFs are
-> read by Gemini (tables→Markdown, figures described, scanned OCR) with an unpdf
-> text-layer fallback, original kept in a private `knowledge-files` Storage
-> bucket. (Word/.docx dropped — no AI-extraction benefit.) Earlier:
-> Ask Workspaces: multi-tenant /ask/<slug> with
-> per-workspace passcode + 3 LLM modes (shared / workspace-BYOK / **user-BYOK**)
-> + scoped KB, via an optional `workspace` param on /api/ask. Frontend now
-> enforces `allow_switch` (locks selectors) and partitions chat history per
-> workspace; BYOK-without-key is blocked at admin + shown as "not ready" on the
-> public page. External RAG Search API (/api/v1/search + api_keys + shared
-> lib/rag/retrieve.ts) consumed via public docs/api-search.html OR the
-> engenius-kb Claude Code skill. generic `web` source; shared chat engine)
+> Last updated: 2026-06-11 (RAG/Ask 全面 review batches 1–3 + tier-3 embed security.
+> ⑥ workspace session tokens are now `<version>.<exp>.<sig>` — expiring + revocable
+> via `ask_workspaces.token_version` (admin「撤銷連線」button), signed by
+> `WORKSPACE_TOKEN_SECRET` (falls back to `API_KEY_ENC_SECRET`); ① widget embed
+> origin allow-list enforced via CSP `frame-ancestors` set in the proxy. Batches 1–2:
+> HNSW index, unified `inScope` scope resolver, `match_threshold` 0.2, Gemini key →
+> `x-goog-api-key` header + `redactSecrets`, `documents` GET → `knowledge_sources`
+> RPC, ask-chat markdown `useMemo`, `knowledge-base.tsx` split into `knowledge/dialogs/`
+> + `shared.ts`. See Common Pitfalls #54–#58 + Next Steps. Earlier: embeddable floating
+> widget (`public/widget.js` → iframe `/embed/<slug>`); Text Snippets + PDF (Gemini)
+> Knowledge channels; multi-tenant /ask/<slug> with 3 LLM modes; external RAG Search API.)
 
 ## Project Overview
 
@@ -204,7 +199,7 @@ Key tables:
 - `translation_glossary` — english_term, locale, translated_term, scope (global/product-line), source (manual/feedback)
 - `app_settings` — key-value store: API keys, `typography_${locale}`, `custom_fonts_${locale}`, `persona_{id}`, `pdf_lock_{model}_{lang}`
 - `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash
-- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), **llm_mode ('shared'|'byok'|'user_byok')**（00018 加 user_byok 到 CHECK）, provider, byok_provider, byok_key_encrypted (AES; 只有 workspace-BYOK 用), scope JSONB `{solution,product_lines[],models[],source_types[],knowledge_areas[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數. RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only。**`scope.knowledge_areas`** = 額外納入的 `kind='knowledge'` 領域 slug（產品 scope + 部門領域的加總，見下方檢索規則）
+- `ask_workspaces` — 多租戶 Ask 入口（/ask/<slug>）：slug, name, enabled, passcode_hash (sha256), **llm_mode ('shared'|'byok'|'user_byok')**（00018 加 user_byok 到 CHECK）, provider, byok_provider, byok_key_encrypted (AES; 只有 workspace-BYOK 用), scope JSONB `{solution,product_lines[],models[],source_types[],knowledge_areas[]}`, persona/profile/allow_switch, welcome_*, rate_limit_per_min + daily_limit + window/day 計數, **allowed_origins** (widget 嵌入網域白名單，空=不限制；proxy 用它設 CSP frame-ancestors), **token_version** (bump 即撤銷所有 session token，見 pitfall #58). RPC `ask_workspace_touch(p_slug)` 原子化配額。RLS on + 0 policies = service role only。**`scope.knowledge_areas`** = 額外納入的 `kind='knowledge'` 領域 slug（產品 scope + 部門領域的加總，見下方檢索規則）
 - `api_keys` — 對外 Search API key：name, key_prefix, key_hash (sha256, 驗證用), **key_encrypted** (AES-256-GCM, 供 admin 列表複製), scope JSONB `{solution,product_lines[],models[],source_types[]}`, rate_limit_per_min, enabled, last_used_at, request_count, window_start/window_count (固定視窗限流). RLS on + 0 policies = 只走 service role。RPC `api_key_touch(p_hash)` 原子化 verify+限流+用量
 - `chat_sessions` — 對話持久化：user_id (default 'anonymous'), title, persona, provider, messages JSONB
 - `profiles` — id (FK auth.users), email, name, avatar_url, role (TEXT CHECK admin/editor/pm/viewer), last_sign_in_at, timestamps. **role values are TEXT not enum** (we DROPped the orphan `user_role` enum during migration cleanup)

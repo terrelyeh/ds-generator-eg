@@ -112,6 +112,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **LLM 三種模式** — `共用 key + 配額`（公司出錢、可設每分/每日上限）、`Workspace BYOK`（管理員為整個 workspace 設一把 key）、或 `User BYOK`（每位使用者自己在前台輸入 key，只存在他的瀏覽器、自付成本）
 - **可自訂** — 每個 workspace 自己的 persona / 對話對象 / 歡迎語 / 範例問題，可鎖定或開放使用者切換
 - **管理** — 管理員在 `/settings/ask-workspaces` 發/編 workspace、設範圍與上限、複製入口連結或 **Embed snippet**；passcode 與 BYOK key 為唯寫（hash / 加密儲存）
+- **嵌入安全（widget）** — 可為每個 workspace 設「允許嵌入的網域」白名單，限制哪些網站能放這個 widget（留空＝不限制）；並可一鍵「撤銷連線」讓所有已發出的存取 token 立即失效（存取 token 會自動到期，無密碼的 widget 失效後自動重連）
 - **整合資源頁**（公開、可分享給部門）— [整合服務介紹](https://ds-generator-eg.vercel.app/docs/ask-integration.html)、[Widget 展示頁](https://ds-generator-eg.vercel.app/docs/widget-demo.html)
 
 ### WiFi Regulation Viewer
@@ -230,5 +231,7 @@ Deployed on Vercel with automatic deploys from `main` branch.
 | `OPENAI_API_KEY` | (Optional) OpenAI API key for GPT-4o translation + RAG embeddings |
 | `GOOGLE_AI_API_KEY` | (Optional) Google AI API key for Gemini translation + Vision |
 | `WIFI_REGHUB_API_KEY` | (Optional) EnGenius WiFi RegHub API key for wifi_regulation source type |
+| `API_KEY_ENC_SECRET` | Encrypts stored API keys + (fallback) signs workspace/widget session tokens |
+| `WORKSPACE_TOKEN_SECRET` | (Optional) Dedicated signing key for workspace/widget session tokens; falls back to `API_KEY_ENC_SECRET` if unset |
 
 > Optional API keys can also be configured via Settings > API Keys (stored in DB, takes priority over env vars).
