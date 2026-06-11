@@ -303,6 +303,8 @@ pointers so you know it exists:
 
 ### 🔜 Next Steps
 
+**🏗️ Monorepo 拆分(已定案,最優先)** — 拆成 `apps/spechub`(datasheet/文件生成)+ `apps/engenie`(Knowledge RAG + Ask),共用同一 Supabase;npm workspaces + `packages/db`(migrations 唯一來源)+ `packages/auth`。完整藍圖(歸屬清單/階段/驗收/回滾)見 [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)。動工前先看藍圖 §8 的待確認決定點(網域名、LLM keys 頁歸屬、側邊 Ask 面板處置)。在 branch `monorepo-split` 上做,每 phase 綠燈才前進;整個拆分 DB-neutral(無 migration)。
+
 **RAG / Ask 全面 review — 第一、二批已完成**。#1–#5：HNSW index、統一 `inScope` scope resolver、match_threshold 0.2、PDF 截斷偵測、串流錯誤/空回覆處理。#6/#8/#10/#11：Gemini key 移到 `x-goog-api-key` header + `redactSecrets`、`documents` GET 改 `knowledge_sources` RPC、`ask-chat.tsx` markdown components `useMemo`、`knowledge-base.tsx` 拆檔（1511→753 行）。
 
 **🟢 安全強化 — tier 3 ①⑥ 已完成**：① widget `allowed_origins` + CSP `frame-ancestors`、⑥ workspace token 加「版本撤銷 + 到期 + 獨立 signing key」（見 pitfall #58）。剩餘（用量上來再做，非必做）：passcode 改 argon2/scrypt（目前無鹽 SHA-256）、modal 改用 shadcn Dialog（focus trap/Esc/aria）、web/google_doc ingest 擋內網/metadata IP（SSRF）、上傳檔驗 `%PDF-` magic bytes、型號清單三份合一。
