@@ -1,0 +1,710 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter, usePathname } from "next/navigation";
+import { toast } from "sonner";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Columns2, History, Languages } from "lucide-react";
+import type { ProductLine } from "@eg/db/types";
+import { can, type Role } from "@eg/auth/permissions";
+
+interface ProductSummary {
+  id: string;
+  model_name: string;
+  subtitle: string;
+  full_name: string;
+  current_version: string;
+  status: string;
+  has_product_image: boolean;
+  has_hardware_image: boolean;
+  has_overview: boolean;
+  has_features: boolean;
+  has_specs: boolean;
+  radio_patterns: { band: string; h_plane: boolean; e_plane: boolean }[];
+  last_content_changed: string | null;
+  last_change_by: string | null;
+  last_change_summary: string | null;
+  updated_at: string;
+  product_line_id: string;
+  product_line: { name: string; label: string; category: string };
+  translation_locales: string[];
+  overview_layout_status: "ok" | "warn" | "overflow";
+  features_layout_status: "ok" | "warn" | "overflow";
+  spec_layout_status: "ok" | "warn" | "overflow";
+  layout_reasons: string[];
+}
+
+interface DashboardContentProps {
+  productLines: ProductLine[];
+  products: ProductSummary[];
+  role?: Role;
+}
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+/** Colored dot status indicator */
+function ImgStatus({ ok }: { ok: boolean }) {
+  return ok ? (
+    <span className="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" />
+  ) : (
+    <span className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25" />
+  );
+}
+
+/**
+ * Content status dot: combines "has content" presence with PDF layout fit.
+ *   Missing  → grey ring (no content)
+ *   OK       → green (content present, fits PDF)
+ *   Warn     → amber (content present, nearly full — might break layout)
+ *   Overflow → red (content present, will definitely overflow PDF)
+ * Hover tooltip explains the specific reason.
+ */
+function ContentStatus({
+  present,
+  layout,
+  hoverText,
+}: {
+  present: boolean;
+  layout: "ok" | "warn" | "overflow";
+  hoverText?: string;
+}) {
+  if (!present) {
+    return (
+      <span
+        className="inline-block h-2.5 w-2.5 rounded-full border-2 border-muted-foreground/25"
+        title={hoverText ?? "No content"}
+      />
+    );
+  }
+  const color =
+    layout === "overflow" ? "bg-red-500" :
+    layout === "warn"     ? "bg-amber-500" :
+                            "bg-emerald-500";
+  return (
+    <span
+      className={`inline-block h-2.5 w-2.5 rounded-full ${color}`}
+      title={hoverText ?? (layout === "ok" ? "Fits PDF layout" : layout === "warn" ? "Layout warning" : "Will overflow PDF")}
+    />
+  );
+}
+
+/** Radio pattern cell for AP — shows bands with H/E status */
+function RadioPatternCell({
+  patterns,
+}: {
+  patterns: { band: string; h_plane: boolean; e_plane: boolean }[];
+}) {
+  if (patterns.length === 0) {
+    return <span className="text-xs text-muted-foreground/40">—</span>;
+  }
+  return (
+    <div className="flex gap-2">
+      {patterns.map((p) => {
+        const complete = p.h_plane && p.e_plane;
+        const partial = p.h_plane || p.e_plane;
+        return (
+          <Badge
+            key={p.band}
+            variant="outline"
+            className={`text-[11px] px-1.5 py-0 ${
+              complete
+                ? "border-green-300 text-green-700 bg-green-50"
+                : partial
+                  ? "border-amber-300 text-amber-700 bg-amber-50"
+                  : "text-muted-foreground"
+            }`}
+            title={`${p.band}: H-plane ${p.h_plane ? "✓" : "✗"} / E-plane ${p.e_plane ? "✓" : "✗"}`}
+          >
+            {p.band}
+          </Badge>
+        );
+      })}
+    </div>
+  );
+}
+
+function ProductTable({
+  products,
+  lineCategory,
+}: {
+  products: ProductSummary[];
+  lineCategory: string;
+}) {
+  if (products.length === 0) {
+    return (
+      <div className="py-12 text-center text-sm text-muted-foreground">
+        No products found in this product line.
+      </div>
+    );
+  }
+
+  const isAP = lineCategory.toLowerCase().includes("ap");
+
+  return (
+    <Table>
+      <TableHeader className="[&_th]:sticky [&_th]:top-14 [&_th]:z-10 [&_th]:bg-muted">
+        <TableRow className="border-b-2 border-foreground/15">
+          <TableHead className="w-8 text-center">#</TableHead>
+          <TableHead className="w-28">Model #</TableHead>
+          <TableHead className="w-56">Model Name</TableHead>
+          <TableHead className="w-16 text-center">Version</TableHead>
+          <TableHead className="w-20">Lang</TableHead>
+          <TableHead className="w-24">Last Changed</TableHead>
+          <TableHead className="w-14 text-center">OV</TableHead>
+          <TableHead className="w-14 text-center">FT</TableHead>
+          <TableHead className="w-14 text-center">SP</TableHead>
+          <TableHead className="w-14 text-center">Prod</TableHead>
+          <TableHead className="w-14 text-center">HW</TableHead>
+          {isAP && (
+            <TableHead className="w-24 text-center">
+              Radio Pattern
+            </TableHead>
+          )}
+          <TableHead className="w-16">Actions</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {products.map((product, index) => (
+          <TableRow
+            key={product.id}
+            className={`hover:bg-engenius-blue/[0.06] ${
+              index % 2 === 1 ? "bg-muted/30" : ""
+            }`}
+          >
+            <TableCell className="text-center text-xs tabular-nums text-muted-foreground/60">
+              {index + 1}
+            </TableCell>
+            <TableCell>
+              <div className="flex items-center gap-1.5">
+                <Link
+                  href={`/product/${product.model_name}`}
+                  className="font-semibold text-engenius-blue hover:text-engenius-blue-dark transition-colors"
+                >
+                  {product.model_name}
+                </Link>
+                <StatusBadge status={product.status} />
+              </div>
+            </TableCell>
+            <TableCell
+              className="max-w-72 truncate text-muted-foreground"
+              title={product.subtitle || product.full_name}
+            >
+              {product.subtitle || product.full_name}
+            </TableCell>
+            <TableCell className="text-center">
+              <Badge variant="outline" className="tabular-nums text-xs">
+                {product.current_version && product.current_version !== "0.0"
+                  ? `v${product.current_version}`
+                  : "—"}
+              </Badge>
+            </TableCell>
+            <TableCell>
+              <div className="flex gap-1">
+                <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">EN</span>
+                {product.translation_locales.map((loc) => (
+                  <span
+                    key={loc}
+                    className="rounded bg-engenius-blue/10 px-1.5 py-0.5 text-[11px] font-medium text-engenius-blue"
+                  >
+                    {loc.toUpperCase()}
+                  </span>
+                ))}
+              </div>
+            </TableCell>
+            <TableCell
+              className="tabular-nums text-muted-foreground"
+              title={product.last_change_summary ?? ""}
+            >
+              {formatDate(product.last_content_changed)}
+            </TableCell>
+            <TableCell className="text-center">
+              <ContentStatus
+                present={product.has_overview}
+                layout={product.overview_layout_status}
+                hoverText={
+                  !product.has_overview ? "Overview missing" :
+                  product.overview_layout_status === "overflow" ? "Overview 過長 — PDF 會超出版面，需縮短" :
+                  product.overview_layout_status === "warn" ? "Overview 偏長 — 建議縮短" :
+                  "Overview fits PDF layout"
+                }
+              />
+            </TableCell>
+            <TableCell className="text-center">
+              <ContentStatus
+                present={product.has_features}
+                layout={product.features_layout_status}
+                hoverText={
+                  !product.has_features ? "Features missing" :
+                  product.features_layout_status === "overflow" ? "Features 過多或過長 — PDF 會超出版面" :
+                  product.features_layout_status === "warn" ? "Features 偏多或偏長 — 建議精簡" :
+                  "Features fits PDF layout"
+                }
+              />
+            </TableCell>
+            <TableCell className="text-center">
+              <ContentStatus
+                present={product.has_specs}
+                layout={product.spec_layout_status}
+                hoverText={
+                  !product.has_specs ? "Specs missing" :
+                  product.spec_layout_status === "overflow" ? "Specs 過長 — 某些 value 會換行太多導致跑版" :
+                  product.spec_layout_status === "warn" ? "Specs 接近頁面上限或有長 value — 建議精簡" :
+                  "Specs fits PDF layout"
+                }
+              />
+            </TableCell>
+            <TableCell className="text-center">
+              <ImgStatus ok={product.has_product_image} />
+            </TableCell>
+            <TableCell className="text-center">
+              <ImgStatus ok={product.has_hardware_image} />
+            </TableCell>
+            {isAP && (
+              <TableCell className="text-center">
+                <RadioPatternCell patterns={product.radio_patterns} />
+              </TableCell>
+            )}
+            <TableCell>
+              <Link
+                href={`/preview/${product.model_name}`}
+                target="_blank"
+                className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+              >
+                Preview
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M5 3h8v8M13 3 6 10" />
+                </svg>
+              </Link>
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+/** Status badge */
+function StatusBadge({ status }: { status: string }) {
+  if (status === "active") return null;
+  const config = {
+    upcoming: { label: "Upcoming", className: "border-amber-300 text-amber-700 bg-amber-50" },
+    pending: { label: "Pending", className: "border-red-300 text-red-700 bg-red-50" },
+  }[status] ?? { label: status, className: "border-gray-300 text-gray-600 bg-gray-50" };
+
+  return (
+    <Badge variant="outline" className={`text-[11px] px-1.5 py-0 ${config.className}`}>
+      {config.label}
+    </Badge>
+  );
+}
+
+
+export function DashboardContent({
+  productLines,
+  products,
+  initialLineId,
+  role,
+}: DashboardContentProps & { initialLineId?: string }) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const canSync = can(role, "sync.run");
+  const canEditTranslations = can(role, "translation.edit");
+  // Default to "All" — matches PM expectation that the dashboard starts
+  // as a full overview; they opt into "Active only" when they want to
+  // hide Upcoming / Pending noise.
+  const [showAll, setShowAll] = useState(true);
+
+  const visibleProducts = showAll
+    ? products
+    : products.filter((p) => p.status === "active" || !p.status);
+
+  const firstLineWithProducts = productLines.find((pl) =>
+    visibleProducts.some((p) => p.product_line_id === pl.id)
+  );
+  const [activeTab, setActiveTab] = useState(
+    initialLineId ?? firstLineWithProducts?.id ?? productLines[0]?.id ?? ""
+  );
+
+  function handleTabChange(lineId: string) {
+    setActiveTab(lineId);
+    const pl = productLines.find((p) => p.id === lineId);
+    if (pl) {
+      const slug = pl.name.toLowerCase().replace(/\s+/g, "-");
+      router.replace(`${pathname}?line=${slug}`, { scroll: false });
+    }
+  }
+
+  const [syncing, setSyncing] = useState(false);
+  const [showSyncMenu, setShowSyncMenu] = useState(false);
+  const [resyncingVersions, setResyncingVersions] = useState(false);
+
+  /**
+   * Re-scan Drive for each model's latest PDF version and update the DB.
+   * Daily sync doesn't probe Drive for versions (it only syncs Sheet
+   * content + images), so if a PM manually drops a new PDF or the
+   * generate-pdf flow partially failed, the Dashboard shows stale
+   * version numbers. This brings the DB back in line.
+   */
+  async function handleResyncVersions() {
+    if (!activeLine) return;
+    setResyncingVersions(true);
+    setShowSyncMenu(false);
+    const toastId = toast.loading(`Resyncing versions for ${activeLine.label}…`, {
+      description: "Scanning Drive for each model",
+    });
+    try {
+      const res = await fetch(
+        `/api/resync-versions?line=${encodeURIComponent(activeLine.name)}`,
+        { method: "POST" },
+      );
+      const data = (await res.json()) as {
+        ok?: boolean;
+        scanned?: number;
+        changes?: Array<{ model: string; from: string; to: string }>;
+        unchanged_count?: number;
+        not_found_in_drive?: string[];
+        errors?: Array<{ model: string; error: string }>;
+        error?: string;
+      };
+      if (!res.ok || !data.ok) {
+        toast.error(`Resync failed: ${data.error ?? res.statusText}`, { id: toastId });
+        return;
+      }
+      const changed = data.changes ?? [];
+      const errs = data.errors ?? [];
+      const summary = changed.length === 0
+        ? `${data.scanned ?? 0} models scanned, all already up to date`
+        : `${changed.length} updated: ${changed.map((c) => `${c.model} ${c.from}→${c.to}`).join(", ")}`;
+      if (errs.length > 0) {
+        toast.warning(`Versions resynced with ${errs.length} error(s)`, {
+          id: toastId,
+          description: `${summary} · errors: ${errs.map((e) => e.model).join(", ")}`,
+          duration: 12000,
+        });
+      } else {
+        toast.success("Versions resynced", {
+          id: toastId,
+          description: summary,
+          duration: 8000,
+        });
+      }
+      router.refresh();
+    } catch (err) {
+      toast.error("Resync failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setResyncingVersions(false);
+    }
+  }
+
+  /**
+   * Smart sync by default: only pulls lines whose Drive modifiedTime
+   * has advanced since last_synced_at. For Hobby plan's 60s function
+   * limit this is critical — a full force-sync of 25 Cloud APs can
+   * take 60s+ and 504 timeout. Force mode stays available via the
+   * dropdown for the rare case PMs genuinely want to re-pull
+   * everything (e.g. suspected RAG index drift).
+   */
+  async function handleSync(force = false) {
+    if (!activeLine) return;
+    setSyncing(true);
+    setShowSyncMenu(false);
+    try {
+      // Client-side timeout safety net: if Vercel function exceeds
+      // maxDuration (60s on Hobby plan) and the HTTP connection hangs,
+      // this ensures the UI recovers after 90s instead of spinning
+      // forever with no feedback.
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 90_000);
+      const forceParam = force ? "force=true&" : "";
+      const res = await fetch(
+        `/api/sync?${forceParam}line=${encodeURIComponent(activeLine.name)}`,
+        { method: "POST", signal: controller.signal }
+      );
+      clearTimeout(timeoutId);
+
+      // Safe response parsing. Vercel 504/500 returns an HTML/text
+      // error page starting with "An error occurred...", which breaks
+      // res.json(). Read as text first, then try to parse; otherwise
+      // surface the HTTP status and a sanitized preview so the PM
+      // sees the real problem (usually function timeout).
+      const rawText = await res.text();
+      let data: {
+        ok?: boolean;
+        error?: string;
+        results?: Array<{ synced?: string[]; errors?: string[] }>;
+      } | null = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok || !data) {
+        const preview = rawText.slice(0, 160).replace(/\s+/g, " ").trim();
+        if (res.status === 504 || /timed? ?out/i.test(preview)) {
+          toast.error(
+            `Sync timed out — ${activeLine.label} has too many models to finish within Vercel's 60s limit. Tip: open a specific product and use "Resync ▾ → Content + Images" for single-model sync.`,
+            { duration: 10000 },
+          );
+        } else {
+          toast.error(
+            `Sync failed (HTTP ${res.status})${preview ? ` — ${preview}` : ""}`,
+            { duration: 10000 },
+          );
+        }
+        return;
+      }
+
+      if (data.ok) {
+        const result = data.results?.[0];
+        const synced: string[] = result?.synced ?? [];
+        const errors: string[] = result?.errors ?? [];
+
+        if (synced.length === 0 && errors.length === 0) {
+          toast.success(`${activeLine.label} is up to date`);
+        } else {
+          toast.success(`${activeLine.label} synced`, {
+            description: synced.length > 0
+              ? `${synced.length} models: ${synced.join(", ")}${errors.length > 0 ? ` | ${errors.length} errors` : ""}`
+              : `${errors.length} errors`,
+            duration: 8000,
+          });
+        }
+        router.refresh();
+      } else {
+        toast.error(`Sync failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        toast.error("Sync timed out — the server took too long. Try again or check Vercel logs.", { duration: 10000 });
+      } else {
+        toast.error(`Sync failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const activeLine = productLines.find((pl) => pl.id === activeTab);
+  const filteredProducts = visibleProducts.filter(
+    (p) => p.product_line_id === activeTab
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Row 1: Product line tabs */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1">
+        {productLines.map((pl) => {
+          const count = visibleProducts.filter(
+            (p) => p.product_line_id === pl.id
+          ).length;
+          if (count === 0) return null;
+          return (
+            <button
+              key={pl.id}
+              onClick={() => handleTabChange(pl.id)}
+              className={`cursor-pointer rounded-md px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-all ${
+                activeTab === pl.id
+                  ? "bg-engenius-blue text-white shadow-sm"
+                  : "text-muted-foreground hover:text-foreground hover:bg-background"
+              }`}
+            >
+              {pl.label}
+              <span
+                className={`ml-1 tabular-nums ${
+                  activeTab === pl.id
+                    ? "text-white/60"
+                    : "text-muted-foreground/50"
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Row 2: Actions — split into two semantic groups.
+          Left: view navigation (Compare / Changelog / Translations).
+          Right: data operations (Status filter + Sync). */}
+      <div className="flex items-center justify-between gap-4">
+        {/* Left group: navigation links (flat ghost buttons with icons
+            to improve scannability — each link has a glyph that hints
+            at its destination: side-by-side columns for Compare, clock
+            for history/Changelog, language script for Translations). */}
+        <div className="flex items-center gap-1">
+          <Link
+            href={`/compare/${encodeURIComponent(activeLine?.name ?? "")}`}
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <Columns2 className="h-3.5 w-3.5" />
+            Compare
+          </Link>
+          <Link
+            href={`/changelog/${encodeURIComponent(activeLine?.name ?? "")}`}
+            className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          >
+            <History className="h-3.5 w-3.5" />
+            Changelog
+          </Link>
+          {canEditTranslations && (
+            <Link
+              href={`/translations/${encodeURIComponent(activeLine?.name ?? "")}`}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Languages className="h-3.5 w-3.5" />
+              Translations
+            </Link>
+          )}
+        </div>
+
+        {/* Right group: status filter (chip with border) + Sync */}
+        <div className="flex items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+              aria-label="Filter products by status"
+            >
+              {/* Filter icon so it visually reads as a filter, not just a button */}
+              <svg className="h-3 w-3 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M1.5 2.5h13l-5 6v5l-3-1.5v-3.5l-5-6z" />
+              </svg>
+              <span className="text-muted-foreground">Status:</span>
+              <span>{showAll ? "All" : "Active only"}</span>
+              <svg className="h-3 w-3 text-muted-foreground" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36">
+              <DropdownMenuItem onClick={() => setShowAll(true)} className="text-xs">
+                <span className={showAll ? "font-medium" : ""}>All</span>
+                {showAll && <span className="ml-auto text-engenius-blue">✓</span>}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowAll(false)} className="text-xs">
+                <span className={!showAll ? "font-medium" : ""}>Active only</span>
+                {!showAll && <span className="ml-auto text-engenius-blue">✓</span>}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Split button: main click does smart sync (skips unchanged
+              lines via Drive modifiedTime). Dropdown arrow reveals
+              "Force full re-sync" for the rare case — warns about
+              Hobby plan's 60s timeout since a full AP sync is tight.
+              Hidden for non-editor roles (PM/Viewer). */}
+          {canSync && (
+          <div className="relative flex items-center">
+            <button
+              onClick={() => handleSync(false)}
+              disabled={syncing}
+              className="inline-flex items-center gap-1 rounded-l-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Smart sync — only pulls product lines Drive says have changed since last sync"
+            >
+              <svg
+                className={`h-3 w-3 ${syncing ? "animate-spin" : ""}`}
+                viewBox="0 0 16 16"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+                <path d="M14 1v4h-4M2 15v-4h4" />
+              </svg>
+              {syncing ? "Syncing..." : "Sync"}
+            </button>
+            <button
+              onClick={() => setShowSyncMenu((v) => !v)}
+              disabled={syncing}
+              className="inline-flex items-center rounded-r-md border-l border-transparent px-1.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              aria-label="Sync options"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M4 6l4 4 4-4" />
+              </svg>
+            </button>
+            {showSyncMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border bg-popover p-1 shadow-md">
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+                  onClick={() => handleSync(false)}
+                  disabled={syncing}
+                >
+                  <span className="mt-0.5">⚡</span>
+                  <div>
+                    <div className="font-medium">Smart sync</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Only re-sync if Drive says the sheet changed. Fast.
+                    </div>
+                  </div>
+                </button>
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+                  onClick={() => handleSync(true)}
+                  disabled={syncing}
+                >
+                  <span className="mt-0.5">🔄</span>
+                  <div>
+                    <div className="font-medium">Force full re-sync</div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Re-pull everything. ⚠️ Cloud AP (25 models) may exceed the 60s Vercel limit.
+                    </div>
+                  </div>
+                </button>
+                <div className="my-1 h-px bg-border" />
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-xs hover:bg-accent transition-colors text-left"
+                  onClick={handleResyncVersions}
+                  disabled={resyncingVersions}
+                >
+                  <span className="mt-0.5">🔢</span>
+                  <div>
+                    <div className="font-medium">
+                      {resyncingVersions ? "Resyncing versions…" : "Resync versions from Drive"}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground mt-0.5">
+                      Detect each model&apos;s latest PDF version in Drive and update DB. Use when Dashboard version looks stale.
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+          )}
+        </div>
+      </div>
+
+      {/* Product table */}
+      <div className="rounded-lg border bg-card shadow-sm">
+        <ProductTable
+          products={filteredProducts}
+          lineCategory={activeLine?.category ?? ""}
+        />
+      </div>
+    </div>
+  );
+}

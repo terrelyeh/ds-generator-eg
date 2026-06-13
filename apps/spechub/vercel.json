@@ -1,0 +1,9 @@
+{
+  "regions": ["hnd1"],
+  "crons": [
+    {
+      "path": "/api/sync",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}

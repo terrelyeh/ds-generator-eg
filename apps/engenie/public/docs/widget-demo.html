@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnGenie Widget — 展示頁 (Demo)</title>
+  <style>
+    :root {
+      --blue: #03a9f4; --blue-dark: #0288d1;
+      --gray-dark: #2C3345; --gray: #58595B; --gray-light: #6f6f6f;
+      --gray-bg: #f5f7fa; --border: #e3e7ec;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--gray-dark); line-height: 1.6; background: var(--gray-bg);
+    }
+
+    /* demo banner */
+    .demo-banner {
+      background: repeating-linear-gradient(45deg, #fff7e6, #fff7e6 14px, #fff2d6 14px, #fff2d6 28px);
+      border-bottom: 1px solid #ffe2a8; color: #8a6d3b; text-align: center;
+      font-size: 13px; font-weight: 600; padding: 9px 16px; letter-spacing: .01em;
+    }
+
+    /* fake site header */
+    header.site {
+      background: #fff; border-bottom: 1px solid var(--border);
+      padding: 14px 32px; display: flex; align-items: center; gap: 12px;
+    }
+    header.site .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--blue); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 800; }
+    header.site .brand { font-weight: 700; font-size: 16px; }
+    header.site .brand small { display:block; font-weight: 500; font-size: 11px; color: var(--gray-light); }
+    header.site nav { margin-left: auto; display: flex; gap: 22px; font-size: 14px; color: var(--gray); }
+
+    /* fake hero */
+    .hero { max-width: 920px; margin: 0 auto; padding: 64px 32px 32px; }
+    .hero h1 { font-size: 38px; line-height: 1.15; letter-spacing: -.02em; }
+    .hero p { margin-top: 14px; font-size: 17px; color: var(--gray-light); max-width: 640px; }
+
+    /* fake product cards */
+    .grid { max-width: 920px; margin: 8px auto 0; padding: 0 32px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .pcard { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+    .pcard .ph { height: 96px; border-radius: 10px; background: linear-gradient(135deg, #e9f6fe, #d7eefb); margin-bottom: 14px; display:flex; align-items:center; justify-content:center; font-size: 30px; }
+    .pcard h3 { font-size: 16px; }
+    .pcard .spec { margin-top: 6px; font-size: 13px; color: var(--gray-light); }
+    .pcard .price { margin-top: 10px; font-weight: 700; color: var(--gray-dark); font-variant-numeric: tabular-nums; }
+    .fake-flag { display:inline-block; margin-left:6px; font-size: 10px; font-weight:700; color:#b08800; background:#fff2d6; border-radius: 4px; padding: 1px 5px; vertical-align: middle; }
+
+    /* how-to */
+    .howto { max-width: 920px; margin: 48px auto 90px; padding: 0 32px; }
+    .howto .box { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 28px 30px; }
+    .howto h2 { font-size: 20px; }
+    .howto p.sub { color: var(--gray-light); font-size: 14px; margin-top: 4px; }
+    .howto ol { margin: 18px 0 0; padding-left: 0; list-style: none; counter-reset: s; }
+    .howto li { position: relative; padding: 0 0 16px 42px; font-size: 14.5px; }
+    .howto li:last-child { padding-bottom: 0; }
+    .howto li::before { counter-increment: s; content: counter(s); position: absolute; left: 0; top: -2px; width: 28px; height: 28px; background: var(--blue); color:#fff; border-radius: 50%; font-weight: 700; font-size: 13px; display:flex; align-items:center; justify-content:center; }
+    .howto b { color: var(--gray-dark); }
+    .howto .arrow { color: var(--blue-dark); font-weight: 700; }
+    .howto .note { margin-top: 18px; font-size: 13px; color: var(--gray-light); border-top: 1px dashed var(--border); padding-top: 14px; }
+    .howto a { color: var(--blue-dark); text-decoration: none; font-weight: 600; }
+    .howto a:hover { text-decoration: underline; }
+
+    @media (max-width: 720px) {
+      header.site nav { display: none; }
+      .hero { padding: 40px 20px 24px; } .hero h1 { font-size: 28px; }
+      .grid, .howto { padding-left: 20px; padding-right: 20px; }
+      .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-banner">⚠️ 這是 EnGenie Widget 的展示頁 — 頁面內容（公司、產品、價格）皆為示意假資料，僅用來展示浮動聊天 widget 的樣子與用法。</div>
+
+  <header class="site">
+    <span class="logo">N</span>
+    <span class="brand">NimbusNet Store <small>示意品牌（非真實）</small></span>
+    <nav><span>產品</span><span>方案</span><span>支援</span><span>聯絡</span></nav>
+  </header>
+
+  <section class="hero">
+    <h1>企業網路設備，一站採購</h1>
+    <p>這是一個虛構的「經銷商網站」，用來示範把 EnGenie 聊天 widget 嵌進真實頁面後的效果。右下角會出現一顆聊天泡泡 —— 點它就能用自然語言問產品問題。</p>
+  </section>
+
+  <div class="grid">
+    <div class="pcard">
+      <div class="ph">📡</div>
+      <h3>NN-AP7 <span class="fake-flag">假資料</span></h3>
+      <div class="spec">WiFi 7 · 6 GHz · 2.5G PoE</div>
+      <div class="price">NT$ 8,900</div>
+    </div>
+    <div class="pcard">
+      <div class="ph">🔀</div>
+      <h3>NN-SW24P <span class="fake-flag">假資料</span></h3>
+      <div class="spec">24-Port · L2+ · 410W PoE</div>
+      <div class="price">NT$ 15,200</div>
+    </div>
+    <div class="pcard">
+      <div class="ph">🛡️</div>
+      <h3>NN-GW100 <span class="fake-flag">假資料</span></h3>
+      <div class="spec">Cloud Gateway · VPN · 多 WAN</div>
+      <div class="price">NT$ 12,400</div>
+    </div>
+  </div>
+
+  <div class="howto">
+    <div class="box">
+      <h2>💬 這個 Widget 怎麼用</h2>
+      <p class="sub">底下這幾步，就是其他部門把它放上自己網站後，使用者會經歷的流程。</p>
+      <ol>
+        <li>看右下角 <span class="arrow">↘</span> 的<b>藍色聊天按鈕</b> —— 點它打開聊天面板。</li>
+        <li>用自然語言<b>直接發問</b>，例如：「哪些 AP 支援 WiFi 7？」「ECW536 的規格是什麼？」「推薦適合飯店的網路方案」。</li>
+        <li>答案會<b>即時串流</b>出來，並附上<b>來源引用</b>；可繼續追問、或左上選單切換模型／角色。</li>
+        <li>關閉面板後再點按鈕可隨時回來；對話<b>歷史</b>保留在你的瀏覽器。</li>
+      </ol>
+      <div class="note">
+        要把這個 widget 放到自己的網站，只需貼一段 <code>&lt;script&gt;</code> snippet。完整說明與三種整合形式見
+        <a href="/docs/ask-integration.html">部門整合服務介紹 →</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Live demo widget -->
+  <script
+    src="https://engenie-eg.vercel.app/widget.js"
+    data-workspace="demo-widget"
+    data-title="EnGenie Demo"
+    async></script>
+</body>
+</html>

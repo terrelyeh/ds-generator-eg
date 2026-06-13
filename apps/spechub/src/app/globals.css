@@ -1,0 +1,216 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+/* highlight.js token colours for chat code blocks (CodeBlock component).
+   Layout/background is owned by `.chat-codeblock` below; this only supplies
+   syntax token colours via rehype-highlight. */
+@import "highlight.js/styles/github-dark.css";
+
+/* Typography plugin — powers the `prose` classes used by the EnGenie
+   demo chat (engenie-chat) and the WiFi regulation markdown viewer.
+   Without it, `prose`/`prose-*` are no-ops and markdown renders bare
+   (no list bullets, heading sizes, table borders, paragraph spacing).
+   The main Ask panel uses its own `.ask-markdown` CSS instead. */
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  /* EnGenius brand colors */
+  --color-engenius-blue: #03a9f4;
+  --color-engenius-blue-dark: #0288d1;
+  --color-engenius-dark: #231f20;
+  --color-engenius-gray: #6f6f6f;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --font-heading: var(--font-plus-jakarta, var(--font-sans));
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.87 0 0);
+  --chart-2: oklch(0.556 0 0);
+  --chart-3: oklch(0.439 0 0);
+  --chart-4: oklch(0.371 0 0);
+  --chart-5: oklch(0.269 0 0);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
+
+/* Ask SpecHub markdown rendering — tuned to match the EnGenie demo's `prose`
+   feel (generous line-height + spacing) so the desktop panel and the demo read
+   the same. Closer to ChatGPT/Claude: 15px body, 1.75 line-height, airy blocks. */
+.ask-markdown {
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--color-engenius-dark);
+}
+.ask-markdown p { margin: 12px 0; }
+.ask-markdown > :first-child { margin-top: 0; }
+.ask-markdown > :last-child { margin-bottom: 0; }
+.ask-markdown strong { font-weight: 600; }
+.ask-markdown ul, .ask-markdown ol { margin: 14px 0; padding-left: 24px; }
+.ask-markdown ul { list-style: disc; }
+.ask-markdown ol { list-style: decimal; }
+.ask-markdown li { margin: 5px 0; line-height: 1.65; }
+.ask-markdown li::marker { color: rgba(35,31,32,0.4); }
+.ask-markdown li > ul, .ask-markdown li > ol { margin: 6px 0; }
+.ask-markdown h1, .ask-markdown h2, .ask-markdown h3, .ask-markdown h4 {
+  font-weight: 600; line-height: 1.3; margin: 22px 0 10px; letter-spacing: -0.01em;
+}
+.ask-markdown h1 { font-size: 17px; }
+.ask-markdown h2 { font-size: 15.5px; }
+.ask-markdown h3 { font-size: 14.5px; }
+.ask-markdown :not(pre) > code {
+  background: rgba(0,0,0,0.05); padding: 2px 5px; border-radius: 4px; font-size: 12.5px;
+}
+.ask-markdown pre { background: #1e293b; color: #e2e8f0; padding: 14px 16px; border-radius: 8px; overflow-x: auto; margin: 14px 0; font-size: 13px; line-height: 1.6; }
+.ask-markdown pre code { background: none; padding: 0; color: inherit; font-size: inherit; }
+
+/* Shared chat code block (CodeBlock component) — dark body + hljs token
+   colours. Layout owned here so it renders identically under .ask-markdown
+   and `prose`. Higher specificity than .ask-markdown pre / prose :where(pre). */
+.chat-codeblock { background: #0d1117; }
+.chat-codeblock .chat-pre {
+  margin: 0; padding: 14px 16px; overflow-x: auto;
+  background: #0d1117; font-size: 13px; line-height: 1.6;
+}
+.chat-codeblock .chat-pre code {
+  background: transparent; padding: 0; border-radius: 0;
+  color: #c9d1d9; font-size: inherit;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+.ask-markdown table { width: 100%; border-collapse: collapse; margin: 14px 0; font-size: 13.5px; }
+.ask-markdown th {
+  background: rgba(0,0,0,0.04); text-align: left; padding: 8px 12px;
+  font-weight: 600; border: 1px solid rgba(0,0,0,0.1);
+}
+.ask-markdown td { padding: 7px 12px; border: 1px solid rgba(0,0,0,0.1); vertical-align: top; }
+.ask-markdown tr:nth-child(even) td { background: rgba(0,0,0,0.02); }
+.ask-markdown blockquote {
+  border-left: 3px solid var(--color-engenius-blue); padding-left: 14px; margin: 14px 0; color: rgba(35,31,32,0.75);
+}
+.ask-markdown hr { border: none; border-top: 1px solid rgba(0,0,0,0.1); margin: 22px 0; }
+.ask-markdown a { color: var(--color-engenius-blue); text-decoration: underline; text-underline-offset: 2px; }
+.ask-markdown img { border-radius: 8px; margin: 14px 0; max-width: 100%; }
+
+/* Ask SpecHub — breathing animation for AI assistant icon */
+@keyframes breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.85; }
+}
+
+/* Prevent Tailwind h-full / min-h-full from creating extra print pages */
+@media print {
+  html { height: auto !important; min-height: 0 !important; }
+  body { height: auto !important; min-height: 0 !important; }
+}

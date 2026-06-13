@@ -1,0 +1,1757 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
+import { can, type Role } from "@eg/auth/permissions";
+import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
+import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
+import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
+
+interface LongFeature {
+  index: number;
+  chars: number;
+  preview: string;
+}
+
+interface LongSpecItem {
+  section: string;
+  label: string;
+  preview: string;
+  chars: number;
+  estimated_lines: number;
+}
+
+interface LayoutReport {
+  status: "ok" | "warn" | "overflow";
+  cover: {
+    status: "ok" | "warn" | "overflow";
+    overview_status: "ok" | "warn" | "overflow";
+    features_status: "ok" | "warn" | "overflow";
+    reasons: string[];
+    metrics: {
+      overview_chars: number;
+      features_count: number;
+      max_feature_chars: number;
+    };
+    long_features: LongFeature[];
+  };
+  spec: {
+    status: "ok" | "warn" | "overflow";
+    reasons: string[];
+    metrics: { pages: number; max_column_fill_pct: number };
+    long_items: LongSpecItem[];
+  };
+}
+
+interface ProductDetailProps {
+  product: ProductWithSpecs;
+  versions: Version[];
+  translations?: ProductTranslation[];
+  layoutReport?: LayoutReport;
+  /** Per-locale layout reports — one entry per enabled translation.
+   *  Each has the same shape as layoutReport but evaluates against that
+   *  locale's typography metrics (CJK fonts are larger with taller
+   *  line-height). Surfaces locale-specific warnings so PMs know
+   *  exactly which language needs shortening.
+   *  `acked` = true means the PM already clicked "Mark as Reviewed OK"
+   *  for this locale AND the content hash still matches → warning is
+   *  suppressed, show an Undo affordance instead. */
+  localizedLayoutReports?: {
+    locale: string;
+    report: LayoutReport;
+    acked: boolean;
+  }[];
+  /** English: the layout has an issue but the PM acked it and the ack
+   *  is still valid. Show the Undo affordance. */
+  englishAcked?: boolean;
+  /** Caller-supplied user role. Used to hide editor-only controls
+   *  (Generate / Resync / Upload / Mark-as-Reviewed / Translation Editor). */
+  role?: Role;
+}
+
+function LayoutWarningBanner({
+  report,
+  locale,
+  modelName,
+  onAcked,
+}: {
+  report: LayoutReport;
+  /** Locale tag shown in the banner title. Omit for English (default). */
+  locale?: string;
+  /** Needed for the "Mark as reviewed OK" action to hit the API. */
+  modelName: string;
+  /** Callback after a successful ack — lets the parent refresh or hide. */
+  onAcked?: () => void;
+}) {
+  const [acking, setAcking] = useState(false);
+  const ackLocale = locale ?? "en";
+  const isOverflow = report.status === "overflow";
+  const Icon = isOverflow ? "⚠️" : "💡";
+  const localeTag = locale
+    ? ` [${locale === "zh-TW" ? "繁中" : locale === "ja" ? "日文" : locale.toUpperCase()}]`
+    : "";
+  const title = isOverflow
+    ? `PDF Layout Overflow${localeTag} — 內容超過版面容納範圍`
+    : `PDF Layout Warning${localeTag} — 內容偏多，可能排版緊繃`;
+  const bg = isOverflow
+    ? "bg-red-50 border-red-300"
+    : "bg-amber-50 border-amber-300";
+  const textColor = isOverflow ? "text-red-900" : "text-amber-900";
+
+  async function markReviewed() {
+    setAcking(true);
+    try {
+      const res = await fetch(
+        `/api/products/${encodeURIComponent(modelName)}/layout-ack`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ locale: ackLocale, ack: true }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        toast.error(`Failed to mark as reviewed: ${err.error ?? res.statusText}`);
+        return;
+      }
+      toast.success(`${ackLocale.toUpperCase()} layout marked as reviewed OK`);
+      onAcked?.();
+    } finally {
+      setAcking(false);
+    }
+  }
+
+  return (
+    <div className={`mb-4 rounded-lg border px-5 py-4 ${bg} ${textColor}`}>
+      <div className="flex items-start gap-3">
+        <span className="text-xl leading-none pt-0.5">{Icon}</span>
+        <div className="min-w-0 flex-1 space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="font-semibold text-base flex items-center gap-2 flex-wrap">
+              {title}
+              <a
+                href="/docs/overview-length-rule.html"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`text-xs font-normal underline-offset-2 hover:underline ${
+                  isOverflow ? "text-red-700/80" : "text-amber-800/80"
+                }`}
+                title="說明 Overview 為什麼會超出、CJK 跟英文的差異、Mark OK 是什麼意思"
+              >
+                📖 字數規則說明
+              </a>
+            </div>
+            <button
+              onClick={markReviewed}
+              disabled={acking}
+              className={`flex-shrink-0 inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${
+                isOverflow
+                  ? "border-red-300 bg-white text-red-700 hover:bg-red-100"
+                  : "border-amber-300 bg-white text-amber-800 hover:bg-amber-100"
+              }`}
+              title="目視驗證 PDF 沒問題後，點這個把紅燈壓成綠燈。Dashboard 會記住此確認。"
+            >
+              {acking ? "Saving…" : "✓ Mark as Reviewed OK"}
+            </button>
+          </div>
+
+          {/* Overview */}
+          {report.cover.overview_status !== "ok" && (
+            <LayoutIssueBlock
+              title="Overview"
+              status={report.cover.overview_status}
+              detail={
+                <>
+                  目前 <strong className="tabular-nums">{report.cover.metrics.overview_chars}</strong> 字，
+                  建議 ≤ <strong>500</strong>（上限 650）。
+                  {report.cover.metrics.overview_chars > 500 && (
+                    <> 建議刪去 <strong className="tabular-nums">{report.cover.metrics.overview_chars - 500}</strong> 字。</>
+                  )}
+                </>
+              }
+              action="去 Google Sheet 的 Web Overview 頁籤 → 「Single Overview」欄位精簡內容。"
+            />
+          )}
+
+          {/* Features */}
+          {report.cover.features_status !== "ok" && (
+            <LayoutIssueBlock
+              title="Features & Benefits"
+              status={report.cover.features_status}
+              detail={
+                <>
+                  目前 <strong className="tabular-nums">{report.cover.metrics.features_count}</strong> 項，
+                  建議 ≤ <strong>8</strong>（上限 10）。
+                  {report.cover.metrics.features_count > 8 && (
+                    <> 建議刪去 <strong className="tabular-nums">{report.cover.metrics.features_count - 8}</strong> 項。</>
+                  )}
+                  {report.cover.long_features.length > 0 && (
+                    <>
+                      <br />
+                      <span className="text-xs">以下 {report.cover.long_features.length} 項偏長（建議 ≤ 90 字）：</span>
+                      <ul className="mt-1 ml-2 list-decimal list-inside text-xs">
+                        {report.cover.long_features.slice(0, 5).map((f) => (
+                          <li key={f.index}>
+                            第 {f.index} 項 (<span className="tabular-nums">{f.chars}</span> 字)：
+                            <span className="text-current/70">「{f.preview}…」</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              }
+              action="去 Google Sheet → Web Overview → Key Feature Lists：精簡敘述，或移除不關鍵的項目。"
+            />
+          )}
+
+          {/* Specs */}
+          {report.spec.status !== "ok" && (
+            <LayoutIssueBlock
+              title="Technical Specifications"
+              status={report.spec.status}
+              detail={
+                <>
+                  Spec 頁面最寬欄位填滿率 <strong className="tabular-nums">{report.spec.metrics.max_column_fill_pct}%</strong>
+                  {report.spec.metrics.max_column_fill_pct > 100 && (
+                    <> — 超過 100% 會導致跑版或截斷。</>
+                  )}
+                  {report.spec.long_items.length > 0 && (
+                    <>
+                      <br />
+                      <span className="text-xs">以下 {report.spec.long_items.length} 個 value 偏長（建議 ≤ 60 字，超過會換行到 2+ 行）：</span>
+                      <ul className="mt-1 ml-2 text-xs">
+                        {report.spec.long_items.slice(0, 5).map((item, i) => (
+                          <li key={i} className="mb-1">
+                            <strong>{item.section} ›</strong> {item.label}
+                            {" "}
+                            <span className="tabular-nums">({item.chars} 字，估 {item.estimated_lines} 行)</span>
+                            <br />
+                            <span className="text-current/70">「{item.preview}…」</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
+                </>
+              }
+              action="去 Google Sheet → Detail Specs：精簡長 value（縮寫、分行、移除非必要資訊）。"
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Low-key inline notice shown in place of the warning banner when a
+ * locale has been manually acked AND the ack is still valid. Gives
+ * the PM a way to see "this was reviewed" and undo if desired.
+ */
+function LayoutAckedNotice({
+  locale,
+  modelName,
+  onUnacked,
+}: {
+  locale?: string;
+  modelName: string;
+  onUnacked?: () => void;
+}) {
+  const [unacking, setUnacking] = useState(false);
+  const ackLocale = locale ?? "en";
+  const localeTag = locale
+    ? ` [${locale === "zh-TW" ? "繁中" : locale === "ja" ? "日文" : locale.toUpperCase()}]`
+    : "";
+
+  async function undoAck() {
+    setUnacking(true);
+    try {
+      const res = await fetch(
+        `/api/products/${encodeURIComponent(modelName)}/layout-ack`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ locale: ackLocale, ack: false }),
+        },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: res.statusText }));
+        toast.error(`Failed to undo: ${err.error ?? res.statusText}`);
+        return;
+      }
+      toast.success(`Reverted ${ackLocale.toUpperCase()} — warning will reappear if overflow still exists`);
+      onUnacked?.();
+    } finally {
+      setUnacking(false);
+    }
+  }
+
+  return (
+    <div className="mb-4 flex items-center justify-between rounded-md border border-green-200 bg-green-50/60 px-4 py-2 text-sm text-green-800">
+      <div className="flex items-center gap-2">
+        <span className="text-green-600">✓</span>
+        <span>
+          Layout reviewed{localeTag} — warning suppressed by your confirmation.
+        </span>
+      </div>
+      <button
+        onClick={undoAck}
+        disabled={unacking}
+        className="rounded border border-green-300 bg-white px-2 py-0.5 text-xs font-medium text-green-700 hover:bg-green-100 transition-colors disabled:opacity-50"
+        title="Remove this confirmation — the warning banner will come back if overflow still exists."
+      >
+        {unacking ? "…" : "Undo"}
+      </button>
+    </div>
+  );
+}
+
+function LayoutIssueBlock({
+  title,
+  status,
+  detail,
+  action,
+}: {
+  title: string;
+  status: "warn" | "overflow";
+  detail: React.ReactNode;
+  action: string;
+}) {
+  const statusLabel = status === "overflow" ? "Overflow" : "Warn";
+  const statusBg = status === "overflow" ? "bg-red-200/70 text-red-900" : "bg-amber-200/70 text-amber-900";
+  return (
+    <div className="rounded-md bg-white/60 px-3 py-2 text-sm">
+      <div className="flex items-center gap-2 font-semibold">
+        <span className={`inline-block rounded text-[10px] font-bold uppercase px-1.5 py-0.5 ${statusBg}`}>
+          {statusLabel}
+        </span>
+        {title}
+      </div>
+      <div className="mt-1 leading-relaxed">{detail}</div>
+      <div className="mt-1.5 text-xs text-current/70">
+        <strong>💡 Action:</strong> {action}
+      </div>
+    </div>
+  );
+}
+
+function formatDate(dateStr: string | null) {
+  if (!dateStr) return "—";
+  return new Date(dateStr).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function ImageUploadButton({
+  modelName,
+  imageType,
+  currentUrl,
+  onUploaded,
+}: {
+  modelName: string;
+  imageType: "product" | "hardware";
+  currentUrl: string;
+  onUploaded: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("model", modelName);
+      formData.append("type", imageType);
+
+      const res = await fetch("/api/upload-image", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Upload failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(
+        `Upload failed: ${err instanceof Error ? err.message : String(err)}`
+      );
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleDownload() {
+    try {
+      const res = await fetch(currentUrl);
+      const blob = await res.blob();
+      const ext = currentUrl.match(/\.(png|jpg|jpeg|webp)/i)?.[1] || "png";
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `${modelName}_${imageType}.${ext}`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {
+      // Fallback: open in new tab
+      window.open(currentUrl, "_blank");
+    }
+  }
+
+  const [deleting, setDeleting] = useState(false);
+  async function handleDelete() {
+    if (!confirm(`Delete ${imageType} image for ${modelName}? This removes it from Supabase and Drive (Drive trash, recoverable 30 days).`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/upload-image?model=${encodeURIComponent(modelName)}&type=${imageType}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Delete failed: ${data.error || "Unknown error"}${data.details ? `\n\n${data.details}` : ""}`);
+      }
+    } catch (err) {
+      alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  const label = imageType === "product" ? "Product Image" : "Hardware Image";
+  const hasImage = currentUrl && !currentUrl.startsWith("cache/");
+
+  return (
+    <>
+      <div className="flex flex-col items-center gap-2 rounded-lg border p-4 transition-colors hover:border-engenius-blue/30">
+        {hasImage ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={currentUrl}
+            alt={`${modelName} ${imageType}`}
+            className="h-32 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+            onClick={() => setLightbox(true)}
+            title="Click to enlarge"
+          />
+        ) : (
+          <div className="flex h-32 w-32 items-center justify-center rounded bg-muted text-xs text-muted-foreground">
+            No image
+          </div>
+        )}
+        <span className="text-sm font-medium">{label}</span>
+        <div className="flex items-center gap-1.5">
+          {hasImage && (
+            <button
+              onClick={handleDownload}
+              className="inline-flex h-8 items-center rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+              title="Download original"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+            </button>
+          )}
+          <label>
+            <span className="inline-flex h-8 cursor-pointer items-center rounded-md border border-input bg-background px-3 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors">
+              {uploading ? "Uploading..." : hasImage ? "Replace" : "Upload"}
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+              disabled={uploading}
+            />
+          </label>
+          {hasImage && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              className="inline-flex h-8 items-center rounded-md border border-red-200 bg-background px-2.5 text-xs font-medium text-red-600 shadow-xs hover:bg-red-50 hover:text-red-700 transition-colors disabled:opacity-50"
+              title="Delete image (removes from Supabase + Drive)"
+            >
+              {deleting ? (
+                "..."
+              ) : (
+                <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+                  <path d="M10 11v6M14 11v6" />
+                  <path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" />
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Lightbox modal */}
+      {lightbox && hasImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8"
+          onClick={() => setLightbox(false)}
+        >
+          <div className="relative max-h-full max-w-full" onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={currentUrl}
+              alt={`${modelName} ${imageType}`}
+              className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl"
+            />
+            <div className="absolute top-3 right-3 flex items-center gap-2">
+              <button
+                onClick={handleDownload}
+                className="rounded-full bg-white/90 p-2 text-gray-700 hover:bg-white transition-colors shadow-md"
+                title="Download"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setLightbox(false)}
+                className="rounded-full bg-white/90 p-2 text-gray-700 hover:bg-white transition-colors shadow-md"
+                title="Close"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function RadioPatternSlot({
+  modelName,
+  band,
+  plane,
+  label,
+  hasImage,
+  imageUrl,
+  onUploaded,
+}: {
+  modelName: string;
+  band: string;
+  plane: string;
+  label: string;
+  hasImage: boolean;
+  imageUrl?: string;
+  onUploaded: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [lightbox, setLightbox] = useState(false);
+
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("model", modelName);
+      formData.append("type", "radio_pattern");
+      formData.append("label", label);
+      const res = await fetch("/api/upload-image", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Upload failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Upload failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setUploading(false);
+      e.target.value = "";
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm(`Delete ${label} radio pattern for ${modelName}?`)) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(
+        `/api/upload-image?model=${encodeURIComponent(modelName)}&type=radio_pattern&label=${encodeURIComponent(label)}`,
+        { method: "DELETE" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        onUploaded();
+      } else {
+        alert(`Delete failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Delete failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  return (
+    <>
+    <div
+      className={`flex w-36 flex-col items-center gap-2 rounded-lg border-2 border-dashed p-3 transition-colors ${
+        hasImage
+          ? "border-green-300 bg-green-50"
+          : "border-gray-200 bg-gray-50 hover:border-engenius-blue/30"
+      }`}
+    >
+      {hasImage && imageUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={`${modelName} ${label}`}
+          className="h-16 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity"
+          onClick={() => setLightbox(true)} title="Click to enlarge" />
+      ) : (
+        <svg className="h-10 w-10 text-gray-300" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+        </svg>
+      )}
+      <span className={`text-xs font-medium ${hasImage ? "text-green-700" : "text-gray-400"}`}>
+        {band} {plane}
+      </span>
+      <div className="flex items-center gap-1">
+        <label>
+          <span className="inline-flex h-6 cursor-pointer items-center rounded border border-input bg-background px-2 text-[11px] font-medium shadow-xs hover:bg-accent transition-colors">
+            {uploading ? "..." : hasImage ? "Replace" : "Upload"}
+          </span>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleUpload}
+            disabled={uploading}
+          />
+        </label>
+        {hasImage && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="inline-flex h-6 items-center rounded border border-red-200 bg-background px-1.5 text-red-600 shadow-xs hover:bg-red-50 transition-colors disabled:opacity-50"
+            title="Delete"
+          >
+            <svg className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="3 6 5 6 21 6" />
+              <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+
+    {/* Lightbox */}
+    {lightbox && hasImage && imageUrl && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-8" onClick={() => setLightbox(false)}>
+        <div className="relative" onClick={(e) => e.stopPropagation()}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={imageUrl} alt={`${modelName} ${label}`} className="max-h-[85vh] max-w-[90vw] object-contain rounded-lg shadow-2xl" />
+          <button onClick={() => setLightbox(false)} className="absolute top-3 right-3 rounded-full bg-white/90 p-2 text-gray-700 hover:bg-white transition-colors shadow-md" title="Close">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    )}
+    </>
+  );
+}
+
+/**
+ * Read-only display of the QSG URL that gets printed as the QR code on
+ * the datasheet PDF cover. Lets PM/Editor verify the link before
+ * generating the PDF and provides Copy / Test affordances.
+ *
+ * Resolution mirrors `preview/[model]/page.tsx`:
+ *   lineTemplate (from product_lines.qr_url_template)
+ *     → fallback to "https://qr.engenius.ai/qsg/{model}" (en dict default)
+ * Per-locale `product_translations.qr_url` overrides are NOT shown here —
+ * those are visible per-locale in the Translations editor. This card
+ * shows the EN/default URL that the EN PDF will use.
+ */
+function QsgUrlCard({
+  modelName,
+  lineTemplate,
+}: {
+  modelName: string;
+  lineTemplate: string | null;
+}) {
+  const [copied, setCopied] = useState(false);
+  const template = lineTemplate || "https://qr.engenius.ai/qsg/{model}";
+  const url = template.replace("{model}", modelName.toLowerCase());
+  const source = lineTemplate ? "Per-line template" : "Default short URL";
+
+  async function copyToClipboard() {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed");
+    }
+  }
+
+  return (
+    <Card className="shadow-sm">
+      <CardHeader>
+        <CardTitle className="text-base flex items-center gap-2">
+          QSG URL
+          <span className="text-[11px] font-normal text-muted-foreground">
+            (printed as QR code on the datasheet)
+          </span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="flex items-center gap-2 flex-wrap">
+          <code className="flex-1 min-w-0 truncate rounded-md border bg-muted/50 px-3 py-2 text-xs font-mono text-foreground">
+            {url}
+          </code>
+          <button
+            onClick={copyToClipboard}
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+            title="Copy URL"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" />
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+            </svg>
+            {copied ? "Copied!" : "Copy"}
+          </button>
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex h-8 items-center gap-1 rounded-md border border-input bg-background px-2.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground transition-colors"
+            title="Open in new tab to verify the page exists"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            Test
+          </a>
+        </div>
+        <p className="mt-2 text-[11px] text-muted-foreground">
+          Source: {source}. Configure per-line templates via
+          {" "}<code className="font-mono text-[10px] bg-muted px-1 rounded">product_lines.qr_url_template</code>.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role }: ProductDetailProps) {
+  // Role-derived flags. Prefixed `roleCan` to avoid collision with the
+  // existing `canGenerate` that signals "all required fields are filled
+  // (Product Image, Hardware Image, Overview, Features)".
+  const roleCanEdit = can(role, "product.edit");
+  const roleCanUpload = can(role, "product.upload_image");
+  const roleCanGenerate = can(role, "pdf.generate");
+  const roleCanResync = can(role, "sync.run");
+  const roleCanTranslate = can(role, "translation.edit");
+  const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
+  const router = useRouter();
+  const [generating, setGenerating] = useState(false);
+  const [resyncing, setResyncing] = useState(false);
+
+  const [showGenMenu, setShowGenMenu] = useState(false);
+  const [showLangMenu, setShowLangMenu] = useState(false);
+  const [showResyncMenu, setShowResyncMenu] = useState(false);
+  const [showSpecHelp, setShowSpecHelp] = useState(false);
+
+  async function handleResyncImages() {
+    setResyncing(true);
+    setShowResyncMenu(false);
+    try {
+      const res = await fetch(
+        `/api/resync-product?model=${encodeURIComponent(product.model_name)}`,
+        { method: "POST" },
+      );
+      const data = await res.json();
+      if (data.ok) {
+        const cleared = data.english?.cleared ?? [];
+        if (cleared.length > 0) {
+          alert(`Resync complete. Cleared (deleted in Drive): ${cleared.join(", ")}`);
+        }
+        router.refresh();
+      } else {
+        alert(`Resync failed: ${data.error || "Unknown error"}${data.details ? `\n\n${data.details}` : ""}`);
+      }
+    } catch (err) {
+      alert(`Resync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setResyncing(false);
+    }
+  }
+
+  /**
+   * Full content + images resync for a single model. Unlike the
+   * dashboard's per-line sync which hits Vercel's 60s limit on AP
+   * (25 models), one model completes in a few seconds. Uses the
+   * existing /api/sync route with ?model= filter which already
+   * re-reads Sheets, syncs images, and re-indexes RAG.
+   */
+  async function handleResyncContent() {
+    setResyncing(true);
+    setShowResyncMenu(false);
+    try {
+      // Pass BOTH line and model so the backend scopes to a single
+      // product line right away. Without line=, old backend builds
+      // would iterate all 7 lines probing for the model — 6x wasted
+      // Sheet API calls that pushed us past Hobby's 60s limit.
+      const res = await fetch(
+        `/api/sync?force=true&line=${encodeURIComponent(product.product_line.name)}&model=${encodeURIComponent(product.model_name)}`,
+        { method: "POST" },
+      );
+      const rawText = await res.text();
+      let data: { ok?: boolean; error?: string; results?: Array<{ synced?: string[]; errors?: string[] }> } | null = null;
+      try {
+        data = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        data = null;
+      }
+      if (!res.ok || !data) {
+        const preview = rawText.slice(0, 160).replace(/\s+/g, " ").trim();
+        alert(`Resync failed (HTTP ${res.status})${preview ? `\n\n${preview}` : ""}`);
+        return;
+      }
+      if (data.ok) {
+        const synced = data.results?.[0]?.synced ?? [];
+        const errors = data.results?.[0]?.errors ?? [];
+        if (errors.length > 0) {
+          alert(`Resync completed with errors:\n${errors.join("\n")}`);
+        }
+        router.refresh();
+        if (synced.length > 0) {
+          toast.success(`${product.model_name} re-synced (content + images)`);
+        } else {
+          toast.success(`${product.model_name} is already up to date`);
+        }
+      } else {
+        alert(`Resync failed: ${data.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      alert(`Resync failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setResyncing(false);
+    }
+  }
+
+  const currentVer = product.current_version || "0.0";
+  const hasExistingVersion = currentVer !== "0.0";
+
+  const isAP = product.product_line.category === "APs";
+
+  // Determine which radio pattern slots to show for AP products
+  // Check "Operating Frequency" spec for 6GHz support
+  const has6G = isAP && product.spec_sections.some((s) =>
+    s.items.some(
+      (i) =>
+        i.label.toLowerCase().includes("operating frequency") &&
+        /6\s*GHz/i.test(i.value)
+    )
+  );
+  const radioPatternSlots = isAP
+    ? [
+        { band: "2.4G", plane: "H-plane" },
+        { band: "2.4G", plane: "E-plane" },
+        { band: "5G", plane: "H-plane" },
+        { band: "5G", plane: "E-plane" },
+        ...(has6G
+          ? [
+              { band: "6G", plane: "H-plane" },
+              { band: "6G", plane: "E-plane" },
+            ]
+          : []),
+      ]
+    : [];
+
+  const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
+  const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
+  const hasOverview = !!product.overview && product.overview.trim().length > 0;
+  const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
+  const hasSpecs = product.spec_sections.length > 0;
+  const canGenerate = hasProductImage && hasHardwareImage && hasOverview && hasFeatures && hasSpecs;
+
+  const missingItems: string[] = [];
+  if (!hasProductImage) missingItems.push("Product Image");
+  if (!hasHardwareImage) missingItems.push("Hardware Image");
+  if (!hasOverview) missingItems.push("Overview");
+  if (!hasFeatures) missingItems.push("Features");
+  if (!hasSpecs) missingItems.push("Spec Details");
+
+  const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
+  const localesWithTranslations = translations.map((t) => t.locale);
+  const confirmedLocales = new Set(translations.filter((t) => t.confirmed).map((t) => t.locale));
+
+  async function handleGeneratePdf(mode: "regenerate" | "new", locale = "en") {
+    setShowGenMenu(false);
+    setShowLangMenu(false);
+    setGenerating(true);
+    const toastId = toast.loading("Generating PDF…", {
+      description: `${product.model_name}${locale !== "en" ? ` · ${locale.toUpperCase()}` : ""}`,
+    });
+    try {
+      const res = await fetch(
+        `/api/generate-pdf?model=${encodeURIComponent(product.model_name)}&mode=${mode}&lang=${locale}`,
+        { method: "POST" }
+      );
+      const data = await res.json();
+      if (res.status === 409) {
+        toast.error("Already generating", {
+          id: toastId,
+          description:
+            data.error ||
+            "Another PDF generation is in progress. Please wait.",
+        });
+        return;
+      }
+      if (data.ok && data.pdfUrl) {
+        // Don't auto-window.open — popup blockers swallow it after the
+        // long await. Show a toast with an Open-PDF action button so a
+        // real user gesture handles the navigation.
+        toast.success(
+          mode === "regenerate"
+            ? `Regenerated v${data.version}`
+            : `Generated v${data.version}`,
+          {
+            id: toastId,
+            description: data.fileName,
+            duration: 12000,
+            action: {
+              label: "Open PDF",
+              onClick: () => window.open(data.pdfUrl, "_blank"),
+            },
+          }
+        );
+        router.refresh();
+      } else {
+        toast.error("PDF generation failed", {
+          id: toastId,
+          description: data.error || data.details || "Unknown error",
+          duration: 15000,
+        });
+      }
+    } catch (err) {
+      toast.error("PDF generation failed", {
+        id: toastId,
+        description: err instanceof Error ? err.message : String(err),
+        duration: 15000,
+      });
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-1.5 text-sm">
+        <Link
+          href={`/dashboard/cloud?line=${product.product_line.name.toLowerCase().replace(/\s+/g, "-")}`}
+          className="text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {product.product_line.label}
+        </Link>
+        <span className="text-muted-foreground/40">/</span>
+        <span className="font-medium text-foreground">
+          {product.model_name}
+        </span>
+      </nav>
+
+      {/* Layout overflow warning banners — one per language that has
+          an issue. Shown at the top regardless of active tab so PMs
+          see all locales' warnings in one place and can act on each.
+          Each banner has a "Mark as Reviewed OK" button that calls the
+          layout-ack API so the dashboard red flag goes away.
+          If a locale is already acked (and the ack is still valid),
+          we show a subtle green notice with an Undo button instead. */}
+      {/* Layout banners hidden for non-editors — they have no actionable
+          buttons available and can read dashboard red/green flags instead. */}
+      {roleCanEdit && englishAcked && (
+        <LayoutAckedNotice
+          modelName={product.model_name}
+          onUnacked={() => router.refresh()}
+        />
+      )}
+      {roleCanEdit && layoutReport && layoutReport.status !== "ok" && (
+        <LayoutWarningBanner
+          report={layoutReport}
+          modelName={product.model_name}
+          onAcked={() => router.refresh()}
+        />
+      )}
+      {roleCanEdit && localizedLayoutReports.map(({ locale, report, acked }) => {
+        if (acked) {
+          // Suppressed by a valid ack — show Undo affordance instead
+          // of the warning. We only show this when the underlying
+          // report actually has an issue (no point telling the PM
+          // "reviewed OK" when nothing was wrong).
+          if (report.status === "ok") return null;
+          return (
+            <LayoutAckedNotice
+              key={locale}
+              locale={locale}
+              modelName={product.model_name}
+              onUnacked={() => router.refresh()}
+            />
+          );
+        }
+        if (report.status === "ok") return null;
+        return (
+          <LayoutWarningBanner
+            key={locale}
+            report={report}
+            locale={locale}
+            modelName={product.model_name}
+            onAcked={() => router.refresh()}
+          />
+        );
+      })}
+
+      {/* Sticky Header */}
+      <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
+        <div className="flex items-center justify-between gap-6">
+          <div className="flex items-center gap-3 min-w-0">
+            <h1 className="text-2xl font-bold tracking-tight">
+              {product.model_name}
+            </h1>
+            {hasExistingVersion ? (
+              <span className="rounded-md bg-engenius-blue/10 px-2.5 py-1 text-sm font-semibold tabular-nums text-engenius-blue">
+                v{currentVer}
+              </span>
+            ) : (
+              <span className="rounded-md bg-muted px-2.5 py-1 text-sm font-medium text-muted-foreground">
+                No version
+              </span>
+            )}
+            <span className="hidden sm:inline text-sm text-muted-foreground/60 truncate">
+              {product.full_name}
+            </span>
+          </div>
+        <div className="flex flex-shrink-0 gap-3">
+          {/* Split button: main = images only (fast, no Sheet re-read).
+              Dropdown reveals full Content + Images sync for this one
+              model — safer than dashboard's per-line sync because a
+              single model never gets near the 60s Vercel limit.
+              Hidden for non-editor roles. */}
+          {roleCanResync && (
+          <div className="relative flex">
+            <Button
+              variant="outline"
+              size="default"
+              onClick={handleResyncImages}
+              disabled={resyncing}
+              className="rounded-r-none"
+              title="Re-fetch this product's images from Google Drive (also propagates deletes)"
+            >
+              {resyncing ? "Syncing..." : "Resync Images"}
+            </Button>
+            <Button
+              variant="outline"
+              size="default"
+              onClick={() => setShowResyncMenu(!showResyncMenu)}
+              disabled={resyncing}
+              className="rounded-l-none border-l-0 px-2"
+              aria-label="Resync options"
+            >
+              <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M3 5l3 3 3-3" />
+              </svg>
+            </Button>
+            {showResyncMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border bg-popover p-1 shadow-md">
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+                  onClick={handleResyncImages}
+                  disabled={resyncing}
+                >
+                  <svg className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <rect x="1.5" y="3" width="13" height="10" rx="1" />
+                    <path d="M4 10l2.5-2.5L9 10l2-2 3 3" />
+                    <circle cx="5" cy="6" r="0.8" fill="currentColor" />
+                  </svg>
+                  <div>
+                    <div className="font-medium">Images only</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Re-fetch images from Drive. Fast.
+                    </div>
+                  </div>
+                </button>
+                <button
+                  className="flex w-full items-start gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors text-left"
+                  onClick={handleResyncContent}
+                  disabled={resyncing}
+                >
+                  <svg className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+                    <path d="M14 1v4h-4M2 15v-4h4" />
+                  </svg>
+                  <div>
+                    <div className="font-medium">Content + Images</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Re-read Sheet (overview, features, specs) and images.
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+          )}
+          <Link href={`/preview/${product.model_name}`} target="_blank">
+            <Button variant="outline" size="default">
+              Preview Datasheet
+            </Button>
+          </Link>
+          {roleCanGenerate && (
+          <div className="relative">
+            {!canGenerate && (
+              <p className="absolute -top-6 right-0 text-[11px] text-red-500 whitespace-nowrap">
+                Missing: {missingItems.join(", ")}
+              </p>
+            )}
+            <div className="flex">
+              <Button
+                size="default"
+                className={hasExistingVersion ? "rounded-r-none" : ""}
+                onClick={() =>
+                  handleGeneratePdf(hasExistingVersion ? "regenerate" : "new")
+                }
+                disabled={generating || !canGenerate}
+              >
+                {generating
+                  ? "Generating..."
+                  : hasExistingVersion
+                    ? `Regenerate v${currentVer}`
+                    : "Generate PDF"}
+              </Button>
+              {hasExistingVersion && (
+                <Button
+                  size="default"
+                  className="rounded-l-none border-l border-white/20 px-2.5"
+                  onClick={() => setShowGenMenu(!showGenMenu)}
+                  disabled={generating || !canGenerate}
+                >
+                  <svg
+                    className="h-3 w-3"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                  >
+                    <path d="M3 5l3 3 3-3" />
+                  </svg>
+                </Button>
+              )}
+            </div>
+            {showGenMenu && (
+              <div className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border bg-popover p-1 shadow-md">
+                <button
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors"
+                  onClick={() => handleGeneratePdf("regenerate")}
+                >
+                  <svg
+                    className="h-4 w-4 text-muted-foreground"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M1 8a7 7 0 0 1 13.1-3.5M15 8a7 7 0 0 1-13.1 3.5" />
+                    <path d="M14 1v4h-4M2 15v-4h4" />
+                  </svg>
+                  <div className="text-left">
+                    <div className="font-medium">
+                      Regenerate v{currentVer}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      覆蓋當前版本的 PDF
+                    </div>
+                  </div>
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 rounded-sm px-3 py-2 text-sm hover:bg-accent transition-colors"
+                  onClick={() => handleGeneratePdf("new")}
+                >
+                  <svg
+                    className="h-4 w-4 text-muted-foreground"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                  >
+                    <path d="M8 3v10M3 8h10" />
+                  </svg>
+                  <div className="text-left">
+                    <div className="font-medium">New Version</div>
+                    <div className="text-xs text-muted-foreground">
+                      建立新版本 PDF
+                    </div>
+                  </div>
+                </button>
+              </div>
+            )}
+          </div>
+          )}
+
+          {/* 🌐 Other Languages button (方案 C) */}
+          {localesWithTranslations.length > 0 && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => setShowLangMenu(!showLangMenu)}
+                disabled={generating}
+                className="px-2.5"
+                title="Other Languages"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
+                </svg>
+              </Button>
+              {showLangMenu && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-md border bg-popover p-2 shadow-md">
+                  <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">Other Languages</div>
+                  {SUPPORTED_LOCALES.filter((l) => l.value !== "en").map((l) => {
+                    const hasTranslation = localesWithTranslations.includes(l.value);
+                    const localeVer = currentVersions[l.value];
+                    return (
+                      <div key={l.value} className="rounded-sm px-2 py-2">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-sm font-medium">
+                            {l.flag} {l.label}
+                            {localeVer && (
+                              <span className="ml-1.5 text-xs text-muted-foreground tabular-nums">v{localeVer}</span>
+                            )}
+                          </span>
+                        </div>
+                        {hasTranslation ? (
+                          <div className="flex flex-col gap-1.5">
+                            {confirmedLocales.has(l.value) ? (
+                              <div className="flex gap-1.5">
+                                {localeVer ? (
+                                  <>
+                                    <button
+                                      className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                      onClick={() => handleGeneratePdf("regenerate", l.value)}
+                                    >
+                                      Regen v{localeVer}
+                                    </button>
+                                    <button
+                                      className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                      onClick={() => handleGeneratePdf("new", l.value)}
+                                    >
+                                      New Ver
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                    onClick={() => handleGeneratePdf("new", l.value)}
+                                  >
+                                    Generate v1.0
+                                  </button>
+                                )}
+                                <Link
+                                  href={`/preview/${product.model_name}?lang=${l.value}&mode=full`}
+                                  target="_blank"
+                                  className="rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+                                >
+                                  Preview
+                                </Link>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">Draft</span>
+                                <span className="text-xs text-muted-foreground/60">Save translation to enable PDF generation</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="text-xs text-muted-foreground/60">No translation yet</p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        </div>
+      </div>
+
+      {/* Sub-header info */}
+      <p className="-mt-4 text-xs text-muted-foreground">
+        Last edited{" "}
+        {formatDate(product.sheet_last_modified ?? product.updated_at)}
+        {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
+      </p>
+
+      {/* Tab switcher — Translations tab hidden for non-translators. */}
+      <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
+        <button
+          onClick={() => setActiveTab("detail")}
+          className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            activeTab === "detail"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          Detail
+        </button>
+        {roleCanTranslate && (
+          <button
+            onClick={() => setActiveTab("translations")}
+            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+              activeTab === "translations"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Translations
+            {translations.length > 0 && (
+              <span className="ml-1.5 tabular-nums text-muted-foreground/50">{translations.length}</span>
+            )}
+          </button>
+        )}
+      </div>
+
+      <Separator />
+
+      {/* Translations tab */}
+      {activeTab === "translations" && (
+        <ProductTranslationEditor
+          modelName={product.model_name}
+          productLineName={product.product_line.name}
+          englishOverview={product.overview ?? ""}
+          englishFeatures={product.features ?? []}
+          englishHeadline={product.headline || product.full_name}
+          englishSubtitle={product.subtitle}
+          existingTranslations={translations.map((t) => ({
+            locale: t.locale,
+            translation_mode: t.translation_mode,
+            overview: t.overview,
+            features: t.features,
+            headline: t.headline,
+            subtitle: t.subtitle,
+            hardware_image: t.hardware_image,
+            qr_label: t.qr_label,
+            qr_url: t.qr_url,
+            confirmed: t.confirmed,
+          }))}
+        />
+      )}
+
+      {/* Product Images */}
+      {activeTab === "detail" && (<>
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Product Images</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <ImageUploadButton
+              modelName={product.model_name}
+              imageType="product"
+              currentUrl={product.product_image}
+              onUploaded={() => router.refresh()}
+            />
+            <ImageUploadButton
+              modelName={product.model_name}
+              imageType="hardware"
+              currentUrl={product.hardware_image}
+              onUploaded={() => router.refresh()}
+            />
+          </div>
+
+          {/* Radio Pattern placeholders (AP only) */}
+          {isAP && (
+            <div className="mt-6">
+              <div className="mb-3 flex items-start justify-between gap-4">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Radio Patterns
+                </h4>
+                <div className="text-[11px] leading-relaxed text-muted-foreground max-w-md text-right">
+                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長寬 ≥ 500px 的方形圖</strong>（純 polar plot 即可，不含側邊 legend）。PDF 會渲染為 158×158pt，解析度低會略模糊。
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-4">
+                {radioPatternSlots.map((slot) => {
+                  const slotLabel = `${slot.band} ${slot.plane}`;
+                  const asset = product.image_assets.find(
+                    (a) =>
+                      a.image_type === "radio_pattern" &&
+                      a.label === slotLabel
+                  );
+                  const hasImage = asset && asset.status !== "missing" && asset.file_url;
+                  return (
+                    <RadioPatternSlot
+                      key={`${slot.band}-${slot.plane}`}
+                      modelName={product.model_name}
+                      band={slot.band}
+                      plane={slot.plane}
+                      label={slotLabel}
+                      hasImage={!!hasImage}
+                      imageUrl={hasImage ? asset!.file_url! : undefined}
+                      onUploaded={() => router.refresh()}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <p className="mt-3 text-xs text-muted-foreground">
+            Images are automatically synced from Google Drive. You can also
+            upload manually here.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* QSG URL (printed as QR code on the datasheet) — admin/editor only */}
+      {roleCanEdit && (
+        <QsgUrlCard
+          modelName={product.model_name}
+          lineTemplate={(product.product_line as { qr_url_template?: string | null }).qr_url_template ?? null}
+        />
+      )}
+
+      {/* Overview & Features */}
+      {(product.overview || product.features?.length > 0) && (
+        <Card className={`shadow-sm ${
+          layoutReport?.cover.status === "overflow" ? "ring-2 ring-red-400/60" :
+          layoutReport?.cover.status === "warn" ? "ring-2 ring-amber-300/60" : ""
+        }`}>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              Overview & Features
+              {layoutReport?.cover.status === "overflow" && (
+                <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded px-1.5 py-0.5">
+                  Overflow
+                </span>
+              )}
+              {layoutReport?.cover.status === "warn" && (
+                <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5">
+                  Warn
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {/* Overview */}
+            {product.overview && (
+              <div>
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Overview
+                </h3>
+                <p className="text-sm leading-relaxed text-foreground/85">
+                  {product.overview}
+                </p>
+              </div>
+            )}
+
+            {/* Features */}
+            {product.features?.length > 0 && (
+              <div>
+                {product.overview && <Separator className="mb-5" />}
+                <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Key Features
+                </h3>
+                <ul className="grid grid-cols-1 gap-x-8 gap-y-1.5 sm:grid-cols-2">
+                  {product.features.map((feature, i) => (
+                    <li key={i} className="flex items-baseline gap-2 text-sm">
+                      <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-engenius-blue/60" />
+                      <span className="text-foreground/85">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Specifications */}
+      <Card className={`shadow-sm ${
+        layoutReport?.spec.status === "overflow" ? "ring-2 ring-red-400/60" :
+        layoutReport?.spec.status === "warn" ? "ring-2 ring-amber-300/60" : ""
+      }`}>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            Specifications
+            <button
+              type="button"
+              onClick={() => setShowSpecHelp((v) => !v)}
+              className={`inline-flex h-5 w-5 items-center justify-center rounded-full border text-[11px] font-semibold transition-colors ${
+                showSpecHelp
+                  ? "border-engenius-blue bg-engenius-blue text-white"
+                  : "border-muted-foreground/40 text-muted-foreground hover:border-engenius-blue hover:text-engenius-blue"
+              }`}
+              aria-label="Spec filling rules"
+              title="Click to show how to fill spec values in the Sheet"
+            >
+              i
+            </button>
+            {layoutReport?.spec.status === "overflow" && (
+              <span className="text-[11px] font-medium text-red-700 bg-red-50 border border-red-300 rounded px-1.5 py-0.5">
+                Overflow ({layoutReport.spec.metrics.max_column_fill_pct}%)
+              </span>
+            )}
+            {layoutReport?.spec.status === "warn" && (
+              <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-300 rounded px-1.5 py-0.5">
+                Warn ({layoutReport.spec.metrics.max_column_fill_pct}%)
+              </span>
+            )}
+          </CardTitle>
+          {showSpecHelp && (
+            <div className="mt-3 rounded-md border border-engenius-blue/20 bg-engenius-blue/[0.04] px-4 py-3 text-sm">
+              <div className="mb-2 font-semibold text-engenius-blue">Spec 填寫規則（給 PM）</div>
+              <ul className="space-y-1.5 text-foreground/85">
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>N/A / 空白</strong>：填 <code className="rounded bg-muted px-1 text-xs">N/A</code> 或留空的列，PDF 會自動隱藏；可以保留以維持 spec template 結構。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>多項值</strong>：用<strong>逗號</strong>（短縮寫，像 <code className="rounded bg-muted px-1 text-xs">FCC, CE, IC, JP</code>）或<strong>換行</strong>（長項目，像每項 Package Contents 各自一行）分隔。空格分隔會在 PDF 渲染成一整句。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>不適用</strong>：寫 <code className="rounded bg-muted px-1 text-xs">-</code> 表示「該型號不適用」，PDF 也會隱藏。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>刪除線</strong>：Sheet 裡加刪除線的文字會在 sync 時自動過濾，不會進 PDF。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>TBD 佔位</strong>：填 <code className="rounded bg-muted px-1 text-xs">TBD</code> 標記尚未決定的規格，本頁會用灰底顯示提醒你補上，但 PDF 還是會印出 TBD（如果你已生 PDF，記得最後實測後回來更新）。</span>
+                </li>
+                <li className="flex gap-2">
+                  <span className="flex-shrink-0 text-engenius-blue">•</span>
+                  <span><strong>Category header</strong>：整列只有 column A 有文字、其他 model 欄位全空時，該列會被當成分類標題。<code className="rounded bg-muted px-1 text-xs">-</code> 也算有值，會變成一般 spec 列。</span>
+                </li>
+              </ul>
+              <div className="mt-3 text-xs text-muted-foreground">
+                完整規則見{" "}
+                <a
+                  href="/docs/drive-folder-and-naming-rules.html#s5"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-engenius-blue hover:underline"
+                >
+                  Drive 資料夾與命名規則 §5
+                </a>
+                。
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {product.spec_sections.map((section) => (
+            <div
+              key={section.id}
+              className="overflow-hidden rounded-lg border"
+            >
+              {/* Category header */}
+              <div className="border-b bg-engenius-blue/[0.06] px-4 py-2">
+                <h3 className="text-sm font-semibold text-engenius-blue">
+                  {section.category}
+                </h3>
+              </div>
+              {/* Spec rows */}
+              <table className="w-full table-fixed">
+                <colgroup>
+                  <col className="w-[220px]" />
+                  <col />
+                </colgroup>
+                <tbody>
+                  {section.items.map((item, idx) => {
+                    const unseparated = looksLikeUnseparatedList(item.value);
+                    const tbd = isTBD(item.value);
+                    // TBD wins visually — the whole row gets a slate
+                    // tint so PMs can quickly scan for unfinished
+                    // specs. Stays muted so it doesn't fight the
+                    // overflow/warn red/amber ring at the card level.
+                    const rowBg = tbd
+                      ? "bg-slate-200/60"
+                      : idx % 2 === 1
+                        ? "bg-muted/30"
+                        : "";
+                    return (
+                    <tr
+                      key={item.id}
+                      className={`border-b border-border/50 last:border-b-0 ${rowBg}`}
+                    >
+                      <td className="py-2 px-4 align-top text-sm font-medium text-muted-foreground">
+                        {item.label}
+                      </td>
+                      <td className="py-2 px-4 align-top text-sm leading-relaxed break-words whitespace-pre-line">
+                        <div className="flex items-start gap-2">
+                          <span className={`min-w-0 flex-1 ${tbd ? "text-slate-500 italic" : ""}`}>
+                            {item.value}
+                          </span>
+                          {tbd && (
+                            <span
+                              className="flex-shrink-0 inline-flex items-center gap-0.5 rounded border border-slate-400 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-700"
+                              title="PM 尚未填入最終數值。建議在 Google Sheet 的 Detail Specs 補上實際值後再 Generate PDF。"
+                            >
+                              TBD
+                            </span>
+                          )}
+                          {unseparated && (
+                            <span
+                              className="flex-shrink-0 inline-flex items-center gap-0.5 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-800"
+                              title={`這個值看起來是多項但沒有分隔符。PDF 會渲染成一整句。建議去 Google Sheet 的 Detail Specs 把「${item.value.trim()}」改成逗號分隔（${item.value.trim().split(/\s+/).join(", ")}）或每項一行。`}
+                            >
+                              ⚠️ 多項建議加分隔符
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
+          {product.spec_sections.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No specifications loaded yet. Run a sync to pull data from Google
+              Sheets.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Version History — grouped by locale */}
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base">Version History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {versions.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No versions generated yet.
+            </p>
+          ) : (
+            <div className="space-y-6">
+              {/* Group versions by locale */}
+              {Object.entries(
+                versions.reduce<Record<string, typeof versions>>((acc, v) => {
+                  const loc = v.locale || "en";
+                  if (!acc[loc]) acc[loc] = [];
+                  acc[loc].push(v);
+                  return acc;
+                }, {})
+              )
+                .sort(([a], [b]) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)))
+                .map(([loc, locVersions]) => {
+                  const localeInfo = SUPPORTED_LOCALES.find((l) => l.value === loc);
+                  return (
+                    <div key={loc}>
+                      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        {localeInfo ? `${localeInfo.flag} ${localeInfo.label}` : loc.toUpperCase()}
+                      </h4>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-foreground/10">
+                            <TableHead className="w-24">Version</TableHead>
+                            <TableHead className="w-32">Date</TableHead>
+                            <TableHead>Changes</TableHead>
+                            <TableHead className="w-24">PDF</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {locVersions.map((v, idx) => (
+                            <TableRow
+                              key={v.id}
+                              className={`hover:bg-engenius-blue/[0.06] ${
+                                idx % 2 === 1 ? "bg-muted/30" : ""
+                              }`}
+                            >
+                              <TableCell className="font-medium tabular-nums">
+                                v{v.version}
+                              </TableCell>
+                              <TableCell className="text-sm tabular-nums text-muted-foreground">
+                                {formatDate(v.generated_at)}
+                              </TableCell>
+                              <TableCell className="text-sm text-muted-foreground">
+                                {v.changes || "—"}
+                              </TableCell>
+                              <TableCell>
+                                {v.pdf_storage_path ? (
+                                  <a
+                                    href={v.pdf_storage_path}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-0.5 rounded px-2 py-0.5 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
+                                  >
+                                    Download
+                                    <svg
+                                      className="h-3 w-3"
+                                      viewBox="0 0 16 16"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      strokeWidth="2"
+                                    >
+                                      <path d="M5 3h8v8M13 3 6 10" />
+                                    </svg>
+                                  </a>
+                                ) : (
+                                  <span className="text-sm text-muted-foreground">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      </>)}
+    </div>
+  );
+}

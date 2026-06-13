@@ -1,0 +1,528 @@
+import { NextResponse } from "next/server";
+import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
+import {
+  detectLatestVersion,
+  detectLocaleVersion,
+  bumpVersion,
+  uploadPdfToDrive,
+  getLocaleSuffix,
+} from "@/lib/google/drive-versions";
+import type { ProductLine } from "@eg/db/types";
+
+// Chromium binary URL for @sparticuz/chromium-min (downloaded at runtime).
+// Must match the @sparticuz/chromium-min version in package.json — Vercel is
+// x64 Lambda. Previous URL pointed at a deleted third-party mirror, causing
+// PDF generation to 404 on every run.
+const CHROMIUM_URL =
+  "https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar";
+
+// Allow up to 60s for PDF generation
+export const maxDuration = 60;
+
+// PDF generation lock: auto-expires after 5 minutes
+const LOCK_TTL_MS = 5 * 60 * 1000;
+
+interface PdfLock {
+  locked_at: string;
+  model: string;
+  lang: string;
+}
+
+function getLockKey(model: string, lang: string) {
+  return `pdf_lock_${model}_${lang}`;
+}
+
+/**
+ * GET /api/generate-pdf?model=ECC100&lang=en
+ * Check if a PDF generation lock is active for a model+locale.
+ */
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const model = searchParams.get("model");
+  const lang = searchParams.get("lang") ?? "en";
+
+  if (!model) {
+    return NextResponse.json({ error: "Missing ?model=" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const lockKey = getLockKey(model, lang);
+
+  const { data } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", lockKey)
+    .single() as { data: { value: string } | null };
+
+  if (data?.value) {
+    try {
+      const lock: PdfLock = JSON.parse(data.value);
+      const elapsed = Date.now() - new Date(lock.locked_at).getTime();
+      if (elapsed < LOCK_TTL_MS) {
+        return NextResponse.json({ ok: true, locked: true, lock });
+      }
+    } catch { /* expired or bad data */ }
+  }
+
+  return NextResponse.json({ ok: true, locked: false });
+}
+
+/**
+ * POST /api/generate-pdf?model=ECC100&mode=regenerate&lang=en
+ *
+ * 1. Acquires generation lock (prevents concurrent generation for same model+locale)
+ * 2. Detects latest version from Google Drive (locale-aware)
+ * 3. Generates PDF from the preview page using headless Chromium
+ * 4. Uploads to Supabase Storage
+ * 5. Uploads to Google Drive (locale-specific folder)
+ * 6. Bumps version in Supabase (with optimistic locking)
+ * 7. Releases lock
+ */
+export async function POST(request: Request) {
+  const denied = await gate("pdf.generate");
+  if (denied) return denied;
+  const { searchParams } = new URL(request.url);
+  const model = searchParams.get("model");
+  const mode = searchParams.get("mode") ?? "regenerate"; // "regenerate" | "new"
+  const lang = searchParams.get("lang") ?? "en";
+
+  if (!model) {
+    return NextResponse.json(
+      { error: "Missing ?model= parameter" },
+      { status: 400 }
+    );
+  }
+
+  const isLocalized = lang !== "en";
+  const supabase = createAdminClient();
+  const lockKey = getLockKey(model, lang);
+
+  // --- Acquire lock ---
+  const { data: existingLock } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", lockKey)
+    .single() as { data: { value: string } | null };
+
+  if (existingLock?.value) {
+    try {
+      const lock: PdfLock = JSON.parse(existingLock.value);
+      const elapsed = Date.now() - new Date(lock.locked_at).getTime();
+      if (elapsed < LOCK_TTL_MS) {
+        return NextResponse.json(
+          { error: `PDF is already being generated for ${model} (${lang}). Please wait and try again.` },
+          { status: 409 }
+        );
+      }
+    } catch { /* stale lock, proceed to overwrite */ }
+  }
+
+  const lockValue: PdfLock = { locked_at: new Date().toISOString(), model, lang };
+  await supabase
+    .from("app_settings" as "products")
+    .upsert(
+      { key: lockKey, value: JSON.stringify(lockValue), updated_at: new Date().toISOString() },
+      { onConflict: "key" }
+    );
+
+  // Get the product + product line info
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("id, model_name, current_version, current_versions, product_line_id")
+    .eq("model_name", model)
+    .single();
+
+  if (productError || !product) {
+    return NextResponse.json(
+      { error: `Product "${model}" not found` },
+      { status: 404 }
+    );
+  }
+
+  const { data: productLine } = (await supabase
+    .from("product_lines")
+    .select("*")
+    .eq("id", product.product_line_id)
+    .single()) as { data: ProductLine | null };
+
+  if (!productLine) {
+    return NextResponse.json(
+      { error: "Product line not found" },
+      { status: 404 }
+    );
+  }
+
+  // Helper to release the lock
+  async function releaseLock() {
+    await supabase
+      .from("app_settings" as "products")
+      .delete()
+      .eq("key", lockKey);
+  }
+
+  // Defense-in-depth: refuse to generate locale PDF when the translation
+  // is still a Draft. The UI also blocks this, but a DevTools / curl
+  // request from an editor would otherwise slip through. English ("en")
+  // has no translation row — skip.
+  if (isLocalized) {
+    const { data: ptRow } = await supabase
+      .from("product_translations")
+      .select("confirmed")
+      .eq("product_id", product.model_name)
+      .eq("locale", lang)
+      .maybeSingle();
+    const confirmed = (ptRow as { confirmed?: boolean } | null)?.confirmed;
+    if (!confirmed) {
+      await releaseLock();
+      return NextResponse.json(
+        {
+          error:
+            `Cannot generate PDF: ${lang} translation is still a Draft. ` +
+            `Click "Save & Confirm" on the Translations tab first.`,
+        },
+        { status: 409 },
+      );
+    }
+  }
+
+  try {
+    const dsPrefix = productLine.ds_prefix ?? "DS_Cloud";
+    const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
+
+    // Step 1: Determine version
+    let newVersion: string;
+
+    if (isLocalized) {
+      // Locale versions — check Drive first, then DB fallback
+      let driveLocaleVersion = null;
+      if (productLine.drive_folder_id) {
+        try {
+          driveLocaleVersion = await detectLocaleVersion(
+            productLine.drive_folder_id,
+            dsPrefix,
+            model,
+            lang
+          );
+        } catch (err) {
+          console.warn(
+            "Drive locale version detection failed:",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+
+      const currentLocaleVer = driveLocaleVersion?.version || currentVersions[lang] || "0.0";
+      const isRegenerate = mode === "regenerate";
+      const hasExistingVersion = currentLocaleVer !== "0.0";
+
+      if (isRegenerate && hasExistingVersion) {
+        newVersion = currentLocaleVer;
+      } else {
+        newVersion = driveLocaleVersion
+          ? bumpVersion(driveLocaleVersion)
+          : (() => {
+              if (currentLocaleVer === "0.0") return "1.0";
+              const parts = currentLocaleVer.split(".");
+              const major = parseInt(parts[0]) || 1;
+              const minor = (parseInt(parts[1]) || 0) + 1;
+              return `${major}.${minor}`;
+            })();
+      }
+    } else {
+      // English version — existing logic with Drive detection
+      let driveVersion = null;
+      if (productLine.drive_folder_id) {
+        try {
+          driveVersion = await detectLatestVersion(
+            productLine.drive_folder_id,
+            dsPrefix,
+            model
+          );
+        } catch (err) {
+          console.warn(
+            "Drive version detection failed, using Supabase version:",
+            err instanceof Error ? err.message : String(err)
+          );
+        }
+      }
+
+      const isRegenerate = mode === "regenerate";
+      const currentVer = product.current_version || "0.0";
+      const hasExistingVersion = currentVer !== "0.0";
+
+      if (isRegenerate && hasExistingVersion) {
+        newVersion = currentVer;
+      } else {
+        newVersion = driveVersion
+          ? bumpVersion(driveVersion)
+          : currentVer === "0.0"
+            ? "1.0"  // Brand-new product, first version ever
+            : (() => {
+                const parts = currentVer.split(".");
+                const major = parseInt(parts[0]) || 1;
+                const minor = (parseInt(parts[1]) || 0) + 1;
+                return `${major}.${minor}`;
+              })();
+      }
+    }
+
+    // Step 2: Generate PDF with headless Chromium
+    const chromium = (await import("@sparticuz/chromium-min")).default;
+    const puppeteer = (await import("puppeteer-core")).default;
+
+    const executablePath = process.env.VERCEL
+      ? await chromium.executablePath(CHROMIUM_URL)
+      : process.platform === "darwin"
+        ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+        : "/usr/bin/google-chrome";
+
+    const browser = await puppeteer.launch({
+      args: chromium.args,
+      defaultViewport: { width: 612, height: 792 },
+      executablePath,
+      headless: true,
+    });
+
+    const page = await browser.newPage();
+
+    // Attach Vercel Deployment Protection bypass header if configured.
+    // Without this, Puppeteer fetching our own URL may hit the "Log in to
+    // Vercel" gate and print that page instead of the datasheet.
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    if (bypassSecret) {
+      await page.setExtraHTTPHeaders({
+        "x-vercel-protection-bypass": bypassSecret,
+        "x-vercel-set-bypass-cookie": "true",
+      });
+    }
+
+    // Resolve the base URL for the preview page.
+    //
+    // Priority:
+    //   1. PDF_PREVIEW_BASE_URL — explicit override, e.g. the stable
+    //      production alias `https://ds-generator-eg.vercel.app`. Set this
+    //      to avoid the Vercel Deployment Protection login gate that
+    //      sometimes intercepts the per-deployment hash URL from within
+    //      serverless functions.
+    //   2. VERCEL_PROJECT_PRODUCTION_URL — Vercel-provided stable alias.
+    //   3. VERCEL_URL — the per-deployment hash (may be gated).
+    //   4. localhost fallback for dev.
+    const baseUrl =
+      process.env.PDF_PREVIEW_BASE_URL ||
+      (process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : `http://localhost:${process.env.PORT || 3000}`);
+
+    // Pass lang and mode to the preview page
+    // Pass the resolved version to the preview page so the footer renders
+    // the correct version — otherwise the preview reads current_version
+    // from DB which hasn't been updated yet at this point (updated AFTER
+    // the PDF is generated), resulting in "v0.0" in the footer.
+    const translationMode = isLocalized ? "full" : "light"; // Default to full for localized PDFs
+    const versionParam = `&version=${encodeURIComponent(newVersion)}`;
+    const previewUrl = isLocalized
+      ? `${baseUrl}/preview/${model}?lang=${lang}&mode=${translationMode}${versionParam}`
+      : `${baseUrl}/preview/${model}?toolbar=false${versionParam}`;
+
+    await page.goto(previewUrl, {
+      waitUntil: "networkidle0",
+      timeout: 30000,
+    });
+
+    // Guard: if Vercel Deployment Protection (or any other gate) intercepted
+    // the request, the page will be Vercel's OAuth login. Detect by title
+    // and fail loudly with diagnostics instead of printing the login page.
+    const pageTitle = await page.title();
+    const finalUrl = page.url();
+    if (/log in to vercel|authentication required/i.test(pageTitle)) {
+      await browser.close();
+      throw new Error(
+        `Preview page hit Vercel auth gate. pageTitle="${pageTitle}" finalUrl="${finalUrl}" baseUrl="${baseUrl}" previewUrl="${previewUrl}" hasBypassSecret=${!!bypassSecret}`
+      );
+    }
+
+    const pdfBuffer = Buffer.from(
+      await page.pdf({
+        format: "Letter",
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      })
+    );
+
+    await browser.close();
+
+    // Step 3: Upload to Supabase Storage
+    const langSuffix = isLocalized ? `_${getLocaleSuffix(lang)}` : "";
+    const fileName = `${dsPrefix}_${model}_v${newVersion}${langSuffix}.pdf`;
+    const storagePath = `${model}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("datasheets")
+      .upload(storagePath, pdfBuffer, {
+        contentType: "application/pdf",
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return NextResponse.json(
+        { error: "PDF upload to Supabase failed", details: uploadError.message },
+        { status: 500 }
+      );
+    }
+
+    const { data: urlData } = supabase.storage
+      .from("datasheets")
+      .getPublicUrl(storagePath);
+
+    const pdfUrl = urlData.publicUrl;
+
+    // Step 4: Upload to Google Drive (locale-specific folder)
+    let driveResult = null;
+    if (productLine.drive_folder_id) {
+      try {
+        driveResult = await uploadPdfToDrive(
+          productLine.drive_folder_id,
+          dsPrefix,
+          model,
+          newVersion,
+          pdfBuffer,
+          null, // For localized, always create new folder if needed
+          isLocalized ? lang : undefined,
+          productLine.name, // needed to resolve sibling locale line folder
+        );
+      } catch (err) {
+        console.error(
+          "Drive upload failed (PDF still saved to Supabase):",
+          err instanceof Error ? err.message : String(err)
+        );
+      }
+    }
+
+    // Step 5: Update Supabase records
+    const isRegenerate = mode === "regenerate";
+    const hasExistingVersion = isLocalized
+      ? (currentVersions[lang] || "0.0") !== "0.0"
+      : (product.current_version || "0.0") !== "0.0";
+
+    // Helper: surface DB errors instead of swallowing them. The earlier
+    // bug was a silent unique-constraint violation on (product_id,
+    // version) that left products.current_versions claiming a row
+    // existed when none did. Always check `error` after writes.
+    const throwIfDbError = (label: string) =>
+      (res: { error: { message?: string; code?: string } | null }) => {
+        if (res.error) {
+          throw new Error(
+            `[generate-pdf] ${label} failed: ${res.error.message ?? "unknown"} ` +
+              (res.error.code ? `(code=${res.error.code})` : ""),
+          );
+        }
+      };
+
+    if (isRegenerate && hasExistingVersion) {
+      // .maybeSingle() so 0 rows returns null instead of throwing.
+      // Don't .order/.limit since the (product_id, version, locale)
+      // unique constraint guarantees at most 1 row.
+      const { data: existingVersion } = await supabase
+        .from("versions")
+        .select("id")
+        .eq("product_id", product.id)
+        .eq("version", newVersion)
+        .eq("locale", lang)
+        .maybeSingle();
+
+      if (existingVersion) {
+        const updateRes = await supabase
+          .from("versions")
+          .update({
+            pdf_storage_path: pdfUrl,
+            changes: `PDF regenerated`,
+            generated_at: new Date().toISOString(),
+          })
+          .eq("id", existingVersion.id);
+        throwIfDbError("versions update")(updateRes);
+      } else {
+        const insertRes = await supabase.from("versions").insert({
+          product_id: product.id,
+          version: newVersion,
+          locale: lang,
+          changes: `PDF regenerated`,
+          pdf_storage_path: pdfUrl,
+        });
+        throwIfDbError("versions insert (regenerate-but-missing)")(insertRes);
+      }
+    } else {
+      const insertRes = await supabase.from("versions").insert({
+        product_id: product.id,
+        version: newVersion,
+        locale: lang,
+        changes: `PDF generated${hasExistingVersion ? ` (new version)` : " (initial)"}`,
+        pdf_storage_path: pdfUrl,
+      });
+      throwIfDbError("versions insert (new)")(insertRes);
+    }
+
+    // Update current_version(s) with optimistic locking
+    // Re-read current_versions to merge safely (prevents overwriting concurrent changes to other locales)
+    const { data: freshProduct } = await supabase
+      .from("products")
+      .select("current_versions")
+      .eq("id", product.id)
+      .single();
+
+    const freshVersions = (freshProduct?.current_versions ?? {}) as Record<string, string>;
+
+    if (isLocalized) {
+      const updatedVersions = { ...freshVersions, [lang]: newVersion };
+      await supabase
+        .from("products")
+        .update({ current_versions: updatedVersions })
+        .eq("id", product.id);
+    } else {
+      const updatedVersions = { ...freshVersions, en: newVersion };
+      await supabase
+        .from("products")
+        .update({
+          current_version: newVersion,
+          current_versions: updatedVersions,
+        })
+        .eq("id", product.id);
+    }
+
+    await supabase.from("change_logs").insert({
+      product_id: product.id,
+      product_line_id: product.product_line_id,
+      changes_summary: isRegenerate
+        ? `Regenerated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`
+        : `Generated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`,
+    });
+
+    // --- Release lock ---
+    await releaseLock();
+
+    return NextResponse.json({
+      ok: true,
+      model,
+      locale: lang,
+      version: newVersion,
+      fileName,
+      pdfUrl,
+      driveFileId: driveResult?.fileId ?? null,
+      driveLink: driveResult?.webViewLink ?? null,
+    });
+  } catch (err) {
+    // --- Release lock on failure ---
+    await releaseLock();
+
+    console.error("PDF generation error:", err);
+    return NextResponse.json(
+      {
+        error: "PDF generation failed",
+        details: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 }
+    );
+  }
+}

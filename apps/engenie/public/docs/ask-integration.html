@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnGenie Ask — 部門整合服務</title>
+  <style>
+    :root {
+      --blue: #03a9f4; --blue-dark: #0288d1;
+      --gray-dark: #2C3345; --gray: #58595B; --gray-light: #6f6f6f;
+      --gray-bg: #f8f9fa; --border: #e2e5e9;
+      --amber: #d97706; --amber-bg: #fffbeb;
+      --green: #059669; --green-bg: #ecfdf5;
+      --purple: #7c3aed; --purple-bg: #f5f3ff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      color: var(--gray-dark); font-size: 15px; line-height: 1.7; background: #fff;
+    }
+    .page-layout { display: flex; max-width: 1180px; margin: 0 auto; }
+    .sidebar {
+      width: 230px; flex-shrink: 0; position: sticky; top: 0; height: 100vh; overflow-y: auto;
+      border-right: 1px solid var(--border); padding: 32px 18px; background: var(--gray-bg);
+    }
+    .sidebar-title { font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gray-light); margin-bottom: 16px; }
+    .sidebar ol { list-style: none; padding: 0; margin: 0; }
+    .sidebar a { display: block; padding: 7px 12px; border-radius: 6px; font-size: 13.5px; color: var(--gray); text-decoration: none; transition: all 0.15s; line-height: 1.4; }
+    .sidebar a:hover { background: rgba(3,169,244,0.08); color: var(--blue-dark); }
+    .main-content { flex: 1; min-width: 0; padding: 0 0 90px; }
+
+    .hero {
+      background: linear-gradient(135deg, #062b3a 0%, #0a3a4f 45%, #0288d1 120%);
+      color: #fff; padding: 56px 48px 48px; border-radius: 0 0 0 0;
+    }
+    .hero .kicker { font-size: 13px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #7fd6ff; }
+    .hero h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.02em; margin: 10px 0 14px; line-height: 1.12; border: none; padding: 0; color: #fff; }
+    .hero p { font-size: 16.5px; line-height: 1.65; color: #d6eefb; max-width: 640px; margin: 0; }
+    .hero .pills { margin-top: 22px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .hero .pill { background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); color: #eaf6ff; font-size: 13px; font-weight: 600; padding: 6px 13px; border-radius: 20px; }
+
+    .body-pad { padding: 0 48px; }
+    h2 { font-size: 22px; font-weight: 700; color: var(--gray-dark); margin: 46px 0 8px; padding-bottom: 9px; border-bottom: 2px solid var(--border); scroll-margin-top: 20px; }
+    h2 .num { display: inline-block; background: var(--blue); color: #fff; width: 28px; height: 28px; border-radius: 7px; text-align: center; line-height: 28px; font-size: 14px; margin-right: 9px; vertical-align: middle; }
+    h3 { font-size: 16px; font-weight: 700; color: var(--gray-dark); margin: 22px 0 8px; }
+    p { margin-bottom: 11px; }
+    .section-lead { font-size: 15px; color: var(--gray); margin: 12px 0 8px; }
+    ul, ol { margin: 0 0 16px; padding-left: 22px; }
+    li { margin-bottom: 5px; }
+
+    table { width: 100%; border-collapse: collapse; margin: 16px 0 22px; font-size: 14px; }
+    thead th { background: var(--gray-dark); color: #fff; font-weight: 600; padding: 11px 14px; text-align: left; }
+    tbody td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+
+    code { font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace; font-size: 13px; background: #f0f2f5; padding: 2px 7px; border-radius: 4px; color: #c7254e; }
+    pre { position: relative; background: #0d1117; color: #c9d1d9; padding: 16px 18px; border-radius: 10px; overflow-x: auto; font-size: 12.5px; line-height: 1.7; margin: 10px 0 8px; font-family: "SF Mono", "Fira Code", "JetBrains Mono", monospace; }
+    pre code { background: none; padding: 0; color: inherit; }
+    .copy-btn { position: absolute; top: 10px; right: 10px; background: rgba(255,255,255,0.1); color: #c9d1d9; border: 1px solid rgba(255,255,255,0.18); border-radius: 6px; font-size: 11.5px; padding: 4px 10px; cursor: pointer; transition: all .15s; }
+    .copy-btn:hover { background: var(--blue); color: #fff; border-color: var(--blue); }
+
+    .callout { background: rgba(3,169,244,0.06); border-left: 4px solid var(--blue); padding: 13px 18px; border-radius: 0 8px 8px 0; margin: 14px 0 22px; font-size: 14px; }
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn { background: var(--amber-bg); border-left-color: var(--amber); }
+    .callout-warn strong { color: var(--amber); }
+
+    /* form cards */
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin: 18px 0 8px; }
+    .card { border: 1px solid var(--border); border-radius: 14px; padding: 22px 20px; background: #fff; display: flex; flex-direction: column; transition: box-shadow .15s, border-color .15s; }
+    .card:hover { box-shadow: 0 10px 30px -12px rgba(2,40,60,0.18); border-color: rgba(3,169,244,0.4); }
+    .card .ic { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 21px; margin-bottom: 14px; background: rgba(3,169,244,0.1); }
+    .card h3 { margin: 0 0 4px; font-size: 17px; }
+    .card .who { font-size: 12.5px; font-weight: 600; color: var(--blue-dark); margin-bottom: 10px; }
+    .card p { font-size: 13.5px; color: var(--gray); line-height: 1.6; margin-bottom: 12px; flex: 1; }
+    .card .tag { align-self: flex-start; font-size: 11.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; background: var(--gray-bg); color: var(--gray); }
+
+    /* mode cards inline accents */
+    .mode { font-weight: 700; }
+    .mode-shared { color: var(--green); }
+    .mode-wbyok { color: var(--blue-dark); }
+    .mode-ubyok { color: var(--purple); }
+
+    .steps { counter-reset: step; margin: 16px 0 8px; padding: 0; list-style: none; }
+    .steps li { position: relative; padding: 4px 0 18px 46px; }
+    .steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 0; top: 0; width: 30px; height: 30px; background: var(--blue); color: #fff; border-radius: 50%; font-weight: 700; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+    .steps li:not(:last-child)::after { content: ""; position: absolute; left: 14px; top: 32px; bottom: 4px; width: 2px; background: var(--border); }
+    .steps b { color: var(--gray-dark); }
+
+    .try { background: linear-gradient(135deg, rgba(3,169,244,0.08), rgba(3,169,244,0.02)); border: 1px dashed rgba(3,169,244,0.45); border-radius: 14px; padding: 20px 24px; margin: 16px 0; }
+    .try h3 { margin-top: 0; }
+    .try .arrow { font-weight: 700; color: var(--blue-dark); }
+
+    .doc-footer { margin: 50px 48px 0; padding-top: 22px; border-top: 1px solid var(--border); font-size: 13.5px; color: var(--gray-light); line-height: 1.9; }
+
+    @media (max-width: 820px) {
+      .sidebar { display: none; }
+      .hero { padding: 40px 22px 34px; }
+      .hero h1 { font-size: 28px; }
+      .body-pad, .doc-footer { padding-left: 22px; padding-right: 22px; }
+      .cards { grid-template-columns: 1fr; }
+      table { font-size: 13px; }
+      thead th, tbody td { padding: 9px 10px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page-layout">
+    <nav class="sidebar">
+      <div class="sidebar-title">EnGenie Ask 整合</div>
+      <ol>
+        <li><a href="#what">這是什麼</a></li>
+        <li><a href="#forms">三種整合形式</a></li>
+        <li><a href="#modes">三種 LLM 模式</a></li>
+        <li><a href="#scope">知識範圍與權限</a></li>
+        <li><a href="#start">三步驟開始</a></li>
+        <li><a href="#snippets">複製即用</a></li>
+        <li><a href="#faq">常見問題</a></li>
+      </ol>
+    </nav>
+
+    <main class="main-content">
+      <div class="hero">
+        <div class="kicker">Product SpecHub · Knowledge Service</div>
+        <h1>EnGenie Ask — 給每個部門的<br>AI 產品知識助理</h1>
+        <p>把 EnGenius 的產品規格、文件、FAQ、上傳資料變成一個能對話的 AI 助理，讓你的團隊或客戶用自然語言直接問答——並用最適合你的形式整合進現有網站或工具。</p>
+        <div class="pills">
+          <span class="pill">🟦 浮動 Widget</span>
+          <span class="pill">🔗 整頁入口</span>
+          <span class="pill">⚙️ Search API</span>
+          <span class="pill">🔒 各自 scope / key / 角色</span>
+        </div>
+      </div>
+
+      <div class="body-pad">
+        <h2 id="what"><span class="num">1</span>這是什麼</h2>
+        <p class="section-lead">每個部門可以擁有<strong>自己的 Ask 入口</strong>（<code>/ask/&lt;你的代號&gt;</code>），背後共用同一個 EnGenius 知識庫，但各自設定：</p>
+        <ul>
+          <li><b>知識範圍 (scope)</b>：限定到某 Solution / 產品線 / 型號 / 來源類型，只回答你關心的範圍。</li>
+          <li><b>生成模式</b>：用系統共用的 AI key，或帶你自己的 key（見<a href="#modes">第 3 節</a>）。</li>
+          <li><b>角色與歡迎語</b>：預設 persona／對象、歡迎標題、範例問題，可鎖定或開放使用者切換。</li>
+          <li><b>存取控制</b>：可設 passcode（半私密）或開放（無摩擦對外）。</li>
+        </ul>
+        <div class="callout">
+          <strong>知識庫怎麼來？</strong> 由 SpecHub 集中維護：產品規格、Gitbook 文件、Help Center、Google Docs、網頁、WiFi 法規，加上你可以自己新增的<strong>文字片段</strong>與<strong>上傳 PDF</strong>（PDF 由 AI 讀取，含表格、圖片描述、掃描檔 OCR）。
+        </div>
+
+        <h2 id="forms"><span class="num">2</span>三種整合形式</h2>
+        <p class="section-lead">同一個 workspace、同一套知識，三種對外形式任你挑、也可並用：</p>
+        <div class="cards">
+          <div class="card">
+            <div class="ic">💬</div>
+            <h3>浮動 Widget</h3>
+            <div class="who">給：有自己網站的團隊</div>
+            <p>像 Intercom 的右下角聊天泡泡。貼一段 <code>&lt;script&gt;</code> 就能嵌進任何網頁，自動隔離樣式、手機自動全螢幕。</p>
+            <span class="tag">一行 snippet</span>
+          </div>
+          <div class="card">
+            <div class="ic">🔗</div>
+            <h3>整頁入口</h3>
+            <div class="who">給：只想要一條連結的人</div>
+            <p>直接分享 <code>/ask/&lt;代號&gt;</code> 網址（手機也能像 App 一樣加到主畫面）。不用改任何網站。</p>
+            <span class="tag">零整合</span>
+          </div>
+          <div class="card">
+            <div class="ic">⚙️</div>
+            <h3>Search API</h3>
+            <div class="who">給：自建 App / 系統串接</div>
+            <p>機器對機器的 JSON 檢索 API（<code>/api/v1/search</code>，Bearer key、可限 scope、有流量限制）。把知識庫接進你自己的產品。</p>
+            <span class="tag">RESTful</span>
+          </div>
+        </div>
+        <div class="callout">
+          前兩種（Widget／整頁）是<strong>對人</strong>的完整聊天體驗；第三種（Search API）是<strong>對程式</strong>的檢索結果。Search API 的完整規格見 <a href="/docs/api-search.html">RAG Search API 文件</a>。
+        </div>
+
+        <h2 id="modes"><span class="num">3</span>三種 LLM 模式</h2>
+        <p class="section-lead">「AI 要用誰的 key、誰付費」可以三選一：</p>
+        <table>
+          <thead>
+            <tr><th style="width:150px">模式</th><th>API key 從哪來</th><th>計費</th><th>最適合</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="mode mode-shared">Shared key</span></td>
+              <td>系統共用的 AI key（你不用準備）</td>
+              <td>由 SpecHub 統一</td>
+              <td>大多數部門；最省事</td>
+            </tr>
+            <tr>
+              <td><span class="mode mode-wbyok">Workspace BYOK</span></td>
+              <td>管理員幫整個 workspace 設<strong>一把</strong>你的 key</td>
+              <td>記在你部門的帳上</td>
+              <td>要用自己帳號 / 集中計費的團隊</td>
+            </tr>
+            <tr>
+              <td><span class="mode mode-ubyok">User BYOK</span></td>
+              <td>每位使用者第一次用時<strong>自己貼</strong>自己的 key（存在他的瀏覽器）</td>
+              <td>各自負擔</td>
+              <td>每個人用自己額度的情境</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout callout-warn">
+          <strong>對外 Widget 建議用 Shared 或 Workspace BYOK。</strong> User BYOK 會要求每位訪客先貼自己的 key，不適合公開的浮動 widget。
+        </div>
+
+        <h2 id="scope"><span class="num">4</span>知識範圍與權限</h2>
+        <h3>知識範圍 (scope)</h3>
+        <p>每個 workspace 可限定回答範圍：<b>Solution → 產品線 → 型號</b> 三層，加上<b>來源類型</b>（產品規格 / 文件 / Help Center / 網頁 / 文字片段 / PDF…）。留空＝全部。例如「只回答 Cloud AP 產品線的規格與文件」。</p>
+        <h3>存取控制</h3>
+        <ul>
+          <li><b>有 passcode</b>：訪客輸入一次通行碼（半私密，例如內部工具）。</li>
+          <li><b>無 passcode</b>：打開即用，最適合對外、客戶面的 widget。</li>
+          <li><b>流量保護</b>：每分鐘 / 每日上限可調，保護共用資源。</li>
+          <li><b>鎖定設定</b>：可關閉「使用者自行切換模型 / 角色」，固定成你設定的樣子。</li>
+        </ul>
+
+        <h2 id="start"><span class="num">5</span>三步驟開始</h2>
+        <ol class="steps">
+          <li><b>告訴我們需求</b>：你的部門代號、知識範圍、要不要 passcode、用哪種 LLM 模式。管理員在 <code>Settings → Ask Workspaces</code> 幫你建立。</li>
+          <li><b>拿到你的入口</b>：得到一條 <code>/ask/&lt;代號&gt;</code> 連結，以及一段 widget snippet（管理頁「Embed」一鍵複製）。</li>
+          <li><b>整合 / 分享</b>：把 snippet 貼進你的網站、或直接分享連結、或用 API key 串進你的 App。完成。</li>
+        </ol>
+
+        <div class="try">
+          <h3>👉 想先試用？兩種形式都能直接玩</h3>
+          <p>① <strong>浮動 Widget</strong> — 這個頁面右下角<span class="arrow"> ↘ </span>就有一個活的 demo widget（EnGenie Demo）。點開直接問「<em>哪些 AP 支援 WiFi 7？</em>」或「<em>ECW536 的規格是什麼？</em>」。</p>
+          <p style="margin-bottom:0">② <strong>整頁入口</strong> — 開這條連結看完整頁版（同一套知識、同一個 demo workspace）：<a href="/ask/demo-widget" target="_blank" rel="noopener noreferrer"><strong>開啟 /ask/demo-widget ↗</strong></a></p>
+        </div>
+
+        <h2 id="snippets"><span class="num">6</span>複製即用</h2>
+        <h3>① 浮動 Widget（貼在你網站 <code>&lt;/body&gt;</code> 前）</h3>
+        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>&lt;script
+  src="https://engenie-eg.vercel.app/widget.js"
+  data-workspace="你的代號"
+  data-title="你的助理名稱"
+  async&gt;&lt;/script&gt;</code></pre>
+        <p style="font-size:13.5px;color:var(--gray-light)">可選參數：<code>data-color="#03a9f4"</code>（按鈕顏色）、<code>data-position="left"</code>（改成左下角）。</p>
+
+        <h3>② 整頁入口（直接分享連結）</h3>
+        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>https://engenie-eg.vercel.app/ask/你的代號</code></pre>
+        <p style="font-size:13.5px;color:var(--gray-light)">實際範例（demo workspace）：<a href="/ask/demo-widget" target="_blank" rel="noopener noreferrer">開啟 /ask/demo-widget ↗</a></p>
+
+        <h3>③ Search API（程式串接）</h3>
+        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>curl -X POST https://engenie-eg.vercel.app/api/v1/search \
+  -H "Authorization: Bearer sk_live_你的key" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"哪些 AP 支援 WiFi 7?","top_k":5}'</code></pre>
+        <p style="font-size:13.5px;color:var(--gray-light)">完整參數、scope、限流、錯誤碼見 <a href="/docs/api-search.html">RAG Search API 文件</a>。</p>
+
+        <h2 id="faq"><span class="num">7</span>常見問題</h2>
+        <h3>Widget 會影響我網站的樣式嗎？</h3>
+        <p>不會。聊天介面跑在獨立的 iframe 裡，你的 CSS 不會干擾它、它也不會干擾你的頁面。</p>
+        <h3>需要登入 SpecHub 嗎？</h3>
+        <p>不需要。Widget／整頁入口給的是你部門專屬連結，訪客（含外部客戶）不需要 SpecHub 帳號；若有設 passcode 則輸入一次即可。</p>
+        <h3>資料安全嗎？跨網站能用嗎？</h3>
+        <p>可以。Widget 用安全 token（非 cookie）認證，在 Safari / Chrome 等封鎖第三方 cookie 的瀏覽器都正常運作。User BYOK 模式下，使用者的 key 只存在他自己的瀏覽器、不會存到伺服器。</p>
+        <h3>知識可以只限我們部門的內容嗎？</h3>
+        <p>可以。透過 scope 限定 Solution／產品線／型號／來源類型；也能上傳你部門自己的 PDF 與文字片段。</p>
+        <h3>回答的語言？</h3>
+        <p>跟著提問語言走——中文問中文答、英文問英文答、日文問日文答。</p>
+        <h3>對話歷史存在哪裡？保留多久？</h3>
+        <p>對話歷史只存在<strong>使用者自己的瀏覽器</strong>（localStorage），<strong>不會上傳伺服器、也不與他人共享</strong>。重點規則：</p>
+        <ul>
+          <li>每個入口（workspace）<strong>各自獨立</strong>，彼此看不到對方的歷史。</li>
+          <li>最多保留<strong>最近約 30 筆</strong>對話（超過自動汰舊）。</li>
+          <li>換裝置、換瀏覽器、清除瀏覽資料、或無痕視窗全部關閉後就會<strong>消失</strong>。</li>
+          <li>嵌入式 widget 的歷史是<strong>依「所在網站」分開</strong>存的——同一個入口放在不同網站，歷史不互通。</li>
+          <li>因為存在前端，<strong>不適合當長期/正式紀錄</strong>；需要稽核或跨裝置保存請另循正式管道。</li>
+        </ul>
+      </div>
+
+      <div class="doc-footer">
+        <strong>EnGenie Ask — 部門整合服務</strong><br>
+        Powered by EnGenius Product SpecHub.
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function copyPre(btn) {
+      var code = btn.parentElement.querySelector("code");
+      var text = code.innerText;
+      navigator.clipboard.writeText(text).then(function () {
+        var old = btn.textContent; btn.textContent = "已複製 ✓";
+        setTimeout(function () { btn.textContent = old; }, 1500);
+      });
+    }
+  </script>
+
+  <!-- Live demo widget — readers can try it right here -->
+  <script
+    src="https://engenie-eg.vercel.app/widget.js"
+    data-workspace="demo-widget"
+    data-title="EnGenie Demo"
+    async></script>
+</body>
+</html>
