@@ -134,6 +134,7 @@ npm run build -w engenie
 
 ## 詳細文件
 
+- [`docs/agent-architecture.md`](docs/agent-architecture.md) — **設計提案**：從純 RAG 到「工具導向 Agent」（tool calling / agent loop 基礎觀念 + 針對本系統的設計、分階段計畫、安全模型）。尚未實作；排在 monorepo Phase 5 之後
 - [`docs/rag-context.md`](docs/rag-context.md) — RAG 完整架構
 - [`docs/api-search.md`](docs/api-search.md) — 對外 Search API 規格（HTML 版已公開於 `/docs/api-search.html`）
 - [`docs/ask-chat-ux-spec.md`](docs/ask-chat-ux-spec.md) — 聊天互動規範
