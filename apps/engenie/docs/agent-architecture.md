@@ -148,6 +148,36 @@ loop:
 | **MCP（Model Context Protocol）** | 一套「工具/資料源」的標準接法，讓工具可跨系統重用 |
 | **Multi-agent（多代理）** | 多個各有專長的 agent 協作（進階，本文先不展開） |
 
+## 1.7 名詞釐清：Tool Calling / Tool Use / Function Calling / Agent Loop
+
+這四個詞最容易混淆。一句話：**前三個是同一件事的不同叫法；Agent Loop 是不同層次。**
+
+| 詞 | 是什麼 | 關係 |
+|---|---|---|
+| **Tool Calling** | LLM「主動要求呼叫工具」的**能力**（機制） | 這三個 |
+| **Tool Use** | 同上 —— **Anthropic（Claude）** 的官方叫法 | 是 |
+| **Function Calling** | 同上 —— **OpenAI / Gemini** 的叫法 | 同一件事 |
+| **Agent Loop** | 反覆運用上面那個能力、直到任務完成的**流程** | 蓋在上面、不同層次 |
+
+**(1) Tool Calling = Tool Use = Function Calling — 同一個機制，不同廠商命名。**
+都是指「事先告訴 LLM 有哪些工具，LLM 可主動要求呼叫工具 X、參數 Y」。看到哪個詞都一樣：
+Anthropic 文件寫 "tool use"、OpenAI/Gemini 文件寫 "function calling"，可當同義詞。
+
+**(2) Agent Loop 是不同層次 —— 它「用」tool calling，反覆做。**
+
+```
+Agent Loop（流程：反覆呼叫 LLM、執行工具、把結果接回去，直到模型給最終答案）
+   └─ 每一輪都用到 Tool Calling（= Tool Use = Function Calling）（機制：要一個工具）
+```
+
+**類比**：
+- **Tool Calling** ＝「打一通電話查一件事」這個**動作/能力**。
+- **Agent Loop** ＝「為了辦完一個任務，**反覆打好幾通電話**，每通的結果決定下一通打給誰，
+  直到事情辦完」這個**做事流程**。
+
+沒有 tool calling 就組不出 agent loop；但只用一次 tool calling、不迴圈，也還不算 agent
+loop。**「會用工具」是能力；「會用工具、能多步把事做完」才叫 Agent。**
+
 ---
 
 # Part 2 — 現況盤點（你們現在的程式）
