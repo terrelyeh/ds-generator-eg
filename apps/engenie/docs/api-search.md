@@ -12,7 +12,7 @@
 ## 1. Base URL
 
 ```
-https://ds-generator-eg.vercel.app
+https://engenie-eg.vercel.app
 ```
 
 目前只有一個端點:`POST /api/v1/search`。
@@ -158,7 +158,7 @@ Body(JSON):
 ### cURL
 
 ```bash
-curl -X POST https://ds-generator-eg.vercel.app/api/v1/search \
+curl -X POST https://engenie-eg.vercel.app/api/v1/search \
   -H "Authorization: Bearer sk_live_xxx" \
   -H "Content-Type: application/json" \
   -d '{
@@ -171,7 +171,7 @@ curl -X POST https://ds-generator-eg.vercel.app/api/v1/search \
 ### JavaScript / Node(後端)
 
 ```js
-const res = await fetch("https://ds-generator-eg.vercel.app/api/v1/search", {
+const res = await fetch("https://engenie-eg.vercel.app/api/v1/search", {
   method: "POST",
   headers: {
     "Authorization": `Bearer ${process.env.SPECHUB_API_KEY}`,
@@ -191,7 +191,7 @@ const context = data.results.map((r) => r.content).join("\n\n---\n\n");
 import os, requests
 
 resp = requests.post(
-    "https://ds-generator-eg.vercel.app/api/v1/search",
+    "https://engenie-eg.vercel.app/api/v1/search",
     headers={"Authorization": f"Bearer {os.environ['SPECHUB_API_KEY']}"},
     json={"query": "推薦適合飯店的網路方案", "top_k": 8},
     timeout=30,

@@ -231,18 +231,18 @@
         <h2 id="snippets"><span class="num">6</span>複製即用</h2>
         <h3>① 浮動 Widget（貼在你網站 <code>&lt;/body&gt;</code> 前）</h3>
         <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>&lt;script
-  src="https://ds-generator-eg.vercel.app/widget.js"
+  src="https://engenie-eg.vercel.app/widget.js"
   data-workspace="你的代號"
   data-title="你的助理名稱"
   async&gt;&lt;/script&gt;</code></pre>
         <p style="font-size:13.5px;color:var(--gray-light)">可選參數：<code>data-color="#03a9f4"</code>（按鈕顏色）、<code>data-position="left"</code>（改成左下角）。</p>
 
         <h3>② 整頁入口（直接分享連結）</h3>
-        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>https://ds-generator-eg.vercel.app/ask/你的代號</code></pre>
+        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>https://engenie-eg.vercel.app/ask/你的代號</code></pre>
         <p style="font-size:13.5px;color:var(--gray-light)">實際範例（demo workspace）：<a href="/ask/demo-widget" target="_blank" rel="noopener noreferrer">開啟 /ask/demo-widget ↗</a></p>
 
         <h3>③ Search API（程式串接）</h3>
-        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>curl -X POST https://ds-generator-eg.vercel.app/api/v1/search \
+        <pre><button class="copy-btn" onclick="copyPre(this)">複製</button><code>curl -X POST https://engenie-eg.vercel.app/api/v1/search \
   -H "Authorization: Bearer sk_live_你的key" \
   -H "Content-Type: application/json" \
   -d '{"query":"哪些 AP 支援 WiFi 7?","top_k":5}'</code></pre>
@@ -290,7 +290,7 @@
 
   <!-- Live demo widget — readers can try it right here -->
   <script
-    src="https://ds-generator-eg.vercel.app/widget.js"
+    src="https://engenie-eg.vercel.app/widget.js"
     data-workspace="demo-widget"
     data-title="EnGenie Demo"
     async></script>

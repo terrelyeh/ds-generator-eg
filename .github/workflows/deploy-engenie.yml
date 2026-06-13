@@ -1,0 +1,53 @@
+name: Deploy EnGenie (prebuilt)
+
+# Vercel's remote/cloud build currently fails for newly-created projects on this
+# account (a platform issue — even a hello-world new project fails with empty
+# logs). To restore push-to-deploy for engenie-eg without that broken remote
+# build, we build the app *in CI* and upload a prebuilt deployment via the
+# Vercel CLI. The engenie-eg project's "Ignored Build Step" is set to always
+# skip, so Vercel never tries (and fails) its own build.
+#
+# SpecHub (ds-generator-eg) is unaffected — its Vercel cloud build works, so it
+# keeps deploying through Vercel's native Git integration. This workflow is
+# engenie-only.
+#
+# Required repo secret: VERCEL_TOKEN  (Account → Settings → Tokens; scope: this team)
+# The org/project IDs below are identifiers, not secrets.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "apps/engenie/**"
+      - "packages/**"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/deploy-engenie.yml"
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-engenie
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: team_wO5BepSfJM89WYbrpk90HAVq
+      VERCEL_PROJECT_ID: prj_GCfZTdG1ajY1qUgZEtScSSTQp3sU
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install dependencies (workspace root)
+        run: npm ci
+      - name: Install Vercel CLI
+        run: npm i -g vercel@latest
+      - name: Pull Vercel project settings (production)
+        run: vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+      - name: Build (prebuilt output)
+        run: vercel build --prod --token="$VERCEL_TOKEN"
+      - name: Deploy prebuilt to production
+        run: vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN"
