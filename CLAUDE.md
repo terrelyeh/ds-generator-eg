@@ -1,10 +1,11 @@
 # CLAUDE.md — Monorepo Root
 
-> Monorepo 拆分（branch `monorepo-split`，藍圖見
-> [apps/spechub/docs/monorepo-split-plan.md](apps/spechub/docs/monorepo-split-plan.md)）。
-> Phase 1–4 完成：app 搬入 `apps/spechub`、`@eg/db`+`@eg/auth` 抽出、
-> `apps/engenie` 析出（Vercel 專案 `engenie-eg`）、CLAUDE.md 分家。
-> 剩 Phase 5 切換（merge main + §6 驗收 + 更新 engenius-kb skill 的 API URL）。
+> Monorepo 拆分**全部完成（Phase 1–5）**，藍圖見
+> [apps/spechub/docs/monorepo-split-plan.md](apps/spechub/docs/monorepo-split-plan.md)。
+> app 搬入 `apps/spechub`、`@eg/db`+`@eg/auth` 抽出、`apps/engenie` 析出
+> （Vercel 專案 `engenie-eg`）、CLAUDE.md 分家；**Phase 5 cutover 已 merge 進 `main`
+> （2026-06-13），兩個 prod 都在拆分後架構**。剩手動收尾：engenie CI 的
+> `VERCEL_TOKEN` secret、藍圖 §6 驗收、更新 engenius-kb skill 的 Search API base URL。
 
 ## 結構
 

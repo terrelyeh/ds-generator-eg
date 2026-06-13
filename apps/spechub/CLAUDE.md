@@ -1,8 +1,9 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-06-11（monorepo 拆分 Phase 3–4：RAG/Ask/Knowledge 全部
+> Last updated: 2026-06-13（monorepo 拆分**全部完成（Phase 1–5）**；Phase 5 cutover
+> 已 merge 進 `main`、兩個 prod 都在拆分後架構。Phase 3–4 把 RAG/Ask/Knowledge 全部
 > 析出到 **apps/engenie**（含 lib/rag、聊天 UI、workspaces、對外 Search API、
-> wifi-regulation、LLM keys 設定頁）。本 app 回歸純 datasheet/文件生成平台。
+> wifi-regulation、LLM keys 設定頁）；本 app 回歸純 datasheet/文件生成平台。
 > 共用碼在 packages：`@eg/db`（supabase clients/settings/types/migrations）、
 > `@eg/auth`（session/RBAC/page-guards）。RAG/Ask 的事去看
 > [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。）
@@ -181,9 +182,10 @@ Key tables:
 
 ### 🔜 Next Steps
 
-**🏗️ Monorepo 拆分** — Phase 1–3 已完成（骨架、packages、engenie 析出）。
-剩餘：Phase 5 切換（merge main、prod 部署、跑藍圖 §6 驗收、更新 engenius-kb
-skill 的 API base URL）。藍圖見 [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)。
+**🏗️ Monorepo 拆分** — **全部完成（Phase 1–5）**。骨架、packages、engenie 析出、
+Phase 5 cutover 已 merge 進 `main`（2026-06-13），兩個 prod 都在拆分後架構。
+剩手動收尾：engenie CI 的 `VERCEL_TOKEN` secret、跑藍圖 §6 驗收、更新 engenius-kb
+skill 的 Search API base URL。藍圖見 [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)。
 
 **Datasheet 系統**：
 1. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt

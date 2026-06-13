@@ -1,7 +1,8 @@
 # CLAUDE.md — EnGenie (apps/engenie)
 
-> Last updated: 2026-06-11（monorepo 拆分 Phase 3：自 SpecHub 析出成獨立 app。
-> 本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge 全部 context。）
+> Last updated: 2026-06-13（monorepo 拆分**全部完成（Phase 1–5）**；Phase 5 cutover
+> 已 merge 進 `main`、prod `engenie-eg` 在拆分後架構。Phase 3 自 SpecHub 析出成獨立
+> app，本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge 全部 context。）
 
 ## Project Overview
 
