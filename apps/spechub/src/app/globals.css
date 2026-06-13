@@ -1,17 +1,12 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-/* highlight.js token colours for chat code blocks (CodeBlock component).
-   Layout/background is owned by `.chat-codeblock` below; this only supplies
-   syntax token colours via rehype-highlight. */
-@import "highlight.js/styles/github-dark.css";
 
-/* Typography plugin — powers the `prose` classes used by the EnGenie
-   demo chat (engenie-chat) and the WiFi regulation markdown viewer.
-   Without it, `prose`/`prose-*` are no-ops and markdown renders bare
-   (no list bullets, heading sizes, table borders, paragraph spacing).
-   The main Ask panel uses its own `.ask-markdown` CSS instead. */
-@plugin "@tailwindcss/typography";
+/* NOTE: the chat/Ask code-block syntax theme (highlight.js) and the `prose`
+   typography plugin moved to EnGenie with the chat UI (monorepo split).
+   SpecHub no longer renders chat, so neither is imported here — importing
+   highlight.js here was a phantom dependency that broke the Vercel build
+   (it only resolved locally via the hoisted workspace node_modules). */
 
 @custom-variant dark (&:where(.dark, .dark *));
 
