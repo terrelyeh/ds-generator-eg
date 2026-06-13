@@ -194,6 +194,7 @@
       <li><a href="#rag-as-tool">1.5 RAG 只是一個工具</a></li>
       <li><a href="#glossary">1.6 名詞速查表</a></li>
       <li><a href="#terms">1.7 名詞釐清（重要）</a></li>
+      <li><a href="#roles">1.8 關鍵角色＋常見誤解</a></li>
     </ol>
 
     <div class="sidebar-title">Part 2 — 現況</div>
@@ -353,6 +354,36 @@
         <li><strong>Agent Loop</strong> ＝「為了辦完一個任務，<strong>反覆打好幾通電話</strong>，每通的結果決定下一通打給誰，直到事情辦完」這個<strong>做事流程</strong>。</li>
       </ul>
       沒有 tool calling 就組不出 agent loop；但只用一次 tool calling、不迴圈，也還不算 agent loop。<strong>「會用工具」是能力；「會用工具、能多步把事做完」才叫 Agent。</strong>
+    </div>
+
+    <h2 id="roles">1.8 關鍵角色一次看懂（都是「程式」）＋ 常見誤解</h2>
+    <p>這套架構會出現幾個「角色」，它們<strong>全都是後端程式</strong>（跑在 <code>/api/ask</code> 裡的函式/模組，不是 UI、不是設定檔），差別只在各自的職責：</p>
+    <table>
+      <thead><tr><th>角色</th><th>職責（白話）</th><th>它「做決定」嗎</th><th>必備嗎</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Orchestrator</strong><br>（編排器 / agent loop）</td><td>跑迴圈：呼叫 LLM → 執行模型要的工具 → 結果接回去 → 再呼叫</td><td>❌ 不決定，只<strong>執行</strong>模型的決定</td><td><span class="badge badge-green">必備</span></td></tr>
+        <tr><td><strong>Tool 抽象</strong><br>（工具介面 + registry）</td><td>讓每個工具「長一樣」（都有 <code>run()</code>），orchestrator 不用管它是 RAG 還是 API</td><td>❌</td><td><span class="badge badge-green">必備</span></td></tr>
+        <tr><td><strong>Provider 抽象</strong><br>（三家 adapter）</td><td>把 Claude/GPT/Gemini 不同的 tool API 翻譯成同一個內部格式</td><td>❌</td><td><span class="badge badge-amber">多 provider 才必備</span></td></tr>
+        <tr><td><strong>Router</strong><br>（意圖分類）</td><td>先判斷「知識題/即時題」再分流</td><td>✅ 它<strong>做</strong>分流決定</td><td><span class="badge badge-gray">選配（路線 A 才用）</span></td></tr>
+      </tbody>
+    </table>
+
+    <h3>兩個「抽象層」分別抽象掉什麼？</h3>
+    <p>「抽象層」白話講就是一段<strong>轉接程式</strong>：把下面各種不同的東西，包成上面程式認得的「同一種樣子」，這樣上面就不用管下面的差異。這個設計有<strong>兩個</strong>抽象層，常被搞混：</p>
+    <ul>
+      <li><strong>Tool 抽象</strong> → 抽象掉「<strong>工具種類</strong>的差異」。對 orchestrator 來說，「搜知識庫」和「打設備 API」都只是一個有 <code>run()</code> 的東西，一視同仁地呼叫。<strong>好處：加新工具不用改 orchestrator。</strong>（＝你直覺講的「工具上面的抽象層」）</li>
+      <li><strong>Provider 抽象</strong> → 抽象掉「<strong>LLM 廠商</strong>的差異」。三家的 tool API 形狀不同（Claude <code>tool_use</code> / OpenAI <code>tool_calls</code> / Gemini <code>functionCall</code>），這層把它們統一成一個內部介面。<strong>好處：換或加模型不用改 orchestrator。</strong></li>
+    </ul>
+    <div class="callout"><strong>比喻：</strong>抽象層就像「<strong>轉接頭</strong>」—— 上面的程式只認識一種插孔，轉接頭負責把下面各種不同的插頭（不同工具 / 不同 LLM 廠商）轉成那個插孔。</div>
+
+    <h3>兩個最常見的誤解</h3>
+    <div class="callout-warn callout">
+      <strong>誤解 1：「導入 tool calling，上面一定要再寫一層 router 分流。」</strong> → <strong>不用。</strong>
+      模型自己 routing（自己選工具）。你一定要有的是 <strong>orchestrator（執行迴圈）</strong>，不是 router（分流）。router 只有走路線 A 才需要，或當成本/安全最佳化才加。
+    </div>
+    <div class="callout-warn callout">
+      <strong>誤解 2：「這就是 Agent Teams / 多 agent。」</strong> → <strong>不是。</strong>
+      這是「<strong>一個</strong> agent + 一堆工具」。Agent Teams（多個 agent 協作）是更上層、更後面的事，你現在不需要。
     </div>
 
     <!-- ===================== PART 2 ===================== -->
