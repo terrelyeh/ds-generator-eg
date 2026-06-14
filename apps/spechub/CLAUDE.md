@@ -28,9 +28,11 @@ Cloud Camera, Cloud AI-NVS, Cloud VPN Firewall, Switch Extender, Unmanaged Switc
    `/api/cron/reindex-products`（`Bearer CRON_SECRET`，兩 Vercel 專案同值；
    `ENGENIE_INTERNAL_URL` 指向 engenie 網域）。失敗不擋 sync —— EnGenie 每日
    09:30 TW 有全量備援 cron。
-2. **側邊 Ask 面板已改為 EnGenie 浮動 widget**（`components/layout/engenie-widget.tsx`，
-   workspace `spechub`，由 `NEXT_PUBLIC_ENGENIE_URL` 載入 widget.js）。navbar 的
-   Ask / Knowledge 是連到 EnGenie 網域的外部連結。
+2. **Ask 入口只剩 EnGenie 浮動 widget**（`components/layout/engenie-widget.tsx`，
+   workspace `spechub`，由 `NEXT_PUBLIC_ENGENIE_URL` 載入 widget.js）。**navbar 不再放
+   Ask / Knowledge**（2026-06-14 移除跨站連結與死碼 `ENGENIE_URL`/`showAsk`/`showKnowledge`，
+   commit db17c56）——跨站跳轉會讓使用者 confuse、且 widget 已就地覆蓋問答。**別再加回
+   navbar**；要瀏覽整個知識庫請直接去 EnGenie 站。
 3. **LLM provider keys 管理 UI 在 EnGenie**（settings 首頁有連結卡）；本 app 的
    translate runtime 直接讀共用 `app_settings`（`@eg/db/settings` 的 `getApiKey`）。
 4. **產品表 schema 演進權在本 app**；改 products/product_lines schema 前要確認
