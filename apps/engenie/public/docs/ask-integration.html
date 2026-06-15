@@ -175,13 +175,40 @@
 
         <h3 style="margin-top:28px">換個角度：其實是「兩個家族」——誰來當回答的大腦</h3>
         <p class="section-lead">上面三種，差別其實在「生成答案的 LLM 在誰那邊」，可收斂成兩家：</p>
-        <table>
-          <thead><tr><th style="width:240px">家族</th><th>回答的「大腦」</th><th>對應形式</th></tr></thead>
-          <tbody>
-            <tr><td><strong>A · EnGenie 自己答</strong></td><td>EnGenie 的 RAG 管線（檢索＋生成）</td><td>浮動 Widget、整頁入口（對人、完整聊天）</td></tr>
-            <tr><td><strong>B · EnGenie 只給料，別人的腦答</strong></td><td>呼叫方</td><td>Search API → 消費端可是 <strong>傳統 App</strong>，也可是 <strong>AI agent</strong></td></tr>
-          </tbody>
-        </table>
+        <div style="margin:18px 0 22px">
+          <svg viewBox="0 0 720 366" role="img" aria-labelledby="famttl famdsc" style="width:100%;max-width:720px;height:auto;display:block;margin:0 auto">
+            <title id="famttl">EnGenie Ask 的兩個整合家族</title>
+            <desc id="famdsc">同一個 SpecHub 知識庫與 Search API 之下，分成 A（EnGenie 自己答：Widget、整頁）與 B（別人的腦答：B1 傳統 App、B2 AI agent 即 skill/MCP）。差別在「誰是回答的大腦」。</desc>
+            <style>
+              .mtxt{fill:#2C3345;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}
+              .msub{fill:#58595B;font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Microsoft JhengHei",sans-serif}
+              .mbox{fill:#fff;stroke:#e2e5e9;stroke-width:1}
+              .mln{stroke:#cdd3da;stroke-width:2;fill:none}
+            </style>
+            <rect x="206" y="14" width="308" height="58" rx="12" fill="#f5f6f8" stroke="#e2e5e9"/>
+            <text x="360" y="38" text-anchor="middle" class="mtxt" font-size="15" font-weight="800">📚 SpecHub 知識庫</text>
+            <text x="360" y="58" text-anchor="middle" class="msub" font-size="12.5">RAG 檢索 · /api/v1/search</text>
+            <path class="mln" d="M360 72 v14 M190 86 h340 M190 86 v18 M530 86 v18"/>
+            <rect x="34" y="104" width="312" height="206" rx="14" fill="rgba(5,150,105,0.05)" stroke="#059669"/>
+            <text x="52" y="132" font-size="15" font-weight="800" fill="#059669" font-family="-apple-system,'PingFang TC',sans-serif">A · EnGenie 自己答</text>
+            <text x="52" y="151" class="msub" font-size="12">檢索＋生成都在 EnGenie</text>
+            <rect class="mbox" x="52" y="162" width="276" height="42" rx="8"/>
+            <text x="66" y="188" class="mtxt" font-size="13.5" font-weight="700">💬 浮動 Widget</text>
+            <rect class="mbox" x="52" y="212" width="276" height="42" rx="8"/>
+            <text x="66" y="238" class="mtxt" font-size="13.5" font-weight="700">🔗 整頁入口</text>
+            <text x="52" y="288" font-size="12" fill="#059669" font-family="-apple-system,'PingFang TC',sans-serif">● 對人 · 完整聊天體驗</text>
+            <rect x="374" y="104" width="312" height="206" rx="14" fill="rgba(3,169,244,0.06)" stroke="#0288d1"/>
+            <text x="392" y="132" font-size="15" font-weight="800" fill="#0288d1" font-family="-apple-system,'PingFang TC',sans-serif">B · 別人的腦答</text>
+            <text x="392" y="151" class="msub" font-size="12">EnGenie 只回 chunks，呼叫方生成</text>
+            <rect class="mbox" x="392" y="162" width="276" height="42" rx="8"/>
+            <text x="406" y="188" class="mtxt" font-size="13" font-weight="700">⚙️ B1 · 傳統 App（你的程式）</text>
+            <rect class="mbox" x="392" y="212" width="276" height="54" rx="8" stroke="#0288d1" stroke-width="1.6"/>
+            <text x="406" y="234" class="mtxt" font-size="13" font-weight="700">🤖 B2 · AI agent</text>
+            <text x="406" y="253" class="msub" font-size="11.5">Claude Code skill / MCP　←　engenius-kb</text>
+            <text x="392" y="298" font-size="12" fill="#0288d1" font-family="-apple-system,'PingFang TC',sans-serif">● 對程式 · 知識變成 agent 的工具</text>
+            <text x="360" y="344" text-anchor="middle" class="msub" font-size="12.5">軸線＝「誰是回答的大腦」：<tspan fill="#059669" font-weight="700">綠 EnGenie</tspan>　／　<tspan fill="#0288d1" font-weight="700">藍 呼叫方</tspan></text>
+          </svg>
+        </div>
         <div class="callout">
           <strong>B 家族最進階的一種：把知識接進 AI agent。</strong>做成一個 <strong>Claude Code skill</strong>（現有的 <code>engenius-kb</code>）或 <strong>MCP server</strong>（設計草案見 <a href="/docs/engenie-knowledge-mcp.html">EnGenie Knowledge MCP</a>），EnGenie 知識就變成使用者 AI 工具裡的「一個工具」——直接在他本來的工作流（Claude Code／Cursor…）裡問，還能跟他的其他工具一起用。架構觀念見 <a href="/docs/agent-architecture.html">Agent 架構</a>與<a href="/docs/multi-agent-architecture.html">多 Agent 架構</a>文件。
         </div>
