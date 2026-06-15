@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnGenie — 多 Agent 架構（Multi-Agent）</title>
+  <style>
+    :root {
+      --blue: #03a9f4;
+      --blue-dark: #0288d1;
+      --gray-dark: #2C3345;
+      --gray: #58595B;
+      --gray-light: #6f6f6f;
+      --gray-bg: #f8f9fa;
+      --border: #e2e5e9;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --green: #059669;
+      --green-bg: #ecfdf5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: var(--gray-dark);
+      font-size: 16.5px;
+      line-height: 1.75;
+      background: #fff;
+    }
+
+    .page-layout { display: flex; max-width: 1300px; margin: 0 auto; }
+
+    /* Left sidebar TOC */
+    .sidebar {
+      width: 264px; flex-shrink: 0; position: sticky; top: 0;
+      height: 100vh; overflow-y: auto;
+      border-right: 1px solid var(--border); padding: 28px 18px; background: var(--gray-bg);
+    }
+    .sidebar-brand {
+      font-weight: 800; font-size: 17.6px; color: var(--blue-dark); margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+    .sidebar-tag { font-size: 13.2px; color: var(--gray-light); margin-bottom: 22px; }
+    .sidebar-title {
+      font-weight: 700; font-size: 13.2px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--gray-light); margin: 18px 0 8px;
+    }
+    .sidebar ol { list-style: none; padding: 0; margin: 0; }
+    .sidebar li { margin: 0; }
+    .sidebar a {
+      display: block; padding: 6px 12px; border-radius: 6px; font-size: 14.85px;
+      color: var(--gray); text-decoration: none; transition: all 0.15s; line-height: 1.45;
+    }
+    .sidebar a.sub { padding-left: 26px; font-size: 14.3px; color: var(--gray-light); }
+    .sidebar a:hover { background: rgba(3,169,244,0.08); color: var(--blue-dark); }
+    .sidebar a.xref { color: var(--blue-dark); font-weight: 600; }
+
+    /* Main content */
+    .main-content { flex: 1; min-width: 0; padding: 44px 56px 90px; max-width: 920px; }
+
+    .doc-status {
+      display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px;
+      background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a;
+      font-size: 14.3px; font-weight: 600; padding: 5px 14px; border-radius: 20px;
+    }
+    .doc-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+
+    h1 {
+      font-size: 33px; font-weight: 800; color: var(--blue-dark); letter-spacing: -0.015em;
+      margin-bottom: 8px; border-bottom: 3px solid var(--blue); padding-bottom: 14px; line-height: 1.25;
+    }
+    .subtitle { font-size: 15.4px; color: var(--gray-light); margin-bottom: 30px; line-height: 1.7; }
+
+    .part-header {
+      font-size: 14.3px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--blue); margin: 52px 0 4px;
+    }
+    h2 {
+      font-size: 23.1px; font-weight: 700; color: var(--gray-dark);
+      margin: 8px 0 16px; padding-bottom: 9px; border-bottom: 2px solid var(--border); scroll-margin-top: 16px;
+    }
+    h3 { font-size: 17.6px; font-weight: 700; color: var(--gray); margin: 26px 0 9px; scroll-margin-top: 16px; }
+
+    p { margin-bottom: 12px; }
+    ul, ol { margin: 0 0 16px; padding-left: 24px; }
+    li { margin-bottom: 6px; }
+    strong { color: var(--gray-dark); }
+    a.inline { color: var(--blue-dark); text-decoration: none; }
+    a.inline:hover { text-decoration: underline; }
+
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 15.4px; }
+    thead th {
+      background: var(--gray-dark); color: #fff; font-weight: 600;
+      padding: 10px 14px; text-align: left;
+    }
+    tbody td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+    tbody tr:hover { background: rgba(3, 169, 244, 0.06); }
+    td code, li code, p code { white-space: nowrap; }
+
+    code {
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace; font-size: 14.3px;
+      background: #f0f2f5; padding: 2px 7px; border-radius: 4px; color: #c7254e;
+    }
+    pre {
+      background: #0d1117; color: #c9d1d9; padding: 18px 22px; border-radius: 8px;
+      overflow-x: auto; font-size: 14.3px; line-height: 1.7; margin: 12px 0 24px;
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+    }
+    pre code { background: none; padding: 0; color: inherit; white-space: pre; }
+    pre .c { color: #8b949e; }   /* comment */
+    pre .k { color: #ff7b72; }   /* keyword */
+    pre .s { color: #a5d6ff; }   /* string */
+    pre .f { color: #d2a8ff; }   /* function/type */
+    pre .arrow { color: #79c0ff; }
+
+    .callout {
+      background: rgba(3,169,244,0.06); border-left: 4px solid var(--blue);
+      padding: 13px 18px; border-radius: 0 8px 8px 0; margin: 14px 0 24px; font-size: 15.4px;
+    }
+    .callout-warn { background: var(--amber-bg); border-left-color: var(--amber); }
+    .callout-ok { background: var(--green-bg); border-left-color: var(--green); }
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn strong { color: var(--amber); }
+    .callout-ok strong { color: var(--green); }
+
+    .lead {
+      font-size: 17.05px; color: var(--gray-dark); background: var(--gray-bg);
+      border-radius: 12px; padding: 18px 22px; margin-bottom: 28px; line-height: 1.75;
+      border: 1px solid var(--border);
+    }
+    .lead strong { color: var(--blue-dark); }
+
+    .sibling {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 28px;
+      background: rgba(3,169,244,0.06); border: 1px solid #bbe6fb; border-radius: 10px;
+      padding: 12px 16px; font-size: 15.4px;
+    }
+    .sibling a { color: var(--blue-dark); font-weight: 700; text-decoration: none; }
+    .sibling a:hover { text-decoration: underline; }
+
+    .badge {
+      display: inline-block; font-size: 13.2px; font-weight: 600;
+      padding: 2px 9px; border-radius: 10px; white-space: nowrap; vertical-align: middle;
+    }
+    .badge-blue { background: rgba(3,169,244,0.12); color: var(--blue-dark); }
+    .badge-gray { background: #eee; color: var(--gray); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+
+    .ascii {
+      background: var(--gray-bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px 20px; margin: 12px 0 24px; overflow-x: auto;
+      font-family: "SF Mono", "Fira Code", ui-monospace, monospace; font-size: 13.75px;
+      line-height: 1.7; color: var(--gray-dark); white-space: pre;
+    }
+    .ascii b { color: var(--blue-dark); }
+
+    .doc-footer {
+      margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border);
+      font-size: 15.4px; color: var(--gray); line-height: 1.9;
+    }
+    .doc-footer a { color: var(--blue-dark); text-decoration: none; }
+    .doc-footer a:hover { text-decoration: underline; }
+    .doc-footer .muted { color: var(--gray-light); font-size: 14.3px; margin-top: 8px; }
+
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main-content { padding: 28px 22px 70px; }
+    }
+    @media print {
+      .sidebar { display: none; }
+      .main-content { padding: 20px; max-width: 100%; }
+      table, pre, .ascii { break-inside: avoid; }
+      a.inline { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-layout">
+  <!-- ============ Sidebar TOC ============ -->
+  <nav class="sidebar">
+    <div class="sidebar-brand">EnGenie</div>
+    <div class="sidebar-tag">多 Agent 架構（Multi-Agent）</div>
+
+    <div class="sidebar-title">總覽</div>
+    <ol>
+      <li><a href="#summary">0 · 一句話總結</a></li>
+      <li><a href="agent-architecture.html" class="xref">↩ 姊妹篇：單一 Agent</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part A — 觀念</div>
+    <ol>
+      <li><a href="#what">A.1 什麼是「多 agent」</a></li>
+      <li><a href="#when" class="sub">A.2 何時才需要</a></li>
+      <li><a href="#relation" class="sub">A.3 跟單一 agent 的關係</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part B — 四種結構</div>
+    <ol>
+      <li><a href="#supervisor">B.1 主管–工人</a></li>
+      <li><a href="#agent-as-tool" class="sub">B.2 子 agent 當工具</a></li>
+      <li><a href="#pipeline" class="sub">B.3 流水線</a></li>
+      <li><a href="#handoff" class="sub">B.4 對等交接</a></li>
+      <li><a href="#choose" class="sub">B.5 怎麼選</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part C — 核心難題</div>
+    <ol>
+      <li><a href="#context">C.1 上下文傳遞</a></li>
+      <li><a href="#cost" class="sub">C.2 成本與延遲</a></li>
+      <li><a href="#consistency" class="sub">C.3 錯誤與一致性</a></li>
+      <li><a href="#observability" class="sub">C.4 可觀測性與護欄</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part D — 套到 EnGenie</div>
+    <ol>
+      <li><a href="#eg-cut">D.1 第一刀：安全邊界</a></li>
+      <li><a href="#eg-impl" class="sub">D.2 用 agent-as-tool 落地</a></li>
+      <li><a href="#eg-roadmap" class="sub">D.3 漸進路線</a></li>
+    </ol>
+
+    <div class="sidebar-title">附錄</div>
+    <ol>
+      <li><a href="#appendix">延伸關鍵字</a></li>
+    </ol>
+  </nav>
+
+  <!-- ============ Main content ============ -->
+  <main class="main-content">
+    <div class="doc-status"><span class="dot"></span>進階主題 · 設計參考 · 單一 agent 穩固後再評估</div>
+
+    <h1>多 Agent 架構（Multi-Agent）</h1>
+    <p class="subtitle">
+      EnGenie 架構設計文件 · 2026-06-15<br>
+      這份專講「<strong>當單一 agent 撐不住、要拆成多個 agent</strong>」時怎麼設計：何時拆、有哪幾種結構、會踩到哪些難題、套到 EnGenie 怎麼走。<br>
+      讀者：PM／RD／決策者。<strong>建議先讀姊妹篇</strong>（單一 Agent 架構），這份是它的延伸。
+    </p>
+
+    <div class="sibling">
+      <span>📄</span>
+      <span>這是「<a href="agent-architecture.html">單一 Agent 架構（從純 RAG 到工具導向 Agent）</a>」的姊妹篇。那份講「一個 agent ＋ 一堆工具」怎麼設計（先讀那份）；<strong>這份只講多 agent</strong>。</span>
+    </div>
+
+    <!-- 0 -->
+    <h2 id="summary">0 · 一句話總結</h2>
+    <p class="lead">
+      單一 agent（一個 agent ＋ 一堆工具）能走的路<strong>比你想的遠</strong> —— 先把那條做扎實。
+      <strong>Multi-agent</strong>（多個各有專長的 agent 協作）不是「更聰明」的免費升級，而是
+      <strong>用「成本 × 延遲 × 失敗面 × 除錯難度」換「專業化 ＋ 隔離」</strong>。
+      只有撞到具體痛點（工具太多選錯、人設互相打架、子任務要分模型、要平行、<strong>安全隔離</strong>）才值得拆。
+      真要拆，最省的入口是<strong>「子 agent 當工具」</strong>（沿用單一 agent 已有的工具抽象）；
+      EnGenie 的第一刀建議<strong>按安全邊界切</strong>（知識 Agent vs 即時網路 Agent）。
+    </p>
+
+    <!-- ===================== PART A ===================== -->
+    <div class="part-header">Part A — 觀念</div>
+
+    <h2 id="what">A.1 什麼是「多 agent」（以及什麼不是）</h2>
+    <p><strong>多 agent</strong> ＝ 不只一個「會自己跑 agent loop 的決策體」，每個各自帶<strong>自己的 system prompt ＋ 自己的工具子集 ＋（可選）自己的模型</strong>，彼此協作完成一個任務。</p>
+    <p>最常見的混淆，先講清楚<strong>什麼不是多 agent</strong>：</p>
+    <div class="callout-warn callout">
+      <strong>「一個 agent 用很多工具」不是多 agent。</strong> 那叫單一 agent（見姊妹篇）。判準很簡單：數數看「<strong>會自己呼叫 LLM 做決定的決策體</strong>」有幾個 —— 一個就是單一 agent，多個才是 multi-agent。「工具」即使內部會打 API、查 DB，只要它不是「自己再跑一輪 agent loop」，就只是工具、不是 agent。
+    </div>
+    <div class="ascii"><b>單一 agent</b>（不是多 agent）           <b>多 agent</b>
+   ┌─ Agent ─┐                       ┌─ Supervisor ─┐
+   │ 決策 │ ──► 工具 工具 工具          │   決策   │ ──► <b>子 Agent</b> ──► 工具 工具
+   └─────────┘                       └──────────┘ ──► <b>子 Agent</b> ──► 工具
+   1 個決策體                              2＋ 個決策體（各自會做決定）</div>
+
+    <h2 id="when">A.2 什麼時候才真的需要多 agent？</h2>
+    <p>預設答案是「<strong>還不需要</strong>」。只有<strong>實際撞到</strong>下面的痛點之一，拆成多 agent 才划算：</p>
+    <table>
+      <thead><tr><th>觸發訊號</th><th>單一 agent 為什麼會痛</th><th>拆成多 agent 怎麼解</th></tr></thead>
+      <tbody>
+        <tr><td><strong>工具太多、選錯率上升</strong></td><td>一個 agent 掛 15–20 個工具，system prompt 爆長、模型常選錯工具</td><td>按領域拆，每個 agent 只看自己 3–5 個工具，選得更準</td></tr>
+        <tr><td><strong>人設／指令互相打架</strong></td><td>「謹慎的內網維運」和「親切的產品問答」需要完全不同的 prompt 與安全姿態，塞一份兩邊都變差</td><td>各自一個 agent、各自一份 system prompt</td></tr>
+        <tr><td><strong>子任務該用不同模型</strong></td><td>檢索用便宜模型就好，但對設備數據推理要強模型 —— 單一 agent 全程同一個</td><td>每個 agent 綁自己的模型，做成本／品質分級</td></tr>
+        <tr><td><strong>子任務可平行</strong></td><td>「比較三台規格 ＋ 同時查三台即時狀態」單一 agent 只能一步步排隊</td><td>主管把工作 fan-out 給多個 worker 同時跑</td></tr>
+        <tr><td><strong>安全隔離</strong></td><td>能打內網即時 API 的能力，跟對外公開問答塞在同一個 agent，風險面變大</td><td>把「碰得到內網」的 agent 獨立、收緊權限，跟公開 agent 隔開</td></tr>
+      </tbody>
+    </table>
+    <div class="callout-warn callout"><strong>反向訊號：</strong>如果想做多 agent 只是因為「聽起來比較進階」，<strong>別做</strong>。每多一個 agent ＝ 多一輪（或多輪）LLM 呼叫，成本、延遲、失敗面全部往上疊。把這五個訊號當<strong>檢核表</strong>：一個都沒中，就繼續用單一 agent。</div>
+
+    <h2 id="relation">A.3 跟單一 agent 的關係：是「疊上去」，不是「換掉」</h2>
+    <p>多 agent <strong>不是另一套架構</strong>，而是把單一 agent 當積木疊起來。姊妹篇裡的每一塊都還是地基：</p>
+    <ul>
+      <li><strong>Agent Loop</strong>（思考→行動→看結果）—— 每個子 agent 內部還是一個 agent loop。</li>
+      <li><strong>Tool 抽象</strong>（姊妹篇 §3.2）—— 子 agent 之間的接法，直接<strong>重用</strong>這個介面（見 <a class="inline" href="#agent-as-tool">B.2</a>）。</li>
+      <li><strong>Provider 抽象</strong> —— 不同子 agent 可綁不同模型，靠的就是這層。</li>
+      <li><strong>per-workspace scope</strong>（姊妹篇 §3.5）—— 「哪個 workspace 能用哪個子 agent」就是 scope 再上一層。</li>
+    </ul>
+    <div class="callout-ok callout"><strong>結論：</strong>先有扎實的單一 agent，多 agent 才有地基。如果單一 agent 的 Tool／Provider／scope 抽象沒做好，硬上多 agent 只會更亂。<strong>順序不能顛倒。</strong></div>
+
+    <!-- ===================== PART B ===================== -->
+    <div class="part-header">Part B — 四種結構（topology）</div>
+    <p style="margin-top:18px">多 agent「怎麼接」主流就這四種骨架。前兩種最常用，後兩種知道即可。</p>
+
+    <h2 id="supervisor">B.1 主管–工人（Supervisor / Orchestrator-Worker）</h2>
+    <p>一個「主管 agent」收下需求，<strong>自己不做領域工作</strong>，而是判斷該交給哪個（哪幾個）專長子 agent、派工、收回結果、綜合成最終答案。子 agent 之間互不知道彼此，只對主管負責。</p>
+    <div class="ascii">                 ┌──────────── Supervisor（主管 agent）────────────┐
+   使用者問題 ──▶ │  看懂需求 → 決定派給誰 → 收齊結果 → 綜合成答案    │
+                 └──────┬──────────────┬──────────────┬──────────┘
+                        ▼              ▼              ▼
+                 <b>知識 Agent</b>     <b>即時網路 Agent</b>   （其他專長）
+                 └ search_kb     └ device_status …    └ …
+                    ↑ 各自有自己的 prompt、工具子集、甚至模型；可<b>平行</b>派工</div>
+    <ul>
+      <li><strong>適合：</strong>專長多（3＋）、需要<strong>動態</strong>決定找誰、或要<strong>平行</strong> fan-out。</li>
+      <li><strong>優點：</strong>最有彈性；新增專長＝多掛一個子 agent。</li>
+      <li><strong>缺點：</strong>要多寫一層 supervisor ＋ 派工協定；主管本身也會選錯人。</li>
+    </ul>
+
+    <h2 id="agent-as-tool">B.2 子 agent 當工具（Agent-as-Tool）— 最省的入口</h2>
+    <p>這是<strong>從單一 agent 設計最自然的長法</strong>：回頭看姊妹篇 §3.2 的 <code>Tool</code> 介面，那張表已經列了一種工具叫「<strong>LLM 型工具 / 子 agent</strong>」。一個子 agent 其實就是一個 <code>run()</code> 內部跑著自己 agent loop 的工具 —— 上層 agent 像呼叫任何工具一樣呼叫它，<strong>完全沿用既有抽象</strong>。</p>
+    <pre><code><span class="c">// 把一個「即時網路專長 agent」包成上層 agent 的一個工具</span>
+<span class="k">const</span> networkSpecialistTool: <span class="f">Tool</span>&lt;{ task: string }&gt; = {
+  name: <span class="s">"ask_network_specialist"</span>,
+  description: <span class="s">"把『設備即時狀態 / 事件 / 授權』類的子任務，交給內網即時網路專長 agent 處理並回報。"</span>,
+  inputSchema: { type: <span class="s">"object"</span>, properties: { task: { type: <span class="s">"string"</span> } }, required: [<span class="s">"task"</span>] },
+  requiresPermission: <span class="s">"agent.network"</span>,
+  <span class="k">async</span> <span class="f">run</span>({ task }, ctx) {
+    <span class="c">// ↓ run() 裡面是「另一個 agent loop」，帶自己的 prompt 與自己的工具子集</span>
+    <span class="k">const</span> answer = <span class="k">await</span> <span class="f">runAgent</span>({
+      ctx,
+      systemPrompt: NETWORK_AGENT_PROMPT,          <span class="c">// 自己的人設＋安全指示</span>
+      tools: [getDeviceStatus, queryEventLogs, getOrgLicenses],  <span class="c">// 只給網路工具</span>
+      model: <span class="s">"claude-strong"</span>,                      <span class="c">// 高風險，綁強模型</span>
+      messages: [{ role: <span class="s">"user"</span>, content: task }],
+    });
+    <span class="k">return</span> { ok: <span class="k">true</span>, content: answer.text, display: answer.display };
+  },
+};</code></pre>
+    <div class="callout"><strong>關鍵：</strong>(B) 不是新架構，是 §3.2 Tool 抽象的一個 case。把單一 agent 的 Tool 介面做好，未來要多 agent 就是「<strong>把某個專長包成一個 <code>run()</code> 是 agent loop 的工具</strong>」—— <strong>不用重寫</strong>。上層 agent 連「它是不是 agent」都不用知道，照選工具邏輯叫即可。</div>
+    <ul>
+      <li><strong>適合：</strong>只想隔出 1–2 個專長子 agent（<strong>EnGenie 的起點</strong>）。</li>
+      <li><strong>優點：</strong>幾乎零新概念、零新基礎建設；漸進、好回退。</li>
+      <li><strong>缺點：</strong>子 agent 是「被呼叫」而非「被協調」，不適合需要多個 agent 來回協商的場景。</li>
+    </ul>
+
+    <h2 id="pipeline">B.3 流水線（Sequential Pipeline）</h2>
+    <p>固定順序、把產出一棒接一棒往下傳：<code>planner → executor → reviewer</code>。每一棒是一個專長 agent，<strong>順序寫死</strong>、不動態決定。</p>
+    <div class="ascii">需求 ──▶ <b>Planner</b> ──(計畫)──▶ <b>Executor</b> ──(初稿)──▶ <b>Reviewer</b> ──▶ 成品
+         拆解任務            實際執行              審查/校正</div>
+    <ul>
+      <li><strong>適合：</strong>階段固定的工作（先規劃再執行再覆核），例如「先擬答 → 再事實查核 → 再潤稿」。</li>
+      <li><strong>優點：</strong>最好控、最好除錯（流程是死的）、行為可預期。</li>
+      <li><strong>缺點：</strong>不靈活；不適合「事先不知道要做幾步、找誰」的任務。</li>
+    </ul>
+
+    <h2 id="handoff">B.4 對等交接（Handoff / Swarm）</h2>
+    <p>沒有主管；agent 之間<strong>把控制權「轉接」</strong>給彼此 —— 「這題不歸我，轉給 X」。常見於客服路由（前線 → 帳務 → 技術）。</p>
+    <div class="ascii">使用者 ──▶ <b>分流 Agent</b> ──「這是帳務問題」──▶ <b>帳務 Agent</b> ──「需要技術」──▶ <b>技術 Agent</b>
+              （誰拿到球，誰就負責，或再轉手）</div>
+    <ul>
+      <li><strong>適合：</strong>意圖明確、可一棒交給某個專責 agent 全權處理的場景。</li>
+      <li><strong>優點：</strong>每個 agent 上下文乾淨（只看自己這段）。</li>
+      <li><strong>缺點：</strong>難「合併多領域」（球一次只在一個人手上）；交接點容易掉資訊。EnGenie 用不太到。</li>
+    </ul>
+
+    <h2 id="choose">B.5 怎麼選？</h2>
+    <table>
+      <thead><tr><th>結構</th><th>誰決定流程</th><th>能平行?</th><th>改動量</th><th>適合</th></tr></thead>
+      <tbody>
+        <tr><td><strong>子 agent 當工具</strong> <span class="badge badge-green">起點</span></td><td>上層 agent（當工具叫）</td><td>可（並行呼叫）</td><td><strong>最小</strong>（沿用 Tool 介面）</td><td>隔出 1–2 個專長</td></tr>
+        <tr><td><strong>主管–工人</strong></td><td>主管 agent 動態派工</td><td>可（fan-out）</td><td>中（多一層 supervisor）</td><td>3＋ 專長、動態組合</td></tr>
+        <tr><td><strong>流水線</strong></td><td>寫死的順序</td><td>否（一棒接一棒）</td><td>小–中</td><td>階段固定的工作</td></tr>
+        <tr><td><strong>對等交接</strong></td><td>各 agent 自行轉接</td><td>否（球在一人手上）</td><td>中</td><td>單領域路由</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>建議路徑：</strong><code>子 agent 當工具</code>（先隔 1–2 個）→ 撐不住再升級 <code>主管–工人</code>。流水線／對等交接 EnGenie 多半用不到。</div>
+
+    <!-- ===================== PART C ===================== -->
+    <div class="part-header">Part C — 核心難題（拆下去才會遇到）</div>
+
+    <h2 id="context">C.1 上下文怎麼傳（最難的一題）</h2>
+    <p>子 agent 預設<strong>看不到</strong>完整對話。主管要決定「往下傳什麼、子 agent 往上回什麼」。這是多 agent 最大的工程成本，主要三種做法：</p>
+    <table>
+      <thead><tr><th>做法</th><th>怎麼傳</th><th>代價</th></tr></thead>
+      <tbody>
+        <tr><td><strong>整包傳</strong></td><td>把完整對話歷史往下倒給子 agent</td><td>token 爆炸、子 agent 被無關內容干擾</td></tr>
+        <tr><td><strong>摘要傳</strong></td><td>主管先摘要再往下傳</td><td>省 token，但摘要會<strong>掉資訊</strong>、且多一次 LLM 呼叫</td></tr>
+        <tr><td><strong>結構化交接</strong> <span class="badge badge-green">建議</span></td><td>只傳一個「<strong>明確的子任務規格</strong>」（typed task），子 agent 回一個「<strong>結構化結果</strong>」</td><td>要事先設計好任務／結果的 schema，但最省、最好除錯</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>原則：</strong>把子 agent 當「<strong>純函式</strong>」設計 —— 給定清楚的輸入（task spec）、回固定形狀的輸出（result），<strong>不依賴</strong>外部對話脈絡。這也正好對上 <a class="inline" href="#agent-as-tool">B.2</a> 的 <code>Tool</code> 介面（<code>inputSchema</code> ＋ <code>ToolResult</code>）。</div>
+
+    <h2 id="cost">C.2 成本與延遲會「相乘」</h2>
+    <p>每個子 agent 各跑一輪自己的 loop（多次 LLM 呼叫）。一棵兩層的 agent 樹，很容易變成單一 agent 的<strong>數倍</strong> token 與時間。緩解：</p>
+    <ul>
+      <li><strong>保持淺</strong>：1 個主管 ＋ 一排平行專長（深度 ≤ 2），不要 agent 叫 agent 叫 agent。</li>
+      <li><strong>worker 用便宜模型</strong>：只有需要強推理的子 agent 才綁強模型。</li>
+      <li><strong>回報前先摘要</strong>：子 agent 把大量原始資料整理成精簡結論再回主管，別整包往上倒。</li>
+      <li><strong>能不拆就不拆</strong>：簡單問題讓主管自己一步收掉，別硬派工。</li>
+    </ul>
+
+    <h2 id="consistency">C.3 錯誤會累積、答案誰負責</h2>
+    <ul>
+      <li><strong>錯誤累積</strong> —— 主管派錯 ＋ 子 agent 讀錯，誤差一層層疊上去，也更難定位是哪一層出包。</li>
+      <li><strong>矛盾要調和</strong> —— 兩個子 agent 給出衝突資訊時，<strong>主管要負責調和並對最終答案負責</strong>，不能把兩段矛盾直接貼給使用者。</li>
+      <li><strong>跨 agent 引用</strong> —— 來源標註（知識庫引用、即時數據查詢時間）要能<strong>從子 agent 一路帶回</strong>主管的最終答案，否則使用者看不到憑據。</li>
+    </ul>
+
+    <h2 id="observability">C.4 可觀測性與護欄</h2>
+    <ul>
+      <li><strong>trace 變成樹</strong> —— 原本一條線性紀錄，現在要記「哪個 agent 叫了哪個、帶什麼 task、回什麼 result」<strong>整棵樹</strong>，否則出事查不到。</li>
+      <li><strong>兩道上限</strong> —— 除了單一 agent 已有的「步數上限」，多 agent 要再加「<strong>agent 深度上限</strong>」，避免遞迴失控。</li>
+      <li><strong>每個子 agent 沿用安全模型</strong> —— 子 agent 的工具一樣受 allow-list ＋ scope ＋ 稽核 log 管（見姊妹篇 §3.6），<strong>不因為被包成工具就鬆綁</strong>。</li>
+    </ul>
+    <div class="callout-warn callout">一句話：<strong>多 agent ＝ 用「成本 × 延遲 × 失敗面 × 除錯難度」換「專業化 ＋ 隔離」。</strong>沒撞到 <a class="inline" href="#when">A.2</a> 的痛點前，這筆交易划不來。</div>
+
+    <!-- ===================== PART D ===================== -->
+    <div class="part-header">Part D — 套到 EnGenie</div>
+
+    <h2 id="eg-cut">D.1 第一刀：按「安全邊界」拆，不是按「聰明」拆</h2>
+    <p>如果哪天 EnGenie 的單一 agent 真的撐不住要拆，最有價值的第一刀是<strong>沿著安全邊界</strong>切 —— 把「碰得到內網」和「對外公開」分開：</p>
+    <table>
+      <thead><tr><th>專長 agent</th><th>工具子集</th><th>模型 / 風險</th><th>誰能用（沿用 §3.5 scope）</th></tr></thead>
+      <tbody>
+        <tr><td><strong>知識 Agent</strong></td><td><code>search_knowledge_base</code>（＝現在的 RAG）</td><td>便宜模型可、唯讀、低風險</td><td>所有 workspace（含對外公開 widget）</td></tr>
+        <tr><td><strong>即時網路 Agent</strong></td><td><code>get_device_status</code> / <code>query_event_logs</code> / <code>get_org_licenses</code> …</td><td>強模型、碰內網、<strong>高風險</strong></td><td>僅內部 IT／FAE workspace，且限定 org</td></tr>
+      </tbody>
+    </table>
+    <div class="callout-ok callout"><strong>為什麼先切這刀：</strong>就算還不缺「更聰明」，光是<strong>把高風險的內網能力獨立成一個收緊權限、可獨立稽核的 agent</strong>，隔離價值就回本了。安全優先，聰明其次。</div>
+
+    <h2 id="eg-impl">D.2 用「子 agent 當工具」落地</h2>
+    <p>不要一上來就蓋動態 supervisor。用 <a class="inline" href="#agent-as-tool">B.2</a> 的做法：主管 agent 的工具清單裡，多一個 <code>ask_network_specialist</code>（內部就是即時網路 Agent 的 loop）。誰能用，繼續用 <code>ask_workspaces.scope</code> 管：</p>
+    <pre><code><span class="c">// ask_workspaces.scope —— 沿用姊妹篇 §3.5，只是把「能用的子 agent」也納入</span>
+{
+  <span class="s">"knowledge_areas"</span>: [<span class="s">"marketing"</span>],
+  <span class="s">"tools"</span>: [<span class="s">"search_knowledge_base"</span>],
+  <span class="s">"agents"</span>: []                          <span class="c">// 公開 widget：只有知識，碰不到即時網路 agent</span>
+}
+{
+  <span class="s">"tools"</span>: [<span class="s">"search_knowledge_base"</span>],
+  <span class="s">"agents"</span>: [<span class="s">"network_specialist"</span>],     <span class="c">// 內部 IT workspace：才開即時網路 agent</span>
+  <span class="s">"agent_orgs"</span>: [<span class="s">"org_abc"</span>]              <span class="c">// 且限定可查的 org</span>
+}</code></pre>
+    <div class="callout"><strong>＝同一個權限模型再上一層：</strong>多 agent <strong>不需要</strong>另一套權限系統。「哪個 workspace 能叫哪個子 agent」就是 <a class="inline" href="agent-architecture.html#permissions">§3.5</a> per-workspace scope 的延伸。</div>
+
+    <h2 id="eg-roadmap">D.3 漸進路線（別一步到位）</h2>
+    <table>
+      <thead><tr><th>階段</th><th>做什麼</th><th>結構</th></tr></thead>
+      <tbody>
+        <tr><td><strong>現在</strong></td><td>把單一 agent 做扎實（姊妹篇 Part 3–5：Tool／Provider 抽象、scope、安全）</td><td>單一 agent</td></tr>
+        <tr><td><strong>第一刀</strong></td><td>把「即時網路」獨立成<strong>一個</strong>子 agent，用 agent-as-tool 掛上去；scope 加 <code>agents</code> 欄位</td><td>1 主 ＋ 1 專長（當工具）</td></tr>
+        <tr><td><strong>長出來再說</strong></td><td>專長到 3＋（再加 FAE 診斷、報表…）、需要動態組合與平行，才把「當工具」升級成真正的 <strong>supervisor</strong></td><td>主管–工人</td></tr>
+      </tbody>
+    </table>
+    <div class="callout-warn callout"><strong>前提：</strong>這條線排在姊妹篇 <a class="inline" href="agent-architecture.html#plan">§5</a> 的 Stage 4 之後 —— 單一 agent 穩了、且實際感受到 <a class="inline" href="#when">A.2</a> 的某個痛點，再啟動。</div>
+    <div class="callout-ok callout"><strong>好消息：</strong>因為單一 agent 設計已經用了乾淨的 <strong>Tool 抽象</strong> ＋ <strong>per-workspace scope</strong>，未來要走多 agent，是「<strong>把一個專長包成工具</strong>」，不是打掉重練 —— 這套架構<strong>天生就是 multi-agent-ready</strong>。</div>
+
+    <!-- ===================== 附錄 ===================== -->
+    <h2 id="appendix">附錄 · 延伸閱讀的觀念關鍵字</h2>
+    <ul>
+      <li><strong>Orchestrator-Worker / Supervisor</strong>：主管派工給專長 worker 的主流多 agent 結構（<a class="inline" href="#supervisor">B.1</a>）。</li>
+      <li><strong>Agent-as-Tool</strong>：把子 agent 包成工具的做法 —— 多 agent 最省的入口（<a class="inline" href="#agent-as-tool">B.2</a>）。</li>
+      <li><strong>Handoff / Swarm</strong>：agent 之間轉接控制權的對等模式（<a class="inline" href="#handoff">B.4</a>）。</li>
+      <li><strong>Context Engineering for sub-agents</strong>：怎麼設計「往下傳的子任務」與「往上回的結果」—— 多 agent 的核心工夫（<a class="inline" href="#context">C.1</a>）。</li>
+      <li><strong>框架地景</strong>：市面上有 LangGraph、CrewAI、AutoGen 等多 agent 框架；但 EnGenie <strong>現有的 Tool / Provider 抽象先夠用</strong>，不急著綁框架 —— 需要時再評估，重點是觀念而非工具。</li>
+      <li><strong>姊妹篇</strong>：<a class="inline" href="agent-architecture.html">單一 Agent 架構（從純 RAG 到工具導向 Agent）</a> —— 一切的地基。</li>
+    </ul>
+
+    <div class="doc-footer">
+      EnGenie 多 Agent 架構 · 撰寫 2026-06-15 · 狀態：進階設計參考（尚未實作）<br>
+      姊妹篇：<a href="agent-architecture.html">單一 Agent 架構</a> ·
+      原始 Markdown：<a href="https://github.com/terrelyeh/ds-generator-eg/blob/main/apps/engenie/docs/multi-agent-architecture.md">apps/engenie/docs/multi-agent-architecture.md</a>
+      <div class="muted">本頁為內部知識文件，需 EnGenie 登入後檢視。</div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
