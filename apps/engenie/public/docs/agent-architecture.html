@@ -217,7 +217,21 @@
       <li><a href="#routes">4 · 兩種路線</a></li>
       <li><a href="#plan">5 · 分階段計畫</a></li>
       <li><a href="#decisions">6 · 決策點</a></li>
-      <li><a href="#appendix">附錄 · 延伸關鍵字</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part 7 — 進階</div>
+    <ol>
+      <li><a href="#multi-agent">7 · 多 Agent 架構</a></li>
+      <li><a href="#ma-when" class="sub">7.1 何時才需要</a></li>
+      <li><a href="#ma-topologies" class="sub">7.2 兩種主要結構</a></li>
+      <li><a href="#ma-engenie" class="sub">7.3 套到 EnGenie</a></li>
+      <li><a href="#ma-costs" class="sub">7.4 工程代價</a></li>
+      <li><a href="#ma-advice" class="sub">7.5 務實建議</a></li>
+    </ol>
+
+    <div class="sidebar-title">附錄</div>
+    <ol>
+      <li><a href="#appendix">延伸關鍵字</a></li>
     </ol>
   </nav>
 
@@ -329,7 +343,7 @@
         <tr><td><strong>Orchestration（編排）</strong></td><td>後端負責「叫 LLM、執行工具、把結果接回去」的協調邏輯</td></tr>
         <tr><td><strong>Router（路由）</strong></td><td>先分類意圖，把問題分流到不同處理路徑（比 agent 簡單）</td></tr>
         <tr><td><strong>MCP</strong></td><td>Model Context Protocol，一套「工具/資料源」標準接法，讓工具可跨系統重用</td></tr>
-        <tr><td><strong>Multi-agent</strong></td><td>多個各有專長的 agent 協作（進階，本文先不展開）</td></tr>
+        <tr><td><strong>Multi-agent</strong></td><td>多個各有專長的 agent 協作（進階，見 <a class="inline" href="#multi-agent">§7</a>）</td></tr>
       </tbody>
     </table>
 
@@ -383,7 +397,7 @@
     </div>
     <div class="callout-warn callout">
       <strong>誤解 2：「這就是 Agent Teams / 多 agent。」</strong> → <strong>不是。</strong>
-      這是「<strong>一個</strong> agent + 一堆工具」。Agent Teams（多個 agent 協作）是更上層、更後面的事，你現在不需要。
+      這是「<strong>一個</strong> agent + 一堆工具」。Agent Teams（多個 agent 協作）是更上層、更後面的事，你現在不需要（多 agent 怎麼設計見 <a class="inline" href="#multi-agent">§7</a>）。
     </div>
 
     <!-- ===================== PART 2 ===================== -->
@@ -601,7 +615,7 @@
         <tr><td><strong>適合</strong></td><td>需求種類少、想快速驗證價值</td><td>需求多樣、要真正的「agent」體驗</td></tr>
       </tbody>
     </table>
-    <div class="callout"><strong>建議：</strong>先做 A 的精神當 PoC（甚至可用 B 的技術只接 2 個工具），驗證「即時資料進得來、使用者買單」之後，再投資 B 的完整 provider 抽象。<strong>B 才是「多 agent 概念」的終態</strong>，A 是過渡。</div>
+    <div class="callout"><strong>建議：</strong>先做 A 的精神當 PoC（甚至可用 B 的技術只接 2 個工具），驗證「即時資料進得來、使用者買單」之後，再投資 B 的完整 provider 抽象。<strong>B 才是「完整工具導向 agent」的終態</strong>（真正的「多 agent」是更後面的事，見 <a class="inline" href="#multi-agent">§7</a>），A 是過渡。</div>
 
     <h2 id="plan">5 · 分階段實作計畫</h2>
     <div class="callout-warn callout"><strong>前提：</strong>先把 monorepo 切換（Phase 5）收尾，再開這條線。</div>
@@ -612,7 +626,7 @@
         <tr><td><strong>Stage 1 — Provider 抽象 + 串流</strong></td><td>把 Claude tool loop 抽象化，補 OpenAI / Gemini adapter；接上 SSE，前端顯示「工具執行中」狀態。</td><td><span class="badge badge-blue">2–3 天</span></td></tr>
         <tr><td><strong>Stage 2 — 工具擴充 + 權限</strong></td><td>加 <code>query_event_logs</code> / <code>get_org_licenses</code> / <code>list_orgs</code>；<code>scope</code> 加 <code>tools</code>/<code>tool_orgs</code>；管理 UI 勾選工具。</td><td><span class="badge badge-blue">1–2 天</span></td></tr>
         <tr><td><strong>Stage 3 — 安全 + 稽核 + 成本</strong></td><td>輸入白名單、稽核 log、限流、prompt-injection 防護、模型分級。</td><td><span class="badge badge-blue">1–2 天</span></td></tr>
-        <tr><td><strong>（未來）Stage 4</strong></td><td>需人工確認的「寫入類」工具；或 multi-agent 協作。風險最高，獨立評估。</td><td><span class="badge badge-gray">未定</span></td></tr>
+        <tr><td><strong>（未來）Stage 4</strong></td><td>需人工確認的「寫入類」工具；或 multi-agent 協作（見 <a class="inline" href="#multi-agent">§7</a>）。風險最高，獨立評估。</td><td><span class="badge badge-gray">未定</span></td></tr>
       </tbody>
     </table>
 
@@ -625,6 +639,104 @@
       <li><strong>模型策略</strong> —— agent 模式要不要鎖定較強模型？便宜款只做純 RAG？</li>
     </ol>
 
+    <!-- ===================== PART 7 ===================== -->
+    <div class="part-header">Part 7 — 進階：多 Agent 架構</div>
+
+    <h2 id="multi-agent">7 · 多 Agent 架構（你還用不到，但先講清楚怎麼設計）</h2>
+    <p class="lead">
+      前面整份文件的結論是「<strong>一個 agent ＋ 一堆工具</strong>」就能走很遠。<strong>Multi-agent</strong>
+      （多個各有專長的 agent 協作）是更後面、更進階的事 —— 它不是「更聰明」的免費升級，而是
+      <strong>用複雜度換取「專業化」與「隔離」</strong>。這章講三件事：<strong>何時才真的需要</strong>、
+      <strong>有哪幾種結構</strong>、以及<strong>套到 EnGenie 會長怎樣</strong>。
+    </p>
+
+    <h3 id="ma-when">7.1 什麼時候才真的需要多 agent？</h3>
+    <p>預設答案是「<strong>還不需要</strong>」。單一 agent 配上設計良好的工具集，能涵蓋的範圍比直覺大很多。
+    只有當你<strong>實際撞到</strong>下面這些痛點之一，拆成多 agent 才划算：</p>
+    <table>
+      <thead><tr><th>觸發訊號</th><th>單一 agent 為什麼會痛</th><th>拆成多 agent 怎麼解</th></tr></thead>
+      <tbody>
+        <tr><td><strong>工具太多、選錯率上升</strong></td><td>一個 agent 掛 15–20 個工具，system prompt 爆長、模型常選錯</td><td>按領域拆，每個 agent 只看自己 3–5 個工具，選得更準</td></tr>
+        <tr><td><strong>人設／指令互相打架</strong></td><td>「謹慎的內網維運」和「親切的產品問答」需要完全不同的 prompt 與安全姿態，塞一份兩邊都變差</td><td>各自一個 agent、各自一份 system prompt</td></tr>
+        <tr><td><strong>子任務該用不同模型</strong></td><td>檢索用便宜模型就好，但對設備數據推理要強模型 —— 單一 agent 全程同一個</td><td>每個 agent 綁自己的模型，做成本／品質分級</td></tr>
+        <tr><td><strong>子任務可平行</strong></td><td>「比較三台規格 ＋ 同時查三台即時狀態」單一 agent 只能一步步排隊</td><td>主管 agent 把工作 fan-out 給多個 worker 同時跑</td></tr>
+        <tr><td><strong>安全隔離</strong></td><td>能打內網即時 API 的能力，跟對外公開問答塞在同一個 agent，風險面變大</td><td>把「碰得到內網」的 agent 獨立、收緊權限，跟公開 agent 隔開</td></tr>
+      </tbody>
+    </table>
+    <div class="callout-warn callout"><strong>反向訊號：</strong>如果想做多 agent 只是因為「聽起來比較進階」，<strong>別做</strong>。每多一個 agent ＝ 多一輪（或多輪）LLM 呼叫，成本、延遲、失敗面全部往上疊。</div>
+
+    <h3 id="ma-topologies">7.2 兩種主要結構（topology）</h3>
+    <p>多 agent 怎麼接，主流就兩種骨架；其餘變形多半從這兩種衍生。</p>
+    <p><strong>(A) 主管–工人（Supervisor / Orchestrator-Worker）</strong> —— 一個「主管 agent」收下需求，
+    <strong>自己不做領域工作</strong>，而是判斷該交給哪個（哪幾個）專長子 agent、派工、收回結果、綜合成最終答案。</p>
+    <div class="ascii">                  ┌──────────── Supervisor（主管 agent）────────────┐
+   使用者問題 ──▶ │  看懂需求 → 決定派給誰 → 收齊結果 → 綜合成答案    │
+                  └──────┬──────────────┬──────────────┬──────────┘
+                         ▼              ▼              ▼
+                  <b>知識 Agent</b>     <b>即時網路 Agent</b>    （其他專長）
+                  └ search_kb     └ device_status / event_logs …
+                     ↑ 各自有自己的 prompt、工具子集、甚至模型</div>
+    <p><strong>(B) 子 agent 當工具（Agent-as-Tool）</strong> —— 這是<strong>從本文單一 agent 設計最自然的長法</strong>：
+    回頭看 <a class="inline" href="#abstractions">§3.2</a> 的 <code>Tool</code> 介面，那裡的表已經列了一種工具叫
+    「<strong>LLM 型工具 / 子 agent</strong>」。一個子 agent 其實就是一個 <code>run()</code> 內部跑著自己 agent loop
+    的工具 —— 上層 agent 像呼叫任何工具一樣呼叫它。</p>
+    <div class="ascii">上層 Agent 的工具清單：
+   ├─ search_knowledge_base        ← 純程式工具
+   ├─ get_device_status            ← 純程式工具
+   └─ <b>ask_network_specialist</b>       ← 子 agent 包成的工具：run() 裡是另一個 agent loop
+                                    （帶自己的 prompt ＋ 自己的即時 API 工具子集）</div>
+    <div class="callout"><strong>關鍵：</strong>(B) 不是新架構，是 <a class="inline" href="#abstractions">§3.2</a> Tool 抽象的一個 case。
+    把單一 agent 的 Tool 介面做好，未來要多 agent 就是「<strong>把某個專長包成一個 run() 是 agent loop 的工具</strong>」，<strong>不用重寫</strong>。</div>
+    <table>
+      <thead><tr><th></th><th>(A) 主管–工人</th><th>(B) 子 agent 當工具</th></tr></thead>
+      <tbody>
+        <tr><td><strong>誰決定派工</strong></td><td>主管 agent 動態判斷</td><td>上層 agent 把子 agent 當工具，照選工具邏輯叫</td></tr>
+        <tr><td><strong>改動量</strong></td><td>要新增 supervisor 層 ＋ 派工協定</td><td>幾乎零新概念，沿用 Tool 介面</td></tr>
+        <tr><td><strong>適合</strong></td><td>專長多（3＋）、需要動態組合與平行派工</td><td>只想隔出 1–2 個專長子 agent（EnGenie 的起點）</td></tr>
+      </tbody>
+    </table>
+    <p><strong>另外兩種變形（知道即可）：</strong>固定<strong>流水線</strong>（planner → executor → reviewer，順序寫死、好控）、
+    <strong>對等交接</strong>（一個 agent 把控制權「轉接」給另一個，常見於客服路由）。EnGenie 用不太到，先略。</p>
+
+    <h3 id="ma-engenie">7.3 套到 EnGenie：會長怎樣</h3>
+    <p>如果哪天 EnGenie 的單一 agent 真的撐不住要拆，最自然的切法是<strong>按「安全邊界」拆，而不是按「聰明」拆</strong>：</p>
+    <table>
+      <thead><tr><th>專長 agent</th><th>工具子集</th><th>模型 / 風險</th><th>誰能用（沿用 §3.5 scope）</th></tr></thead>
+      <tbody>
+        <tr><td><strong>知識 Agent</strong></td><td><code>search_knowledge_base</code>（＝現在的 RAG）</td><td>便宜模型可、唯讀、低風險</td><td>所有 workspace（含對外公開 widget）</td></tr>
+        <tr><td><strong>即時網路 Agent</strong></td><td><code>get_device_status</code> / <code>query_event_logs</code> / <code>get_org_licenses</code> …</td><td>強模型、碰內網、<strong>高風險</strong></td><td>僅內部 IT／FAE workspace，且限定 org</td></tr>
+      </tbody>
+    </table>
+    <p>主管 agent 收到「<strong>ECW536 規格 ＋ 它現在線上嗎</strong>」→ 規格題派給知識 Agent、即時題派給即時網路 Agent，
+    再把兩邊合成一個答案（標清楚哪段是知識、哪段是即時數據與查詢時間）。</p>
+    <div class="callout-ok callout"><strong>這跟你們現有設計接得起來：</strong>「哪個 workspace 能用哪個專長 agent」
+    <strong>就是 <a class="inline" href="#permissions">§3.5</a> per-workspace 權限</strong>再上一層 —— 公開 widget 的 workspace
+    只給「知識 Agent」，內部 workspace 才給「即時網路 Agent」。多 agent <strong>不需要另一套權限模型</strong>，沿用 <code>ask_workspaces.scope</code> 的思路即可。</div>
+
+    <h3 id="ma-costs">7.4 多 agent 多出來的工程問題（誠實面）</h3>
+    <p>拆成多 agent 不是免費的，它把幾個原本沒有的難題端上桌：</p>
+    <ol>
+      <li><strong>上下文怎麼傳（最難的一題）</strong> —— 子 agent 預設<strong>看不到</strong>完整對話。主管要決定「往下傳什麼、子 agent 往上回什麼」。傳太少 → 子 agent 缺資訊答錯；整包往下傳 → token 爆炸。這是多 agent 的頭號工程成本。</li>
+      <li><strong>成本與延遲相乘</strong> —— 每個子 agent 各跑一輪自己的 loop（多次 LLM 呼叫），兩層的樹很容易變成單一 agent 的數倍 token 與時間。</li>
+      <li><strong>錯誤會累積</strong> —— 主管派錯 ＋ 子 agent 讀錯，誤差一層層疊上去，也更難定位是哪一層出包。</li>
+      <li><strong>最終答案誰負責、一致性</strong> —— 兩個子 agent 給出矛盾資訊時，主管要負責調和；跨 agent 的<strong>來源引用</strong>也更難串。</li>
+      <li><strong>可觀測性</strong> —— 原本一條線性 trace 變成一棵樹，log／tracing 要記「哪個 agent 叫了哪個、帶什麼、回什麼」整棵樹，否則出事查不到。</li>
+      <li><strong>遞迴護欄</strong> —— 在原本「步數上限」之外，還要加「<strong>agent 深度上限</strong>」，避免 agent 叫 agent 無限往下。</li>
+    </ol>
+    <div class="callout-warn callout">一句話：<strong>多 agent ＝ 用「成本 × 延遲 × 失敗面 × 除錯難度」換「專業化 ＋ 隔離」。</strong>沒撞到 7.1 的痛點前，這筆交易划不來。</div>
+
+    <h3 id="ma-advice">7.5 務實建議</h3>
+    <ol>
+      <li><strong>先把單一 agent 做扎實</strong>（本文 Part 3–5）—— 它能走的路比你想的遠，多數需求加個工具就解決。</li>
+      <li><strong>真要拆，第一刀切在「安全邊界」</strong> —— 把「碰得到內網即時 API」的能力獨立成一個收緊權限的 agent，跟對外知識 agent 隔開。光是<strong>隔離價值</strong>就回本，不必等到「更聰明」。</li>
+      <li><strong>用 (B) 子 agent 當工具落地</strong>，沿用 <a class="inline" href="#abstractions">§3.2</a> Tool 抽象，<strong>別</strong>一上來就蓋動態 supervisor。等真的有 3＋ 個專長、需要動態組合與平行，再升級成 (A)。</li>
+      <li><strong>保持淺</strong> —— 1 個主管 ＋ 一排平行專長（深度 ≤ 2），避免深層 agent 樹。</li>
+      <li><strong>排在 <a class="inline" href="#plan">§5</a> 的 Stage 4 之後</strong> —— 單一 agent 穩了、且實際感受到 7.1 的某個痛點，再啟動。</li>
+    </ol>
+    <div class="callout-ok callout"><strong>好消息：</strong>因為本文的單一 agent 設計已經用了乾淨的 <strong>Tool 抽象</strong>（<a class="inline" href="#abstractions">§3.2</a>）
+    ＋ <strong>per-workspace scope</strong>（<a class="inline" href="#permissions">§3.5</a>），未來要走多 agent，是「<strong>把一個專長包成工具</strong>」，
+    不是打掉重練 —— 這套架構<strong>天生就是 multi-agent-ready</strong>。</div>
+
     <h2 id="appendix">附錄 · 延伸閱讀的觀念關鍵字</h2>
     <ul>
       <li><strong>Function Calling / Tool Use</strong>：各家官方文件都有（Anthropic Tool Use、OpenAI Function Calling、Gemini Function Calling）—— 三家概念相同、API 形狀不同。</li>
@@ -634,7 +746,7 @@
     </ul>
 
     <div class="doc-footer">
-      EnGenie Agent 架構設計提案 · 撰寫 2026-06-13 · 狀態：設計提案（尚未實作）<br>
+      EnGenie Agent 架構設計提案 · 撰寫 2026-06-13（補充 Part 7 多 agent · 2026-06-15） · 狀態：設計提案（尚未實作）<br>
       原始 Markdown：<a href="https://github.com/terrelyeh/ds-generator-eg/blob/main/apps/engenie/docs/agent-architecture.md">apps/engenie/docs/agent-architecture.md</a>
       <div class="muted">本頁為內部知識文件，需 EnGenie 登入後檢視。</div>
     </div>
