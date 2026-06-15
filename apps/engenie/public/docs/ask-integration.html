@@ -164,13 +164,26 @@
           <div class="card">
             <div class="ic">⚙️</div>
             <h3>Search API</h3>
-            <div class="who">給：自建 App / 系統串接</div>
-            <p>機器對機器的 JSON 檢索 API（<code>/api/v1/search</code>，Bearer key、可限 scope、有流量限制）。把知識庫接進你自己的產品。</p>
-            <span class="tag">RESTful</span>
+            <div class="who">給：自建 App / AI agent</div>
+            <p>機器對機器的 JSON 檢索 API（<code>/api/v1/search</code>，Bearer key、可限 scope、有流量限制）。把知識庫接進你自己的產品——<strong>消費端可以是傳統程式，也可以是 AI agent（Claude Code skill / MCP）</strong>。</p>
+            <span class="tag">RESTful · MCP-ready</span>
           </div>
         </div>
         <div class="callout">
           前兩種（Widget／整頁）是<strong>對人</strong>的完整聊天體驗；第三種（Search API）是<strong>對程式</strong>的檢索結果。Search API 的完整規格見 <a href="/docs/api-search.html">RAG Search API 文件</a>。
+        </div>
+
+        <h3 style="margin-top:28px">換個角度：其實是「兩個家族」——誰來當回答的大腦</h3>
+        <p class="section-lead">上面三種，差別其實在「生成答案的 LLM 在誰那邊」，可收斂成兩家：</p>
+        <table>
+          <thead><tr><th style="width:240px">家族</th><th>回答的「大腦」</th><th>對應形式</th></tr></thead>
+          <tbody>
+            <tr><td><strong>A · EnGenie 自己答</strong></td><td>EnGenie 的 RAG 管線（檢索＋生成）</td><td>浮動 Widget、整頁入口（對人、完整聊天）</td></tr>
+            <tr><td><strong>B · EnGenie 只給料，別人的腦答</strong></td><td>呼叫方</td><td>Search API → 消費端可是 <strong>傳統 App</strong>，也可是 <strong>AI agent</strong></td></tr>
+          </tbody>
+        </table>
+        <div class="callout">
+          <strong>B 家族最進階的一種：把知識接進 AI agent。</strong>做成一個 <strong>Claude Code skill</strong>（現有的 <code>engenius-kb</code>）或 <strong>MCP server</strong>，EnGenie 知識就變成使用者 AI 工具裡的「一個工具」——直接在他本來的工作流（Claude Code／Cursor…）裡問，還能跟他的其他工具一起用。架構觀念見 <a href="/docs/agent-architecture.html">Agent 架構</a>與<a href="/docs/multi-agent-architecture.html">多 Agent 架構</a>文件。
         </div>
 
         <h2 id="modes"><span class="num">3</span>三種 LLM 模式</h2>
