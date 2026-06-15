@@ -66,6 +66,7 @@
     }
     .sidebar a.sub { padding-left: 26px; font-size: 14.3px; color: var(--gray-light); }
     .sidebar a:hover { background: rgba(3,169,244,0.08); color: var(--blue-dark); }
+    .sidebar a.active { background: rgba(3,169,244,0.14); color: var(--blue-dark); font-weight: 700; }
     .sidebar a.xref { color: var(--blue-dark); font-weight: 600; }
 
     /* Main content */
@@ -482,5 +483,44 @@
     </div>
   </main>
 </div>
+<script>
+  // Scrollspy：捲動時高亮目前章節對應的 TOC 連結
+  (function () {
+    var sidebar = document.querySelector('.sidebar');
+    var items = Array.prototype.slice
+      .call(document.querySelectorAll('.sidebar a[href^="#"]'))
+      .map(function (a) {
+        var el = document.getElementById(a.getAttribute('href').slice(1));
+        return el ? { a: a, el: el } : null;
+      })
+      .filter(Boolean);
+    if (!items.length) return;
+    var activeA = null;
+    function update() {
+      var line = 120; // 「目前章節」判定線：距視窗頂端 px
+      var current = items[0];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].el.getBoundingClientRect().top <= line) current = items[i];
+        else break;
+      }
+      if (current.a !== activeA) {
+        if (activeA) activeA.classList.remove('active');
+        current.a.classList.add('active');
+        activeA = current.a;
+        if (sidebar) {
+          var lr = current.a.getBoundingClientRect(), sr = sidebar.getBoundingClientRect();
+          if (lr.top < sr.top + 8 || lr.bottom > sr.bottom - 8) current.a.scrollIntoView({ block: 'nearest' });
+        }
+      }
+    }
+    var ticking = false;
+    function onScroll() {
+      if (!ticking) { ticking = true; requestAnimationFrame(function () { update(); ticking = false; }); }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+  })();
+</script>
 </body>
 </html>
