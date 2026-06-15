@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EnGenie Knowledge MCP — 設計草案</title>
+  <meta name="description" content="把 EnGenius 知識庫(Search API)包成一個 MCP server,讓任何 MCP client(Claude Code/Desktop、Cursor…)把 EnGenie 知識當原生工具。engenie_search 工具設計、stdio vs 遠端 hosted、key/scope 沿用、跟 skill 的分工。">
+  <meta property="og:type" content="article">
+  <meta property="og:site_name" content="EnGenie">
+  <meta property="og:title" content="EnGenie Knowledge MCP — 設計草案">
+  <meta property="og:description" content="把知識庫(Search API)包成 MCP server,讓任何 AI agent 把 EnGenie 知識當原生工具。工具 schema、傳輸、key/scope、跟 skill 的分工與落地計畫。">
+  <meta property="og:url" content="https://engenie-eg.vercel.app/docs/engenie-knowledge-mcp.html">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="EnGenie Knowledge MCP — 設計草案">
+  <meta name="twitter:description" content="把知識庫包成 MCP server,讓任何 AI agent 把 EnGenie 知識當原生工具。">
+  <style>
+    :root {
+      --blue: #03a9f4;
+      --blue-dark: #0288d1;
+      --gray-dark: #2C3345;
+      --gray: #58595B;
+      --gray-light: #6f6f6f;
+      --gray-bg: #f8f9fa;
+      --border: #e2e5e9;
+      --amber: #d97706;
+      --amber-bg: #fffbeb;
+      --red: #dc2626;
+      --red-bg: #fef2f2;
+      --green: #059669;
+      --green-bg: #ecfdf5;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "PingFang TC", "Microsoft JhengHei", sans-serif;
+      color: var(--gray-dark);
+      font-size: 16.5px;
+      line-height: 1.75;
+      background: #fff;
+    }
+
+    .page-layout { display: flex; max-width: 1300px; margin: 0 auto; }
+
+    .sidebar {
+      width: 264px; flex-shrink: 0; position: sticky; top: 0;
+      height: 100vh; overflow-y: auto;
+      border-right: 1px solid var(--border); padding: 28px 18px; background: var(--gray-bg);
+    }
+    .sidebar-brand {
+      font-weight: 800; font-size: 17.6px; color: var(--blue-dark); margin-bottom: 4px;
+      letter-spacing: -0.01em;
+    }
+    .sidebar-tag { font-size: 13.2px; color: var(--gray-light); margin-bottom: 22px; }
+    .sidebar-title {
+      font-weight: 700; font-size: 13.2px; text-transform: uppercase;
+      letter-spacing: 0.06em; color: var(--gray-light); margin: 18px 0 8px;
+    }
+    .sidebar ol { list-style: none; padding: 0; margin: 0; }
+    .sidebar li { margin: 0; }
+    .sidebar a {
+      display: block; padding: 6px 12px; border-radius: 6px; font-size: 14.85px;
+      color: var(--gray); text-decoration: none; transition: all 0.15s; line-height: 1.45;
+    }
+    .sidebar a.sub { padding-left: 26px; font-size: 14.3px; color: var(--gray-light); }
+    .sidebar a:hover { background: rgba(3,169,244,0.08); color: var(--blue-dark); }
+    .sidebar a.active { background: rgba(3,169,244,0.14); color: var(--blue-dark); font-weight: 700; }
+    .sidebar a.xref { color: var(--blue-dark); font-weight: 600; }
+
+    .main-content { flex: 1; min-width: 0; padding: 44px 56px 90px; max-width: 920px; }
+
+    .doc-status {
+      display: inline-flex; align-items: center; gap: 8px; margin-bottom: 18px;
+      background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a;
+      font-size: 14.3px; font-weight: 600; padding: 5px 14px; border-radius: 20px;
+    }
+    .doc-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--amber); }
+
+    h1 {
+      font-size: 33px; font-weight: 800; color: var(--blue-dark); letter-spacing: -0.015em;
+      margin-bottom: 8px; border-bottom: 3px solid var(--blue); padding-bottom: 14px; line-height: 1.25;
+    }
+    .subtitle { font-size: 15.4px; color: var(--gray-light); margin-bottom: 30px; line-height: 1.7; }
+
+    .part-header {
+      font-size: 14.3px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--blue); margin: 52px 0 4px;
+    }
+    h2 {
+      font-size: 23.1px; font-weight: 700; color: var(--gray-dark);
+      margin: 8px 0 16px; padding-bottom: 9px; border-bottom: 2px solid var(--border); scroll-margin-top: 16px;
+    }
+    h3 { font-size: 17.6px; font-weight: 700; color: var(--gray); margin: 26px 0 9px; scroll-margin-top: 16px; }
+
+    p { margin-bottom: 12px; }
+    ul, ol { margin: 0 0 16px; padding-left: 24px; }
+    li { margin-bottom: 6px; }
+    strong { color: var(--gray-dark); }
+    a.inline { color: var(--blue-dark); text-decoration: none; }
+    a.inline:hover { text-decoration: underline; }
+
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 24px; font-size: 15.4px; }
+    thead th {
+      background: var(--gray-dark); color: #fff; font-weight: 600;
+      padding: 10px 14px; text-align: left;
+    }
+    tbody td { padding: 9px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tbody tr:nth-child(even) { background: var(--gray-bg); }
+    tbody tr:hover { background: rgba(3, 169, 244, 0.06); }
+    td code, li code, p code { white-space: nowrap; }
+
+    code {
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace; font-size: 14.3px;
+      background: #f0f2f5; padding: 2px 7px; border-radius: 4px; color: #c7254e;
+    }
+    pre {
+      background: #0d1117; color: #c9d1d9; padding: 18px 22px; border-radius: 8px;
+      overflow-x: auto; font-size: 14.3px; line-height: 1.7; margin: 12px 0 24px;
+      font-family: "SF Mono", "Fira Code", "JetBrains Mono", ui-monospace, monospace;
+    }
+    pre code { background: none; padding: 0; color: inherit; white-space: pre; }
+    pre .c { color: #8b949e; }
+    pre .k { color: #ff7b72; }
+    pre .s { color: #a5d6ff; }
+    pre .f { color: #d2a8ff; }
+    pre .arrow { color: #79c0ff; }
+
+    .callout {
+      background: rgba(3,169,244,0.06); border-left: 4px solid var(--blue);
+      padding: 13px 18px; border-radius: 0 8px 8px 0; margin: 14px 0 24px; font-size: 15.4px;
+    }
+    .callout-warn { background: var(--amber-bg); border-left-color: var(--amber); }
+    .callout-ok { background: var(--green-bg); border-left-color: var(--green); }
+    .callout strong { color: var(--blue-dark); }
+    .callout-warn strong { color: var(--amber); }
+    .callout-ok strong { color: var(--green); }
+
+    .lead {
+      font-size: 17.05px; color: var(--gray-dark); background: var(--gray-bg);
+      border-radius: 12px; padding: 18px 22px; margin-bottom: 28px; line-height: 1.75;
+      border: 1px solid var(--border);
+    }
+    .lead strong { color: var(--blue-dark); }
+
+    .sibling {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 28px;
+      background: rgba(3,169,244,0.06); border: 1px solid #bbe6fb; border-radius: 10px;
+      padding: 12px 16px; font-size: 15.4px;
+    }
+    .sibling a { color: var(--blue-dark); font-weight: 700; text-decoration: none; }
+    .sibling a:hover { text-decoration: underline; }
+
+    .badge {
+      display: inline-block; font-size: 13.2px; font-weight: 600;
+      padding: 2px 9px; border-radius: 10px; white-space: nowrap; vertical-align: middle;
+    }
+    .badge-blue { background: rgba(3,169,244,0.12); color: var(--blue-dark); }
+    .badge-gray { background: #eee; color: var(--gray); }
+    .badge-amber { background: var(--amber-bg); color: var(--amber); border: 1px solid #fde68a; }
+    .badge-green { background: var(--green-bg); color: var(--green); }
+
+    .ascii {
+      background: var(--gray-bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 16px 20px; margin: 12px 0 24px; overflow-x: auto;
+      font-family: "SF Mono", "Fira Code", ui-monospace, monospace; font-size: 13.75px;
+      line-height: 1.7; color: var(--gray-dark); white-space: pre;
+    }
+    .ascii b { color: var(--blue-dark); }
+
+    .doc-footer {
+      margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--border);
+      font-size: 15.4px; color: var(--gray); line-height: 1.9;
+    }
+    .doc-footer a { color: var(--blue-dark); text-decoration: none; }
+    .doc-footer a:hover { text-decoration: underline; }
+    .doc-footer .muted { color: var(--gray-light); font-size: 14.3px; margin-top: 8px; }
+
+    @media (max-width: 900px) {
+      .sidebar { display: none; }
+      .main-content { padding: 28px 22px 70px; }
+    }
+    @media print {
+      .sidebar { display: none; }
+      .main-content { padding: 20px; max-width: 100%; }
+      table, pre, .ascii { break-inside: avoid; }
+      a.inline { color: inherit; }
+    }
+  </style>
+</head>
+<body>
+<div class="page-layout">
+  <nav class="sidebar">
+    <div class="sidebar-brand">EnGenie</div>
+    <div class="sidebar-tag">Knowledge MCP 設計草案</div>
+
+    <div class="sidebar-title">總覽</div>
+    <ol>
+      <li><a href="#summary">0 · 一句話總結</a></li>
+      <li><a href="ask-integration.html" class="xref">↩ 整合總覽（兩個家族）</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part A — 為什麼</div>
+    <ol>
+      <li><a href="#place">A.1 它在架構的位置</a></li>
+      <li><a href="#vs-skill" class="sub">A.2 MCP vs Skill</a></li>
+      <li><a href="#why-now" class="sub">A.3 為什麼現在做划算</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part B — 設計</div>
+    <ol>
+      <li><a href="#expose">B.1 暴露什麼</a></li>
+      <li><a href="#search-tool" class="sub">B.2 engenie_search</a></li>
+      <li><a href="#transport" class="sub">B.3 傳輸：stdio / hosted</a></li>
+      <li><a href="#auth" class="sub">B.4 key / scope</a></li>
+      <li><a href="#with-skill" class="sub">B.5 跟 skill 的分工</a></li>
+    </ol>
+
+    <div class="sidebar-title">Part C–D</div>
+    <ol>
+      <li><a href="#security">C · 安全與治理</a></li>
+      <li><a href="#plan">D · 落地計畫</a></li>
+      <li><a href="#appendix">附錄</a></li>
+    </ol>
+  </nav>
+
+  <main class="main-content">
+    <div class="doc-status"><span class="dot"></span>設計草案 · 尚未實作 · engenius-kb skill 的產品化</div>
+
+    <h1>EnGenie Knowledge MCP</h1>
+    <p class="subtitle">
+      EnGenie 架構設計文件 · 2026-06-15<br>
+      把 EnGenius 知識庫（現有 Search API）包成一個 <strong>MCP server</strong>，讓任何 MCP client
+      （Claude Code／Desktop、Cursor…）把 EnGenie 知識當<strong>原生工具</strong>。<br>
+      讀者：PM／RD／決策者。這份是 <code>engenius-kb</code> skill 的「產品版」設計。
+    </p>
+
+    <div class="sibling">
+      <span>🧩</span>
+      <span>系列文件：<a href="ask-integration.html">整合總覽（兩個家族）</a> · <a href="agent-architecture.html">單一 Agent 架構</a> · <a href="multi-agent-architecture.html">多 Agent 架構</a>。本篇＝整合總覽裡「<strong>B2 · AI agent 消費</strong>」那一格的產品化設計。</span>
+    </div>
+
+    <h2 id="summary">0 · 一句話總結</h2>
+    <p class="lead">
+      <code>engenius-kb</code> skill 是<strong>手刻原型</strong>（叫模型用 <code>curl</code> 打 <code>/api/v1/search</code>）。
+      <strong>EnGenie Knowledge MCP</strong> 是它的<strong>產品版</strong>：把同一支 Search API 包成一個
+      <strong>typed 工具 <code>engenie_search</code></strong>，任何 MCP client 都能<strong>原生呼叫</strong>，
+      不再經手 shell／jq／env var。投入小（薄薄一層包裝、沿用現有 key/scope/限流），
+      槓桿大（<strong>跨工具</strong>、<strong>更可靠</strong>、<strong>中央治理</strong>）。
+    </p>
+
+    <!-- ===================== PART A ===================== -->
+    <div class="part-header">Part A — 為什麼</div>
+
+    <h2 id="place">A.1 它在整個架構的位置</h2>
+    <p>在 <a class="inline" href="ask-integration.html">整合總覽</a>，EnGenie Ask 分兩個家族：<strong>A</strong>（EnGenie 自己答：Widget／整頁）和 <strong>B</strong>（EnGenie 只給料，呼叫方的腦答：Search API）。B 又分兩種消費者：傳統 App（B1）與 <strong>AI agent（B2）</strong>。</p>
+    <p>本篇就是 <strong>B2 的產品化</strong>：把「EnGenie 知識」做成 AI agent 能直接接的工具。它跟 <a class="inline" href="agent-architecture.html">單一 Agent 架構</a>是同一個概念的鏡像 —— 那裡 <code>search_knowledge_base</code> 是 <strong>EnGenie 自己 agent</strong> 的工具；MCP 是把同一個檢索能力<strong>跨出組織邊界、變成別人 agent 的工具</strong>。</p>
+    <div class="ascii">     EnGenie 後端                          別人的 AI agent（Claude Code / Cursor…）
+   ┌─────────────────┐    MCP 協定     ┌──────────────────────────────┐
+   │  /api/v1/search │◀───────────────│  工具清單：                    │
+   │  （RAG 檢索）    │  engenie_search │   ├─ 讀檔 / 終端機 / 其他 skill │
+   └─────────────────┘                 │   └─ <b>engenie_search</b>  ← 本篇  │
+        ↑ 沿用 key/scope/限流          └──────────────────────────────┘
+                                          知識跟使用者其他工具<b>同一輪推理</b></div>
+
+    <h2 id="vs-skill">A.2 MCP vs Skill（做的事不一樣，不是二選一）</h2>
+    <p><strong>Skill＝劇本</strong>（教 agent 怎麼做，模型用現有工具執行）；<strong>MCP＝能力</strong>（給 agent 一個原生工具，server 執行）。</p>
+    <table>
+      <thead><tr><th></th><th>Skill（現在的 engenius-kb）</th><th>MCP server（本篇）</th></tr></thead>
+      <tbody>
+        <tr><td><strong>打 API 方式</strong></td><td>模型寫 <code>curl</code> → Bash 跑 → 讀 JSON</td><td>模型直接 <code>engenie_search(...)</code>，server 內部打 API</td></tr>
+        <tr><td><strong>可靠度</strong></td><td>較脆（shell 引號／jq／<code>SPECHUB_API_KEY</code> 沒設）</td><td>高（typed 呼叫，沒那層雷）</td></tr>
+        <tr><td><strong>適用範圍</strong></td><td>只有 Claude Code</td><td>任何 MCP client（Claude Code/Desktop、Cursor、…）</td></tr>
+        <tr><td><strong>key/scope</strong></td><td>每人 export key 在 <code>.zshrc</code></td><td>server 統一管（hosted）或每人一條連線（stdio）</td></tr>
+        <tr><td><strong>本質</strong></td><td>劇本（含「怎麼用得好」）</td><td>能力（typed 工具）＋ 可附 prompt 劇本</td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>終態：MCP 墊在 Skill 底下，不是取代。</strong> MCP 提供穩、跨工具、可治理的 <code>engenie_search</code>；一份薄 prompt／skill 提供「用得好」的劇本（見 <a class="inline" href="#with-skill">B.5</a>）。</div>
+
+    <h2 id="why-now">A.3 為什麼現在做特別划算</h2>
+    <ul>
+      <li><strong>核心已經有了</strong> —— <code>/api/v1/search</code>、Bearer key、scope、限流、稽核全都在。MCP server 只是它<strong>薄薄一層轉接</strong>。</li>
+      <li><strong>不新增後端表面</strong> —— MCP 不是新的 RAG 管線，是現有 API 的另一種「門」。安全模型不變。</li>
+      <li><strong>最高槓桿的分發</strong> —— 知識去到使用者<strong>本來就在的 AI 工具</strong>裡，跟他的其他工具一起用，不用切去 widget。</li>
+    </ul>
+
+    <!-- ===================== PART B ===================== -->
+    <div class="part-header">Part B — 設計</div>
+
+    <h2 id="expose">B.1 暴露什麼：tools / resources / prompts</h2>
+    <p>MCP server 可以對 client 暴露三種東西。建議的取捨：</p>
+    <table>
+      <thead><tr><th>種類</th><th>內容</th><th>建議</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Tools</strong></td><td><code>engenie_search</code>（檢索，核心）；可選 <code>engenie_ask</code>（server 端直接生成答案）</td><td><span class="badge badge-green">先做 search</span></td></tr>
+        <tr><td><strong>Prompts</strong></td><td>一個 <code>/engenie</code> prompt：把「只根據檢索結果回答、標來源、同語言」的劇本送進 client</td><td><span class="badge badge-blue">第二步</span></td></tr>
+        <tr><td><strong>Resources</strong></td><td>可瀏覽的 taxonomy（Solution／產品線／型號／來源類型），給 agent 先看「有哪些範圍」</td><td><span class="badge badge-gray">選配</span></td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong><code>engenie_search</code> vs <code>engenie_ask</code>：</strong>
+      <code>search</code> = 只回 chunks、<strong>呼叫方的腦</strong>綜合（家族 B，乾淨的原語）。
+      <code>ask</code> = EnGenie <strong>自己</strong>檢索＋生成、回成品答案（家族 A 用 MCP 送）—— 給「只想要答案、不想處理 chunks」的呼叫方,但會吃 EnGenie 的 LLM 額度。先做 <code>search</code>,<code>ask</code> 之後再說。</div>
+
+    <h2 id="search-tool">B.2 核心工具 <code>engenie_search</code>（直接對映現有 API）</h2>
+    <pre><code><span class="c">// MCP 工具宣告（概念）— 內部就是打 /api/v1/search</span>
+{
+  name: <span class="s">"engenie_search"</span>,
+  description: <span class="s">"從 EnGenius 官方知識庫(Product SpecHub)檢索最相關的內容片段:產品規格、設定、"</span>
+             <span class="s">"Help Center、Gitbook、法規、上傳文件。回傳 chunks,由呼叫方綜合。用於任何需要"</span>
+             <span class="s">"以 EnGenius 官方文件為依據回答的問題。"</span>,
+  inputSchema: {
+    type: <span class="s">"object"</span>,
+    properties: {
+      query:        { type: <span class="s">"string"</span>, description: <span class="s">"使用者問題(≤2000 字)"</span> },
+      top_k:        { type: <span class="s">"number"</span>, description: <span class="s">"回幾筆(1–20,預設 8)"</span> },
+      source_types: { type: <span class="s">"array"</span>,  items: { type: <span class="s">"string"</span> } },   <span class="c">// product_spec / helpcenter…</span>
+      taxonomy:     { type: <span class="s">"object"</span> }                                  <span class="c">// { product_lines:[...] } 限範圍</span>
+    },
+    required: [<span class="s">"query"</span>]
+  }
+}</code></pre>
+    <p>回傳就是 Search API 的回應原樣（<code>{ ok, count, results:[{ content, title, source_type, source_url, score, taxonomy }] }</code>）。<strong>server 的 <code>run()</code> 幾乎是一行</strong>：</p>
+    <pre><code><span class="k">async function</span> <span class="f">engenie_search</span>(args, ctx) {
+  <span class="k">return</span> <span class="k">await</span> fetch(<span class="s">`${BASE}/api/v1/search`</span>, {
+    method: <span class="s">"POST"</span>,
+    headers: { Authorization: <span class="s">`Bearer ${ctx.apiKey}`</span>, <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span> },
+    body: JSON.<span class="f">stringify</span>(args),
+  }).<span class="f">then</span>(r =&gt; r.json());   <span class="c">// scope / 限流 / 稽核都在 API 那端已處理</span>
+}</code></pre>
+
+    <h2 id="transport">B.3 傳輸：本地 stdio vs 遠端 hosted</h2>
+    <table>
+      <thead><tr><th></th><th>本地 stdio</th><th>遠端 hosted（HTTP/SSE）</th></tr></thead>
+      <tbody>
+        <tr><td><strong>怎麼跑</strong></td><td>client 啟一個本地進程：<code>npx -y @engenius/engenie-mcp</code></td><td>EnGenie 跑一個 server，client 連 URL（如 <code>/mcp</code>）</td></tr>
+        <tr><td><strong>key 在哪</strong></td><td>使用者自己的 <code>SPECHUB_API_KEY</code>（env）</td><td>連線時認證（OAuth／key）→ 對映到 workspace/scope</td></tr>
+        <tr><td><strong>治理</strong></td><td>分散（每人一份）</td><td><strong>中央</strong>：可撤銷、可更新、可審計、統一限流</td></tr>
+        <tr><td><strong>安裝</strong></td><td>client 設定加一段（<code>.mcp.json</code> / Cursor 設定）</td><td>連一個 URL + 登入</td></tr>
+        <tr><td><strong>適合</strong></td><td><span class="badge badge-green">PoC / 個人最快</span></td><td><span class="badge badge-blue">正式產品 / 部門治理</span></td></tr>
+      </tbody>
+    </table>
+    <div class="callout"><strong>建議路徑：</strong>先做 <strong>stdio</strong>（<code>npx</code>，最快驗證，沿用現有 key）→ 有治理需求再做 <strong>hosted</strong>（中央管 key/scope，比「每人 export key」更安全）。</div>
+    <pre><code><span class="c">// 使用者端設定(stdio)— 例:Claude Code / .mcp.json</span>
+{
+  <span class="s">"mcpServers"</span>: {
+    <span class="s">"engenie"</span>: {
+      <span class="s">"command"</span>: <span class="s">"npx"</span>,
+      <span class="s">"args"</span>: [<span class="s">"-y"</span>, <span class="s">"@engenius/engenie-mcp"</span>],
+      <span class="s">"env"</span>: { <span class="s">"SPECHUB_API_KEY"</span>: <span class="s">"sk_live_…"</span> }
+    }
+  }
+}</code></pre>
+
+    <h2 id="auth">B.4 key / scope（沿用現有，不另起爐灶）</h2>
+    <ul>
+      <li>MCP server 對 <code>/api/v1/search</code> 認證用的就是<strong>現有的 <code>sk_live_</code> key</strong>；key 本身已綁 scope（能查哪些產品線／知識領域）與限流。</li>
+      <li><strong>stdio</strong>：key 在使用者 env，跟現在的 skill 一樣 —— 但<strong>不再寫進每次的 curl</strong>，由 server 持有。</li>
+      <li><strong>hosted</strong>：連線認證對映到一個 workspace 的 scope；key 不落到使用者端,<strong>中央可撤銷</strong>。這比現在「每人 <code>.zshrc</code> 放 key」治理好很多。</li>
+    </ul>
+
+    <h2 id="with-skill">B.5 跟 skill 的分工（MCP 之後 skill 還在做什麼）</h2>
+    <p>MCP 接手「<strong>打 API</strong>」這段；skill／prompt 留下「<strong>用得好</strong>」這段：</p>
+    <div class="ascii">  <b>MCP</b>（能力）         engenie_search 工具：穩、跨 client、server 治理
+     └ 取代 skill 裡「curl /api/v1/search」那段 plumbing
+
+  <b>Skill / Prompt</b>（劇本）  何時該查、查回來怎麼綜合/引用/排版、跟別的工具怎麼組合
+     └ engenius-kb skill <b>瘦身</b>:不再自己 curl,改成「呼叫 engenie_search 工具」</div>
+    <div class="callout-ok callout"><strong>遷移很輕：</strong>現有 <code>engenius-kb</code> skill 的「retrieve」那段換成呼叫 MCP 工具,「answer/cite」劇本原封不動保留(或搬進 MCP 的 <code>/engenie</code> prompt)。對使用者體驗只升不降。</div>
+
+    <!-- ===================== PART C ===================== -->
+    <div class="part-header">Part C–D — 安全與落地</div>
+
+    <h2 id="security">C · 安全與治理</h2>
+    <ol>
+      <li><strong>沿用 Search API 的模型</strong> —— key＝scope 邊界、限流、稽核 log 全在 API 端,MCP 不繞過。</li>
+      <li><strong>唯讀</strong> —— <code>engenie_search</code> 只讀不寫,風險等級低。任何「寫入類」工具是另一個等級,獨立評估。</li>
+      <li><strong>工具 description 是 prompt</strong> —— 寫清楚用途即可;檢索回傳的內容對呼叫方的模型是<strong>資料不是指令</strong>(prompt injection 由呼叫方的 agent 負責,但我們回傳乾淨結構化結果有幫助)。</li>
+      <li><strong>hosted＝信任邊界由 EnGenie 控</strong> —— 想中央撤銷、限制某 workspace、改 scope,都在 server 做,不必動使用者端。</li>
+    </ol>
+
+    <h2 id="plan">D · 落地計畫</h2>
+    <table>
+      <thead><tr><th>階段</th><th>內容</th><th>產出</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Stage 0 — stdio PoC</strong></td><td>一個 <code>npx</code> 起的 stdio MCP,只暴露 <code>engenie_search</code>(包現有 API);自己接上 Claude Code 驗證能原生呼叫。</td><td><span class="badge badge-blue">1 天內</span></td></tr>
+        <tr><td><strong>Stage 1 — prompt + 遷移</strong></td><td>加 <code>/engenie</code> prompt(劇本);把 <code>engenius-kb</code> skill 改成呼叫 MCP 工具;發佈 <code>@engenius/engenie-mcp</code>。</td><td><span class="badge badge-blue">1–2 天</span></td></tr>
+        <tr><td><strong>Stage 2 — hosted</strong></td><td>遠端 HTTP/SSE server + 連線認證對映 workspace/scope;中央 key 管理、撤銷、審計。</td><td><span class="badge badge-blue">數天</span></td></tr>
+        <tr><td><strong>（之後）Stage 3</strong></td><td><code>engenie_ask</code>(server 端生成)、resources(taxonomy 瀏覽)、更多 MCP client 適配。</td><td><span class="badge badge-gray">未定</span></td></tr>
+      </tbody>
+    </table>
+    <h3>決策點</h3>
+    <ol>
+      <li><strong>先 stdio 還是直接 hosted？</strong> —— 建議先 stdio PoC,證明價值再投 hosted。</li>
+      <li><strong>要不要 <code>engenie_ask</code>？</strong> —— 看有沒有「只想要成品答案」的呼叫方;先只做 <code>search</code>。</li>
+      <li><strong>發佈範圍</strong> —— 先內部(RD/FAE)還是直接給部門/整合商?跟 Search API 的 key 發放對齊。</li>
+    </ol>
+
+    <h2 id="appendix">附錄 · 延伸關鍵字</h2>
+    <ul>
+      <li><strong>MCP（Model Context Protocol）</strong>：讓 AI client 連到外部工具/資料源的開放協定;tools / resources / prompts 三類能力 + stdio / HTTP 傳輸。</li>
+      <li><strong>Search API</strong>：本 MCP 的後端,完整規格見 <a class="inline" href="api-search.html">RAG Search API 文件</a>。</li>
+      <li><strong>系列文件</strong>：<a class="inline" href="ask-integration.html">整合總覽</a> · <a class="inline" href="agent-architecture.html">單一 Agent 架構</a> · <a class="inline" href="multi-agent-architecture.html">多 Agent 架構</a>。</li>
+    </ul>
+
+    <div class="doc-footer">
+      EnGenie Knowledge MCP · 設計草案 · 撰寫 2026-06-15 · 狀態：設計草案（尚未實作）<br>
+      系列：<a href="ask-integration.html">整合總覽</a> · <a href="agent-architecture.html">單一 Agent</a> · <a href="multi-agent-architecture.html">多 Agent</a> ·
+      原始 Markdown：<a href="https://github.com/terrelyeh/ds-generator-eg/blob/main/apps/engenie/docs/engenie-knowledge-mcp.md">apps/engenie/docs/engenie-knowledge-mcp.md</a>
+      <div class="muted">本頁為內部知識文件，已公開分享。</div>
+    </div>
+  </main>
+</div>
+<script>
+  // Scrollspy：捲動時高亮目前章節對應的 TOC 連結
+  (function () {
+    var sidebar = document.querySelector('.sidebar');
+    var items = Array.prototype.slice
+      .call(document.querySelectorAll('.sidebar a[href^="#"]'))
+      .map(function (a) {
+        var el = document.getElementById(a.getAttribute('href').slice(1));
+        return el ? { a: a, el: el } : null;
+      })
+      .filter(Boolean);
+    if (!items.length) return;
+    var activeA = null;
+    function update() {
+      var line = 120;
+      var current = items[0];
+      for (var i = 0; i < items.length; i++) {
+        if (items[i].el.getBoundingClientRect().top <= line) current = items[i];
+        else break;
+      }
+      if (current.a !== activeA) {
+        if (activeA) activeA.classList.remove('active');
+        current.a.classList.add('active');
+        activeA = current.a;
+        if (sidebar) {
+          var lr = current.a.getBoundingClientRect(), sr = sidebar.getBoundingClientRect();
+          if (lr.top < sr.top + 8 || lr.bottom > sr.bottom - 8) current.a.scrollIntoView({ block: 'nearest' });
+        }
+      }
+    }
+    var ticking = false;
+    function onScroll() {
+      if (!ticking) { ticking = true; requestAnimationFrame(function () { update(); ticking = false; }); }
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+  })();
+</script>
+</body>
+</html>

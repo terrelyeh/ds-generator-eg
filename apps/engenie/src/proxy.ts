@@ -39,6 +39,7 @@ const PUBLIC_EXACT_PATHS = [
   "/docs/widget-demo.html",     // standalone widget showcase (fake-data demo page)
   "/docs/agent-architecture.html",        // agent architecture (single-agent) — shareable
   "/docs/multi-agent-architecture.html",  // multi-agent architecture — shareable
+  "/docs/engenie-knowledge-mcp.html",     // EnGenie Knowledge MCP design — shareable
 ];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/cron"];
