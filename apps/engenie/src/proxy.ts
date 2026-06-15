@@ -37,6 +37,8 @@ const PUBLIC_EXACT_PATHS = [
   "/docs/topology-icon-spec.html", // topology icon spec (design team)
   "/docs/ask-integration.html", // Ask Workspace integration service intro (departments)
   "/docs/widget-demo.html",     // standalone widget showcase (fake-data demo page)
+  "/docs/agent-architecture.html",        // agent architecture (single-agent) — shareable
+  "/docs/multi-agent-architecture.html",  // multi-agent architecture — shareable
 ];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/cron"];
