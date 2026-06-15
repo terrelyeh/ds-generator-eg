@@ -102,6 +102,34 @@ export function SolutionSidebar({
       <nav className="flex-1 space-y-0.5 px-2">
         {solutions.map((s) => {
           const isActive = s.slug === currentSlug;
+          // Solutions with no product lines yet are shown as disabled
+          // placeholders — visible so users know they're coming, but not
+          // clickable (a dead dashboard tab would just be empty).
+          const isEmpty = s.product_line_count === 0;
+
+          if (isEmpty) {
+            return (
+              <div
+                key={s.id}
+                title={collapsed ? `${s.label}（尚無產品）` : "尚無產品線"}
+                aria-disabled="true"
+                className={`flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm font-medium text-muted-foreground/35 cursor-not-allowed select-none ${
+                  collapsed ? "justify-center px-0" : ""
+                }`}
+              >
+                <span className="flex-shrink-0">{getIcon(s.icon)}</span>
+                {!collapsed && (
+                  <>
+                    <span className="truncate">{s.label}</span>
+                    <span className="ml-auto text-[10px] uppercase tracking-wide text-muted-foreground/35">
+                      soon
+                    </span>
+                  </>
+                )}
+              </div>
+            );
+          }
+
           return (
             <Link
               key={s.id}
