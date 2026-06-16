@@ -437,7 +437,7 @@ Current question: ${question}${topoHint}
 IMPORTANT formatting rules:
 1. Use inline citations like [1] to reference source documents. Rules: place ONE citation at the END of a paragraph or key claim (not after every sentence). Maximum 2 citations per paragraph. Never stack multiple citations together like [1, 3, 4, 5] — pick the single most relevant source.
 2. After your main answer, add a line with just "---" as a separator.
-3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in ${answerLanguageLabel}.`;
+3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in ${answerLanguageLabel}. Each MUST be a complete, standalone question that explicitly names the product / model / subject — never use context-dependent pronouns like "it" / "這個" / "該款" / "そちら". Suggested follow-ups are re-submitted verbatim as a brand-new query, so each one must make full sense on its own.`;
 
         // Step 4: Build sources for the response
         const sources = docs.map((d) => ({

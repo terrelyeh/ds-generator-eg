@@ -127,7 +127,6 @@ async function getKnowledgeSlugs(supabase: ReturnType<typeof createAdminClient>)
 export async function retrieveDocuments(opts: RetrieveOptions): Promise<RetrievedDoc[]> {
   const {
     question,
-    history = [],
     sourceType = null,
     sourceTypes = null,
     productLine = null,
@@ -158,14 +157,16 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
 
   const supabase = createAdminClient();
 
-  // Build the embedding query from recent history + the new question.
-  const recentHistory = history.slice(-20);
-  const searchQuery =
-    recentHistory.length > 0
-      ? `${recentHistory.map((m) => m.content).join("\n")}\n${question}`
-      : question;
+  // Embed ONLY the current question — NOT the conversation history. Concatenating
+  // prior turns biased the embedding toward earlier topics: a long WiFi-regulation
+  // answer in turn 1 would poison retrieval for an unrelated turn-2 question (e.g.
+  // switch PoE), so the vector search returned WiFi chunks and the model concluded
+  // the KB "only contains WiFi regulations". History still reaches the LLM via
+  // /api/ask for conversational context — it just must not skew the vector search.
+  // (`opts.history` is intentionally not read here; it stays on the type for a
+  // future query-condensation step that rewrites follow-ups into standalone queries.)
   const queryEmbedding = await generateEmbedding(
-    searchQuery.length > 8000 ? searchQuery.slice(-8000) : searchQuery,
+    question.length > 8000 ? question.slice(-8000) : question,
   );
 
   const filterMetadata = productLine ? JSON.stringify({ product_line: productLine }) : null;
