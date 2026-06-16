@@ -32,6 +32,121 @@ export type Database = {
         }
         Relationships: []
       }
+      battlecard_dimensions: {
+        Row: {
+          category: string
+          created_at: string
+          dimension_key: string
+          id: string
+          label: string
+          product_line_id: string
+          sort_order: number
+          unit: string | null
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          dimension_key: string
+          id?: string
+          label: string
+          product_line_id: string
+          sort_order?: number
+          unit?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          dimension_key?: string
+          id?: string
+          label?: string
+          product_line_id?: string
+          sort_order?: number
+          unit?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battlecard_dimensions_product_line_id_fkey"
+            columns: ["product_line_id"]
+            isOneToOne: false
+            referencedRelation: "product_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      battlecard_values: {
+        Row: {
+          anchor_model_name: string | null
+          captured_at: string | null
+          competitor_product_id: string | null
+          confirmed: boolean
+          confirmed_at: string | null
+          confirmed_by: string | null
+          dimension_id: string
+          extraction_method: string | null
+          id: string
+          source_url: string | null
+          updated_at: string
+          value: string
+        }
+        Insert: {
+          anchor_model_name?: string | null
+          captured_at?: string | null
+          competitor_product_id?: string | null
+          confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          dimension_id: string
+          extraction_method?: string | null
+          id?: string
+          source_url?: string | null
+          updated_at?: string
+          value?: string
+        }
+        Update: {
+          anchor_model_name?: string | null
+          captured_at?: string | null
+          competitor_product_id?: string | null
+          confirmed?: boolean
+          confirmed_at?: string | null
+          confirmed_by?: string | null
+          dimension_id?: string
+          extraction_method?: string | null
+          id?: string
+          source_url?: string | null
+          updated_at?: string
+          value?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "battlecard_values_dimension_id_fkey"
+            columns: ["dimension_id"]
+            isOneToOne: false
+            referencedRelation: "battlecard_dimensions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battlecard_values_anchor_model_name_fkey"
+            columns: ["anchor_model_name"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["model_name"]
+          },
+          {
+            foreignKeyName: "battlecard_values_competitor_product_id_fkey"
+            columns: ["competitor_product_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "battlecard_values_confirmed_by_fkey"
+            columns: ["confirmed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       change_logs: {
         Row: {
           changes_detail: Json | null
@@ -191,6 +306,151 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "comparisons_product_line_id_fkey"
+            columns: ["product_line_id"]
+            isOneToOne: false
+            referencedRelation: "product_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitors: {
+        Row: {
+          brand_family: string | null
+          created_at: string
+          homepage_url: string | null
+          id: string
+          name: string
+          slug: string
+          sort_order: number
+        }
+        Insert: {
+          brand_family?: string | null
+          created_at?: string
+          homepage_url?: string | null
+          id?: string
+          name: string
+          slug: string
+          sort_order?: number
+        }
+        Update: {
+          brand_family?: string | null
+          created_at?: string
+          homepage_url?: string | null
+          id?: string
+          name?: string
+          slug?: string
+          sort_order?: number
+        }
+        Relationships: []
+      }
+      competitor_products: {
+        Row: {
+          captured_at: string | null
+          competitor_id: string
+          created_at: string
+          datasheet_url: string | null
+          display_name: string | null
+          id: string
+          model_name: string
+          notes: string | null
+          product_line_id: string
+          source_url: string | null
+          sort_order: number
+        }
+        Insert: {
+          captured_at?: string | null
+          competitor_id: string
+          created_at?: string
+          datasheet_url?: string | null
+          display_name?: string | null
+          id?: string
+          model_name: string
+          notes?: string | null
+          product_line_id: string
+          source_url?: string | null
+          sort_order?: number
+        }
+        Update: {
+          captured_at?: string | null
+          competitor_id?: string
+          created_at?: string
+          datasheet_url?: string | null
+          display_name?: string | null
+          id?: string
+          model_name?: string
+          notes?: string | null
+          product_line_id?: string
+          source_url?: string | null
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_products_competitor_id_fkey"
+            columns: ["competitor_id"]
+            isOneToOne: false
+            referencedRelation: "competitors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_products_product_line_id_fkey"
+            columns: ["product_line_id"]
+            isOneToOne: false
+            referencedRelation: "product_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      competitor_matchups: {
+        Row: {
+          anchor_model_name: string
+          competitor_product_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          positioning: string | null
+          product_line_id: string
+          sort_order: number
+          tier: number
+        }
+        Insert: {
+          anchor_model_name: string
+          competitor_product_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          positioning?: string | null
+          product_line_id: string
+          sort_order?: number
+          tier: number
+        }
+        Update: {
+          anchor_model_name?: string
+          competitor_product_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          positioning?: string | null
+          product_line_id?: string
+          sort_order?: number
+          tier?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "competitor_matchups_anchor_model_name_fkey"
+            columns: ["anchor_model_name"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["model_name"]
+          },
+          {
+            foreignKeyName: "competitor_matchups_competitor_product_id_fkey"
+            columns: ["competitor_product_id"]
+            isOneToOne: false
+            referencedRelation: "competitor_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "competitor_matchups_product_line_id_fkey"
             columns: ["product_line_id"]
             isOneToOne: false
             referencedRelation: "product_lines"

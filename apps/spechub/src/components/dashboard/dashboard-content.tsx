@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Columns2, History, Languages } from "lucide-react";
+import { Columns2, History, Languages, Swords } from "lucide-react";
 import type { ProductLine } from "@eg/db/types";
 import { can, type Role } from "@eg/auth/permissions";
 
@@ -331,6 +331,7 @@ export function DashboardContent({
   const pathname = usePathname();
   const canSync = can(role, "sync.run");
   const canEditTranslations = can(role, "translation.edit");
+  const canViewBattlecard = can(role, "battlecard.view");
   // Default to "All" — matches PM expectation that the dashboard starts
   // as a full overview; they opt into "Active only" when they want to
   // hide Upcoming / Pending noise.
@@ -579,6 +580,17 @@ export function DashboardContent({
             >
               <Languages className="h-3.5 w-3.5" />
               Translations
+            </Link>
+          )}
+          {/* Battlecard — internal competitor comparison. MVP: Cloud AP only.
+              Gated by battlecard.view (admin/editor/pm). */}
+          {canViewBattlecard && activeLine?.name === "Cloud AP" && (
+            <Link
+              href={`/battlecard/${encodeURIComponent(activeLine?.name ?? "")}`}
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            >
+              <Swords className="h-3.5 w-3.5" />
+              Battlecard
             </Link>
           )}
         </div>

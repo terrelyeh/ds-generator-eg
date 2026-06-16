@@ -338,6 +338,105 @@ export interface Database {
           Partial<Pick<Database["public"]["Tables"]["spec_label_translations"]["Row"], "id" | "translated_label">>;
         Update: Partial<Database["public"]["Tables"]["spec_label_translations"]["Insert"]>;
       };
+      competitors: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          brand_family: string | null;
+          homepage_url: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["competitors"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["competitors"]["Row"], "id" | "created_at" | "brand_family" | "homepage_url" | "sort_order">>;
+        Update: Partial<Database["public"]["Tables"]["competitors"]["Insert"]>;
+      };
+      competitor_products: {
+        Row: {
+          id: string;
+          competitor_id: string;
+          model_name: string;
+          display_name: string | null;
+          product_line_id: string;
+          datasheet_url: string | null;
+          source_url: string | null;
+          captured_at: string | null;
+          notes: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["competitor_products"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["competitor_products"]["Row"], "id" | "created_at" | "display_name" | "datasheet_url" | "source_url" | "captured_at" | "notes" | "sort_order">>;
+        Update: Partial<Database["public"]["Tables"]["competitor_products"]["Insert"]>;
+      };
+      competitor_matchups: {
+        Row: {
+          id: string;
+          product_line_id: string;
+          anchor_model_name: string;
+          competitor_product_id: string;
+          tier: number;
+          positioning: string | null;
+          enabled: boolean;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["competitor_matchups"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["competitor_matchups"]["Row"], "id" | "created_at" | "positioning" | "enabled" | "sort_order">>;
+        Update: Partial<Database["public"]["Tables"]["competitor_matchups"]["Insert"]>;
+      };
+      battlecard_dimensions: {
+        Row: {
+          id: string;
+          product_line_id: string;
+          category: string;
+          dimension_key: string;
+          label: string;
+          unit: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["battlecard_dimensions"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["battlecard_dimensions"]["Row"], "id" | "created_at" | "unit" | "sort_order">>;
+        Update: Partial<Database["public"]["Tables"]["battlecard_dimensions"]["Insert"]>;
+      };
+      battlecard_values: {
+        Row: {
+          id: string;
+          dimension_id: string;
+          /** Exactly one of anchor_model_name / competitor_product_id is set
+           *  (DB CHECK). anchor → an EnGenius model; competitor → a rival. */
+          anchor_model_name: string | null;
+          competitor_product_id: string | null;
+          value: string;
+          confirmed: boolean;
+          source_url: string | null;
+          captured_at: string | null;
+          extraction_method: string | null;
+          confirmed_by: string | null;
+          confirmed_at: string | null;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["battlecard_values"]["Row"],
+          "id" | "updated_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["battlecard_values"]["Row"], "id" | "updated_at" | "anchor_model_name" | "competitor_product_id" | "value" | "confirmed" | "source_url" | "captured_at" | "extraction_method" | "confirmed_by" | "confirmed_at">>;
+        Update: Partial<Database["public"]["Tables"]["battlecard_values"]["Insert"]>;
+      };
     };
     Enums: {
       image_type: ImageType;
@@ -363,6 +462,11 @@ export type Comparison = Database["public"]["Tables"]["comparisons"]["Row"];
 export type CloudComparison = Database["public"]["Tables"]["cloud_comparisons"]["Row"];
 export type ProductTranslation = Database["public"]["Tables"]["product_translations"]["Row"];
 export type SpecLabelTranslation = Database["public"]["Tables"]["spec_label_translations"]["Row"];
+export type Competitor = Database["public"]["Tables"]["competitors"]["Row"];
+export type CompetitorProduct = Database["public"]["Tables"]["competitor_products"]["Row"];
+export type CompetitorMatchup = Database["public"]["Tables"]["competitor_matchups"]["Row"];
+export type BattlecardDimension = Database["public"]["Tables"]["battlecard_dimensions"]["Row"];
+export type BattlecardValue = Database["public"]["Tables"]["battlecard_values"]["Row"];
 
 // Composite types for API responses
 export type ProductWithSpecs = Product & {
