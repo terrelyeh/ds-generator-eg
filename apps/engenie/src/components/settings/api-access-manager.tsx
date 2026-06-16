@@ -211,15 +211,15 @@ export function ApiAccessManager() {
 
   return (
     <div>
-      <nav className="flex items-center gap-1.5 text-sm mb-4">
+      <nav className="flex items-center gap-1.5 text-base mb-4">
         <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
         <span className="text-muted-foreground/40">/</span>
         <span className="font-medium text-foreground">API Access</span>
       </nav>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">API Access (Departments)</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-[28px] font-bold tracking-tight">API Access (Departments)</h1>
+          <p className="mt-1 text-base text-muted-foreground">
             Issue scoped API keys so other teams&apos; apps can query the RAG knowledge base via the
             Search API. Each key is limited to the Solution / Product Lines / source types you set here.
           </p>
@@ -234,13 +234,13 @@ export function ApiAccessManager() {
         {/* A — API documentation */}
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between gap-2 text-sm">
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
               <span>① 對外 API 文件</span>
-              <a href={docUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-engenius-blue hover:underline">開啟 ↗</a>
+              <a href={docUrl} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-engenius-blue hover:underline">開啟 ↗</a>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-2 text-xs text-muted-foreground">
+            <p className="mb-2 text-sm text-muted-foreground">
               給要自己寫 app 串接的部門 — 認證、參數、回傳、scope、限流、錯誤碼 + curl/JS/Python 範例。
             </p>
             <div className="flex items-center gap-2">
@@ -248,13 +248,13 @@ export function ApiAccessManager() {
                 readOnly
                 value={docUrl}
                 onFocus={(e) => e.currentTarget.select()}
-                className="min-w-0 flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-xs"
+                className="min-w-0 flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-sm"
               />
               <Button size="sm" variant="outline" className="flex-shrink-0" onClick={async () => {
                 try { await navigator.clipboard.writeText(docUrl); setDocCopied(true); setTimeout(() => setDocCopied(false), 1600); } catch { /* ignore */ }
               }}>{docCopied ? "Copied" : "Copy"}</Button>
             </div>
-            <button onClick={() => setDocOpen((v) => !v)} className="mt-2 text-xs text-engenius-blue hover:underline">
+            <button onClick={() => setDocOpen((v) => !v)} className="mt-2 text-sm text-engenius-blue hover:underline">
               {docOpen ? "收合預覽" : "預覽文件"}
             </button>
           </CardContent>
@@ -263,13 +263,13 @@ export function ApiAccessManager() {
         {/* B — Claude Code skill */}
         <Card className="shadow-none">
           <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between gap-2 text-sm">
+            <CardTitle className="flex items-center justify-between gap-2 text-base">
               <span>② Claude Code Skill（/engenius-kb）</span>
-              <a href={SKILL_GUIDE_URL} target="_blank" rel="noopener noreferrer" className="text-xs font-medium text-engenius-blue hover:underline">安裝說明 ↗</a>
+              <a href={SKILL_GUIDE_URL} target="_blank" rel="noopener noreferrer" className="text-sm font-medium text-engenius-blue hover:underline">安裝說明 ↗</a>
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-2 text-xs text-muted-foreground">
+            <p className="mb-2 text-sm text-muted-foreground">
               給用 Claude Code 的同事 — 一行安裝,AI 就能直接查 EnGenius 知識庫回答。
             </p>
             <div className="flex items-center gap-2">
@@ -277,13 +277,13 @@ export function ApiAccessManager() {
                 readOnly
                 value={SKILL_INSTALL}
                 onFocus={(e) => e.currentTarget.select()}
-                className="min-w-0 flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-xs"
+                className="min-w-0 flex-1 rounded-md border bg-muted/30 px-3 py-1.5 font-mono text-sm"
               />
               <Button size="sm" variant="outline" className="flex-shrink-0" onClick={async () => {
                 try { await navigator.clipboard.writeText(SKILL_INSTALL); setSkillCopied(true); setTimeout(() => setSkillCopied(false), 1600); } catch { /* ignore */ }
               }}>{skillCopied ? "Copied" : "Copy"}</Button>
             </div>
-            <p className="mt-2 text-[11px] text-muted-foreground/70">
+            <p className="mt-2 text-[13px] text-muted-foreground/70">
               裝完設 <code className="rounded bg-muted px-1">SPECHUB_API_KEY</code>(下方各發一把)→ 重開 Claude Code。
               <a href={SKILL_REPO_URL} target="_blank" rel="noopener noreferrer" className="ml-1 text-engenius-blue hover:underline">Repo ↗</a>
             </p>
@@ -301,10 +301,10 @@ export function ApiAccessManager() {
       {/* Endpoint quick-start */}
       <Card className="mb-6 border-dashed shadow-none">
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">How departments call it (server-to-server)</CardTitle>
+          <CardTitle className="text-base">How departments call it (server-to-server)</CardTitle>
         </CardHeader>
         <CardContent>
-          <pre className="overflow-x-auto rounded-lg bg-[#0d1117] p-3 text-[12px] leading-relaxed text-slate-100">{`curl -X POST https://ds-generator-eg.vercel.app/api/v1/search \\
+          <pre className="overflow-x-auto rounded-lg bg-[#0d1117] p-3 text-[14px] leading-relaxed text-slate-100">{`curl -X POST https://ds-generator-eg.vercel.app/api/v1/search \\
   -H "Authorization: Bearer sk_live_xxx" \\
   -H "Content-Type: application/json" \\
   -d '{"query":"Which APs support WiFi 7?","top_k":8}'
@@ -312,7 +312,7 @@ export function ApiAccessManager() {
 # Optional: narrow within the key's scope
 #   "source_types": ["product_spec","helpcenter"]
 #   "taxonomy": { "product_lines": ["Cloud AP"] }`}</pre>
-          <p className="mt-2 text-[11px] text-muted-foreground/70">
+          <p className="mt-2 text-[13px] text-muted-foreground/70">
             Returns relevant chunks (content + source + score). The key never goes in client/browser code.
             Rate limited per key; scope is enforced server-side.
           </p>
@@ -321,14 +321,14 @@ export function ApiAccessManager() {
 
       {/* Keys table */}
       {loading ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="py-12 text-center text-base text-muted-foreground">Loading…</div>
       ) : keys.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed py-12 text-center text-base text-muted-foreground">
           No API keys yet. Create one for a department to get started.
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/50">
                 <th className="px-3 py-2 text-left font-medium">Name</th>
@@ -345,13 +345,13 @@ export function ApiAccessManager() {
                 <tr key={k.id} className="border-t align-top hover:bg-muted/30">
                   <td className="px-3 py-2">
                     <div className="font-medium text-engenius-dark">{k.name}</div>
-                    {k.note && <div className="mt-0.5 text-[11px] text-muted-foreground">{k.note}</div>}
+                    {k.note && <div className="mt-0.5 text-[13px] text-muted-foreground">{k.note}</div>}
                     {!k.enabled && (
-                      <span className="mt-1 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-600">disabled</span>
+                      <span className="mt-1 inline-block rounded bg-red-50 px-1.5 py-0.5 text-[12px] font-medium text-red-600">disabled</span>
                     )}
                   </td>
-                  <td className="px-3 py-2 font-mono text-[11px] text-muted-foreground">{k.key_prefix}…</td>
-                  <td className="max-w-[280px] px-3 py-2 text-[11px] text-muted-foreground">{scopeSummary(k.scope)}</td>
+                  <td className="px-3 py-2 font-mono text-[13px] text-muted-foreground">{k.key_prefix}…</td>
+                  <td className="max-w-[280px] px-3 py-2 text-[13px] text-muted-foreground">{scopeSummary(k.scope)}</td>
                   <td className="px-3 py-2 text-center tabular-nums">{k.rate_limit_per_min}</td>
                   <td className="px-3 py-2 text-center tabular-nums">{k.request_count}</td>
                   <td className="px-3 py-2 text-muted-foreground">{fmtDate(k.last_used_at)}</td>
@@ -381,7 +381,7 @@ export function ApiAccessManager() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !saving && setShowDialog(false)}>
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-background p-6 shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{editId ? "Edit API Key" : "New API Key"}</h2>
+              <h2 className="text-xl font-semibold">{editId ? "Edit API Key" : "New API Key"}</h2>
               <button onClick={() => !saving && setShowDialog(false)} disabled={saving} className="rounded-md p-1 hover:bg-muted">
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
               </button>
@@ -389,28 +389,28 @@ export function ApiAccessManager() {
 
             <div className="space-y-3">
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Name (department / app) <span className="text-red-500">*</span></label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Name (department / app) <span className="text-red-500">*</span></label>
                 <input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., Sales Portal, Marketing Chatbot"
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={saving} />
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={saving} />
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Rate limit (requests / minute)</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Rate limit (requests / minute)</label>
                 <input type="number" min={1} max={6000} value={rate} onChange={(e) => setRate(Number(e.target.value))}
-                  className="w-32 rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={saving} />
+                  className="w-32 rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={saving} />
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium">Scope — Solution / Product Line / Model <span className="font-normal text-muted-foreground/60">(Global = all)</span></p>
+                <p className="mb-2 text-sm font-medium">Scope — Solution / Product Line / Model <span className="font-normal text-muted-foreground/60">(Global = all)</span></p>
                 <TaxonomyPicker value={taxonomy} onChange={setTaxonomy} allowGlobal required={false} disabled={saving} />
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium">Allowed source types <span className="font-normal text-muted-foreground/60">(none selected = all)</span></p>
+                <p className="mb-2 text-sm font-medium">Allowed source types <span className="font-normal text-muted-foreground/60">(none selected = all)</span></p>
                 <div className="flex flex-wrap gap-2">
                   {SOURCE_TYPE_OPTIONS.map((st) => (
                     <button key={st.id} type="button" onClick={() => toggleSourceType(st.id)} disabled={saving}
-                      className={`rounded-md border px-2.5 py-1 text-xs transition-colors ${
+                      className={`rounded-md border px-2.5 py-1 text-sm transition-colors ${
                         sourceTypes.includes(st.id)
                           ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue"
                           : "hover:border-engenius-blue/50 hover:bg-muted"
@@ -422,9 +422,9 @@ export function ApiAccessManager() {
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Note (optional)</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Note (optional)</label>
                 <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contact / purpose"
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={saving} />
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" disabled={saving} />
               </div>
             </div>
 
@@ -442,13 +442,13 @@ export function ApiAccessManager() {
       {newKey && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="w-full max-w-lg rounded-xl bg-background p-6 shadow-xl mx-4">
-            <h2 className="text-lg font-semibold">API key created</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <h2 className="text-xl font-semibold">API key created</h2>
+            <p className="mt-1 text-base text-muted-foreground">
               Copy it and share with the department. You can also copy it again later via
               <strong> Copy key</strong> in the list. Keep it server-side only.
             </p>
             <div className="mt-4 flex items-center gap-2 rounded-lg bg-[#0d1117] p-3">
-              <code className="flex-1 break-all font-mono text-[12px] text-slate-100">{newKey}</code>
+              <code className="flex-1 break-all font-mono text-[14px] text-slate-100">{newKey}</code>
               <Button size="sm" variant="outline" onClick={async () => {
                 try { await navigator.clipboard.writeText(newKey); setCopied(true); setTimeout(() => setCopied(false), 1600); } catch { /* ignore */ }
               }}>{copied ? "Copied" : "Copy"}</Button>

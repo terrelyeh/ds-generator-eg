@@ -90,8 +90,8 @@ export function SettingsPage({ role }: { role: Role }) {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[28px] font-bold tracking-tight">Settings</h1>
+        <p className="mt-1 text-base text-muted-foreground">
           Manage Ask &amp; knowledge workspaces, external API access, and AI providers.
         </p>
       </div>
@@ -101,7 +101,7 @@ export function SettingsPage({ role }: { role: Role }) {
         if (items.length === 0) return null;
         return (
           <div key={g.key} className="space-y-3">
-            <h2 className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
+            <h2 className="text-[13px] font-semibold uppercase tracking-[0.12em] text-muted-foreground/70">
               {g.label}
             </h2>
             <div className="grid gap-4">
@@ -112,10 +112,10 @@ export function SettingsPage({ role }: { role: Role }) {
                       {section.icon}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold group-hover:text-engenius-blue transition-colors">
+                      <h3 className="text-base font-semibold group-hover:text-engenius-blue transition-colors">
                         {section.title}
                       </h3>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
+                      <p className="mt-0.5 text-sm text-muted-foreground">
                         {section.description}
                       </p>
                     </div>

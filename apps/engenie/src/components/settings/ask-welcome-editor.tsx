@@ -94,20 +94,20 @@ export function AskWelcomeEditor() {
     : DEFAULT_QUESTIONS;
 
   if (!loaded) {
-    return <div className="py-12 text-center text-sm text-muted-foreground">Loading...</div>;
+    return <div className="py-12 text-center text-base text-muted-foreground">Loading...</div>;
   }
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <nav className="flex items-center gap-1.5 text-sm mb-4">
+        <nav className="flex items-center gap-1.5 text-base mb-4">
           <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
           <span className="text-muted-foreground/40">/</span>
           <span className="font-medium text-foreground">Ask Welcome</span>
         </nav>
-        <h1 className="text-2xl font-bold tracking-tight">Ask Welcome</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[28px] font-bold tracking-tight">Ask Welcome</h1>
+        <p className="mt-1 text-base text-muted-foreground">
           Customize the greeting shown when users open the Ask panel.
         </p>
       </div>
@@ -116,11 +116,11 @@ export function AskWelcomeEditor() {
         {/* Editor */}
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-sm">Welcome Message</CardTitle>
+            <CardTitle className="text-base">Welcome Message</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Greeting / Subtitle
               </label>
               <input
@@ -128,15 +128,15 @@ export function AskWelcomeEditor() {
                 value={config.subtitle}
                 onChange={(e) => setConfig((c) => ({ ...c, subtitle: e.target.value }))}
                 placeholder={getGreeting()}
-                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                className="w-full rounded-lg border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
               />
-              <p className="mt-1 text-[11px] text-muted-foreground/50">
+              <p className="mt-1 text-[13px] text-muted-foreground/50">
                 Leave empty to use time-based greeting (Good morning / afternoon / evening)
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Description
               </label>
               <textarea
@@ -144,16 +144,16 @@ export function AskWelcomeEditor() {
                 onChange={(e) => setConfig((c) => ({ ...c, description: e.target.value }))}
                 placeholder="I'm your EnGenius product specialist. Ask me about specs, configurations, licensing, or best practices."
                 rows={3}
-                className="w-full rounded-lg border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/30 resize-none"
+                className="w-full rounded-lg border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/30 resize-none"
               />
             </div>
 
             {/* Example Questions */}
             <div>
-              <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+              <label className="block text-sm font-medium text-muted-foreground mb-1.5">
                 Example Questions
               </label>
-              <p className="text-[11px] text-muted-foreground/50 mb-2">
+              <p className="text-[13px] text-muted-foreground/50 mb-2">
                 Shown as clickable buttons below the greeting. Leave empty to use defaults.
               </p>
               <div className="space-y-1.5">
@@ -168,7 +168,7 @@ export function AskWelcomeEditor() {
                         setConfig((c) => ({ ...c, questions: updated }));
                       }}
                       placeholder={DEFAULT_QUESTIONS[i] || "New question..."}
-                      className="flex-1 rounded-md border px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                      className="flex-1 rounded-md border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
                     />
                     <button
                       onClick={() => {
@@ -186,7 +186,7 @@ export function AskWelcomeEditor() {
               </div>
               <button
                 onClick={() => setConfig((c) => ({ ...c, questions: [...(c.questions.length > 0 ? c.questions : DEFAULT_QUESTIONS), ""] }))}
-                className="mt-2 text-xs text-engenius-blue hover:text-engenius-blue/80 transition-colors"
+                className="mt-2 text-sm text-engenius-blue hover:text-engenius-blue/80 transition-colors"
               >
                 + Add question
               </button>
@@ -197,7 +197,7 @@ export function AskWelcomeEditor() {
                 variant="outline"
                 size="sm"
                 onClick={() => setConfig(DEFAULTS)}
-                className="text-xs"
+                className="text-sm"
               >
                 Reset to Default
               </Button>
@@ -205,7 +205,7 @@ export function AskWelcomeEditor() {
                 size="sm"
                 onClick={handleSave}
                 disabled={saving}
-                className="text-xs"
+                className="text-sm"
               >
                 {saving ? "Saving..." : "Save"}
               </Button>
@@ -216,7 +216,7 @@ export function AskWelcomeEditor() {
         {/* Live Preview */}
         <Card className="shadow-sm">
           <CardHeader className="pb-4">
-            <CardTitle className="text-sm">Preview</CardTitle>
+            <CardTitle className="text-base">Preview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="rounded-xl border bg-muted/20 p-8 flex flex-col items-center text-center">
@@ -233,13 +233,13 @@ export function AskWelcomeEditor() {
               </div>
 
               {/* Text */}
-              <h2 className="text-xl font-semibold mt-4 mb-1">{previewSubtitle}</h2>
-              <p className="text-sm text-muted-foreground max-w-xs">{previewDescription}</p>
+              <h2 className="text-[23px] font-semibold mt-4 mb-1">{previewSubtitle}</h2>
+              <p className="text-base text-muted-foreground max-w-xs">{previewDescription}</p>
 
               {/* Example question preview */}
               <div className="mt-6 grid grid-cols-1 gap-2 w-full max-w-xs">
                 {(previewQuestions).slice(0, 6).map((q, i) => (
-                  <div key={i} className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground/50">
+                  <div key={i} className="rounded-lg border px-3 py-2 text-left text-sm text-muted-foreground/50">
                     {q}
                   </div>
                 ))}

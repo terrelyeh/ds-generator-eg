@@ -238,15 +238,15 @@ export function AskWorkspacesManager() {
 
   return (
     <div>
-      <nav className="flex items-center gap-1.5 text-sm mb-4">
+      <nav className="flex items-center gap-1.5 text-base mb-4">
         <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
         <span className="text-muted-foreground/40">/</span>
         <span className="font-medium text-foreground">Ask Workspaces</span>
       </nav>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Ask Workspaces</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <h1 className="text-[28px] font-bold tracking-tight">Ask Workspaces</h1>
+          <p className="mt-1 text-base text-muted-foreground">
             Give a department its own <code className="rounded bg-muted px-1">/ask/&lt;slug&gt;</code> chat — own passcode,
             LLM key (BYOK or shared+quota), knowledge scope, and persona/welcome. Retrieval uses the shared KB, scoped.
           </p>
@@ -255,14 +255,14 @@ export function AskWorkspacesManager() {
       </div>
 
       {loading ? (
-        <div className="py-12 text-center text-sm text-muted-foreground">Loading…</div>
+        <div className="py-12 text-center text-base text-muted-foreground">Loading…</div>
       ) : list.length === 0 ? (
-        <div className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
+        <div className="rounded-lg border border-dashed py-12 text-center text-base text-muted-foreground">
           No workspaces yet. Create one for a department.
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border">
-          <table className="w-full text-xs">
+          <table className="w-full text-sm">
             <thead>
               <tr className="bg-muted/50">
                 <th className="px-3 py-2 text-left font-medium">Workspace</th>
@@ -278,11 +278,11 @@ export function AskWorkspacesManager() {
                 <tr key={w.id} className="border-t align-top hover:bg-muted/30">
                   <td className="px-3 py-2">
                     <div className="font-medium text-engenius-dark">{w.name}</div>
-                    <a href={`/ask/${w.slug}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[11px] text-engenius-blue hover:underline">/ask/{w.slug} ↗</a>
-                    {!w.has_passcode && <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[10px] text-amber-700">no passcode</span>}
-                    {!w.enabled && <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-[10px] text-red-600">disabled</span>}
+                    <a href={`/ask/${w.slug}`} target="_blank" rel="noopener noreferrer" className="font-mono text-[13px] text-engenius-blue hover:underline">/ask/{w.slug} ↗</a>
+                    {!w.has_passcode && <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-[12px] text-amber-700">no passcode</span>}
+                    {!w.enabled && <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-[12px] text-red-600">disabled</span>}
                   </td>
-                  <td className="px-3 py-2 text-[11px] text-muted-foreground">
+                  <td className="px-3 py-2 text-[13px] text-muted-foreground">
                     {w.llm_mode === "byok"
                       ? <span>BYOK · {familyOf(w.provider)}{!w.has_byok_key && <span className="text-red-600"> (key missing)</span>}</span>
                       : w.llm_mode === "user_byok"
@@ -290,7 +290,7 @@ export function AskWorkspacesManager() {
                       : "Shared key"}
                     <div className="text-muted-foreground/60">{w.provider}</div>
                   </td>
-                  <td className="max-w-[200px] px-3 py-2 text-[11px] text-muted-foreground">
+                  <td className="max-w-[200px] px-3 py-2 text-[13px] text-muted-foreground">
                     {w.scope?.solution || "All solutions"}{w.scope?.product_lines?.length ? ` · ${w.scope.product_lines.join(", ")}` : ""}
                     {w.scope?.source_types?.length ? ` · ${w.scope.source_types.length} src` : ""}
                   </td>
@@ -312,7 +312,7 @@ export function AskWorkspacesManager() {
         </div>
       )}
 
-      <div className="mt-6 border-t pt-4 text-xs text-muted-foreground">
+      <div className="mt-6 border-t pt-4 text-sm text-muted-foreground">
         <span className="font-medium text-foreground">給其他部門的資源：</span>{" "}
         <a href="/docs/ask-integration.html" target="_blank" rel="noopener noreferrer" className="text-engenius-blue hover:underline">整合服務介紹</a>
         {" · "}
@@ -325,72 +325,72 @@ export function AskWorkspacesManager() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !saving && setOpen(false)}>
           <div className="max-h-[92vh] w-full max-w-[749px] overflow-y-auto rounded-xl bg-background p-6 shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold">{editId ? "Edit Workspace" : "New Workspace"}</h2>
+              <h2 className="text-xl font-semibold">{editId ? "Edit Workspace" : "New Workspace"}</h2>
               <button onClick={() => !saving && setOpen(false)} disabled={saving} className="rounded-md p-1 hover:bg-muted">
                 <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 4l8 8M12 4l-8 8" /></svg>
               </button>
             </div>
 
-            <div className="space-y-3 text-sm">
+            <div className="space-y-3 text-base">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Slug (URL) {!editId && <span className="text-red-500">*</span>}</label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Slug (URL) {!editId && <span className="text-red-500">*</span>}</label>
                   <input value={slug} disabled={!!editId || saving} onChange={(e) => setSlug(e.target.value.toLowerCase())} placeholder="sales"
-                    className="w-full rounded-md border px-3 py-2 font-mono text-sm disabled:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                    className="w-full rounded-md border px-3 py-2 font-mono text-base disabled:bg-muted/40 focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">Name <span className="text-red-500">*</span></label>
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">Name <span className="text-red-500">*</span></label>
                   <input value={name} disabled={saving} onChange={(e) => setName(e.target.value)} placeholder="Sales Team"
-                    className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                    className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
                 </div>
               </div>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Passcode {editId && editHasPasscode && <span className="font-normal text-muted-foreground/60">(leave blank to keep)</span>}</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Passcode {editId && editHasPasscode && <span className="font-normal text-muted-foreground/60">(leave blank to keep)</span>}</label>
                 <input value={passcode} disabled={saving} onChange={(e) => setPasscode(e.target.value)} placeholder={editId && editHasPasscode ? "•••••• (unchanged)" : "set an access code"}
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium">LLM 生成模式</p>
+                <p className="mb-2 text-sm font-medium">LLM 生成模式</p>
                 <div className="mb-2 flex flex-wrap gap-2">
                   {(["shared", "byok", "user_byok"] as const).map((m) => (
                     <button key={m} type="button" disabled={saving} onClick={() => setLlmMode(m)}
-                      className={`rounded-md border px-3 py-1.5 text-xs ${llmMode === m ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>
+                      className={`rounded-md border px-3 py-1.5 text-sm ${llmMode === m ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>
                       {m === "shared" ? "Shared key + quota" : m === "byok" ? "Workspace BYOK (一把共用)" : "User BYOK (各自輸入)"}
                     </button>
                   ))}
                 </div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">Model</label>
-                <select value={provider} disabled={saving} onChange={(e) => setProvider(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm">
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">Model</label>
+                <select value={provider} disabled={saving} onChange={(e) => setProvider(e.target.value)} className="w-full rounded-md border px-3 py-2 text-base">
                   {PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
                 </select>
                 {llmMode === "byok" && (
                   <div className="mt-2">
-                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
+                    <label className="mb-1 block text-sm font-medium text-muted-foreground">
                       BYOK API key（{familyOf(provider)}）{editId && editHasByok && <span className="font-normal text-muted-foreground/60">(leave blank to keep)</span>}
                     </label>
                     <input value={byokKey} disabled={saving} onChange={(e) => setByokKey(e.target.value)} placeholder={editId && editHasByok ? "•••••• (unchanged)" : `${familyOf(provider)} key`}
-                      className="w-full rounded-md border px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
-                    <p className="mt-1 text-[11px] text-muted-foreground/60">Key 須與所選模型同家族（Claude→Anthropic、GPT→OpenAI、Gemini→Google）。AES 加密儲存，整個 workspace 共用這一把。</p>
+                      className="w-full rounded-md border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                    <p className="mt-1 text-[13px] text-muted-foreground/60">Key 須與所選模型同家族（Claude→Anthropic、GPT→OpenAI、Gemini→Google）。AES 加密儲存，整個 workspace 共用這一把。</p>
                   </div>
                 )}
                 {llmMode === "user_byok" && (
-                  <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+                  <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-700">
                     每位使用者第一次進來時，會在前台輸入自己的 {familyOf(provider)} API key（存在他自己的瀏覽器，不進資料庫）。你只需選好模型，這裡不用填 key。
                   </p>
                 )}
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium">產品知識範圍（共用 KB，scope 過濾）</p>
+                <p className="mb-2 text-sm font-medium">產品知識範圍（共用 KB，scope 過濾）</p>
                 <TaxonomyPicker value={tax} onChange={setTax} allowGlobal required={false} disabled={saving} productOnly />
-                <p className="mb-1 mt-3 text-xs font-medium">額外納入的知識領域 <span className="font-normal text-muted-foreground/60">(部門 SOP / 平台等；可複選)</span></p>
+                <p className="mb-1 mt-3 text-sm font-medium">額外納入的知識領域 <span className="font-normal text-muted-foreground/60">(部門 SOP / 平台等；可複選)</span></p>
                 {areaOptions.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {areaOptions.map((a) => (
                       <button key={a.slug} type="button" disabled={saving} onClick={() => setKnowledgeAreas((p) => p.includes(a.slug) ? p.filter((x) => x !== a.slug) : [...p, a.slug])}
-                        className={`rounded-md border px-2.5 py-1 text-xs ${knowledgeAreas.includes(a.slug) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{a.label}</button>
+                        className={`rounded-md border px-2.5 py-1 text-sm ${knowledgeAreas.includes(a.slug) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{a.label}</button>
                     ))}
                   </div>
                 )}
@@ -399,80 +399,80 @@ export function AskWorkspacesManager() {
                     onChange={(e) => setNewAreaLabel(e.target.value)}
                     onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); createArea(); } }}
                     placeholder="新增領域（如：業務部門）"
-                    className="flex-1 rounded-md border px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/40" />
+                    className="flex-1 rounded-md border px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/40" />
                   <button type="button" onClick={createArea} disabled={saving || addingArea || !newAreaLabel.trim()}
-                    className="flex-shrink-0 rounded-md border border-engenius-blue/40 px-2.5 py-1 text-xs text-engenius-blue hover:bg-engenius-blue/10 disabled:opacity-40">
+                    className="flex-shrink-0 rounded-md border border-engenius-blue/40 px-2.5 py-1 text-sm text-engenius-blue hover:bg-engenius-blue/10 disabled:opacity-40">
                     {addingArea ? "新增中…" : "+ 新增領域"}
                   </button>
                 </div>
-                <p className="mt-1 text-[11px] text-muted-foreground/60">知識領域預設不會被產品 scope 撈到；勾選後才會併入此 workspace。新增後到 Knowledge 頁把內容 tag 到該領域。</p>
-                <p className="mb-1 mt-3 text-xs font-medium">來源類型 <span className="font-normal text-muted-foreground/60">(未選=全部)</span></p>
+                <p className="mt-1 text-[13px] text-muted-foreground/60">知識領域預設不會被產品 scope 撈到；勾選後才會併入此 workspace。新增後到 Knowledge 頁把內容 tag 到該領域。</p>
+                <p className="mb-1 mt-3 text-sm font-medium">來源類型 <span className="font-normal text-muted-foreground/60">(未選=全部)</span></p>
                 <div className="flex flex-wrap gap-2">
                   {SOURCE_TYPES.map((st) => (
                     <button key={st.id} type="button" disabled={saving} onClick={() => setSourceTypes((p) => p.includes(st.id) ? p.filter((x) => x !== st.id) : [...p, st.id])}
-                      className={`rounded-md border px-2.5 py-1 text-xs ${sourceTypes.includes(st.id) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{st.label}</button>
+                      className={`rounded-md border px-2.5 py-1 text-sm ${sourceTypes.includes(st.id) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{st.label}</button>
                   ))}
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">預設 Persona <InfoHint text={PERSONA_HINT} /></label>
-                  <select value={persona} disabled={saving} onChange={(e) => setPersona(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm">
+                  <label className="mb-1 flex items-center gap-1 text-sm font-medium text-muted-foreground">預設 Persona <InfoHint text={PERSONA_HINT} /></label>
+                  <select value={persona} disabled={saving} onChange={(e) => setPersona(e.target.value)} className="w-full rounded-md border px-3 py-2 text-base">
                     {(personas.length ? personas : [{ id: "default", name: "Default" }]).map((p) => <option key={p.id} value={p.id}>{p.name || p.id}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 flex items-center gap-1 text-xs font-medium text-muted-foreground">預設對象 Profile <InfoHint text={PROFILE_HINT} align="right" /></label>
-                  <select value={profile} disabled={saving} onChange={(e) => setProfile(e.target.value)} className="w-full rounded-md border px-3 py-2 text-sm">
+                  <label className="mb-1 flex items-center gap-1 text-sm font-medium text-muted-foreground">預設對象 Profile <InfoHint text={PROFILE_HINT} align="right" /></label>
+                  <select value={profile} disabled={saving} onChange={(e) => setProfile(e.target.value)} className="w-full rounded-md border px-3 py-2 text-base">
                     {(profiles.length ? profiles : [{ id: "default", label: "Default" }]).map((p) => <option key={p.id} value={p.id}>{p.label || p.id}</option>)}
                   </select>
                 </div>
               </div>
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+              <label className="flex items-center gap-2 text-sm text-muted-foreground">
                 <input type="checkbox" checked={allowSwitch} disabled={saving} onChange={(e) => setAllowSwitch(e.target.checked)} />
                 允許使用者自行切換 模型 / 角色 / 對象（關閉則鎖定上面的預設）
               </label>
 
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">歡迎標題</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">歡迎標題</label>
                 <input value={welcomeSubtitle} disabled={saving} onChange={(e) => setWelcomeSubtitle(e.target.value)} placeholder="How can I help you today?"
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">歡迎說明</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">歡迎說明</label>
                 <input value={welcomeDescription} disabled={saving} onChange={(e) => setWelcomeDescription(e.target.value)}
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">範例問題（一行一個）</label>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">範例問題（一行一個）</label>
                 <textarea value={examples} disabled={saving} onChange={(e) => setExamples(e.target.value)} rows={3}
-                  className="w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                  className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">每分鐘上限</label>
-                  <input type="number" min={1} value={rate} disabled={saving} onChange={(e) => setRate(Number(e.target.value))} className="w-full rounded-md border px-3 py-2 text-sm" />
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">每分鐘上限</label>
+                  <input type="number" min={1} value={rate} disabled={saving} onChange={(e) => setRate(Number(e.target.value))} className="w-full rounded-md border px-3 py-2 text-base" />
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-muted-foreground">每日上限 <span className="font-normal text-muted-foreground/60">(空=無限)</span></label>
-                  <input type="number" min={1} value={daily} disabled={saving} onChange={(e) => setDaily(e.target.value)} placeholder="∞" className="w-full rounded-md border px-3 py-2 text-sm" />
+                  <label className="mb-1 block text-sm font-medium text-muted-foreground">每日上限 <span className="font-normal text-muted-foreground/60">(空=無限)</span></label>
+                  <input type="number" min={1} value={daily} disabled={saving} onChange={(e) => setDaily(e.target.value)} placeholder="∞" className="w-full rounded-md border px-3 py-2 text-base" />
                 </div>
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-xs font-medium">嵌入 Widget 安全</p>
-                <label className="mb-1 block text-xs font-medium text-muted-foreground">允許嵌入的網域 <span className="font-normal text-muted-foreground/60">(一行一個；空=不限制)</span></label>
+                <p className="mb-2 text-sm font-medium">嵌入 Widget 安全</p>
+                <label className="mb-1 block text-sm font-medium text-muted-foreground">允許嵌入的網域 <span className="font-normal text-muted-foreground/60">(一行一個；空=不限制)</span></label>
                 <textarea value={allowedOrigins} disabled={saving} onChange={(e) => setAllowedOrigins(e.target.value)} rows={3}
                   placeholder={"https://partner.example.com\nhttps://intranet.engenius.com"}
-                  className="w-full rounded-md border px-3 py-2 font-mono text-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
-                <p className="mt-1 text-[11px] text-muted-foreground/60">只有這些網站能用 widget snippet 嵌入此 chat（瀏覽器以 CSP frame-ancestors 強制）。留空＝任何網站都能嵌入。</p>
+                  className="w-full rounded-md border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                <p className="mt-1 text-[13px] text-muted-foreground/60">只有這些網站能用 widget snippet 嵌入此 chat（瀏覽器以 CSP frame-ancestors 強制）。留空＝任何網站都能嵌入。</p>
                 {editId && (
                   <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
-                    <p className="text-[11px] text-muted-foreground/60">撤銷所有已發出的 token；widget 與 /ask 連線需重新驗證。</p>
+                    <p className="text-[13px] text-muted-foreground/60">撤銷所有已發出的 token；widget 與 /ask 連線需重新驗證。</p>
                     <button type="button" onClick={() => revokeTokens(editId, name)} disabled={saving}
-                      className="flex-shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-xs text-red-600 hover:bg-red-50 disabled:opacity-40">
+                      className="flex-shrink-0 rounded-md border border-red-300 px-2.5 py-1 text-sm text-red-600 hover:bg-red-50 disabled:opacity-40">
                       撤銷連線
                     </button>
                   </div>

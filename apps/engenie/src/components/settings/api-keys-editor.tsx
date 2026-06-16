@@ -166,24 +166,24 @@ export function ApiKeysEditor() {
   return (
     <div className="space-y-6">
       <div>
-        <nav className="flex items-center gap-1.5 text-sm mb-4">
+        <nav className="flex items-center gap-1.5 text-base mb-4">
           <Link href="/settings" className="text-muted-foreground hover:text-foreground transition-colors">Settings</Link>
           <span className="text-muted-foreground/40">/</span>
           <span className="font-medium text-foreground">API Keys</span>
         </nav>
-        <h1 className="text-2xl font-bold tracking-tight">AI API Keys</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
+        <h1 className="text-[28px] font-bold tracking-tight">AI API Keys</h1>
+        <p className="mt-1 text-base text-muted-foreground">
           Manage API keys for AI translation, Ask SpecHub (RAG), and embedding. Keys are stored securely in the database.
         </p>
       </div>
 
       <Card className="shadow-sm">
         <CardHeader>
-          <CardTitle className="text-base">AI API Keys</CardTitle>
+          <CardTitle className="text-lg">AI API Keys</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
           {loading ? (
-            <div className="py-8 text-center text-sm text-muted-foreground">Loading...</div>
+            <div className="py-8 text-center text-base text-muted-foreground">Loading...</div>
           ) : (
             API_KEYS.map((config) => {
               const state = keys[config.key] ?? {
@@ -201,11 +201,11 @@ export function ApiKeysEditor() {
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-semibold">{config.label}</h3>
-                      <p className="text-xs text-muted-foreground">{config.description}</p>
+                      <h3 className="text-base font-semibold">{config.label}</h3>
+                      <p className="text-sm text-muted-foreground">{config.description}</p>
                     </div>
                     {state.hasValue && !state.editing && (
-                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-700">
+                      <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-sm font-medium text-emerald-700">
                         <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                         Connected
                       </span>
@@ -219,7 +219,7 @@ export function ApiKeysEditor() {
                         value={state.value}
                         onChange={(e) => handleChange(config.key, e.target.value)}
                         placeholder={config.placeholder}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm font-mono shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-base font-mono shadow-xs focus:outline-none focus:ring-2 focus:ring-engenius-blue/30"
                         autoFocus
                       />
                       <div className="flex items-center gap-2">
@@ -242,7 +242,7 @@ export function ApiKeysEditor() {
                           href={config.docsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="ml-auto text-xs text-engenius-blue hover:underline"
+                          className="ml-auto text-sm text-engenius-blue hover:underline"
                         >
                           Get API Key
                         </a>
@@ -252,14 +252,14 @@ export function ApiKeysEditor() {
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0 flex-1">
                         {state.hasValue ? (
-                          <code className="block truncate rounded bg-muted px-2 py-1 text-xs font-mono text-muted-foreground">
+                          <code className="block truncate rounded bg-muted px-2 py-1 text-sm font-mono text-muted-foreground">
                             {state.masked}
                           </code>
                         ) : (
-                          <span className="text-xs text-muted-foreground/60">Not configured</span>
+                          <span className="text-sm text-muted-foreground/60">Not configured</span>
                         )}
                         {state.updated_at && (
-                          <span className="mt-1 block text-xs text-muted-foreground/50">
+                          <span className="mt-1 block text-sm text-muted-foreground/50">
                             Updated {formatDate(state.updated_at)}
                           </span>
                         )}
@@ -281,7 +281,7 @@ export function ApiKeysEditor() {
         </CardContent>
       </Card>
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-800">
         <strong>Note:</strong> API keys stored here take priority over Vercel environment variables.
         If both exist, the key saved here will be used.
       </div>
