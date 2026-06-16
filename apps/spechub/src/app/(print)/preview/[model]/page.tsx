@@ -275,6 +275,10 @@ export default async function PreviewPage({
   });
   const productLine = product.product_lines;
   const theme = getTheme(productLine.category);
+  // Transceivers use a distinct cover (image centered below the title, overview
+  // full-width below it) and have NO hardware-overview page — the footer moves
+  // onto the last spec page instead. One product image, no hardware image.
+  const isTransceiver = productLine.category === "Transceivers";
 
   // Per-product-line spec footnote (e.g. "*Note: Performance figures…" for
   // VPN Firewall). Shown once at the bottom of the LAST spec page only.
@@ -304,7 +308,8 @@ export default async function PreviewPage({
     customQrUrl || productLineExt.qr_url_template || dict.defaultQrUrl;
   const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
-  const totalPages = 1 + specPages.length + (hasAntennaPage ? 1 : 0) + 1; // cover + specs + antennas (optional) + hardware
+  // cover + specs + antennas (optional) + hardware (skipped for transceivers)
+  const totalPages = 1 + specPages.length + (hasAntennaPage ? 1 : 0) + (isTransceiver ? 0 : 1);
 
   const isCJK = lang === "ja" || lang === "zh-TW";
 
@@ -493,6 +498,20 @@ body {
 }
 .overview-text {
   font-weight: 400; font-size: 11pt; color: #6f6f6f; line-height: 1.35;
+}
+
+/* Transceiver cover: product image centered directly below the title, with the
+   overview full-width BELOW the image (no image beside the overview). */
+.tx-cover .product-image-container {
+  position: absolute; left: 36pt; right: 36pt; top: 200pt;
+  height: 150pt; width: auto;
+  display: flex; align-items: center; justify-content: center;
+}
+.tx-cover .product-image-container img {
+  max-width: 340pt; max-height: 150pt; object-fit: contain;
+}
+.tx-cover .overview-section {
+  left: 36pt; right: 36pt; top: 365pt; width: auto;
 }
 
 .features-wrapper {
@@ -722,7 +741,7 @@ ${typo ? `
       />
 
       {/* PAGE 1: COVER */}
-      <div className="page">
+      <div className={`page${isTransceiver ? " tx-cover" : ""}`}>
         <div className="top-bar-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -856,6 +875,31 @@ ${typo ? `
               <div className="spec-footnote">{specFootnote}</div>
             )}
           </div>
+          {/* Transceivers have no hardware page, so the footer lives on the
+              last spec page instead. */}
+          {isTransceiver && pageIdx === specPages.length - 1 && (
+            <div className="footer">
+              <div className="footer-content">
+                <div className="footer-left">
+                  <div className="footer-logo">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logo/EnGenius-Logo-gray.png" alt="EnGenius" />
+                  </div>
+                  <div className="footer-disclaimer">{dict.disclaimer}</div>
+                  <div className="footer-version">
+                    Version {version} &nbsp; {today}
+                  </div>
+                </div>
+                <div className="footer-right">
+                  <div className="footer-qr">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={qrCodeUrl} alt="QR Code" />
+                  </div>
+                  <div className="footer-qr-label">{qrLabel}</div>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="page-number">{pageIdx + 2}</div>
         </div>
       ))}
@@ -885,7 +929,9 @@ ${typo ? `
         </div>
       )}
 
-      {/* HARDWARE OVERVIEW + FOOTER */}
+      {/* HARDWARE OVERVIEW + FOOTER (skipped for transceivers — footer is on
+          the last spec page instead) */}
+      {!isTransceiver && (
       <div className="page">
         <div className="top-bar" />
         <div className="hardware-page">
@@ -922,6 +968,7 @@ ${typo ? `
 
         <div className="page-number">{totalPages}</div>
       </div>
+      )}
     </>
   );
 }
