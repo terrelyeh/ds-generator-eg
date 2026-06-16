@@ -4,7 +4,7 @@ import { AskWorkspacesManager } from "@/components/settings/ask-workspaces-manag
 export default async function AskWorkspacesPage() {
   await adminOnly();
   return (
-    <div className="mx-auto max-w-[1100px] px-6 py-8">
+    <div className="mx-auto max-w-[1265px] px-6 py-8">
       <AskWorkspacesManager />
     </div>
   );

@@ -323,7 +323,7 @@ export function AskWorkspacesManager() {
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => !saving && setOpen(false)}>
-          <div className="max-h-[92vh] w-full max-w-xl overflow-y-auto rounded-xl bg-background p-6 shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="max-h-[92vh] w-full max-w-[749px] overflow-y-auto rounded-xl bg-background p-6 shadow-xl mx-4" onClick={(e) => e.stopPropagation()}>
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold">{editId ? "Edit Workspace" : "New Workspace"}</h2>
               <button onClick={() => !saving && setOpen(false)} disabled={saving} className="rounded-md p-1 hover:bg-muted">
