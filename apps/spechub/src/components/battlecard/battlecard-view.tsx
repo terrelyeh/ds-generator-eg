@@ -167,6 +167,7 @@ function GroupTable({
   canEdit,
   onSave,
   onResync,
+  onWebfill,
   onConfirmAll,
 }: {
   group: BattlecardGroup;
@@ -177,6 +178,7 @@ function GroupTable({
     args: { dimensionId: string; column: BattlecardColumn; value: string; sourceUrl: string | null; confirm: boolean }
   ) => Promise<boolean>;
   onResync: (competitorProductId: string) => void | Promise<void>;
+  onWebfill: (competitorProductId: string) => void | Promise<void>;
   onConfirmAll: () => void;
 }) {
   const filteredRows = useMemo(() => {
@@ -273,13 +275,22 @@ function GroupTable({
                         {col.label}
                         <TierBadge tier={col.tier} />
                         {canEdit && (
-                          <button
-                            onClick={() => onResync(col.key)}
-                            title="Re-scrape this competitor's datasheet and refresh draft values (keeps confirmed cells)"
-                            className="ml-1.5 align-middle text-[10px] font-normal text-engenius-blue hover:underline"
-                          >
-                            ↻ sync
-                          </button>
+                          <span className="ml-1.5 inline-flex gap-1.5 align-middle text-[10px] font-normal">
+                            <button
+                              onClick={() => onResync(col.key)}
+                              title="Re-scrape this competitor's official datasheet and refresh draft values (keeps confirmed cells)"
+                              className="text-engenius-blue hover:underline"
+                            >
+                              ↻ sync
+                            </button>
+                            <button
+                              onClick={() => onWebfill(col.key)}
+                              title="Web search to fill this competitor's EMPTY cells (low-confidence drafts with source links)"
+                              className="text-engenius-blue hover:underline"
+                            >
+                              🔍 web
+                            </button>
+                          </span>
                         )}
                       </span>
                     )}
@@ -672,6 +683,32 @@ export function BattlecardView({
     }
   }, []);
 
+  // Fill a competitor's EMPTY cells from a general web search (low-confidence
+  // drafts, each tagged with the source page). Complements ↻ sync (datasheet).
+  const webfill = useCallback(async (competitorProductId: string) => {
+    const t = toast.loading("Searching the web for missing specs…");
+    try {
+      const res = await fetch("/api/battlecard/websearch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competitorProductId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error ?? "Web search failed", { id: t, description: json.details });
+        return;
+      }
+      if (!json.filled) {
+        toast.message("No new values found", { id: t, description: json.message });
+        return;
+      }
+      toast.success(`Filled ${json.filled} cell(s) from web · ${json.notFound} not found — review drafts`, { id: t });
+      setTimeout(() => window.location.reload(), 1000);
+    } catch (e) {
+      toast.error("Web search failed", { id: t, description: e instanceof Error ? e.message : String(e) });
+    }
+  }, []);
+
   // Bulk "Save & Confirm" — mark every filled, unconfirmed competitor cell in
   // one anchor's table as confirmed.
   const confirmAllForGroup = useCallback(
@@ -799,6 +836,7 @@ export function BattlecardView({
             canEdit={canEdit}
             onSave={onSave}
             onResync={resync}
+            onWebfill={webfill}
             onConfirmAll={() => confirmAllForGroup(group)}
           />
         ))}
