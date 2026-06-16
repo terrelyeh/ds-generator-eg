@@ -62,7 +62,10 @@ export type Permission =
   // RAG / knowledge
   | "ask.use"
   | "knowledge.view"
-  | "knowledge.edit";
+  | "knowledge.edit"
+  // competitor battlecard (internal-only)
+  | "battlecard.view"
+  | "battlecard.edit";
 
 const PERMISSIONS: Record<Permission, Role[]> = {
   // Everyone can view product / dashboard / preview
@@ -97,6 +100,12 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   "ask.use": ["admin", "editor", "viewer"],
   "knowledge.view": ["admin", "editor"],
   "knowledge.edit": ["admin", "editor"],
+
+  // Battlecard is internal competitive intel. PM gets edit here (unlike most
+  // content perms) because curating/confirming competitor specs IS a PM job.
+  // viewer (sales/field) excluded for now — easy to widen later.
+  "battlecard.view": ["admin", "editor", "pm"],
+  "battlecard.edit": ["admin", "editor", "pm"],
 };
 
 /** Check if a role can perform an action. */
