@@ -148,6 +148,7 @@ export default async function SolutionDashboardPage({
     { data: changeLogs },
     { data: specSectionRows },
     { data: translationRows },
+    { data: battlecardDimRows },
   ] = await Promise.all([
     productIds.length
       ? (supabase
@@ -176,6 +177,14 @@ export default async function SolutionDashboardPage({
           .select("product_id, locale, overview, features")
           .in("product_id", productModelNames) as unknown as Promise<{ data: TranslationRow[] | null }>)
       : Promise.resolve({ data: [] as TranslationRow[] }),
+    // Which product lines have a battlecard dimension template → drives whether
+    // the dashboard shows the Battlecard link for that line (auto-detect).
+    productLineIds.length
+      ? (supabase
+          .from("battlecard_dimensions")
+          .select("product_line_id")
+          .in("product_line_id", productLineIds) as unknown as Promise<{ data: { product_line_id: string }[] | null }>)
+      : Promise.resolve({ data: [] as { product_line_id: string }[] }),
   ]);
 
   // Build map: product_id → sorted spec sections (for layout estimation)
@@ -415,6 +424,13 @@ export default async function SolutionDashboardPage({
       )?.id
     : undefined;
 
+  // Product lines that have a battlecard dimension template → their dashboard
+  // tab shows the Battlecard link (replaces the old hardcoded "Cloud AP only").
+  const battlecardLineIds = new Set((battlecardDimRows ?? []).map((r) => r.product_line_id));
+  const battlecardLines = (productLines ?? [])
+    .filter((pl) => battlecardLineIds.has(pl.id))
+    .map((pl) => pl.name);
+
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8">
       <DashboardContent
@@ -422,6 +438,7 @@ export default async function SolutionDashboardPage({
         products={productSummaries}
         initialLineId={initialLineId}
         role={role}
+        battlecardLines={battlecardLines}
       />
     </div>
   );
