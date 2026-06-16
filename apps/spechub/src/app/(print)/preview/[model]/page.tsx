@@ -308,7 +308,7 @@ export default async function PreviewPage({
   // Transceiver fallback: zh/ja dict defaults are already Contact Us URLs; EN's
   // default is the QSG link, so substitute a Contact Us URL there.
   const transceiverQrFallback = dict.defaultQrUrl.includes("/qsg/")
-    ? "https://www.engeniustech.com/contact_us"
+    ? "https://www.engeniustech.com/contact-us"
     : dict.defaultQrUrl;
   const qrUrlTemplate =
     customQrUrl ||
