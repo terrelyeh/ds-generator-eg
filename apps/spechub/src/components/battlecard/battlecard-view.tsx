@@ -233,7 +233,7 @@ function GroupTable({
 
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-220px)]">
-          <table className="min-w-max text-xs border-collapse">
+          <table className="min-w-max text-sm border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="border-b-2 border-foreground/12 bg-muted">
                 <th
@@ -257,7 +257,7 @@ function GroupTable({
                       </span>
                     ) : (
                       <span className="text-foreground">
-                        {col.brand && <span className="block text-[10px] font-normal text-muted-foreground">{col.brand}</span>}
+                        {col.brand && <span className="block text-[11px] font-normal text-muted-foreground">{col.brand}</span>}
                         {col.label}
                         <TierBadge tier={col.tier} />
                       </span>
@@ -319,7 +319,7 @@ function CategoryBlock({
       <tr>
         <td
           colSpan={colCount}
-          className="sticky left-0 bg-muted/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-engenius-blue"
+          className="sticky left-0 bg-muted/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-engenius-blue"
         >
           {category}
         </td>
@@ -366,6 +366,7 @@ export function BattlecardView({
   canEdit: boolean;
 }) {
   const [query, setQuery] = useState("");
+  const [activeAnchor, setActiveAnchor] = useState(groups[0]?.anchorModel ?? "");
 
   // Flat live cell store, seeded from server data.
   const [cells, setCells] = useState<Map<string, CellState>>(() => {
@@ -462,9 +463,37 @@ export function BattlecardView({
         </div>
       </div>
 
-      {groups.map((group) => (
-        <GroupTable key={group.anchorModel} group={group} query={query} cells={cells} canEdit={canEdit} onSave={onSave} />
-      ))}
+      {/* Anchor tabs — one EnGenius model's battlecard at a time, instead of
+          stacking every anchor vertically (scales as more anchors are added). */}
+      {groups.length > 1 && (
+        <div className="flex flex-wrap gap-1 border-b">
+          {groups.map((group) => {
+            const isActive = group.anchorModel === activeAnchor;
+            return (
+              <button
+                key={group.anchorModel}
+                onClick={() => setActiveAnchor(group.anchorModel)}
+                className={`-mb-px rounded-t-md border-b-2 px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                  isActive
+                    ? "border-engenius-blue text-engenius-blue"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {group.anchorModel}
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
+                  vs {group.columns.length - 1}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {groups
+        .filter((group) => groups.length === 1 || group.anchorModel === activeAnchor)
+        .map((group) => (
+          <GroupTable key={group.anchorModel} group={group} query={query} cells={cells} canEdit={canEdit} onSave={onSave} />
+        ))}
     </div>
   );
 }
