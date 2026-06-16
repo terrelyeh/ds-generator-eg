@@ -478,13 +478,13 @@ function ManagePanel({
             </select>
           </label>
           <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
-            Brand
+            Brand (new or existing)
             <Input
               list="bc-brands"
               value={brand}
               onChange={(e) => setBrand(e.target.value)}
-              placeholder="Ubiquiti"
-              className="h-7 w-32 text-xs"
+              placeholder="Type a new brand or pick…"
+              className="h-7 w-44 text-xs"
             />
             <datalist id="bc-brands">
               {knownBrands.map((b) => (
@@ -504,9 +504,9 @@ function ManagePanel({
               <option value={3}>T3</option>
             </select>
           </label>
-          <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+          <label className="flex flex-1 flex-col gap-0.5 text-[10px] text-muted-foreground" style={{ minWidth: "20rem" }}>
             Datasheet URL (optional)
-            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" className="h-7 w-48 text-xs" />
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://… (used by ↻ sync)" className="h-7 w-full text-xs" />
           </label>
           <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={add}>
             Add
