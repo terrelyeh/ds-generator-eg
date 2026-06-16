@@ -166,6 +166,7 @@ function GroupTable({
   cells,
   canEdit,
   onSave,
+  onResync,
 }: {
   group: BattlecardGroup;
   query: string;
@@ -174,6 +175,7 @@ function GroupTable({
   onSave: (
     args: { dimensionId: string; column: BattlecardColumn; value: string; sourceUrl: string | null; confirm: boolean }
   ) => Promise<boolean>;
+  onResync: (competitorProductId: string) => void | Promise<void>;
 }) {
   const filteredRows = useMemo(() => {
     if (!query) return group.rows;
@@ -260,6 +262,15 @@ function GroupTable({
                         {col.brand && <span className="block text-[11px] font-normal text-muted-foreground">{col.brand}</span>}
                         {col.label}
                         <TierBadge tier={col.tier} />
+                        {canEdit && (
+                          <button
+                            onClick={() => onResync(col.key)}
+                            title="Re-scrape this competitor's datasheet and refresh draft values (keeps confirmed cells)"
+                            className="ml-1.5 align-middle text-[10px] font-normal text-engenius-blue hover:underline"
+                          >
+                            ↻ sync
+                          </button>
+                        )}
                       </span>
                     )}
                   </th>
@@ -355,18 +366,207 @@ function CategoryBlock({
 }
 
 // ---------------------------------------------------------------------------
+// Manage panel — add / re-tier / remove competitor matchups (canEdit only)
+// ---------------------------------------------------------------------------
+
+function ManagePanel({
+  lineId,
+  activeGroup,
+  lineProducts,
+  knownBrands,
+  mutate,
+}: {
+  lineId: string;
+  activeGroup: BattlecardGroup;
+  lineProducts: { model_name: string; full_name: string }[];
+  knownBrands: string[];
+  mutate: (method: "POST" | "PATCH" | "DELETE", payload: Record<string, unknown>) => Promise<boolean>;
+}) {
+  const [anchor, setAnchor] = useState(activeGroup.anchorModel);
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [tier, setTier] = useState(1);
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const competitors = activeGroup.columns.filter((c) => c.owner === "competitor");
+  const selectCls = "h-7 rounded border border-border bg-background px-1.5 text-xs";
+
+  const reloadIf = (ok: boolean) => {
+    if (ok) {
+      toast.success("Updated");
+      window.location.reload();
+    }
+  };
+
+  const add = async () => {
+    if (!brand.trim() || !model.trim()) {
+      toast.error("Brand and model are required");
+      return;
+    }
+    setBusy(true);
+    const ok = await mutate("POST", {
+      lineId,
+      anchorModelName: anchor,
+      brandName: brand,
+      competitorModelName: model,
+      tier,
+      datasheetUrl: url || undefined,
+    });
+    setBusy(false);
+    reloadIf(ok);
+  };
+
+  return (
+    <div className="rounded-lg border bg-muted/30 p-4 space-y-4">
+      <div>
+        <h3 className="text-sm font-semibold">Competitors for {activeGroup.anchorModel}</h3>
+        <p className="text-[11px] text-muted-foreground">
+          Add, re-tier, or remove competitor matchups. Spec values are filled in the table (or via re-sync).
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        {competitors.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No competitors yet for this model.</p>
+        ) : (
+          competitors.map((c) => (
+            <div key={c.key} className="flex items-center gap-2 text-xs">
+              <span className="min-w-[170px] font-medium">
+                {c.brand ? `${c.brand} ` : ""}
+                {c.label}
+              </span>
+              <select
+                className={selectCls}
+                value={c.tier ?? 1}
+                onChange={(e) =>
+                  mutate("PATCH", {
+                    anchorModelName: activeGroup.anchorModel,
+                    competitorProductId: c.key,
+                    tier: Number(e.target.value),
+                  }).then(reloadIf)
+                }
+              >
+                <option value={1}>T1</option>
+                <option value={2}>T2</option>
+                <option value={3}>T3</option>
+              </select>
+              <button
+                className="text-red-600 hover:underline"
+                onClick={() =>
+                  mutate("DELETE", { anchorModelName: activeGroup.anchorModel, competitorProductId: c.key }).then(reloadIf)
+                }
+              >
+                Remove
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="border-t pt-3 space-y-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Add competitor</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+            EnGenius model
+            <select className={selectCls} value={anchor} onChange={(e) => setAnchor(e.target.value)}>
+              {lineProducts.map((p) => (
+                <option key={p.model_name} value={p.model_name}>
+                  {p.model_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+            Brand
+            <Input
+              list="bc-brands"
+              value={brand}
+              onChange={(e) => setBrand(e.target.value)}
+              placeholder="Ubiquiti"
+              className="h-7 w-32 text-xs"
+            />
+            <datalist id="bc-brands">
+              {knownBrands.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+          </label>
+          <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+            Model
+            <Input value={model} onChange={(e) => setModel(e.target.value)} placeholder="U7 Pro" className="h-7 w-28 text-xs" />
+          </label>
+          <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+            Tier
+            <select className={selectCls} value={tier} onChange={(e) => setTier(Number(e.target.value))}>
+              <option value={1}>T1</option>
+              <option value={2}>T2</option>
+              <option value={3}>T3</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
+            Datasheet URL (optional)
+            <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://…" className="h-7 w-48 text-xs" />
+          </label>
+          <Button size="sm" className="h-7 text-xs" disabled={busy} onClick={add}>
+            Add
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
 
 export function BattlecardView({
   groups,
   canEdit,
+  lineId,
+  lineProducts,
 }: {
   groups: BattlecardGroup[];
   canEdit: boolean;
+  lineId: string;
+  lineProducts: { model_name: string; full_name: string }[];
 }) {
   const [query, setQuery] = useState("");
   const [activeAnchor, setActiveAnchor] = useState(groups[0]?.anchorModel ?? "");
+  const [managing, setManaging] = useState(false);
+
+  // Existing brands across the board → datalist suggestions in the add form.
+  const knownBrands = useMemo(() => {
+    const s = new Set<string>();
+    for (const g of groups) for (const c of g.columns) if (c.brand) s.add(c.brand);
+    return [...s].sort();
+  }, [groups]);
+
+  const activeGroup = groups.find((g) => g.anchorModel === activeAnchor) ?? groups[0];
+
+  // Matchup mutations → reload so the server re-aggregates groups/columns.
+  const mutateMatchup = useCallback(
+    async (method: "POST" | "PATCH" | "DELETE", payload: Record<string, unknown>): Promise<boolean> => {
+      try {
+        const res = await fetch("/api/battlecard/matchup", {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          toast.error(json.error ?? "Failed", { description: json.details });
+          return false;
+        }
+        return true;
+      } catch (e) {
+        toast.error("Failed", { description: e instanceof Error ? e.message : String(e) });
+        return false;
+      }
+    },
+    []
+  );
 
   // Flat live cell store, seeded from server data.
   const [cells, setCells] = useState<Map<string, CellState>>(() => {
@@ -438,6 +638,30 @@ export function BattlecardView({
     [cells]
   );
 
+  // Re-scrape one competitor's datasheet → fresh drafts (server side).
+  const resync = useCallback(async (competitorProductId: string) => {
+    const t = toast.loading("Re-syncing competitor…");
+    try {
+      const res = await fetch("/api/battlecard/resync", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ competitorProductId }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        toast.error(json.error ?? "Re-sync failed", { id: t, description: json.details });
+        return;
+      }
+      toast.success(
+        `Re-synced: ${json.updated} updated · ${json.skipped} kept (confirmed) · ${json.notFound} not found`,
+        { id: t }
+      );
+      setTimeout(() => window.location.reload(), 900);
+    } catch (e) {
+      toast.error("Re-sync failed", { id: t, description: e instanceof Error ? e.message : String(e) });
+    }
+  }, []);
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-3 flex-wrap">
@@ -461,7 +685,27 @@ export function BattlecardView({
           </span>
           {canEdit && <span>· click a cell to edit</span>}
         </div>
+        {canEdit && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 text-xs"
+            onClick={() => setManaging((m) => !m)}
+          >
+            {managing ? "Close" : "Manage competitors"}
+          </Button>
+        )}
       </div>
+
+      {managing && activeGroup && (
+        <ManagePanel
+          lineId={lineId}
+          activeGroup={activeGroup}
+          lineProducts={lineProducts}
+          knownBrands={knownBrands}
+          mutate={mutateMatchup}
+        />
+      )}
 
       {/* Anchor tabs — one EnGenius model's battlecard at a time, instead of
           stacking every anchor vertically (scales as more anchors are added). */}
@@ -492,7 +736,7 @@ export function BattlecardView({
       {groups
         .filter((group) => groups.length === 1 || group.anchorModel === activeAnchor)
         .map((group) => (
-          <GroupTable key={group.anchorModel} group={group} query={query} cells={cells} canEdit={canEdit} onSave={onSave} />
+          <GroupTable key={group.anchorModel} group={group} query={query} cells={cells} canEdit={canEdit} onSave={onSave} onResync={resync} />
         ))}
     </div>
   );

@@ -75,25 +75,33 @@ export default async function BattlecardPage({
 
   if (!productLine) notFound();
 
-  // Dimensions (rows), matchups (who-vs-who + tier), and all cell values.
-  const [{ data: dimData }, { data: matchupData }] = await Promise.all([
-    supabase
-      .from("battlecard_dimensions")
-      .select("*")
-      .eq("product_line_id", productLine.id)
-      .order("sort_order") as unknown as Promise<{ data: BattlecardDimension[] | null }>,
-    supabase
-      .from("competitor_matchups")
-      .select(
-        "anchor_model_name, tier, sort_order, competitor_products(id, model_name, display_name, competitors(name, brand_family))"
-      )
-      .eq("product_line_id", productLine.id)
-      .eq("enabled", true)
-      .order("sort_order") as unknown as Promise<{ data: MatchupRow[] | null }>,
-  ]);
+  // Dimensions (rows), matchups (who-vs-who + tier), and the line's products
+  // (anchor picker for the manage panel).
+  const [{ data: dimData }, { data: matchupData }, { data: lineProductData }] =
+    await Promise.all([
+      supabase
+        .from("battlecard_dimensions")
+        .select("*")
+        .eq("product_line_id", productLine.id)
+        .order("sort_order") as unknown as Promise<{ data: BattlecardDimension[] | null }>,
+      supabase
+        .from("competitor_matchups")
+        .select(
+          "anchor_model_name, tier, sort_order, competitor_products(id, model_name, display_name, competitors(name, brand_family))"
+        )
+        .eq("product_line_id", productLine.id)
+        .eq("enabled", true)
+        .order("sort_order") as unknown as Promise<{ data: MatchupRow[] | null }>,
+      supabase
+        .from("products")
+        .select("model_name, full_name")
+        .eq("product_line_id", productLine.id)
+        .order("model_name") as unknown as Promise<{ data: { model_name: string; full_name: string }[] | null }>,
+    ]);
 
   const dimensions = dimData ?? [];
   const matchups = matchupData ?? [];
+  const lineProducts = lineProductData ?? [];
   const dimIds = dimensions.map((d) => d.id);
 
   const { data: valueData } = (dimIds.length
@@ -226,7 +234,12 @@ export default async function BattlecardPage({
       </div>
 
       {groups.length > 0 ? (
-        <BattlecardView groups={groups} canEdit={canEdit} />
+        <BattlecardView
+          groups={groups}
+          canEdit={canEdit}
+          lineId={productLine.id}
+          lineProducts={lineProducts}
+        />
       ) : (
         <div className="rounded-lg border bg-card py-16 text-center text-sm text-muted-foreground shadow-sm">
           No battlecard matchups configured for this product line yet.
