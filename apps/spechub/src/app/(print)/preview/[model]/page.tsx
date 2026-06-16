@@ -22,8 +22,24 @@ interface ProductQueryRow extends Product {
 
 /** Non-cloud product lines use gray theme instead of blue */
 const NON_CLOUD_CATEGORIES = new Set(["Unmanaged Switches", "Extenders"]);
+/** Accessories ▸ Transceiver datasheets use a green theme (matches template) */
+const GREEN_CATEGORIES = new Set(["Transceivers"]);
 
 function getTheme(category: string) {
+  // Green theme for Transceiver datasheets.
+  if (GREEN_CATEGORIES.has(category)) {
+    const green = "#2F855A";
+    return {
+      isCloud: false,
+      primary: green,
+      headerBg: green,
+      modelColor: green,
+      sectionTitle: green,
+      specLabel: green,
+      featuresBox: "#e9f5ee",
+      subtitleColor: green,
+    };
+  }
   const isCloud = !NON_CLOUD_CATEGORIES.has(category);
   return {
     isCloud,
