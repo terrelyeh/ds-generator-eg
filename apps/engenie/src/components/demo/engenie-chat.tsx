@@ -66,6 +66,8 @@ const FALLBACK_QUESTIONS = [
   "ECC100 和 ECC500 差在哪裡？",
   "怎麼設定 Site-to-Site VPN？",
   "推薦適合飯店的網路方案",
+  "PRO license 到期後設備還能用嗎？",
+  "AirGuard 怎麼偵測 Rogue AP？",
 ];
 
 export function EngenieChat({
@@ -199,7 +201,7 @@ export function EngenieChat({
               </div>
             ) : (
               <div className="mt-10 flex w-full max-w-[320px] flex-col gap-2">
-                {questions.slice(0, 4).map((q, i) => (
+                {questions.slice(0, 6).map((q, i) => (
                   <button
                     key={i}
                     onClick={() => handleSubmit(q)}

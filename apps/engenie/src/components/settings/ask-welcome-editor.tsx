@@ -238,7 +238,7 @@ export function AskWelcomeEditor() {
 
               {/* Example question preview */}
               <div className="mt-6 grid grid-cols-1 gap-2 w-full max-w-xs">
-                {(previewQuestions).slice(0, 4).map((q, i) => (
+                {(previewQuestions).slice(0, 6).map((q, i) => (
                   <div key={i} className="rounded-lg border px-3 py-2 text-left text-xs text-muted-foreground/50">
                     {q}
                   </div>

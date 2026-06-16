@@ -77,7 +77,7 @@
       panel.style.borderRadius = "0";
     } else {
       panel.style.width = "400px";
-      panel.style.height = "min(760px, calc(100vh - 104px))";
+      panel.style.height = "min(836px, calc(100vh - 104px))";
       panel.style.maxWidth = "calc(100vw - 40px)";
       panel.style.maxHeight = "calc(100vh - 104px)";
       panel.style.bottom = "88px";
