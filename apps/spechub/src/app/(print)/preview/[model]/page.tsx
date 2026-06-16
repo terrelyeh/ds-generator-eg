@@ -294,8 +294,9 @@ export default async function PreviewPage({
     productLineExt.spec_footnote ||
     null;
 
-  // QR: custom per-product-translation > locale default
-  const qrLabel = customQrLabel || dict.defaultQrLabel;
+  // QR: custom per-product-translation > locale default.
+  // Transceivers have no QSG, so the QR is "Contact Us" → Contact page.
+  const qrLabel = customQrLabel || (isTransceiver ? "Contact Us" : dict.defaultQrLabel);
   // QR URL resolution priority:
   //   1. product_translations.qr_url (per-product per-locale override)
   //   2. product_lines.qr_url_template (per-line template — most product
@@ -304,8 +305,15 @@ export default async function PreviewPage({
   //   3. dict.defaultQrUrl (e.g. https://qr.engenius.ai/qsg/{model} — used
   //      by Cloud AP and Cloud Camera which keep the short URL)
   // {model} placeholder gets replaced with lowercase model_name.
+  // Transceiver fallback: zh/ja dict defaults are already Contact Us URLs; EN's
+  // default is the QSG link, so substitute a Contact Us URL there.
+  const transceiverQrFallback = dict.defaultQrUrl.includes("/qsg/")
+    ? "https://www.engeniustech.com/contact_us"
+    : dict.defaultQrUrl;
   const qrUrlTemplate =
-    customQrUrl || productLineExt.qr_url_template || dict.defaultQrUrl;
+    customQrUrl ||
+    productLineExt.qr_url_template ||
+    (isTransceiver ? transceiverQrFallback : dict.defaultQrUrl);
   const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   // cover + specs + antennas (optional) + hardware (skipped for transceivers)
