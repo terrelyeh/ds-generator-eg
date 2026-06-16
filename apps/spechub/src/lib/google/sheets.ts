@@ -315,8 +315,17 @@ function parseOverviewData(
     full_name = getCell(rows[descIdx], colIdx);
   }
 
-  // Headline
-  const headlineIdx = rowMap.get("Headline");
+  // Headline — exact match first, then tolerate decorated labels like
+  // "(Headline)" (some sheets annotate the row name).
+  let headlineIdx = rowMap.get("Headline");
+  if (headlineIdx === undefined) {
+    for (let i = 0; i < rows.length; i++) {
+      if (String(rows[i]?.[0] ?? "").trim().includes("Headline")) {
+        headlineIdx = i;
+        break;
+      }
+    }
+  }
   if (headlineIdx !== undefined) {
     headline = getCell(rows[headlineIdx], colIdx);
   }
@@ -550,6 +559,21 @@ export async function loadAllProductsFromSheet(
   const nameRowIdx = findRowByLabel(detailRows, "Model Name") ?? 0;
   const modelNumRow = detailRows[numRowIdx] ?? [];
 
+  // Only import models listed in the Web Overview tab — that's the curated
+  // catalog. The Detail Specs tab can carry extra/example columns (e.g. an EOL
+  // placeholder) that aren't real products. Guarded: if the overview has no
+  // Model # row, fall back to importing every detail-specs column (legacy).
+  const overviewModels = new Set<string>();
+  for (const row of overviewRows) {
+    if (String(row?.[0] ?? "").trim() === "Model #") {
+      for (let c = 1; c < row.length; c++) {
+        const m = String(row[c] ?? "").trim();
+        if (m) overviewModels.add(m);
+      }
+      break;
+    }
+  }
+
   const results = new Map<string, SheetProduct>();
   // Track duplicates so we behave consistently with loadProductFromSheets
   // (which uses the first occurrence). Without this, the Map.set() loop
@@ -561,6 +585,12 @@ export async function loadAllProductsFromSheet(
   for (let col = 1; col < modelNumRow.length; col++) {
     const modelNum = String(modelNumRow[col] ?? "").trim();
     if (!modelNum) continue;
+
+    // Skip detail-specs columns that aren't in the curated Web Overview list.
+    if (overviewModels.size > 0 && !overviewModels.has(modelNum)) {
+      console.warn(`[sheets] "${modelNum}" not in Web Overview — skipping (not a catalog product).`);
+      continue;
+    }
 
     if (seenModels.has(modelNum)) {
       console.warn(
