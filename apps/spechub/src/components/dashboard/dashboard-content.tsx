@@ -326,7 +326,8 @@ export function DashboardContent({
   products,
   initialLineId,
   role,
-}: DashboardContentProps & { initialLineId?: string }) {
+  battlecardLines = [],
+}: DashboardContentProps & { initialLineId?: string; battlecardLines?: string[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const canSync = can(role, "sync.run");
@@ -582,9 +583,10 @@ export function DashboardContent({
               Translations
             </Link>
           )}
-          {/* Battlecard — internal competitor comparison. MVP: Cloud AP only.
+          {/* Battlecard — internal competitor comparison. Shown for any line
+              that has a battlecard dimension template (auto-detected server-side).
               Gated by battlecard.view (admin/editor/pm). */}
-          {canViewBattlecard && activeLine?.name === "Cloud AP" && (
+          {canViewBattlecard && battlecardLines.includes(activeLine?.name ?? "") && (
             <Link
               href={`/battlecard/${encodeURIComponent(activeLine?.name ?? "")}`}
               className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
