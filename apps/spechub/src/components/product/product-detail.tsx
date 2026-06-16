@@ -60,6 +60,9 @@ interface LayoutReport {
 
 interface ProductDetailProps {
   product: ProductWithSpecs;
+  /** Solution slug for the breadcrumb back-link (e.g. "cloud", "accessories").
+   *  Without this the breadcrumb used to hardcode "cloud". */
+  solutionSlug?: string;
   versions: Version[];
   translations?: ProductTranslation[];
   layoutReport?: LayoutReport;
@@ -776,7 +779,7 @@ function QsgUrlCard({
   );
 }
 
-export function ProductDetail({ product, versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role }: ProductDetailProps) {
+export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role }: ProductDetailProps) {
   // Role-derived flags. Prefixed `roleCan` to avoid collision with the
   // existing `canGenerate` that signals "all required fields are filled
   // (Product Image, Hardware Image, Overview, Features)".
@@ -984,7 +987,7 @@ export function ProductDetail({ product, versions, translations = [], layoutRepo
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm">
         <Link
-          href={`/dashboard/cloud?line=${product.product_line.name.toLowerCase().replace(/\s+/g, "-")}`}
+          href={`/dashboard/${solutionSlug}?line=${product.product_line.name.toLowerCase().replace(/\s+/g, "-")}`}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           {product.product_line.label}

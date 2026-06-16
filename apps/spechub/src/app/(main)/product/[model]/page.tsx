@@ -68,6 +68,15 @@ export default async function ProductPage({
     notFound();
   }
 
+  // Solution slug for the breadcrumb back-link. product_lines carries
+  // solution_id, but the /dashboard/[solution] route is keyed by slug.
+  const { data: solRow } = (await supabase
+    .from("solutions")
+    .select("slug")
+    .eq("id", product.product_lines.solution_id)
+    .single()) as { data: { slug: string } | null };
+  const solutionSlug = solRow?.slug ?? "cloud";
+
   const productWithSpecs: ProductWithSpecs = {
     ...product,
     product_line: product.product_lines,
@@ -165,6 +174,7 @@ export default async function ProductPage({
     <div className="mx-auto max-w-[1400px] px-6 py-8">
       <ProductDetail
         product={productWithSpecs}
+        solutionSlug={solutionSlug}
         versions={versionData ?? []}
         translations={translationData ?? []}
         layoutReport={layoutReport ?? undefined}

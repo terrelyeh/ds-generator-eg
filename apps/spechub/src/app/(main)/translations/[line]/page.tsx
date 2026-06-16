@@ -32,6 +32,14 @@ export default async function TranslationsPage({
 
   if (!productLine) notFound();
 
+  // Solution slug for the breadcrumb back-link (route is keyed by slug).
+  const { data: solRow } = (await supabase
+    .from("solutions")
+    .select("slug")
+    .eq("id", productLine.solution_id)
+    .single()) as { data: { slug: string } | null };
+  const solutionSlug = solRow?.slug ?? "cloud";
+
   // Get all unique spec section categories + spec item labels from products in this line
   const { data: products } = (await supabase
     .from("products")
@@ -103,7 +111,7 @@ export default async function TranslationsPage({
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm">
         <Link
-          href={`/dashboard/cloud?line=${productLine.name.toLowerCase().replace(/\s+/g, "-")}`}
+          href={`/dashboard/${solutionSlug}?line=${productLine.name.toLowerCase().replace(/\s+/g, "-")}`}
           className="text-muted-foreground hover:text-foreground transition-colors"
         >
           {productLine.label}
