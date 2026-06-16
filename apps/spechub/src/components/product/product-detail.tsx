@@ -710,14 +710,24 @@ function RadioPatternSlot({
 function QsgUrlCard({
   modelName,
   lineTemplate,
+  isTransceiver = false,
 }: {
   modelName: string;
   lineTemplate: string | null;
+  isTransceiver?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  const template = lineTemplate || "https://qr.engenius.ai/qsg/{model}";
+  // Transceivers have no QSG — the QR points to Contact Us.
+  const fallback = isTransceiver
+    ? "https://www.engeniustech.com/contact-us"
+    : "https://qr.engenius.ai/qsg/{model}";
+  const template = lineTemplate || fallback;
   const url = template.replace("{model}", modelName.toLowerCase());
-  const source = lineTemplate ? "Per-line template" : "Default short URL";
+  const source = lineTemplate
+    ? "Per-line template"
+    : isTransceiver
+      ? "Contact Us (no QSG)"
+      : "Default short URL";
 
   async function copyToClipboard() {
     try {
@@ -733,7 +743,7 @@ function QsgUrlCard({
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          QSG URL
+          {isTransceiver ? "Contact URL" : "QSG URL"}
           <span className="text-[11px] font-normal text-muted-foreground">
             (printed as QR code on the datasheet)
           </span>
@@ -1459,6 +1469,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         <QsgUrlCard
           modelName={product.model_name}
           lineTemplate={(product.product_line as { qr_url_template?: string | null }).qr_url_template ?? null}
+          isTransceiver={isTransceiver}
         />
       )}
 

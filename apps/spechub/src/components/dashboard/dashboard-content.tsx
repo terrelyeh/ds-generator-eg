@@ -28,6 +28,7 @@ interface ProductSummary {
   model_name: string;
   subtitle: string;
   full_name: string;
+  headline: string;
   current_version: string;
   status: string;
   has_product_image: boolean;
@@ -161,6 +162,9 @@ function ProductTable({
   }
 
   const isAP = lineCategory.toLowerCase().includes("ap");
+  // Transceivers: one product image (no hardware), and the "Model Name" field
+  // is really a description.
+  const isTransceiver = lineCategory === "Transceivers";
 
   return (
     <Table>
@@ -168,7 +172,7 @@ function ProductTable({
         <TableRow className="border-b-2 border-foreground/15">
           <TableHead className="w-8 text-center">#</TableHead>
           <TableHead className="w-28">Model #</TableHead>
-          <TableHead className="w-56">Model Name</TableHead>
+          <TableHead className="w-56">{isTransceiver ? "Description" : "Model Name"}</TableHead>
           <TableHead className="w-16 text-center">Version</TableHead>
           <TableHead className="w-20">Lang</TableHead>
           <TableHead className="w-24">Last Changed</TableHead>
@@ -176,7 +180,7 @@ function ProductTable({
           <TableHead className="w-14 text-center">FT</TableHead>
           <TableHead className="w-14 text-center">SP</TableHead>
           <TableHead className="w-14 text-center">Prod</TableHead>
-          <TableHead className="w-14 text-center">HW</TableHead>
+          {!isTransceiver && <TableHead className="w-14 text-center">HW</TableHead>}
           {isAP && (
             <TableHead className="w-24 text-center">
               Radio Pattern
@@ -209,9 +213,9 @@ function ProductTable({
             </TableCell>
             <TableCell
               className="max-w-72 truncate text-muted-foreground"
-              title={product.subtitle || product.full_name}
+              title={isTransceiver ? product.headline : product.subtitle || product.full_name}
             >
-              {product.subtitle || product.full_name}
+              {isTransceiver ? product.headline : product.subtitle || product.full_name}
             </TableCell>
             <TableCell className="text-center">
               <Badge variant="outline" className="tabular-nums text-xs">
@@ -278,9 +282,11 @@ function ProductTable({
             <TableCell className="text-center">
               <ImgStatus ok={product.has_product_image} />
             </TableCell>
-            <TableCell className="text-center">
-              <ImgStatus ok={product.has_hardware_image} />
-            </TableCell>
+            {!isTransceiver && (
+              <TableCell className="text-center">
+                <ImgStatus ok={product.has_hardware_image} />
+              </TableCell>
+            )}
             {isAP && (
               <TableCell className="text-center">
                 <RadioPatternCell patterns={product.radio_patterns} />

@@ -17,6 +17,7 @@ interface ProductRow {
   model_name: string;
   subtitle: string;
   full_name: string;
+  headline: string;
   current_version: string;
   status: string;
   overview: string;
@@ -120,6 +121,7 @@ export default async function SolutionDashboardPage({
         model_name,
         subtitle,
         full_name,
+        headline,
         current_version,
         status,
         overview,
@@ -393,6 +395,7 @@ export default async function SolutionDashboardPage({
       model_name: p.model_name,
       subtitle: p.subtitle,
       full_name: p.full_name,
+      headline: p.headline,
       current_version: p.current_version,
       status: p.status || "active",
       has_overview: !!p.overview && p.overview.trim().length > 0,
