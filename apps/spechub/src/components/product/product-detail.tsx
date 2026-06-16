@@ -905,16 +905,19 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
       ]
     : [];
 
+  // Transceivers have a single product image and no hardware image — the
+  // hardware slot is hidden and not required for PDF generation.
+  const isTransceiver = product.product_line.category === "Transceivers";
   const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
   const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
   const hasOverview = !!product.overview && product.overview.trim().length > 0;
   const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
   const hasSpecs = product.spec_sections.length > 0;
-  const canGenerate = hasProductImage && hasHardwareImage && hasOverview && hasFeatures && hasSpecs;
+  const canGenerate = hasProductImage && (isTransceiver || hasHardwareImage) && hasOverview && hasFeatures && hasSpecs;
 
   const missingItems: string[] = [];
   if (!hasProductImage) missingItems.push("Product Image");
-  if (!hasHardwareImage) missingItems.push("Hardware Image");
+  if (!isTransceiver && !hasHardwareImage) missingItems.push("Hardware Image");
   if (!hasOverview) missingItems.push("Overview");
   if (!hasFeatures) missingItems.push("Features");
   if (!hasSpecs) missingItems.push("Spec Details");
@@ -1396,12 +1399,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
               currentUrl={product.product_image}
               onUploaded={() => router.refresh()}
             />
-            <ImageUploadButton
-              modelName={product.model_name}
-              imageType="hardware"
-              currentUrl={product.hardware_image}
-              onUploaded={() => router.refresh()}
-            />
+            {/* Transceivers have no hardware image — hide the slot. */}
+            {!isTransceiver && (
+              <ImageUploadButton
+                modelName={product.model_name}
+                imageType="hardware"
+                currentUrl={product.hardware_image}
+                onUploaded={() => router.refresh()}
+              />
+            )}
           </div>
 
           {/* Radio Pattern placeholders (AP only) */}
