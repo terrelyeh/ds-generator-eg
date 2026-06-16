@@ -167,6 +167,7 @@ function GroupTable({
   canEdit,
   onSave,
   onResync,
+  onConfirmAll,
 }: {
   group: BattlecardGroup;
   query: string;
@@ -176,6 +177,7 @@ function GroupTable({
     args: { dimensionId: string; column: BattlecardColumn; value: string; sourceUrl: string | null; confirm: boolean }
   ) => Promise<boolean>;
   onResync: (competitorProductId: string) => void | Promise<void>;
+  onConfirmAll: () => void;
 }) {
   const filteredRows = useMemo(() => {
     if (!query) return group.rows;
@@ -230,6 +232,14 @@ function GroupTable({
           <span className="text-[11px] tabular-nums text-muted-foreground">
             · {confirmed}/{total} competitor cells confirmed
           </span>
+        )}
+        {canEdit && total > confirmed && (
+          <button
+            onClick={onConfirmAll}
+            className="rounded border border-emerald-600/40 px-2 py-0.5 text-[11px] font-medium text-emerald-700 hover:bg-emerald-50"
+          >
+            Confirm all drafts ({total - confirmed})
+          </button>
         )}
       </div>
 
@@ -662,6 +672,51 @@ export function BattlecardView({
     }
   }, []);
 
+  // Bulk "Save & Confirm" — mark every filled, unconfirmed competitor cell in
+  // one anchor's table as confirmed.
+  const confirmAllForGroup = useCallback(
+    async (group: BattlecardGroup) => {
+      const ids = group.columns.filter((c) => c.owner === "competitor").map((c) => c.key);
+      const keysToFlip: string[] = [];
+      for (const row of group.rows) {
+        for (const id of ids) {
+          const k = cellKey(row.dimensionId, id);
+          const st = cells.get(k);
+          if (st?.value && !st.confirmed) keysToFlip.push(k);
+        }
+      }
+      if (keysToFlip.length === 0) {
+        toast("Nothing to confirm — all filled cells are already confirmed.");
+        return;
+      }
+      const t = toast.loading(`Confirming ${keysToFlip.length} cells…`);
+      try {
+        const res = await fetch("/api/battlecard/confirm-all", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ competitorProductIds: ids }),
+        });
+        const json = await res.json();
+        if (!res.ok) {
+          toast.error(json.error ?? "Confirm failed", { id: t, description: json.details });
+          return;
+        }
+        setCells((prev) => {
+          const next = new Map(prev);
+          for (const k of keysToFlip) {
+            const st = next.get(k);
+            if (st) next.set(k, { ...st, confirmed: true });
+          }
+          return next;
+        });
+        toast.success(`Confirmed ${json.confirmed} cells`, { id: t });
+      } catch (e) {
+        toast.error("Confirm failed", { id: t, description: e instanceof Error ? e.message : String(e) });
+      }
+    },
+    [cells]
+  );
+
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-3 flex-wrap">
@@ -736,7 +791,16 @@ export function BattlecardView({
       {groups
         .filter((group) => groups.length === 1 || group.anchorModel === activeAnchor)
         .map((group) => (
-          <GroupTable key={group.anchorModel} group={group} query={query} cells={cells} canEdit={canEdit} onSave={onSave} onResync={resync} />
+          <GroupTable
+            key={group.anchorModel}
+            group={group}
+            query={query}
+            cells={cells}
+            canEdit={canEdit}
+            onSave={onSave}
+            onResync={resync}
+            onConfirmAll={() => confirmAllForGroup(group)}
+          />
         ))}
     </div>
   );
