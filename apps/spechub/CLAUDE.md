@@ -17,6 +17,7 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 **7 個產品線**（全屬 EnGenius Cloud solution）：Cloud AP, Cloud Switch,
 Cloud Camera, Cloud AI-NVS, Cloud VPN Firewall, Switch Extender, Unmanaged Switch。
 架構已支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由）。
+另含**內部競品比較 Battlecard**（`/battlecard/[line]`,Cloud AP MVP;詳見下方 Architecture）。
 
 功能清單與產品定位詳見 [README.md](README.md)。
 
@@ -68,6 +69,7 @@ src/
       changelog/[line]/page.tsx
       product/[model]/page.tsx         # Product detail (sticky header, tabs: Detail/Translations)
       translations/[line]/page.tsx     # Per-product-line spec label translations
+      battlecard/[line]/page.tsx       # Internal competitor battlecard (Cloud AP MVP)
       docs/sync/page.tsx
       settings/                        # hub + glossary / typography / users
     auth/                              # Google OAuth flow（與 engenie 各持一份）
@@ -81,17 +83,19 @@ src/
       translations/{product,spec-labels}/、glossary/
       settings/{providers,typography,fonts}/  # providers 與 engenie 各持一份
       products/[model]/layout-ack/
+      battlecard/{value,matchup,resync,websearch,confirm-all}/  # 競品比較 CRUD + 抽取
       notify/、users/*                  # Telegram 通知、admin user management
   proxy.ts                             # session refresh + auth gate + Puppeteer automation bypass（已簡化）
   components/
     layout/{navbar,main-shell,user-menu,engenie-widget}.tsx
-    dashboard/、product/、compare/、changelog/、translations/、preview/
+    dashboard/、product/、compare/、changelog/、translations/、preview/、battlecard/
     settings/{settings-page,glossary-editor,typography-editor,users-manager}.tsx
     ui/                                # shadcn（與 engenie 各持一份）
   lib/
     google/{auth,sheets,sheets-extra,drive-versions,drive-images}.ts
     datasheet/                         # cover-layout、pagination、layout-check、layout-ack、typography、locales/
     translate/                         # prompts + providers (claude/openai/gemini)
+    battlecard/spec-mapping.ts         # dimension_key → EnGenius spec label 對應(自家值 seed 用)
     notifications/
 packages/（repo root）
   db/    → @eg/db：supabase server/client/admin、settings(getApiKey)、DB types、supabase/migrations/
@@ -120,6 +124,13 @@ path `/api/sync`)→ `(main)/layout.tsx`(whitelist 檢查)→ per-route gates
 (`gate()`/`gateOrCron()`/`adminOnly()`/`requirePagePermission()` + client `can()`)。
 4 角色矩陣在 **`@eg/auth/permissions`**(packages/auth)。**改 auth/proxy/權限前先讀該檔。**
 
+### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
+
+內部競品比較(Cloud AP MVP)。`/battlecard/[line]`(gate `battlecard.view`)、API 在 `api/battlecard/`、
+UI fork 自 compare-table。半自動抽取(**↻ sync** datasheet / **🔍 web** 補空格)→ PM 確認制。
+**改 battlecard 前必讀該檔** —— 關鍵雷:`confirmed` 只升不降、auto-extract 不覆蓋已確認格、tier 是關係層、
+新表要手動加進 `database.generated.ts`、需 `FIRECRAWL_API_KEY`、別用 comparisons 的全刪重插。
+
 ## Brand & Visual System
 
 - Primary Blue: `#03a9f4` → `text-engenius-blue`, `bg-engenius-blue`
@@ -142,7 +153,8 @@ EnGenie 擁有：documents、ask_workspaces、api_keys、chat_sessions、topolog
 
 Key tables:
 - `solutions` — id, name, slug, label, color_primary, ds_template, sort_order, **kind**
-  ('product'|'knowledge')。**dashboard sidebar 篩 `kind='product'` 且 `product_line_count>0`**
+  ('product'|'knowledge')。**dashboard sidebar 只顯示 `kind='product'`;沒有 product line 的
+  solution 以灰階 disabled「soon」佔位呈現(2026-06-16 起不再用 `product_line_count>0` 過濾掉)**
 - `product_lines` — solution_id (FK), ds_prefix, ds_images_folder_id, drive_folder_id,
   sort_order, **spec_footnote** + **spec_footnote_translations** (JSONB), **qr_url_template**
   (NULL=用 dict default;`{model}` 替換 lowercase model_name。Cloud AP/Camera 維持短連結
@@ -156,6 +168,12 @@ Key tables:
 - `app_settings` — key-value: API keys（LLM）、`typography_${locale}`、`custom_fonts_${locale}`、
   `pdf_lock_{model}_{lang}`（**與 EnGenie 共用**;keys 管理 UI 在 EnGenie）
 - `profiles` — role TEXT CHECK (admin/editor/pm/viewer)；`email_whitelist` — 邀請制白名單
+- **Battlecard**（內部競品比較,Cloud AP MVP,migration `00025`）— `competitors`(品牌)→
+  `competitor_products`(型號,FK product_line + datasheet_url)；`competitor_matchups`
+  (anchor_model_name × competitor_product_id × **tier**;tier 是**關係層**,同一競品對不同自家機型可不同 tier)；
+  `battlecard_dimensions`(per-line 比較維度模板=表格的列)；`battlecard_values`(每格值;兩個 nullable FK
+  `anchor_model_name`|`competitor_product_id` + CHECK 互斥 + partial unique index;帶 **confirmed** +
+  source_url + captured_at + extraction_method)。**RLS:authenticated 唯讀,寫入一律走 admin client**
 
 ## Conventions
 
@@ -204,6 +222,13 @@ skill 的 Search API base URL。藍圖見 [`docs/monorepo-split-plan.md`](docs/m
    JSONB + content-hash bound + `/api/generate-pdf` approval gate
 7. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
+**Battlecard**（MVP 已上線,功能詳見 README）：
+8. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
+   5 維度(MLO/Recommended Users/BSS Coloring/Warranty/MSRP)刻意留白給 PM
+9. **擴到其他產品線** — 目前只有 Cloud AP 有 dimension 模板 + matchup;Switch/NVS/VPN FW 待建
+   （dashboard toolbar 的 Battlecard 連結目前也只在 Cloud AP 顯示）
+（註:使用者 2026-06-16 決定 ↻sync 與 🔍web 維持兩顆手動按鈕,不自動串接）
+
 ## Deployment
 
 ```bash
@@ -219,8 +244,10 @@ npm run lint
 - 需要的 env vars: `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
   `GOOGLE_SERVICE_ACCOUNT_JSON`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, `CRON_SECRET`（與 engenie 同值）,
   `VERCEL_AUTOMATION_BYPASS_SECRET`, `PDF_PREVIEW_BASE_URL`, **`ENGENIE_INTERNAL_URL`**,
-  **`NEXT_PUBLIC_ENGENIE_URL`**, `API_KEY_ENC_SECRET`（讀共用加密設定時需要）
+  **`NEXT_PUBLIC_ENGENIE_URL`**, `API_KEY_ENC_SECRET`（讀共用加密設定時需要）,
+  **`FIRECRAWL_API_KEY`**（battlecard ↻sync / 🔍web 抓取用;Vercel prod/dev/preview 已設）
 - AI 翻譯 keys 在 EnGenie `/settings/api-keys` 設定（共用 app_settings），env 可覆蓋
+- **Vercel link（`.vercel/`）在 monorepo 根,不在 apps/spechub** — 跑 `vercel env` 等指令要在根目錄
 
 ## Common Pitfalls
 
@@ -261,5 +288,6 @@ npm run lint
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步
 - [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md) — PDF 生成、版面、多語言 + AI 翻譯
 - [`docs/auth-rbac.md`](docs/auth-rbac.md) — 認證/proxy/RBAC 三層、權限矩陣、RLS
+- [`docs/battlecard.md`](docs/battlecard.md) — 競品 battlecard:資料模型、抽取流程、關鍵雷
 - [`public/docs/drive-folder-and-naming-rules.html`](public/docs/drive-folder-and-naming-rules.html) — Drive 規則
 - RAG / Ask / Search API → [apps/engenie/docs/](../engenie/docs/)

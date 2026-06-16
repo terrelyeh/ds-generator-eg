@@ -28,6 +28,16 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - 全域搜尋、欄位排序、Column 顯示/隱藏
 - Sticky header + pinned Category/Spec 欄位
 
+### Competitor Battlecard（內部競品比較）
+- **EnGenius 機型 vs 競品 並排比較表**，供業務/PM 內部參考（目前 Cloud AP，旗艦 ECW536 / 量走 ECW230）
+- **依錨點機型分頁**切換，每張表把自家機型對上各競品（Ubiquiti / Cisco Meraki / TP-Link 等）
+- **Tier 分級（T1/T2/T3）是「相對於某台自家機型」** — 同一台競品對不同自家機型可標不同 tier
+- **半自動填規格、PM 確認制**：競品規格由 AI 抓取，先以「草稿」（琥珀色）呈現、附來源連結，PM 核對後 **Save & Confirm** 才生效（亦可「一鍵確認整表」）
+  - **↻ sync**：抓競品**官方 datasheet** 更新
+  - **🔍 web**：**全網搜尋**只補目前空白的規格（補官方 datasheet 沒有的）
+- **競品管理**：可自行新增競品品牌 / 型號 / 對戰機型 / tier / datasheet 連結，改 tier 或移除
+- 純內部使用，不會印在對外 datasheet 上
+
 ### Datasheet PDF
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
