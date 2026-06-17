@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { TaxonomyBadges } from "./taxonomy-picker";
+import { TaxonomyBadges, fetchTaxonomy } from "./taxonomy-picker";
 import {
   type SourceItem,
   type SourceTypeStats,
@@ -18,6 +18,7 @@ import { WebDialog } from "./dialogs/web-dialog";
 import { SnippetDialog } from "./dialogs/snippet-dialog";
 import { FileDialog } from "./dialogs/file-dialog";
 import { EditTaxonomyDialog } from "./dialogs/edit-taxonomy-dialog";
+import { ProductSpecList } from "./product-spec-list";
 
 interface SourceTypeConfig {
   id: string;
@@ -56,6 +57,8 @@ export function KnowledgeBase() {
   const [newArticleUrl, setNewArticleUrl] = useState("");
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
   const [syncingSpace, setSyncingSpace] = useState<string | null>(null);
+  const [reindexingLine, setReindexingLine] = useState<string | null>(null);
+  const [plIdByName, setPlIdByName] = useState<Map<string, string>>(new Map());
 
   // Which modal is open. Each dialog component owns its own form state, so the
   // parent only tracks which one is showing (+ any seed data it needs).
@@ -84,6 +87,34 @@ export function KnowledgeBase() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Product line name → id, for per-line re-index (taxonomy is module-cached).
+  useEffect(() => {
+    fetchTaxonomy()
+      .then((t) => setPlIdByName(new Map(t.product_lines.map((pl) => [pl.name, pl.id]))))
+      .catch(() => {});
+  }, []);
+
+  async function handleReindexLine(lineName: string) {
+    const id = plIdByName.get(lineName);
+    if (!id) { toast.error(`Product line "${lineName}" not found`); return; }
+    setReindexingLine(lineName);
+    try {
+      const data = await postIngest({ source_type: "product_spec", product_line_id: id });
+      if (data.ok) {
+        const errCount = Array.isArray(data.errors) ? data.errors.length : 0;
+        const errMsg = errCount ? `, ${errCount} errors` : "";
+        toast.success(`${lineName}: ${data.processed ?? 0} indexed, ${data.skipped ?? 0} unchanged${errMsg}`);
+        fetchData();
+      } else {
+        toast.error(`Re-index failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Re-index failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setReindexingLine(null);
+    }
+  }
 
   async function handleIngest(sourceType: string, force = false) {
     setIngesting(sourceType);
@@ -592,6 +623,15 @@ export function KnowledgeBase() {
 
                 {isExpanded && typeSources.length > 0 && config.id !== "gitbook" && config.id !== "helpcenter" && (
                   <CardContent className="pt-0">
+                    {config.id === "product_spec" ? (
+                      <ProductSpecList
+                        sources={typeSources}
+                        onEditTax={(s) => setDialog({ kind: "editTax", target: s })}
+                        onDelete={handleDelete}
+                        onReindexLine={handleReindexLine}
+                        reindexingLine={reindexingLine}
+                      />
+                    ) : (
                     <div className="rounded-lg border overflow-hidden">
                       <table className="w-full text-xs">
                         <thead>
@@ -703,6 +743,7 @@ export function KnowledgeBase() {
                         </tbody>
                       </table>
                     </div>
+                    )}
 
                     <div className="mt-3 flex items-center justify-between">
                       <p className="text-xs text-muted-foreground/50">

@@ -89,13 +89,13 @@ function buildSpecsChunk(
  * Ingest all products (or a specific product) into the documents table.
  * Generates two chunks per product: overview + specifications.
  *
- * Returns { processed, skipped, errors } counts.
+ * Returns { processed, skipped, refreshed, errors } counts.
  */
 export async function ingestProducts(options?: {
   modelName?: string;
   productLineId?: string;
   force?: boolean; // re-embed even if content unchanged
-}): Promise<{ processed: number; skipped: number; errors: string[] }> {
+}): Promise<{ processed: number; skipped: number; refreshed: number; errors: string[] }> {
   const supabase = createAdminClient();
   const errors: string[] = [];
 
@@ -117,7 +117,7 @@ export async function ingestProducts(options?: {
   };
 
   if (prodError || !products) {
-    return { processed: 0, skipped: 0, errors: [`Failed to fetch products: ${prodError}`] };
+    return { processed: 0, skipped: 0, refreshed: 0, errors: [`Failed to fetch products: ${prodError}`] };
   }
 
   // Fetch all product lines for metadata (incl. solution_id for taxonomy)
@@ -134,19 +134,22 @@ export async function ingestProducts(options?: {
 
   const solutionSlugById = new Map((solutions ?? []).map((s) => [s.id, s.slug]));
 
-  // Fetch existing document hashes to skip unchanged
+  // Fetch existing chunks (hash + metadata). content_hash gates whether we
+  // re-embed; metadata is refreshed separately so adding/renaming a metadata
+  // field (e.g. the unified taxonomy) backfills onto content-unchanged chunks
+  // WITHOUT needing a forced re-embed.
   const sourceIds = products.map((p) => p.model_name);
   const { data: existingDocs } = await supabase
     .from("documents" as "products")
-    .select("source_id, chunk_index, content_hash")
+    .select("source_id, chunk_index, content_hash, metadata")
     .eq("source_type", "product_spec")
     .in("source_id", sourceIds) as {
-    data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
+    data: { source_id: string; chunk_index: number; content_hash: string; metadata: Record<string, unknown> | null }[] | null;
   };
 
-  const hashMap = new Map<string, string>();
+  const existingMap = new Map<string, { hash: string; metadata: Record<string, unknown> }>();
   for (const doc of existingDocs ?? []) {
-    hashMap.set(`${doc.source_id}:${doc.chunk_index}`, doc.content_hash);
+    existingMap.set(`${doc.source_id}:${doc.chunk_index}`, { hash: doc.content_hash, metadata: doc.metadata ?? {} });
   }
 
   // Build chunks for all products
@@ -160,6 +163,31 @@ export async function ingestProducts(options?: {
   }[] = [];
 
   let skipped = 0;
+  // Content-unchanged chunks whose metadata drifted — refreshed without re-embedding.
+  const metaRefreshes: { sourceId: string; chunkIndex: number; metadata: Record<string, unknown> }[] = [];
+
+  // The metadata every chunk should carry (taxonomy + legacy fields).
+  const buildSpecMeta = (product: ProductRow, pl: ProductLineRow, chunkIndex: number) => ({
+    product_line: pl.name,
+    product_line_label: pl.label,
+    category: pl.category,
+    status: product.status,
+    chunk_type: chunkIndex === 0 ? "overview" : "specifications",
+    solution: solutionSlugById.get(pl.solution_id) ?? null,
+    product_lines: [pl.name],
+    models: [product.model_name],
+  });
+
+  // Content unchanged → keep the embedding, but queue a metadata refresh if it drifted.
+  const skipOrRefresh = (product: ProductRow, pl: ProductLineRow, chunkIndex: number) => {
+    const existing = existingMap.get(`${product.model_name}:${chunkIndex}`);
+    const merged = { ...(existing?.metadata ?? {}), ...buildSpecMeta(product, pl, chunkIndex) };
+    if (existing && JSON.stringify(merged) !== JSON.stringify(existing.metadata)) {
+      metaRefreshes.push({ sourceId: product.model_name, chunkIndex, metadata: merged });
+    } else {
+      skipped++;
+    }
+  };
 
   for (const product of products) {
     const pl = plMap.get(product.product_line_id);
@@ -179,8 +207,8 @@ export async function ingestProducts(options?: {
     const overviewContent = buildOverviewChunk(product, pl);
     const overviewHash = contentHash(overviewContent);
 
-    if (!options?.force && hashMap.get(`${product.model_name}:0`) === overviewHash) {
-      skipped++;
+    if (!options?.force && existingMap.get(`${product.model_name}:0`)?.hash === overviewHash) {
+      skipOrRefresh(product, pl, 0);
     } else {
       chunksToEmbed.push({
         product,
@@ -197,8 +225,8 @@ export async function ingestProducts(options?: {
       const specsContent = buildSpecsChunk(product, specs);
       const specsHash = contentHash(specsContent);
 
-      if (!options?.force && hashMap.get(`${product.model_name}:1`) === specsHash) {
-        skipped++;
+      if (!options?.force && existingMap.get(`${product.model_name}:1`)?.hash === specsHash) {
+        skipOrRefresh(product, pl, 1);
       } else {
         chunksToEmbed.push({
           product,
@@ -212,8 +240,21 @@ export async function ingestProducts(options?: {
     }
   }
 
+  // Flush metadata-only refreshes (no re-embedding) for content-unchanged chunks.
+  let refreshed = 0;
+  for (const r of metaRefreshes) {
+    const { error } = await supabase
+      .from("documents" as "products")
+      .update({ metadata: r.metadata } as Record<string, unknown>)
+      .eq("source_type", "product_spec")
+      .eq("source_id", r.sourceId)
+      .eq("chunk_index", r.chunkIndex);
+    if (error) errors.push(`${r.sourceId} chunk ${r.chunkIndex} meta refresh: ${JSON.stringify(error)}`);
+    else refreshed++;
+  }
+
   if (chunksToEmbed.length === 0) {
-    return { processed: 0, skipped, errors };
+    return { processed: 0, skipped, refreshed, errors };
   }
 
   // Generate embeddings in batches of 20 (conservative to avoid token limits)
@@ -253,18 +294,7 @@ export async function ingestProducts(options?: {
             chunk_index: chunk.chunkIndex,
             content: chunk.content,
             token_count: estimateTokens(chunk.content),
-            metadata: {
-              // Legacy fields (kept for backwards compat)
-              product_line: chunk.productLine.name,
-              product_line_label: chunk.productLine.label,
-              category: chunk.productLine.category,
-              status: chunk.product.status,
-              chunk_type: chunk.chunkIndex === 0 ? "overview" : "specifications",
-              // Unified taxonomy
-              solution: solutionSlugById.get(chunk.productLine.solution_id) ?? null,
-              product_lines: [chunk.productLine.name],
-              models: [chunk.product.model_name],
-            },
+            metadata: buildSpecMeta(chunk.product, chunk.productLine, chunk.chunkIndex),
             embedding: `[${embedding.join(",")}]`,
             content_hash: chunk.hash,
             updated_at: new Date().toISOString(),
@@ -280,5 +310,5 @@ export async function ingestProducts(options?: {
     }
   }
 
-  return { processed, skipped, errors };
+  return { processed, skipped, refreshed, errors };
 }
