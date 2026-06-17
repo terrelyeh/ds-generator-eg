@@ -18,6 +18,7 @@ import { WebDialog } from "./dialogs/web-dialog";
 import { SnippetDialog } from "./dialogs/snippet-dialog";
 import { FileDialog } from "./dialogs/file-dialog";
 import { EditTaxonomyDialog } from "./dialogs/edit-taxonomy-dialog";
+import { ProductSpecList } from "./product-spec-list";
 
 interface SourceTypeConfig {
   id: string;
@@ -592,6 +593,13 @@ export function KnowledgeBase() {
 
                 {isExpanded && typeSources.length > 0 && config.id !== "gitbook" && config.id !== "helpcenter" && (
                   <CardContent className="pt-0">
+                    {config.id === "product_spec" ? (
+                      <ProductSpecList
+                        sources={typeSources}
+                        onEditTax={(s) => setDialog({ kind: "editTax", target: s })}
+                        onDelete={handleDelete}
+                      />
+                    ) : (
                     <div className="rounded-lg border overflow-hidden">
                       <table className="w-full text-xs">
                         <thead>
@@ -703,6 +711,7 @@ export function KnowledgeBase() {
                         </tbody>
                       </table>
                     </div>
+                    )}
 
                     <div className="mt-3 flex items-center justify-between">
                       <p className="text-xs text-muted-foreground/50">
