@@ -14,10 +14,12 @@
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
-**7 個產品線**（全屬 EnGenius Cloud solution）：Cloud AP, Cloud Switch,
-Cloud Camera, Cloud AI-NVS, Cloud VPN Firewall, Switch Extender, Unmanaged Switch。
-架構已支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由）。
-另含**內部競品比較 Battlecard**（`/battlecard/[line]`,Cloud AP MVP;詳見下方 Architecture）。
+**Cloud solution 7 條產品線**：Cloud AP, Cloud Switch, Cloud Camera, Cloud AI-NVS,
+Cloud VPN Firewall, Switch Extender, Unmanaged Switch。**Accessories ▸ Transceiver**
+也已上線（非 Cloud solution;綠色佈景、無 hardware 頁、Contact-Us QR 的 datasheet 變體）。
+架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
+下方 Architecture 的 product-line onboarding）。
+另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
 
 功能清單與產品定位詳見 [README.md](README.md)。
 
@@ -131,6 +133,14 @@ UI fork 自 compare-table。半自動抽取(**↻ sync** datasheet / **🔍 web*
 **改 battlecard 前必讀該檔** —— 關鍵雷:`confirmed` 只升不降、auto-extract 不覆蓋已確認格、tier 是關係層、
 新表要手動加進 `database.generated.ts`、需 `FIRECRAWL_API_KEY`、別用 comparisons 的全刪重插。
 
+### 產品線 onboarding + 各線 datasheet 變體 → [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
+
+新增產品線(inspect sheet GIDs → `product_lines` row → sync)、sheet 契約、以及 datasheet 輸出
+**依 `category` 變體**(theme / cover / hardware 頁 / QR / 列表欄位)。**關鍵雷:sync 只匯入
+「Web Overview 有列」的型號** —— Detail Specs 多出的 EOL/範例欄會被跳過,而漏在 Web Overview 的
+型號會「靜默不同步」。Transceivers 變體 = 綠色 + tx-cover(圖置中、overview 滿版)+ 無 hardware 頁
++ Contact-Us QR + 列表隱藏 HW 欄、Model Name 改 Description。Drive 各線/各語言資料夾**自動建**。
+
 ## Brand & Visual System
 
 - Primary Blue: `#03a9f4` → `text-engenius-blue`, `bg-engenius-blue`
@@ -202,10 +212,8 @@ Key tables:
 
 ### 🔜 Next Steps
 
-**🏗️ Monorepo 拆分** — **全部完成（Phase 1–5）**。骨架、packages、engenie 析出、
-Phase 5 cutover 已 merge 進 `main`（2026-06-13），兩個 prod 都在拆分後架構。
-剩手動收尾：engenie CI 的 `VERCEL_TOKEN` secret、跑藍圖 §6 驗收、更新 engenius-kb
-skill 的 Search API base URL。藍圖見 [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)。
+**🏗️ Monorepo 拆分** — 完成（Phase 1–5,2026-06-13 cutover,兩 prod 都在拆分後架構）。
+剩手動收尾:藍圖 §6 登入驗收、repo rename。藍圖見 [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)。
 
 **Datasheet 系統**：
 1. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
@@ -289,5 +297,6 @@ npm run lint
 - [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md) — PDF 生成、版面、多語言 + AI 翻譯
 - [`docs/auth-rbac.md`](docs/auth-rbac.md) — 認證/proxy/RBAC 三層、權限矩陣、RLS
 - [`docs/battlecard.md`](docs/battlecard.md) — 競品 battlecard:資料模型、抽取流程、關鍵雷
+- [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md) — 新增產品線、sheet 契約、各 category datasheet 變體
 - [`public/docs/drive-folder-and-naming-rules.html`](public/docs/drive-folder-and-naming-rules.html) — Drive 規則
 - RAG / Ask / Search API → [apps/engenie/docs/](../engenie/docs/)

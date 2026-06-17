@@ -5,7 +5,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ## Features
 
 ### Dashboard
-- **7 個產品線** tab 切換（Cloud AP / SW / Camera / NVS / VPN FW / Extender / Unmgd SW）
+- **多產品線 / 多 Solution** tab 切換（Cloud 7 條線 + Accessories ▸ Transceiver）
 - **Solution sidebar**（可收合）— 支援多 Solution 架構擴展
 - 產品清單：Model、版本、OV/FT/Prod/HW 就緒狀態、Radio Pattern（AP）
 - **Per-line Sync** — 只同步當前產品線，toast 顯示詳細同步結果
@@ -21,7 +21,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **QSG URL 預覽** — Detail 頁顯示這個 model 印在 PDF 上的 QR Code 將指向哪個連結，含 Copy / Test 按鈕（admin/editor only）
 - **Regenerate / New Version** 兩種 PDF 生成模式
 - 版本紀錄與 PDF 下載
-- Generate PDF 前置條件檢查（需 Product Image + Hardware Image + Overview + Features）
+- Generate PDF 前置條件檢查（需 Product Image + Overview + Features + Hardware Image；**Transceiver 無 Hardware Image，不檢查**）
 
 ### Spec Comparison
 - 跨 model 規格比較表（支援 24+ model 橫向滾動）
@@ -29,7 +29,7 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Sticky header + pinned Category/Spec 欄位
 
 ### Competitor Battlecard（內部競品比較）
-- **EnGenius 機型 vs 競品 並排比較表**，供業務/PM 內部參考（目前 Cloud AP，旗艦 ECW536 / 量走 ECW230）
+- **EnGenius 機型 vs 競品 並排比較表**，供業務/PM 內部參考（Cloud AP / Camera / Switch / L3 Switch）
 - **依錨點機型分頁**切換，每張表把自家機型對上各競品（Ubiquiti / Cisco Meraki / TP-Link 等）
 - **Tier 分級（T1/T2/T3）是「相對於某台自家機型」** — 同一台競品對不同自家機型可標不同 tier
 - **半自動填規格、PM 確認制**：競品規格由 AI 抓取，先以「草稿」（琥珀色）呈現、附來源連結，PM 核對後 **Save & Confirm** 才生效（亦可「一鍵確認整表」）
@@ -44,7 +44,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **規格表備註區**（per-product-line, optional）— VPN Firewall 等產品線可在最後一頁 spec 下方放免責備註（如 `*Note: Performance figures are estimates…`），支援多語言
 - **Antennas Patterns**（AP 專用）— 上傳 radio pattern 圖後，PDF 自動新增一頁顯示 2.4G / 5G / 6G H-Plane & E-Plane polar plots
 - Hardware Overview + QR Code footer（QR URL 解析優先序：per-product → per-product-line template → 預設短連結）
-- **Cloud 藍色 / Unmanaged 灰色** 雙主題
+- **依產品線主題**：Cloud 藍色 / Unmanaged·Extender 灰色 / **Transceiver 綠色**
+- **Transceiver 變體**（Accessories）— 封面照片置中 + Overview 滿版、**無 Hardware 頁**、QR 指向 **Contact Us**（無 QSG）
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
 - **Drive 自動建資料夾** — 第一次產 zh / ja PDF 時自動建立 `Cloud Camera_zh` / `Cloud Camera_ja` 等 sibling 資料夾（PM 不需要事先手動建）
@@ -154,7 +155,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 
-## Product Lines (EnGenius Cloud)
+## Product Lines
 
 | Product Line | Label | Models | Theme |
 |---|---|---|---|
@@ -165,8 +166,12 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 | Cloud VPN Firewall | Cloud VPN FW | ESG320, ESG510, ESG610, ESG620 (4) | Blue |
 | Switch Extender | Extender | EXT1105P, EXT1106, EXT1109P (3) | Blue |
 | Unmanaged Switch | Unmgd SW | ES105, ES108, ES110FP (3) | Gray |
+| Transceiver *(Accessories)* | Transceiver | SFP / QSFP / DAC (13) | **Green** |
 
-Future Solutions: EnGenius Fit, Broadband Outdoor, Network Management, Accessories, Data Center, Legacy
+Cloud lines above belong to the **EnGenius Cloud** solution; **Transceiver** is the first
+line under the **Accessories** solution (green theme, single product image, no hardware page).
+
+Future Solutions: EnGenius Fit, Broadband Outdoor, Network Management, Data Center, Legacy
 
 ## Deployment
 
