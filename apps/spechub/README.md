@@ -74,70 +74,19 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Subtitle 可按語言覆寫
 - QR Code 標籤和連結可按語言自訂
 
-### Ask SpecHub (RAG)
-- **AI 產品規格查詢** — 用自然語言（中文/英文）詢問產品規格、比較、推薦、法規
-- **向量搜尋** — pgvector + OpenAI Embedding，語意搜尋而非關鍵字匹配
-- **多 AI 模型** — Gemini（Pro/Flash/Lite）、GPT（4o/4o-mini/Nano）、Claude（Opus/Sonnet/Haiku），可即時切換比較
-- **三維度 Prompt 架構**：
-  - **回答角度**（Persona）— 3 個內建角色（Product Specialist / Sales Assistant / Technical Support），可自訂
-  - **對話對象**（User Profile）— 4 種角色（同事 / 業務·Channel / 產品經理 / 終端客戶）
-  - **產出格式**（規劃中）— 未來支援生成簡報、比較表、Email 草稿
-- **跨語言智慧檢索** — 中文問題問英文文件也能精準命中；偵測到型號（ECW536）或國家（台灣）時自動補查 + 重新排序
-- **對話持久化** — 對話自動存入 DB，側邊欄歷史列表，可恢復 / 批次刪除
-- **ChatGPT 級對話體驗** — 平順串流 + 即時狀態（「搜尋相關資料中…」→「整理回覆中…」）、隨時可**停止生成**、一鍵**重新生成**；舒適排版與閱讀寬度，往上讀歷史不會被拉回底部（附「回到最新」鈕）
-- **Markdown 渲染** — 表格、列表、粗體、程式碼區塊（語言標籤 + 複製 + 語法高亮）等格式化回答；AI 回答會主動用表格做產品比較、粗體標出型號與規格
-- **來源引用 + 延伸問題** — 回答附上可點擊的來源連結（Gitbook / Help Center / Google Doc / WiFi Regulations），並生成 3 個延伸問題
-- **複製按鈕** — 一鍵複製回答內容（保留 Markdown 格式）
-- **內外兩個介面共用同一套體驗** — 內部 Ask SpecHub panel 與對外 EnGenie demo（`/demo/ask`）行為一致（規範見 `docs/ask-chat-ux-spec.md`）
+### Ask / Knowledge / Search API — 已移至 EnGenie
 
-### Knowledge Base
-- **索引管理**（`/knowledge`）— 查看已索引的內容、source 數量、chunk 數、token 數
-- **8 種已實作來源類型**：
-  - **Product Specs** — 66 product × 2 chunks，從 DB 自動 tag taxonomy
-  - **Gitbook Docs** — 含 Vision API 圖片描述；QSG 空間會自動抽出 **LED behavior table** 成為專屬 chunks
-  - **Help Center** — Intercom 技術文章（含 Type-level Re-index All 按鈕）
-  - **Google Docs** — Drive API 或公開連結；per-row **Sync** 按鈕一鍵重抓
-  - **WiFi Regulations** — 93 國 WiFi 法規資料（頻段、頻道、功率、DFS），來自 EnGenius WiFi RegHub API
-  - **Web Pages** — 貼任意網址即可索引；內容自動萃取（Firecrawl → Jina Reader → fetch 層疊），per-row **Sync** 重抓
-  - **Text Snippets** — 手動新增文字片段（FAQ、競品比較、標準答案）；Markdown 編輯、可事後 Edit 重新索引
-  - **Files (PDF)** — 上傳 PDF，由 **AI（Gemini）讀取**：表格轉 Markdown、圖片/圖表描述、掃描檔 OCR；原檔存私有 bucket，列表可「View」檢視原檔
-- **統一 Taxonomy（Solution > Product Line > Model）** — 所有 source 共用的三層分類。Ask 查詢時可以按任一層 filter，未指定 product line 的內容自動套用整個 solution
-- **Edit Taxonomy** — 每個 source 都有 Edit 按鈕，可事後補 tag 而不用重跑 ingest
-- **Re-index / Force Re-index / Delete** — 按來源類型管理
-- **Last Indexed 時間** — 每個來源顯示最後索引時間
+SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base）、部門聊天 workspaces、對外 RAG Search API、各國 WiFi 法規檢視**，已全部析出到獨立的 **[EnGenie](../engenie/README.md)** app（monorepo Phase 3–4）。SpecHub 站內問答現在改用右下角嵌入 EnGenie 的浮動 widget。
 
-### 對外 RAG Search API（其他部門串接）
-- **`POST /api/v1/search`** — 讓其他部門的 app 查詢知識庫、取得最相關片段，接進自己的 LLM（RAG 檢索層）
-- **Scoped API key** — 管理員在 `/settings/api-access` 核發 key，可限定 Solution / 產品線 / 來源類型範圍與每分鐘速率；驗證走 hash、另以 AES-256-GCM 加密儲存供管理員從列表「Copy key」重新複製
-- **Claude Code Skill（`/engenius-kb`）** — 用 Claude Code 的同事可一行安裝 [`claude-skills`](https://github.com/terrelyeh/claude-skills) repo 的 skill，讓 AI 直接查 EnGenius 知識庫回答；key 走環境變數
-- **一站分發** — `/settings/api-access` 並排顯示「API 文件」與「skill 安裝指令」兩張卡，管理員發完 key 即可一鍵複製連結給同事
-- 完整串接文件見 [`docs/api-search.md`](docs/api-search.md)（線上 HTML：`/docs/api-search.html`）
-
-### Ask Workspaces（部門專屬聊天入口）
-- **三種對外形式** — 同一個 workspace、同一套知識，任選或並用：
-  - **整頁入口** `/ask/<slug>` — 每個部門有自己的 Ask 聊天頁，免登入（passcode 進入）
-  - **嵌入式浮動 widget** — 像 Intercom 的右下角聊天泡泡，貼一段 `<script>` snippet 就能放進任何網站；樣式隔離、手機自動全螢幕、跨站安全（token 認證，不靠第三方 cookie）
-  - **Search API** — 機器對機器的 JSON 檢索（見下方對外 RAG Search API）
-- **共用知識庫、各自範圍** — 同一個 EnGenius 知識庫，用 taxonomy + 來源類型 scope 限定每個 workspace 看得到的內容
-- **LLM 三種模式** — `共用 key + 配額`（公司出錢、可設每分/每日上限）、`Workspace BYOK`（管理員為整個 workspace 設一把 key）、或 `User BYOK`（每位使用者自己在前台輸入 key，只存在他的瀏覽器、自付成本）
-- **可自訂** — 每個 workspace 自己的 persona / 對話對象 / 歡迎語 / 範例問題，可鎖定或開放使用者切換
-- **管理** — 管理員在 `/settings/ask-workspaces` 發/編 workspace、設範圍與上限、複製入口連結或 **Embed snippet**；passcode 與 BYOK key 為唯寫（hash / 加密儲存）
-- **嵌入安全（widget）** — 可為每個 workspace 設「允許嵌入的網域」白名單，限制哪些網站能放這個 widget（留空＝不限制）；並可一鍵「撤銷連線」讓所有已發出的存取 token 立即失效（存取 token 會自動到期，無密碼的 widget 失效後自動重連）
-- **整合資源頁**（公開、可分享給部門）— [整合服務介紹](https://ds-generator-eg.vercel.app/docs/ask-integration.html)、[Widget 展示頁](https://ds-generator-eg.vercel.app/docs/widget-demo.html)
-
-### WiFi Regulation Viewer
-- **`/wifi-regulation/[code]`** — 單一國家法規的乾淨 markdown 頁面（UNII 頻段、頻道清單、功率限制、DFS 要求）
-- Ask SpecHub 的法規引用會直接連到此頁面
+→ 功能全貌見 **[EnGenie README](../engenie/README.md)**；RAG / Ask / 知識庫的技術細節見 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 ### Settings
-- **Settings 導航頁** — 五個獨立管理區塊，各自獨立頁面
-- **API Key 管理**（`/settings/api-keys`）— 設定 AI API Key（Embedding + 翻譯 + RAG），存到 DB
 - **翻譯詞庫**（`/settings/glossary`）— 公司認可翻譯術語，分 Global 和產品線專屬
 - **Typography**（`/settings/typography`）— 每個語言獨立的字型、字級、字重設定
   - Google Font 選擇器（預設 + 自定義 URL 添加）
   - Split layout：左設定、右即時 Datasheet Preview（可縮放）
-- **Ask Personas**（`/settings/personas`）— 管理 AI 問答的 system prompt
 - **Users**（`/settings/users`）— 邀請 / 移除使用者、改 role（admin only）
+- **AI Provider Keys / Ask Personas 已移至 [EnGenie](../engenie/README.md)**（settings 首頁有連結卡）；SpecHub 翻譯 runtime 直接讀共用的 `app_settings`
 
 ### Access Control
 - **Google OAuth 登入** — 走 Supabase Auth + PKCE flow，不需要密碼

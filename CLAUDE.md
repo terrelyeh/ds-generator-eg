@@ -4,8 +4,7 @@
 > [apps/spechub/docs/monorepo-split-plan.md](apps/spechub/docs/monorepo-split-plan.md)。
 > app 搬入 `apps/spechub`、`@eg/db`+`@eg/auth` 抽出、`apps/engenie` 析出
 > （Vercel 專案 `engenie-eg`）、CLAUDE.md 分家；**Phase 5 cutover 已 merge 進 `main`
-> （2026-06-13），兩個 prod 都在拆分後架構**。剩手動收尾：engenie CI 的
-> `VERCEL_TOKEN` secret、藍圖 §6 驗收、更新 engenius-kb skill 的 Search API base URL。
+> （2026-06-13），兩個 prod 都在拆分後架構**。剩手動收尾：藍圖 §6 登入驗收、repo rename。
 
 ## 結構
 
@@ -27,4 +26,4 @@
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）
 - 兩個 app 共用同一個 Supabase（project `xzolvtlqafwkxfuaryec`）；Vercel 各自一個專案、Root Directory 指到 `apps/<name>`，region 都釘 `hnd1`
-- **進 app 工作前先讀該 app 的 CLAUDE.md**：[apps/spechub/CLAUDE.md](apps/spechub/CLAUDE.md)
+- **進 app 工作前先讀該 app 的 CLAUDE.md**：[apps/spechub/CLAUDE.md](apps/spechub/CLAUDE.md) · [apps/engenie/CLAUDE.md](apps/engenie/CLAUDE.md)

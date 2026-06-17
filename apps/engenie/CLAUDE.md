@@ -1,6 +1,6 @@
 # CLAUDE.md — EnGenie (apps/engenie)
 
-> Last updated: 2026-06-13（monorepo 拆分**全部完成（Phase 1–5）**；Phase 5 cutover
+> Last updated: 2026-06-17（monorepo 拆分**全部完成（Phase 1–5）**；Phase 5 cutover
 > 已 merge 進 `main`、prod `engenie-eg` 在拆分後架構。Phase 3 自 SpecHub 析出成獨立
 > app，本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge 全部 context。）
 
@@ -109,6 +109,7 @@ src/
 - **檢索核心只有一份** `lib/rag/retrieve.ts`（`retrieveDocuments`）— `/api/ask` 與 `/api/v1/search` 共用；統一 `inScope` scope resolver；知識領域（`kind='knowledge'`）私有/opt-in；`/api/v1/search` 一律傳 `knowledgeAreasAllowed: []`（不外洩部門知識）
 - **串流核心只有一份** `hooks/use-chat-stream.ts` — ask-chat（內部）與 engenie-chat（demo/workspace）共用；新增聊天 surface 一律複用，不要複製串流邏輯
 - **8 條 ingest pipeline**（`lib/rag/ingest-*`）：product_spec, gitbook, helpcenter, google_doc, wifi_regulation, web, text_snippet, file(PDF→Gemini 抽取)
+- **Knowledge 的 Product Specs 清單**用 `knowledge/product-spec-list.tsx` 依 Solution ▸ Product Line 折疊分組 + 搜尋 + 每條產品線各自 re-index（走 `product_line_id`；`/api/taxonomy` 有回 product line `id`）。其餘來源類型維持平鋪表。
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（fail-open）
 - Gemini 一律 `x-goog-api-key` header；錯誤回前端先 `redactSecrets()`
 
@@ -119,6 +120,8 @@ src/
 56. **Gemini key 永遠放 header 不放 URL**；錯誤訊息回前端前先 redact。
 57. **`knowledge-base.tsx` 是 orchestrator** — 對話框在 `knowledge/dialogs/`、共用邏輯在 `knowledge/shared.ts`；新增來源類型照這結構，別把 state 塞回 parent。
 58. **Workspace token 撤銷機制** — `verifyWorkspaceToken()` 只驗簽章+到期（Edge 粗篩）；版本撤銷的權威檢查在 route handler（`workspaceAuthorized`）。改 token 格式/換 signing secret = 所有現存 token 失效（widget 自動重發、passcode 重輸一次）。
+59. **RAG 檢索 embedding 只用「當前問題」，不要串對話歷史** — 串歷史會讓前一題主題污染這題的向量搜尋（換主題被當成「知識庫只有前一題的內容」）。歷史只進 `/api/ask` 的 LLM prompt；建議追問也要求 LLM 產生「自包問句」（`api/ask/route.ts` 的 follow-up 指示）。
+60. **`product_spec` ingest：`content_hash` 只 gate「重新 embed」，metadata 一律刷新** — 內容沒變但 metadata（taxonomy）漂移時，`ingest-products.ts` 做 metadata-only update（不重 embed）。別把兩者重新耦合，否則新加的 metadata 欄位不會回填舊 chunk（症狀：taxonomy badge 時有時無）。
 
 ## Deployment
 
