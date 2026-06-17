@@ -56,6 +56,7 @@ export async function GET() {
       kind: (s as { kind?: string }).kind ?? "product",
     })),
     product_lines: productLines.map((pl) => ({
+      id: pl.id,
       name: pl.name,
       label: pl.label,
       category: pl.category,

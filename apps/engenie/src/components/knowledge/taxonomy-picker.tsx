@@ -8,6 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 export interface TaxonomyData {
   solutions: { slug: string; label: string; sort_order: number; kind?: string }[];
   product_lines: {
+    id: string;
     name: string;
     label: string;
     category: string;

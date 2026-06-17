@@ -26,10 +26,14 @@ export function ProductSpecList({
   sources,
   onEditTax,
   onDelete,
+  onReindexLine,
+  reindexingLine,
 }: {
   sources: SourceItem[];
   onEditTax: (s: SourceItem) => void;
   onDelete: (sourceType: string, sourceId: string) => void;
+  onReindexLine?: (lineName: string) => void;
+  reindexingLine?: string | null;
 }) {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -151,6 +155,26 @@ export function ProductSpecList({
                         <span className="tabular-nums text-muted-foreground/50">
                           {g.items.length} models · {g.chunks} chunks · {formatTokens(g.tokens)}
                         </span>
+                        {onReindexLine && g.line !== "Untagged" && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onReindexLine(g.line);
+                            }}
+                            disabled={reindexingLine === g.line}
+                            className="ml-auto inline-flex flex-shrink-0 items-center gap-1 text-xs text-muted-foreground/60 transition-colors hover:text-engenius-blue disabled:opacity-50"
+                            title={`Re-index all ${g.line} products`}
+                          >
+                            <svg
+                              className={`h-3 w-3 ${reindexingLine === g.line ? "animate-spin" : ""}`}
+                              viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                            >
+                              <path d="M23 4v6h-6M1 20v-6h6" />
+                              <path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" />
+                            </svg>
+                            {reindexingLine === g.line ? "Re-indexing…" : "Re-index"}
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
