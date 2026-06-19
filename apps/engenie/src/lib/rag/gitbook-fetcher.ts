@@ -173,7 +173,7 @@ export async function fetchGitbookPage(url: string): Promise<{
   while ((tokenMatch = tokenRegex.exec(html)) !== null) {
     if (tokenMatch[1]) {
       // It's a heading — start new section
-      let heading = stripHtmlTags(tokenMatch[2]).replace(/hashtag/gi, "").replace(/link/gi, "").trim();
+      const heading = stripHtmlTags(tokenMatch[2]).replace(/hashtag/gi, "").replace(/link/gi, "").trim();
       if (heading && heading.length >= 2) {
         currentSection = heading;
         if (!sectionImages.has(currentSection)) {
