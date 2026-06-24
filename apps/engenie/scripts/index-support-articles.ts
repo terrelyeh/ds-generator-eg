@@ -9,6 +9,7 @@
  * Run from the repo root with the engenie env (Supabase service role from
  * apps/engenie/.env.local; OpenAI embedding key is read from app_settings in DB):
  *   npm -w engenie exec tsx scripts/index-support-articles.ts -- [articlesDir]
+ *   npm -w engenie exec tsx scripts/index-support-articles.ts -- --replace  # full-area replace (dedup-proof refresh)
  *   npm -w engenie exec tsx scripts/index-support-articles.ts -- --dry   # parse only
  */
 import { readFileSync, readdirSync, existsSync } from "node:fs";
@@ -33,6 +34,7 @@ const DEFAULT_DIR = "/Users/terrelyeh/dev/RAG/output/refined/intercom";
 async function main() {
   const args = process.argv.slice(2);
   const dry = args.includes("--dry");
+  const replace = args.includes("--replace");
   const dir = args.find((a) => !a.startsWith("--")) || DEFAULT_DIR;
 
   const files = readdirSync(dir).filter((f) => f.endsWith(".md"));
@@ -42,9 +44,22 @@ async function main() {
   const { ingestSupport, SUPPORT_KNOWLEDGE_AREA } = await import("../src/lib/rag/ingest-support");
 
   if (!dry) {
-    // Ensure the internal knowledge area exists (kind='knowledge' → private/opt-in).
     const { createAdminClient } = await import("@eg/db/admin");
     const supabase = createAdminClient();
+
+    // --replace: Approach A full-area wipe — delete ALL existing 'support' chunks
+    // before re-indexing the freshly re-clustered set, so renamed/merged topics
+    // can never leave duplicate or orphan articles behind.
+    if (replace) {
+      const { error, count } = await supabase
+        .from("documents" as "products")
+        .delete({ count: "exact" })
+        .eq("source_type", "support");
+      if (error) throw new Error(`--replace delete failed: ${JSON.stringify(error)}`);
+      console.log(`✓ --replace: cleared ${count ?? 0} existing 'support' chunks`);
+    }
+
+    // Ensure the internal knowledge area exists (kind='knowledge' → private/opt-in).
     const { data: existing } = await supabase
       .from("solutions" as "products")
       .select("slug")
