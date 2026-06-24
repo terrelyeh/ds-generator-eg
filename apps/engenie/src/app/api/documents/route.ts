@@ -8,6 +8,7 @@ import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 import { ingestWifiRegulations } from "@/lib/rag/ingest-wifi-regulations";
 import { ingestWeb } from "@/lib/rag/ingest-web";
 import { ingestTextSnippet } from "@/lib/rag/ingest-text-snippet";
+import { ingestSupport } from "@/lib/rag/ingest-support";
 import { fetchGoogleDoc } from "@/lib/google/docs";
 import { normalizeTaxonomy, type TaxonomyMeta } from "@/lib/rag/taxonomy";
 
@@ -357,6 +358,33 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: `Snippet ingest failed: ${err instanceof Error ? err.message : String(err)}` },
         { status: 500 },
+      );
+    }
+  }
+
+  if (source_type === "support") {
+    // Pre-refined support articles (Intercom → refinery): markdown with frontmatter.
+    // Taxonomy/visibility is forced internal by ingestSupport (kind='knowledge' area),
+    // so the request `taxonomy` is intentionally ignored here.
+    const { articles } = body as {
+      articles?: { markdown?: string; source_id?: string }[];
+    };
+    const inputs = (articles ?? [])
+      .filter((a) => a?.markdown?.trim())
+      .map((a) => ({ markdown: a.markdown as string, sourceId: a.source_id }));
+    if (inputs.length === 0) {
+      return NextResponse.json(
+        { error: "support ingest requires articles[].markdown (refined .md with frontmatter)" },
+        { status: 400 }
+      );
+    }
+    try {
+      const result = await ingestSupport({ articles: inputs });
+      return NextResponse.json({ ok: true, ...result });
+    } catch (err) {
+      return NextResponse.json(
+        { error: `Support ingest failed: ${err instanceof Error ? err.message : String(err)}` },
+        { status: 500 }
       );
     }
   }

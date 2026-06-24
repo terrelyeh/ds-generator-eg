@@ -18,6 +18,7 @@ import { WebDialog } from "./dialogs/web-dialog";
 import { SnippetDialog } from "./dialogs/snippet-dialog";
 import { FileDialog } from "./dialogs/file-dialog";
 import { VerticalGuideDialog } from "./dialogs/vertical-guide-dialog";
+import { SupportDialog } from "./dialogs/support-dialog";
 import { EditTaxonomyDialog } from "./dialogs/edit-taxonomy-dialog";
 import { ProductSpecList } from "./product-spec-list";
 
@@ -40,6 +41,7 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "text_snippet", label: "Text Snippets", icon: "📝", description: "Manual text entries — FAQ, competitive analysis, standard answers", status: "active", canIngest: true },
   { id: "file", label: "Files (PDF)", icon: "📎", description: "Uploaded PDF documents — read by AI (tables, figures, scanned OCR) and indexed", status: "active", canIngest: true },
   { id: "vertical_guide", label: "Vertical Guides", icon: "🏢", description: "Approved vertical solution guides (industry × product scope) — indexed from the content master; only rag:✓ sections enter the RAG", status: "active", canIngest: true },
+  { id: "support", label: "Support Knowledge", icon: "🎧", description: "Curated from Intercom service conversations — clustered & PII-scrubbed by the offline refinery. Internal-only (excluded from the external Search API)", status: "active", canIngest: true },
 ];
 
 const SUMMARY_CARDS = [
@@ -71,6 +73,7 @@ export function KnowledgeBase() {
     | { kind: "snippet"; editSource?: SourceItem }
     | { kind: "file" }
     | { kind: "verticalGuide" }
+    | { kind: "support" }
     | { kind: "editTax"; target?: SourceItem; space?: { label: string; sources: SourceItem[] } }
     | null;
   const [dialog, setDialog] = useState<DialogState>(null);
@@ -472,7 +475,12 @@ export function KnowledgeBase() {
                           Add Guide
                         </Button>
                       )}
-                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && config.id !== "web" && config.id !== "text_snippet" && config.id !== "file" && config.id !== "vertical_guide" && (
+                      {config.canIngest && config.id === "support" && (
+                        <Button size="sm" onClick={() => setDialog({ kind: "support" })} disabled={!!ingesting} className="text-xs">
+                          Add Articles
+                        </Button>
+                      )}
+                      {config.canIngest && config.id !== "gitbook" && config.id !== "helpcenter" && config.id !== "google_doc" && config.id !== "web" && config.id !== "text_snippet" && config.id !== "file" && config.id !== "vertical_guide" && config.id !== "support" && (
                         <Button size="sm" onClick={() => handleIngest(config.id)} disabled={!!ingesting} className="text-xs">
                           {isIngesting ? "Indexing..." : typeStat ? "Re-index" : "Index"}
                         </Button>
@@ -794,6 +802,9 @@ export function KnowledgeBase() {
       )}
       {dialog?.kind === "verticalGuide" && (
         <VerticalGuideDialog onClose={closeDialog} onSuccess={fetchData} />
+      )}
+      {dialog?.kind === "support" && (
+        <SupportDialog onClose={closeDialog} onSuccess={fetchData} />
       )}
       {dialog?.kind === "editTax" && (
         <EditTaxonomyDialog target={dialog.target} space={dialog.space} onClose={closeDialog} onSuccess={fetchData} />
