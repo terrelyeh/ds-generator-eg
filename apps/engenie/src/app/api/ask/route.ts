@@ -216,8 +216,12 @@ export async function GET(request: Request) {
   });
 }
 
-// Model ID mapping
-const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string }> = {
+// Model ID mapping. `thinkingBudget: 0` disables Gemini's thinking phase —
+// measured on a real 12-chunk RAG prompt it cut first-token latency from
+// ~18s to ~1.2s with equal answer quality (RAG synthesis doesn't benefit
+// from extended reasoning). Flash models only; Pro keeps default thinking
+// since users pick it precisely for deeper reasoning.
+const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string; thinkingBudget?: number }> = {
   // Claude (dateless IDs are pinned snapshots from the 4.6 generation on)
   "claude-opus": { fn: "claude", model: "claude-opus-4-8" },
   "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-6" },
@@ -228,8 +232,8 @@ const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: str
   "gpt-5.4-nano": { fn: "openai", model: "gpt-5.4-nano" },
   // Gemini (3.x — 3.5 Flash is GA frontier; 3.1 Pro is still preview-only)
   "gemini-3.1-pro": { fn: "gemini", model: "gemini-3.1-pro-preview" },
-  "gemini-3.5-flash": { fn: "gemini", model: "gemini-3.5-flash" },
-  "gemini-3.1-flash-lite": { fn: "gemini", model: "gemini-3.1-flash-lite" },
+  "gemini-3.5-flash": { fn: "gemini", model: "gemini-3.5-flash", thinkingBudget: 0 },
+  "gemini-3.1-flash-lite": { fn: "gemini", model: "gemini-3.1-flash-lite", thinkingBudget: 0 },
 };
 
 // app_settings key per provider family — lets the LLM key prefetch run in
@@ -314,7 +318,7 @@ export async function POST(request: Request) {
   const personaId = ws && !ws.allow_switch ? ws.persona : (body.persona ?? ws?.persona ?? "default");
   const profileId = ws && !ws.allow_switch ? ws.profile : (body.profile ?? ws?.profile ?? "default");
   const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? "gemini-3.5-flash");
-  const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-3.5-flash" };
+  const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-3.5-flash", thinkingBudget: 0 };
 
   // BYOK generation key. Two flavours:
   //   byok      — the workspace carries ONE admin-set key (shared by all users).
@@ -513,7 +517,7 @@ IMPORTANT formatting rules:
             break;
           case "gemini":
           default:
-            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent, llmKey);
+            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent, llmKey, mapped.thinkingBudget);
             break;
         }
 
@@ -652,7 +656,8 @@ async function streamGemini(
   userMessage: string,
   model: string,
   sendEvent: (data: string) => void,
-  apiKeyOverride?: string
+  apiKeyOverride?: string,
+  thinkingBudget?: number
 ): Promise<void> {
   const apiKey = apiKeyOverride || await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
   if (!apiKey) throw new Error("Google AI API key not configured");
@@ -666,6 +671,11 @@ async function streamGemini(
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
         contents: [{ role: "user", parts: [{ text: userMessage }] }],
+        // Thinking happens server-side BEFORE the first streamed token, so an
+        // unbounded budget silently adds many seconds of "generating…" wait.
+        ...(thinkingBudget !== undefined
+          ? { generationConfig: { thinkingConfig: { thinkingBudget } } }
+          : {}),
       }),
     }
   );
