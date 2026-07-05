@@ -127,6 +127,28 @@ interface ChatMessage {
   content: string;
 }
 
+// History goes into the LLM prompt verbatim, so a long conversation inflates
+// the prefill (slower first token + cost) every single turn. Cap each message
+// and the whole block; answers lead with the conclusion (prompt contract), so
+// truncating the tail keeps the informative part.
+const HISTORY_MSG_CHAR_CAP = 1500;
+const HISTORY_TOTAL_CHAR_BUDGET = 12000;
+
+function trimHistory(history: ChatMessage[]): ChatMessage[] {
+  const out: ChatMessage[] = [];
+  let budget = HISTORY_TOTAL_CHAR_BUDGET;
+  for (let i = history.length - 1; i >= 0; i--) {
+    let content = history[i].content;
+    if (content.length > HISTORY_MSG_CHAR_CAP) {
+      content = content.slice(0, HISTORY_MSG_CHAR_CAP) + " …(truncated)";
+    }
+    if (content.length > budget) break;
+    budget -= content.length;
+    out.unshift({ role: history[i].role, content });
+  }
+  return out;
+}
+
 interface AskRequest {
   question: string;
   source_type?: string;
@@ -210,6 +232,14 @@ const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: str
   "gemini-3.1-flash-lite": { fn: "gemini", model: "gemini-3.1-flash-lite" },
 };
 
+// app_settings key per provider family — lets the LLM key prefetch run in
+// parallel with retrieval instead of after it.
+const PROVIDER_KEY: Record<"claude" | "openai" | "gemini", keyof typeof API_KEY_MAP> = {
+  claude: "anthropic_api_key",
+  openai: "openai_api_key",
+  gemini: "google_ai_api_key",
+};
+
 /**
  * Lightweight language detection for the question text.
  * Returns a human-readable label (e.g. "English", "Traditional Chinese",
@@ -284,6 +314,7 @@ export async function POST(request: Request) {
   const personaId = ws && !ws.allow_switch ? ws.persona : (body.persona ?? ws?.persona ?? "default");
   const profileId = ws && !ws.allow_switch ? ws.profile : (body.profile ?? ws?.profile ?? "default");
   const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? "gemini-3.5-flash");
+  const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-3.5-flash" };
 
   // BYOK generation key. Two flavours:
   //   byok      — the workspace carries ONE admin-set key (shared by all users).
@@ -321,8 +352,23 @@ export async function POST(request: Request) {
         sendEvent(JSON.stringify({ type: "status", status: "searching" }));
 
         // Step 1+2: Retrieve scoped, ranked chunks via the shared core.
-        const recentHistory = history.slice(-20);
+        const recentHistory = trimHistory(history.slice(-20));
         const supabase = createAdminClient();
+
+        // Everything that does NOT depend on the retrieved docs runs in
+        // parallel with retrieval: persona prompt, the LLM key for the chosen
+        // provider, and the (usually empty) topology hint. None of these
+        // promises reject — they resolve to a fallback instead — so kicking
+        // them off before retrieval can't leave an unhandled rejection.
+        const personaPromise = getPersona(personaId)
+          .then(async (p) => p ?? (await getPersona("default")))
+          .catch(() => null);
+        const topoPromise = buildTopologyHint(supabase, question).catch(() => "");
+        const llmKeyPromise: Promise<string | undefined> = llmKeyOverride
+          ? Promise.resolve(llmKeyOverride)
+          : getApiKey(PROVIDER_KEY[mapped.fn], API_KEY_MAP[PROVIDER_KEY[mapped.fn]])
+              .then((k) => k ?? undefined)
+              .catch(() => undefined);
 
         let docs;
         try {
@@ -367,6 +413,19 @@ export async function POST(request: Request) {
           return;
         }
 
+        // Sources are fully known the moment retrieval finishes — send them
+        // BEFORE the LLM stream so the UI can show what was found while the
+        // answer is still generating (perceived latency drops a lot).
+        const sources = docs.map((d) => ({
+          title: d.title,
+          source_id: d.source_id,
+          source_type: d.source_type,
+          source_url: d.source_url,
+          similarity: Math.round(d.similarity * 100) / 100,
+          image_urls: (d.metadata?.image_urls as string[]) ?? [],
+        }));
+        sendEvent(JSON.stringify({ type: "sources", sources }));
+
         // Step 3: Build context from matched documents
         const context = docs.length > 0
           ? docs
@@ -378,8 +437,8 @@ export async function POST(request: Request) {
           : "(No new documents found -- answer based on conversation history)";
 
         // Assemble system prompt (Persona + User Profile)
-        const persona = await getPersona(personaId);
-        const personaPrompt = persona?.system_prompt ?? (await getPersona("default"))!.system_prompt;
+        const persona = await personaPromise;
+        const personaPrompt = persona?.system_prompt ?? "";
         const userProfile = USER_PROFILES.find((p) => p.id === profileId);
         const profilePrompt = userProfile?.prompt ? `\n\n---\n對話對象設定：\n${userProfile.prompt}` : "";
         // Final enforcement: language + formatting rules override any earlier
@@ -420,7 +479,7 @@ export async function POST(request: Request) {
         // user message itself has highest attention weight and works reliably.
         const answerLanguageLabel = detectLanguageLabel(question);
 
-        const topoHint = await buildTopologyHint(supabase, question);
+        const topoHint = await topoPromise;
 
         const userMessage = `${historyText}Context documents:
 
@@ -439,35 +498,26 @@ IMPORTANT formatting rules:
 2. After your main answer, add a line with just "---" as a separator.
 3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in ${answerLanguageLabel}. Each MUST be a complete, standalone question that explicitly names the product / model / subject — never use context-dependent pronouns like "it" / "這個" / "該款" / "そちら". Suggested follow-ups are re-submitted verbatim as a brand-new query, so each one must make full sense on its own.`;
 
-        // Step 4: Build sources for the response
-        const sources = docs.map((d) => ({
-          title: d.title,
-          source_id: d.source_id,
-          source_type: d.source_type,
-          source_url: d.source_url,
-          similarity: Math.round(d.similarity * 100) / 100,
-          image_urls: (d.metadata?.image_urls as string[]) ?? [],
-        }));
-
-        // Step 5: Stream LLM response
+        // Step 5: Stream LLM response (key was prefetched in parallel with
+        // retrieval; streamX still falls back to getApiKey — now cached — if
+        // the prefetch came back empty, keeping the old error messages).
         sendEvent(JSON.stringify({ type: "status", status: "generating" }));
-        const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-3.5-flash" };
+        const llmKey = await llmKeyPromise;
 
         switch (mapped.fn) {
           case "claude":
-            await streamClaude(systemPrompt, userMessage, mapped.model, sendEvent, llmKeyOverride);
+            await streamClaude(systemPrompt, userMessage, mapped.model, sendEvent, llmKey);
             break;
           case "openai":
-            await streamOpenAI(systemPrompt, userMessage, mapped.model, sendEvent, llmKeyOverride);
+            await streamOpenAI(systemPrompt, userMessage, mapped.model, sendEvent, llmKey);
             break;
           case "gemini":
           default:
-            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent, llmKeyOverride);
+            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent, llmKey);
             break;
         }
 
-        // Step 6: Send sources and metadata
-        sendEvent(JSON.stringify({ type: "sources", sources }));
+        // Step 6: Send metadata (sources already went out before the stream)
         sendEvent(JSON.stringify({
           type: "metadata",
           follow_ups: [],

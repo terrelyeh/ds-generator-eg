@@ -221,32 +221,32 @@ export const DEFAULT_PERSONAS: Persona[] = [
 
 const PERSONA_KEY_PREFIX = "persona_";
 
+// In-process cache: personas are read on every ask request but change only
+// when someone edits them in Settings. savePersona/deletePersona invalidate
+// this instance immediately; other warm instances converge within the TTL.
+let personasCache: { data: Persona[]; at: number } | null = null;
+const PERSONAS_CACHE_TTL_MS = 60_000;
+
+function invalidatePersonasCache(): void {
+  personasCache = null;
+}
+
 /**
- * Get a persona by ID. Checks DB first (for user customizations), falls back to defaults.
+ * Get a persona by ID (DB override wins, falls back to built-in defaults).
+ * Reads through the cached persona list — no extra DB roundtrip per ask.
  */
 export async function getPersona(id: string): Promise<Persona | null> {
-  // Try DB first
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("app_settings" as "products")
-    .select("value")
-    .eq("key", `${PERSONA_KEY_PREFIX}${id}`)
-    .single() as { data: { value: string } | null };
-
-  if (data?.value) {
-    try {
-      return JSON.parse(data.value) as Persona;
-    } catch { /* fall through to defaults */ }
-  }
-
-  // Fallback to built-in default
-  return DEFAULT_PERSONAS.find((p) => p.id === id) ?? null;
+  return (await listPersonas()).find((p) => p.id === id) ?? null;
 }
 
 /**
  * List all available personas (DB overrides + built-in defaults).
+ * Cached in-process for 60s.
  */
 export async function listPersonas(): Promise<Persona[]> {
+  if (personasCache && Date.now() - personasCache.at < PERSONAS_CACHE_TTL_MS) {
+    return personasCache.data;
+  }
   const supabase = createAdminClient();
 
   // Get all DB-stored personas
@@ -284,6 +284,7 @@ export async function listPersonas(): Promise<Persona[]> {
     }
   }
 
+  personasCache = { data: result, at: Date.now() };
   return result;
 }
 
@@ -302,6 +303,7 @@ export async function savePersona(persona: Persona): Promise<void> {
       },
       { onConflict: "key" }
     );
+  invalidatePersonasCache();
 }
 
 /**
@@ -314,4 +316,5 @@ export async function deletePersona(id: string): Promise<void> {
     .from("app_settings" as "products")
     .delete()
     .eq("key", `${PERSONA_KEY_PREFIX}${id}`);
+  invalidatePersonasCache();
 }

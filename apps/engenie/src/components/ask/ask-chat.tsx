@@ -415,8 +415,9 @@ const AskMessage = memo(function AskMessage({
           </div>
         ) : null}
 
-        {/* Reference list */}
-        {!message.isStreaming && message.sources && message.sources.length > 0 && (
+        {/* Reference list — sources arrive before the LLM stream, so show
+            them while the answer is still generating (perceived latency). */}
+        {message.sources && message.sources.length > 0 && (
           <ReferenceList sources={message.sources} />
         )}
 

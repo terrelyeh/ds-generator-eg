@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { invalidateApiKeyCache } from "@eg/db/settings";
 import { gate } from "@eg/auth/session";
 
 /**
@@ -93,5 +94,6 @@ export async function POST(request: Request) {
       );
   }
 
+  invalidateApiKeyCache();
   return NextResponse.json({ ok: true });
 }

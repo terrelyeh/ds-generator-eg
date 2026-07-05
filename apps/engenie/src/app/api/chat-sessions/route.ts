@@ -1,6 +1,23 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gate } from "@eg/auth/session";
+import { requirePermission, AuthError, type AuthUser } from "@eg/auth/session";
+
+/**
+ * Sessions are private per user: every query below is scoped by user_id.
+ * (Legacy rows created before this fix carry user_id='anonymous' — they are
+ * orphaned on purpose rather than left readable/deletable by everyone.)
+ * Returns the caller, or a 401/403 NextResponse.
+ */
+async function requireAskUser(): Promise<AuthUser | NextResponse> {
+  try {
+    return await requirePermission("ask.use");
+  } catch (e) {
+    if (e instanceof AuthError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
+  }
+}
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -39,8 +56,8 @@ function parseMessages(raw: ChatMessage[] | string | unknown): ChatMessage[] {
  * - With id: get a specific session with full messages
  */
 export async function GET(request: Request) {
-  const denied = await gate("ask.use");
-  if (denied) return denied;
+  const user = await requireAskUser();
+  if (user instanceof NextResponse) return user;
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   const supabase = createAdminClient();
@@ -50,6 +67,7 @@ export async function GET(request: Request) {
       .from("chat_sessions" as "products")
       .select("*")
       .eq("id", id)
+      .eq("user_id", user.id)
       .single() as { data: SessionRow | null; error: unknown };
 
     if (error || !data) {
@@ -65,6 +83,7 @@ export async function GET(request: Request) {
   const { data, error } = await supabase
     .from("chat_sessions" as "products")
     .select("id, title, persona, provider, message_count, created_at, updated_at")
+    .eq("user_id", user.id)
     .order("updated_at", { ascending: false })
     .limit(50) as { data: Omit<SessionRow, "messages" | "user_id">[] | null; error: unknown };
 
@@ -81,8 +100,8 @@ export async function GET(request: Request) {
  * Body: { id?, title?, persona?, provider?, messages? }
  */
 export async function POST(request: Request) {
-  const denied = await gate("ask.use");
-  if (denied) return denied;
+  const user = await requireAskUser();
+  if (user instanceof NextResponse) return user;
   const body = await request.json();
   const { id, title, persona, provider, messages } = body as {
     id?: string;
@@ -105,13 +124,19 @@ export async function POST(request: Request) {
       updates.message_count = messages.length;
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("chat_sessions" as "products")
       .update(updates)
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .select("id") as { data: { id: string }[] | null; error: unknown };
 
     if (error) {
       return NextResponse.json({ error: "Update failed" }, { status: 500 });
+    }
+    if (!data || data.length === 0) {
+      // Not this user's session (or it no longer exists) — don't pretend.
+      return NextResponse.json({ error: "Session not found" }, { status: 404 });
     }
 
     return NextResponse.json({ ok: true, id });
@@ -126,7 +151,7 @@ export async function POST(request: Request) {
       provider: provider || "gemini-3.5-flash",
       messages: messages || [],
       message_count: messages?.length || 0,
-      user_id: "anonymous",
+      user_id: user.id,
     })
     .select("id")
     .single() as { data: { id: string } | null; error: unknown };
@@ -143,19 +168,20 @@ export async function POST(request: Request) {
  * Body: { id: string } or { ids: string[] } for batch delete
  */
 export async function DELETE(request: Request) {
-  const denied = await gate("ask.use");
-  if (denied) return denied;
+  const user = await requireAskUser();
+  if (user instanceof NextResponse) return user;
   const body = await request.json();
   const { id, ids } = body as { id?: string; ids?: string[] };
 
   const supabase = createAdminClient();
 
   if (ids && ids.length > 0) {
-    // Batch delete
+    // Batch delete (own sessions only)
     const { error } = await supabase
       .from("chat_sessions" as "products")
       .delete()
-      .in("id", ids);
+      .in("id", ids)
+      .eq("user_id", user.id);
 
     if (error) {
       return NextResponse.json({ error: "Batch delete failed" }, { status: 500 });
@@ -170,7 +196,8 @@ export async function DELETE(request: Request) {
   const { error } = await supabase
     .from("chat_sessions" as "products")
     .delete()
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) {
     return NextResponse.json({ error: "Delete failed" }, { status: 500 });

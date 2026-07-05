@@ -217,37 +217,44 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
       }
     };
 
+    // All supplement queries are independent — fire them concurrently and
+    // merge in a fixed order (focused-per-model, combined, countries) so the
+    // dedup priority matches the old sequential behaviour.
+    type SupplementResult = { data: RawDoc[] | null };
+    const supplementQueries: PromiseLike<SupplementResult>[] = [];
+
     if (hasModelMention) {
       for (const m of mentionedModels) {
-        const { data: focused } = (await supabase
+        supplementQueries.push(supabase
           .from("documents" as "products")
           .select("id, source_type, source_id, source_url, title, content, metadata")
           .gte("chunk_index", 10000)
           .or(`content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
-          .limit(10)) as { data: RawDoc[] | null };
-        addUnique(focused);
+          .limit(10) as unknown as PromiseLike<SupplementResult>);
       }
       const orClauses = mentionedModels
         .map((m) => `content.ilike.%${m}%,title.ilike.%${m}%,source_id.ilike.%${m.toLowerCase()}%`)
         .join(",");
-      const { data: modelMatches } = (await supabase
+      supplementQueries.push(supabase
         .from("documents" as "products")
         .select("id, source_type, source_id, source_url, title, content, metadata")
         .or(orClauses)
-        .limit(30)) as { data: RawDoc[] | null };
-      addUnique(modelMatches);
+        .limit(30) as unknown as PromiseLike<SupplementResult>);
     }
 
     if (hasCountryMention) {
       for (const code of mentionedCountries) {
-        const { data: countryChunks } = (await supabase
+        supplementQueries.push(supabase
           .from("documents" as "products")
           .select("id, source_type, source_id, source_url, title, content, metadata")
           .eq("source_type", "wifi_regulation")
           .eq("source_id", code)
-          .limit(3)) as { data: RawDoc[] | null };
-        addUnique(countryChunks);
+          .limit(3) as unknown as PromiseLike<SupplementResult>);
       }
+    }
+
+    for (const { data } of await Promise.all(supplementQueries)) {
+      addUnique(data);
     }
 
     const scored = docs.map((d) => {

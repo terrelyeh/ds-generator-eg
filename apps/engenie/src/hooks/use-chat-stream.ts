@@ -176,6 +176,20 @@ export function useChatStream(config: UseChatStreamConfig) {
               scheduleFlush();
             } else if (event.type === "sources") {
               streamSources = event.sources ?? [];
+              // Sources arrive right after retrieval, before the LLM stream —
+              // commit them to the in-flight assistant bubble immediately so
+              // the surface can show what was found while the answer is still
+              // generating. (The rAF content flush spreads the previous
+              // message, so this field survives subsequent chunk updates.)
+              const src = streamSources;
+              setMessages((prev) => {
+                const updated = [...prev];
+                const last = updated[updated.length - 1];
+                if (last?.role === "assistant" && last.isStreaming) {
+                  updated[updated.length - 1] = { ...last, sources: src };
+                }
+                return updated;
+              });
             } else if (event.type === "metadata") {
               streamFollowUps = event.follow_ups ?? [];
               streamImageMap = event.image_map ?? {};
