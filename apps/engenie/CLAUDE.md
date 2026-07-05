@@ -1,8 +1,8 @@
 # CLAUDE.md — EnGenie (apps/engenie)
 
-> Last updated: 2026-06-17（monorepo 拆分**全部完成（Phase 1–5）**；Phase 5 cutover
-> 已 merge 進 `main`、prod `engenie-eg` 在拆分後架構。Phase 3 自 SpecHub 析出成獨立
-> app，本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge 全部 context。）
+> Last updated: 2026-07-05（monorepo 拆分**全部完成（Phase 1–5）**；prod `engenie-eg`
+> 在拆分後架構。本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge 全部 context。
+> 2026-07-05 完成 Ask 效能 + 資安 hardening 三批，全上 prod — 見「Ask 效能路徑」與 Pitfalls 61–65。）
 
 ## Project Overview
 
@@ -90,13 +90,15 @@ src/
 
 ## Database Tables（EnGenie 擁有 schema 演進權）
 
-- `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash。HNSW index（00022）
+- `documents` — RAG 向量索引：source_type, content, embedding VECTOR(1536), metadata JSONB, content_hash。HNSW index（00022）+ **pg_trgm GIN index on content/title/source_id（00026）** — 讓 retrieve.ts 的型號 `ilike '%ECW…%'` 補充查詢走索引不掃全表
 - `ask_workspaces` — 多租戶 Ask：slug, passcode_hash, llm_mode('shared'|'byok'|'user_byok'), byok_key_encrypted, scope JSONB（含 knowledge_areas[]）, persona/profile/allow_switch, 配額欄位, allowed_origins（widget CSP）, token_version（撤銷）。RPC `ask_workspace_touch`
 - `api_keys` — 對外 Search API key：key_hash(sha256 驗證), key_encrypted(AES-256-GCM 供複製), scope, 限流欄位。RPC `api_key_touch`
-- `chat_sessions` — 對話持久化
+- `chat_sessions` — 對話持久化，**綁 `user_id`**（route 一律 `.eq("user_id", …)`；舊 `anonymous` 列已孤立，見 Pitfall 62）
+- `auth_rate_limits` — passcode 暴力猜測限流（fixed-window / RPC `auth_rate_check`，00027）；service-role only
 - `topology_icons` — 拓撲圖示
 - 共同：`solutions`（spechub 管產品 solution；engenie 只新增 `kind='knowledge'` 列 — `/api/knowledge-areas`）
 - 唯讀（spechub 擁有）：products, product_lines, profiles, email_whitelist, app_settings（settings route 例外：LLM keys 讀寫）
+- **RLS**：全表已開 RLS；`documents`/`chat_sessions` 為 deny-all backstop（app 全走 service-role + RBAC）。prod 現況已在 migration 00028 補記（之前只在 prod 開、repo 沒檔）
 
 ## Ask / RAG 系統
 
@@ -113,6 +115,15 @@ src/
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（fail-open）
 - Gemini 一律 `x-goog-api-key` header；錯誤回前端先 `redactSecrets()`
 
+## Ask 效能路徑（`/api/ask` — 2026-07-05 hardening 後）
+
+首 token 從 5–6s 降到 prod ~3.5s。關鍵設計，改 route 前務必理解：
+- **檢索平行化**：persona prompt / LLM key / topology hint 用 `Promise.all` 與 `retrieveDocuments` **同時**跑，不要移回檢索後（見 Pitfall 63）。這些 promise 都 `.catch` 成 fallback，不會 unhandled reject
+- **sources 事件在 LLM 串流之前送**：檢索一完成就 `sendEvent({type:"sources"})`，前端 `use-chat-stream` 掛到串流中的訊息、UI 立即顯示來源（別移回串流結束）
+- **三層 in-process 快取**（各 60s TTL / LRU，寫入時 invalidate）：`getApiKey`（@eg/db settings）、`listPersonas`/`getPersona`、`generateEmbedding`（LRU 300）
+- **Gemini Flash 關 thinking**：`MODEL_MAP` 的 flash/lite 帶 `thinkingBudget:0`（Pitfall 61）
+- **history 有字元預算**：`trimHistory()` 每則 1.5k / 總 12k 字，長對話不再脹 prefill
+
 ## Common Pitfalls（自 spechub 繼承，編號保留）
 
 54. **`useChatStream` POST body 一律 `...getParams()` 展開**，別寫死欄位清單 — 否則 workspace/userKey 等欄位被靜默丟掉，workspace 模式整個被繞過（看起來能用、送出才壞）。
@@ -122,6 +133,11 @@ src/
 58. **Workspace token 撤銷機制** — `verifyWorkspaceToken()` 只驗簽章+到期（Edge 粗篩）；版本撤銷的權威檢查在 route handler（`workspaceAuthorized`）。改 token 格式/換 signing secret = 所有現存 token 失效（widget 自動重發、passcode 重輸一次）。
 59. **RAG 檢索 embedding 只用「當前問題」，不要串對話歷史** — 串歷史會讓前一題主題污染這題的向量搜尋（換主題被當成「知識庫只有前一題的內容」）。歷史只進 `/api/ask` 的 LLM prompt；建議追問也要求 LLM 產生「自包問句」（`api/ask/route.ts` 的 follow-up 指示）。
 60. **`product_spec` ingest：`content_hash` 只 gate「重新 embed」，metadata 一律刷新** — 內容沒變但 metadata（taxonomy）漂移時，`ingest-products.ts` 做 metadata-only update（不重 embed）。別把兩者重新耦合，否則新加的 metadata 欄位不會回填舊 chunk（症狀：taxonomy badge 時有時無）。
+61. **Gemini Flash 一律關 thinking（`thinkingBudget:0`）** — flash/lite 的 thinking 發生在第一個 token 之前、且 `streamGemini` 會丟棄 thought parts，等於純浪費 7–15s（實測）。新增 Gemini flash 型號到 `MODEL_MAP` 記得帶 `thinkingBudget:0`；**Gemini Pro 刻意不帶**（選 Pro 就是要深度推理）。`streamGemini` 只在 `thinkingBudget !== undefined` 時才送 `generationConfig`。
+62. **`chat_sessions` 綁 `user_id`，所有查詢都要 `.eq("user_id", user.id)`** — 用 `requirePermission("ask.use")` 取得 user，create 寫真實 id、read/update/delete 全部過濾；update 找不到列回 404 不假裝成功。舊 `user_id='anonymous'` 列刻意孤立（不遷移），所以部署後每人的歷史列表從空開始。別用回 `gate()`（它不回 user）。
+63. **Ask 熱路徑快取寫入端一定要 invalidate** — `getApiKey`（settings route 寫完呼叫 `invalidateApiKeyCache`）、personas（`savePersona`/`deletePersona` 內建 invalidate）。新增「會改 app_settings LLM key / persona」的路徑時記得一起清，否則最長 60s 看到舊值。embedding LRU 不用 invalidate（同 model+text 結果恆定）。
+64. **`ingest-web` 有 SSRF 白名單（`isSafePublicUrl`）** — 擋 loopback/RFC1918/link-local/metadata IP + 十進位/十六進位 IP 變形 + `.local`/`.internal`。純 hostname 比對（DNS-rebinding 不在範圍，此功能 admin-gated）。被擋的 URL 進 `errors[]` 不中斷其他頁。
+65. **passcode 端點（`ws-auth`/`demo-auth`）有 DB-backed 限流** — `passcodeAttemptAllowed(scope, request)` 走 RPC `auth_rate_check`（每 surface+IP 5 分鐘 10 次），放在任何 lookup/hash 比對**之前**（也消 slug 列舉 timing oracle）。fail-open。測試觸發後記得清 `auth_rate_limits` 對應列，免得誤擋真實出口 IP。
 
 ## Deployment
 

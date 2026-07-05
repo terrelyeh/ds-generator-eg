@@ -9,9 +9,10 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 ### Ask — AI 知識問答（RAG）
 - **自然語言查詢** — 用中文 / 英文 / 日文問產品規格、比較、設定、推薦、法規，答案以公司自有知識庫為依據（不靠模型的泛用知識）
 - **向量語意搜尋** — pgvector + OpenAI Embedding，語意命中而非關鍵字匹配
-- **多 AI 模型即時切換** — Gemini（Pro / Flash / Lite）、GPT（4o / 4o-mini）、Claude（Opus / Sonnet / Haiku）
+- **多 AI 模型即時切換** — Gemini（Pro / Flash / Lite）、GPT、Claude（Opus / Sonnet / Haiku）三大家族
 - **跨語言檢索** — 中文問題也能精準命中英文文件；偵測到型號（ECW536）或國家（台灣）時自動補查 + 重新排序
 - **三維度 Prompt** — 回答角度（Persona）、對話對象（User Profile）、產出格式（規劃中）
+- **快速回覆** — 首字約 2–3 秒（平行檢索 + 熱路徑快取 + Flash 免思考）；來源卡片在答案生成前就先出現，不用乾等
 - **ChatGPT 級體驗** — 平順串流 + 即時狀態（「搜尋中…」→「整理回覆中…」）、可隨時停止 / 重新生成；往上讀歷史不會被拉回底部
 - **Markdown 渲染** — 表格、清單、程式碼區塊（語法高亮 + 複製）；回答會主動用表格做產品比較、粗體標出型號與規格
 - **來源引用 + 延伸問題** — 附可點擊的來源連結，並生成 3 個「自包」的延伸追問
@@ -64,6 +65,8 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 ### Access Control
 - **Google OAuth 登入** + Email 白名單 + 4 種角色（Admin / Editor / PM / Viewer），與 SpecHub 共用同一套 RBAC（`@eg/auth`）
 - 公開區（demo / workspace / widget / 設計文件）走各自的 passcode / token gate，不需公司登入
+- **暴力猜測防護** — demo / workspace passcode 端點依 IP 限流（每 5 分鐘 10 次）
+- **對話隱私** — Ask 歷史綁定登入者，各自只看得到自己的對話
 
 ### Design Docs（公開、可分享）
 - [`/docs/ask-integration.html`](https://engenie-eg.vercel.app/docs/ask-integration.html) — 整合服務總覽（EnGenie 回答 vs 呼叫端的腦兩種家族）
