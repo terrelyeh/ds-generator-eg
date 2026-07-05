@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import { EngenieMark } from "./engenie-mark";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
+import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
   type ChatMessage as Message,
@@ -364,13 +365,15 @@ const MessageBubble = memo(function MessageBubble({
               prose-table:text-[13.5px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
               ${message.isStreaming ? cursor : ""}`}
           >
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
-              components={markdownComponents}
-            >
-              {stripCitations(message.content)}
-            </ReactMarkdown>
+            <MarkdownErrorBoundary fallback={stripCitations(message.content)}>
+              <ReactMarkdown
+                remarkPlugins={[remarkGfm]}
+                rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
+                components={markdownComponents}
+              >
+                {stripCitations(message.content)}
+              </ReactMarkdown>
+            </MarkdownErrorBoundary>
           </div>
         ) : thinking ? (
           <div className="flex items-center gap-2 py-2">

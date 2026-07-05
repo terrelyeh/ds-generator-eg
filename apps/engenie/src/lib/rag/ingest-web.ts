@@ -63,6 +63,40 @@ function normalizeUrl(input: string): string {
 }
 
 /**
+ * SSRF guard for admin-supplied URLs. The plain-fetch fallback runs from our
+ * own serverless runtime, so internal targets (cloud metadata, loopback,
+ * RFC1918) must never be fetchable — even by a knowledge.edit admin.
+ * Hostname-based only: DNS-rebinding (public name → private A record) is out
+ * of scope for this internal, admin-gated feature.
+ */
+function isSafePublicUrl(url: string): boolean {
+  let u: URL;
+  try { u = new URL(url); } catch { return false; }
+  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
+  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  if (!host) return false;
+  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
+  // IPv6: loopback / unspecified / link-local / unique-local
+  if (host.includes(":")) {
+    return !(host === "::" || host === "::1" || /^(fe80|fc|fd)/i.test(host));
+  }
+  // Whole-number or hex IPv4 forms (http://2130706433/, http://0x7f000001/)
+  if (/^\d+$/.test(host) || /^0x/i.test(host)) return false;
+  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (
+      a === 0 || a === 10 || a === 127 ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    ) return false;
+  }
+  return true;
+}
+
+/**
  * Colon-free, stable source_id (the GET /api/documents list splits
  * "type:source_id" on the first ":", so a raw URL with "https://" would break
  * it). hostname + pathname is human-readable and unique per page.
@@ -262,7 +296,11 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
   const methods: Record<string, number> = {};
   let pagesSkipped = 0;
 
-  const urls = [...new Set((pageUrls ?? []).map(normalizeUrl).filter(Boolean))];
+  const urls = [...new Set((pageUrls ?? []).map(normalizeUrl).filter(Boolean))].filter((u) => {
+    if (isSafePublicUrl(u)) return true;
+    errors.push(`Blocked non-public URL: ${u}`);
+    return false;
+  });
   if (urls.length === 0) {
     return { processed: 0, skipped: 0, pages_fetched: 0, pages_skipped: 0, errors, methods };
   }

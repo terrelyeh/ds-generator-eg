@@ -8,6 +8,7 @@ import { Card } from "@/components/ui/card";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
+import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
   type ChatMessage as Message,
@@ -275,13 +276,15 @@ function MarkdownWithCitations({ content, sources }: { content: string; sources?
   }), [sources]);
 
   return (
-    <ReactMarkdown
-      remarkPlugins={[remarkGfm]}
-      rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
-      components={markdownComponents}
-    >
-      {content}
-    </ReactMarkdown>
+    <MarkdownErrorBoundary fallback={content}>
+      <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
+        rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
+        components={markdownComponents}
+      >
+        {content}
+      </ReactMarkdown>
+    </MarkdownErrorBoundary>
   );
 }
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { loadWorkspaceBySlug } from "@/lib/ask/workspaces";
 import { workspaceCookieName, computeWorkspaceToken } from "@/lib/auth/workspace-session";
+import { passcodeAttemptAllowed, RATE_LIMIT_MSG } from "@/lib/auth/rate-limit";
 
 /**
  * POST /api/ws-auth { slug, key } — verify a workspace's passcode and, on
@@ -18,6 +19,12 @@ export async function POST(request: Request) {
 
   const slug = (body.slug || "").trim();
   if (!slug) return NextResponse.json({ ok: false, error: "Missing slug" }, { status: 400 });
+
+  // Before ANY lookup/verification: brute-force limiter (also covers slug
+  // enumeration, and removes the found-vs-wrong-passcode timing difference).
+  if (!(await passcodeAttemptAllowed(`ws:${slug}`, request))) {
+    return NextResponse.json({ ok: false, error: RATE_LIMIT_MSG }, { status: 429 });
+  }
 
   const ws = await loadWorkspaceBySlug(slug);
   if (!ws || !ws.enabled) {
