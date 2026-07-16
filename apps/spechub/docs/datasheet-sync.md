@@ -19,6 +19,7 @@
 |---|---|---|
 | 留空 / Active | `active` | 正常顯示 |
 | Upcoming | `upcoming` | 琥珀色 badge |
+| PVT（測試中） | `upcoming` | 琥珀色 badge（同 Upcoming） |
 | Pending | `pending` | 紅色 badge（暫不發布，統一狀態） |
 
 Dashboard 預設只顯示 Active，有 Active/All toggle。

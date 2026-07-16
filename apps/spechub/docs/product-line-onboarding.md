@@ -32,7 +32,8 @@ solutions render as disabled "soon" placeholders.
   Specifications") + label/value rows → spec_sections / spec_items.
 - **⚠️ Enumeration rule (2026-06-16):** models are enumerated from the **Detail
   Specs** `Model #` row, BUT only those **also listed in the Web Overview** `Model #`
-  row are imported. Extra Detail-Specs columns (EOL/example placeholders) are skipped.
+  row are imported (`Model Number` is a tolerated alias for the overview row label —
+  Orin Box sheet uses it). Extra Detail-Specs columns (EOL/example placeholders) are skipped.
   Guard: if a sheet has no Web Overview `Model #` row, falls back to importing all
   columns (legacy). So **a model missing from Web Overview will silently not sync.**
   (`lib/google/sheets.ts` `loadAllProductsFromSheet`.)

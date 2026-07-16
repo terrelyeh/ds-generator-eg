@@ -335,7 +335,8 @@ function parseOverviewData(
     const label = String(row?.[0] ?? "").trim().toLowerCase();
     if (label === "status") {
       const val = getCell(row, colIdx).toLowerCase().trim();
-      if (val === "upcoming") {
+      // "PVT" (production validation testing, 測試中) = not yet released → upcoming
+      if (val === "upcoming" || val === "pvt") {
         status = "upcoming";
       } else if (val === "pending") {
         status = "pending";
@@ -565,7 +566,10 @@ export async function loadAllProductsFromSheet(
   // Model # row, fall back to importing every detail-specs column (legacy).
   const overviewModels = new Set<string>();
   for (const row of overviewRows) {
-    if (String(row?.[0] ?? "").trim() === "Model #") {
+    // "Model Number" is a tolerated alias — the Orin Box sheet labels the
+    // row that way instead of the standard "Model #".
+    const gateLabel = String(row?.[0] ?? "").trim();
+    if (gateLabel === "Model #" || gateLabel === "Model Number") {
       for (let c = 1; c < row.length; c++) {
         const m = String(row[c] ?? "").trim();
         if (m) overviewModels.add(m);
