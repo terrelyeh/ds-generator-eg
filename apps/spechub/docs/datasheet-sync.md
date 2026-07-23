@@ -31,6 +31,10 @@ Dashboard 預設只顯示 Active，有 Active/All toggle。
 - Dashboard Sync 按鈕只同步**當前 tab 的產品線**（`?force=true&line=Cloud+Camera`）
 - Deep diff 含 status 欄位 — status-only 變更也會觸發 upsert
 - **圖片同步**：即使內容無變更，若 product_image 或 hardware_image 缺失仍會從 Drive 拉取
+- **PNG 自動裁透明邊**（2026-07-23，sharp `.trim()`）：PM 給的去背圖常放在巨大透明畫布上
+  （SE110 產品只佔 3800×2850 畫布的 61%×24%，datasheet 上渲染變超小）。下載後自動裁掉
+  透明邊再上傳 Storage；**只裁 PNG**（JPG 白邊可能是有意留白，不動）。Drive 原圖不動。
+  對所有產品線生效——已緊裁的圖 trim 是 no-op
 - `sheet_last_editor` fallback 到 Drive API `displayName`（Service Account 看不到 email）
 - **Auto re-index after sync**：sync 完成後，對 `allChanges` 中的每個 `product_name` 呼叫 `ingestProducts({ modelName })`，自動更新 RAG 向量。`content_hash` 去重確保未變更的 chunks 被 skip。失敗隔離不中斷 sync 回應，`response.reindex` 顯示 `{processed, skipped, errors}`
 

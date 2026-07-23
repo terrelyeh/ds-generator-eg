@@ -236,12 +236,15 @@ body {
   position: absolute; left: 40pt; top: 178pt; width: 290pt;
   font-weight: 300; font-size: 9pt; line-height: 1.65; color: rgba(255,255,255,0.92);
 }
-.hero-product {
-  position: absolute; right: 26pt; top: 120pt;
-  max-width: 235pt; max-height: 195pt; object-fit: contain;
+/* fixed box on the hero's right half; the (sync-trimmed) render centers
+   inside it so flat 1U units and tall towers both sit balanced */
+.hero-product-box {
+  position: absolute; right: 24pt; top: 96pt; width: 252pt; height: 210pt;
+  display: flex; align-items: center; justify-content: center;
 }
+.hero-product-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
 .hero-product-ph {
-  position: absolute; right: 26pt; top: 120pt; width: 235pt; height: 165pt;
+  width: 100%; height: 165pt;
   background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.45);
   color: rgba(255,255,255,0.6);
 }
@@ -337,12 +340,14 @@ body {
           <div className="hero-headline">{product.headline || product.full_name}</div>
           <div className="hero-model">{product.model_name}</div>
           <div className="hero-overview">{product.overview}</div>
-          {productImage ? (
-            /* eslint-disable-next-line @next/next/no-img-element */
-            <img className="hero-product" src={productImage} alt={product.model_name} />
-          ) : (
-            <Placeholder slot={`${product.model_name}_product.png`} className="hero-product-ph" />
-          )}
+          <div className="hero-product-box">
+            {productImage ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={productImage} alt={product.model_name} />
+            ) : (
+              <Placeholder slot={`${product.model_name}_product.png`} className="hero-product-ph" />
+            )}
+          </div>
         </div>
 
         {useGroups ? (

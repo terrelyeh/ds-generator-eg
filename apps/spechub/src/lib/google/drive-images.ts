@@ -355,6 +355,31 @@ export async function uploadImageToDrive(
   }
 }
 
+/**
+ * Trim uniform transparent padding from PNG images. PM-supplied renders
+ * often sit on a huge transparent canvas (SE110: the product occupied only
+ * 61% × 24% of a 3800×2850 canvas), which makes the datasheet <img> render
+ * the product tiny inside its box. Trimming at sync time fixes every
+ * consumer (cover, hardware page, dashboards) at once.
+ *
+ * PNG-only on purpose: sharp's trim() keys off the top-left pixel, which is
+ * reliably the transparent canvas for renders but could eat legitimate
+ * white margins from lossy JPG photos. Failures pass the buffer through.
+ */
+async function trimTransparentEdges(buffer: Buffer, mimeType: string): Promise<Buffer> {
+  if (mimeType !== "image/png") return buffer;
+  try {
+    const sharp = (await import("sharp")).default;
+    return await sharp(buffer).trim().png().toBuffer();
+  } catch (err) {
+    console.warn(
+      "[trimTransparentEdges] pass-through:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return buffer;
+  }
+}
+
 export interface ImageSyncResult {
   product_image_url: string | null;
   hardware_image_url: string | null;
@@ -535,7 +560,7 @@ export async function syncLocalizedHardwareImage(params: {
   }
 
   const { file, fileName } = matched;
-  const buffer = await downloadFile(file.id);
+  const buffer = await trimTransparentEdges(await downloadFile(file.id), file.mimeType);
   const storagePath = `images/${modelName}/${fileName}`;
 
   const { error } = await supabase.storage
@@ -654,7 +679,7 @@ export async function syncProductImages(
         }
       }
 
-      const buffer = await downloadFile(file.id);
+      const buffer = await trimTransparentEdges(await downloadFile(file.id), file.mimeType);
 
       const { error } = await supabase.storage
         .from("datasheets")
