@@ -113,3 +113,11 @@ folder rules, PDF Generation locale handling).
 46. **Puppeteer 自 fetch 撞自己的 auth gate** — `/api/generate-pdf` 內部呼叫 Puppeteer 抓 `/preview/[model]`。Day 3 加 auth proxy 後，這個 internal request 沒 cookie → 被 redirect 到 `/auth/sign-in` → Puppeteer 把 sign-in 頁印成 PDF。修法：proxy 認 `x-vercel-protection-bypass: $VERCEL_AUTOMATION_BYPASS_SECRET` header（generate-pdf 已經有附給 Puppeteer 用於 Vercel Deployment Protection），同個 secret 兩用
 
 48. **`(print)/layout.tsx` 沒有 Toaster** — 預設只 export children，不 mount Toaster。print-toolbar（在 preview 頁）用 sonner toast 之前要記得在 print layout 也 mount `<Toaster />`，不然 toast 出不來
+
+> Moved from inline 2026-07-24 — stable since the multi-language datasheet
+> shipped; only relevant when touching the translation editor or the PDF
+> toast flow.
+
+47. **Browser popup blocker 會擋 async-after `window.open`** — 修法：`toast.success(..., { action: { label: "Open PDF", onClick: () => window.open(...) } })` — toast 上的 click 是真實 user gesture
+
+49. **Translation Save & Confirm 不能綁 `dirty`** — Save 條件 = 「有翻譯內容 AND (locale 還是 Draft OR dirty)」；Preview 對 Draft locale 跳 toast；Draft 狀態按鈕 amber + pulse。三層一起做

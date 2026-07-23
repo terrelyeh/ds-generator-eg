@@ -1,12 +1,12 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-06-13（monorepo 拆分**全部完成（Phase 1–5）**；Phase 5 cutover
-> 已 merge 進 `main`、兩個 prod 都在拆分後架構。Phase 3–4 把 RAG/Ask/Knowledge 全部
-> 析出到 **apps/engenie**（含 lib/rag、聊天 UI、workspaces、對外 Search API、
-> wifi-regulation、LLM keys 設定頁）；本 app 回歸純 datasheet/文件生成平台。
-> 共用碼在 packages：`@eg/db`（supabase clients/settings/types/migrations）、
-> `@eg/auth`（session/RBAC/page-guards）。RAG/Ask 的事去看
-> [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。）
+> Last updated: 2026-07-24。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
+> [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
+> **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth`。RAG/Ask 的事去看
+> [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
+> 近期：Data Center solution（navy 專屬版型）上線、`ds_features` / `hardware_image_2` /
+> PNG 自動裁邊 三個 sync 能力、locale 生成 gate 修復（pitfalls #59–#62）。
 
 ## Project Overview
 
@@ -14,9 +14,11 @@
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
-**Cloud solution 7 條產品線**：Cloud AP, Cloud Switch, Cloud Camera, Cloud AI-NVS,
-Cloud VPN Firewall, Switch Extender, Unmanaged Switch。**Accessories ▸ Transceiver**
-也已上線（非 Cloud solution;綠色佈景、無 hardware 頁、Contact-Us QR 的 datasheet 變體）。
+**4 個 solution 上線**：**Cloud**（AP / L3 Switch / Switch / Camera / AI-NVS /
+VPN Firewall / Switch Extender / Unmanaged Switch，8 條線）、**Accessories ▸
+Transceiver**（綠色、無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network
+Appliance + AI Server**（navy 專屬版型組件）、**Edge AI Box ▸ Orin Box**（per-model
+已上線;整系列一份的 series datasheet 在未 merge 的 `feat/edge-ai-box`）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
 下方 Architecture 的 product-line onboarding）。
 另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
@@ -135,11 +137,14 @@ UI fork 自 compare-table。半自動抽取(**↻ sync** datasheet / **🔍 web*
 
 ### 產品線 onboarding + 各線 datasheet 變體 → [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
-新增產品線(inspect sheet GIDs → `product_lines` row → sync)、sheet 契約、以及 datasheet 輸出
-**依 `category` 變體**(theme / cover / hardware 頁 / QR / 列表欄位)。**關鍵雷:sync 只匯入
-「Web Overview 有列」的型號** —— Detail Specs 多出的 EOL/範例欄會被跳過,而漏在 Web Overview 的
-型號會「靜默不同步」。Transceivers 變體 = 綠色 + tx-cover(圖置中、overview 滿版)+ 無 hardware 頁
-+ Contact-Us QR + 列表隱藏 HW 欄、Model Name 改 Description。Drive 各線/各語言資料夾**自動建**。
+**新增 solution / 產品線前必讀該檔。** 涵蓋:建線 recipe、sheet 契約(含選填的
+`DS Feature Groups` 列 → `products.ds_features`)、圖片命名(`_product`/`_hardware`/
+`_hardware_2` + **PNG 自動裁透明邊**)、**依 `category` 的 datasheet 變體**四種
+(Cloud 藍 / 灰 / Transceiver 綠 / **Data Center navy 專屬組件**)、series-scope、
+以及做新變體時踩過的雷(用 pymupdf 量參考稿、流式排版、自動縮放要校準係數)。
+**關鍵雷**:① sync 只匯入「Web Overview 有列」的型號,漏列 = 靜默不同步;
+② **category 判斷一律精確比對且集中在 `lib/datasheet/qr.ts`**(pitfall #61);
+③ Drive 各線/各語言資料夾**自動建**,但 `drive_folder_id`/`ds_images_folder_id` 常填反。
 
 ## Brand & Visual System
 
@@ -204,7 +209,8 @@ Key tables:
   Changelog Translations | Sync + Lang column 顯示已啟用語言 badges
 - **Product page sticky header**: `sticky top-14 z-20`
 - **Breadcrumb**: `[ProductLine] / [Model]`，ProductLine 連結帶 `?line=` 回正確 tab
-- **Solution sidebar**: 預設收合；**Datasheet 佈景**: Cloud = `#03a9f4`，Unmanaged = `#58595B`
+- **Solution sidebar**: 預設收合；**Datasheet 佈景共 4 種變體**（Cloud 藍 / 灰 /
+  Transceiver 綠 / Data Center navy）→ 見 [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
 ## Current Status
 
@@ -212,28 +218,35 @@ Key tables:
 
 ### 🔜 Next Steps
 
-**🏗️ Monorepo 拆分** — 完成（Phase 1–5,2026-06-13 cutover,兩 prod 都在拆分後架構）。
-剩手動收尾:藍圖 §6 登入驗收、repo rename。藍圖見 [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)。
+**產品線 / 版型**：
+0. **`feat/edge-ai-box` 未 merge** — Orin Box 的 **series datasheet**（整系列一份）功能完成、
+   migration 00029 已在 prod，等 PM 上傳 7 張 `series_*` 圖後驗收再 merge。
+   ⚠️ 該分支與 main 都有一份 `parseFeatureGroups`,merge 時要對齊。
+1. **Data Center 圖片待補** — S21 / S11 的 `_product` / `_hardware` / `_hardware_2`
+   （SE110 / SE210 / S41 已完整）。
+2. **Cloud AP 素材缺口** — 27 台裡 21 台在 Drive 沒有 datasheet 用圖 → 英文版 PDF 生不出來
+   （日/中文版不受影響,各語系有自己的 hardware image）。其他線各缺 1–3 台。
 
 **Datasheet 系統**：
-1. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
-2. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
-3. **多張 Hardware 圖支援** — front/rear/bottom 最多 3 張
-4. **Resync versions per-locale** — `/api/resync-versions` 目前只更新 EN
-5. **新增第 4 個翻譯語言（如 es）** — 動 8 個檔案：`locales/types.ts`(union+SUPPORTED_LOCALES)、
+3. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
+4. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
+5. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
+   三張需再加一欄 + upload API 型別
+6. **Resync versions per-locale** — `/api/resync-versions` 目前只更新 EN
+7. **新增第 4 個翻譯語言（如 es）** — 動 8 個檔案：`locales/types.ts`(union+SUPPORTED_LOCALES)、
    `locales/es.ts`、`locales/index.ts`、`cover-layout.ts` LOCALE_METRICS、`typography.ts`
    TYPOGRAPHY_DEFAULTS、`translate/prompts/locales/es.ts`、`translate/index.ts` 註冊、
    `getLocaleSuffix()` fall-through 免動
 
 **系統**：
-6. **Review Workflow** — PM approve content → MKT generate。需要 `products.review_approval`
+8. **Review Workflow** — PM approve content → MKT generate。需要 `products.review_approval`
    JSONB + content-hash bound + `/api/generate-pdf` approval gate
-7. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
+9. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
 **Battlecard**（MVP 已上線,功能詳見 README）：
-8. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
+10. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
    5 維度(MLO/Recommended Users/BSS Coloring/Warranty/MSRP)刻意留白給 PM
-9. **擴到其他產品線** — 目前只有 Cloud AP 有 dimension 模板 + matchup;Switch/NVS/VPN FW 待建
+11. **擴到其他產品線** — 目前只有 Cloud AP 有 dimension 模板 + matchup;Switch/NVS/VPN FW 待建
    （dashboard toolbar 的 Battlecard 連結目前也只在 Cloud AP 顯示）
 （註:使用者 2026-06-16 決定 ↻sync 與 🔍web 維持兩顆手動按鈕,不自動串接）
 
@@ -259,19 +272,12 @@ npm run lint
 
 ## Common Pitfalls
 
-> Pitfalls #1–#44, #46, #48 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> Pitfalls #1–#44, #46–#49 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 > #54–#58（RAG/聊天相關）搬到 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 45. **Supabase silent insert/update 是這個系統最久的雷** — supabase-js 的 write 不 throw on
     error，回 `{ data, error }`。歷史教訓：`versions` unique constraint 漏 locale → INSERT 撞
     dup key → silent fail → UI 顯示假狀態。慣例：所有 write 一律 `throwIfDbError(label)(res)`。
-
-47. **Browser popup blocker 會擋 async-after `window.open`** — 修法：`toast.success(..., {
-    action: { label: "Open PDF", onClick: () => window.open(...) } })` — toast 上的 click
-    是真實 user gesture。
-
-49. **Translation Save & Confirm 不能綁 `dirty`** — Save 條件 = 「有翻譯內容 AND (locale 還是
-    Draft OR dirty)」；Preview 對 Draft locale 跳 toast；Draft 狀態按鈕 amber + pulse。三層一起做。
 
 50. **Pagination 常數一定要對齊實際 CSS** — `AVAILABLE_HEIGHT = 792 - TOP_BAR - SPEC_TITLE -
     BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、CATEGORY_HEADER 22pt；

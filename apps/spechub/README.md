@@ -5,9 +5,11 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ## Features
 
 ### Dashboard
-- **多產品線 / 多 Solution** tab 切換（Cloud 7 條線 + Accessories ▸ Transceiver）
+- **多產品線 / 多 Solution** tab 切換 —— Cloud（8 條線）、Accessories ▸ Transceiver、
+  Data Center（Edge Network Appliance / AI Server）、Edge AI Box ▸ Orin Box
 - **Solution sidebar**（可收合）— 支援多 Solution 架構擴展
-- 產品清單：Model、版本、OV/FT/Prod/HW 就緒狀態、Radio Pattern（AP）
+- 產品清單：Model、版本、OV/FT/Prod/HW 就緒狀態、Radio Pattern（AP）。
+  有兩張硬體圖的產品線（Data Center）顯示 HW1 / HW2 兩欄
 - **Per-line Sync** — 只同步當前產品線，toast 顯示詳細同步結果
 - 產品線 tab 有獨立 URL（reload 不跳回第一個 tab）
 - **Product Status**：Active / Upcoming / Pending 篩選與 badge 顯示
@@ -18,7 +20,9 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - 完整規格表（分類 header + zebra striping）
 - **圖片雙向管理** — 上傳到 Supabase + 自動同步到 Google Drive，自動重新命名
 - **Radio Pattern**（AP 專用）— 2.4G/5G/6G H-plane & E-plane 圖片 placeholder + 上傳
-- **QSG URL 預覽** — Detail 頁顯示這個 model 印在 PDF 上的 QR Code 將指向哪個連結，含 Copy / Test 按鈕（admin/editor only）
+- **圖片自動去白邊** — 上傳/同步的 PNG 會自動裁掉透明畫布，避免產品在 datasheet 上顯得過小
+- **QR URL 預覽** — Detail 頁顯示這個 model 印在 PDF 上的 QR Code 將指向哪個連結，含 Copy / Test
+  按鈕（admin/editor only）。無 QSG 的產品線（Transceiver、Data Center）顯示 Contact URL
 - **Regenerate / New Version** 兩種 PDF 生成模式
 - 版本紀錄與 PDF 下載
 - Generate PDF 前置條件檢查（需 Product Image + Overview + Features + Hardware Image；**Transceiver 無 Hardware Image，不檢查**）
@@ -44,8 +48,12 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **規格表備註區**（per-product-line, optional）— VPN Firewall 等產品線可在最後一頁 spec 下方放免責備註（如 `*Note: Performance figures are estimates…`），支援多語言
 - **Antennas Patterns**（AP 專用）— 上傳 radio pattern 圖後，PDF 自動新增一頁顯示 2.4G / 5G / 6G H-Plane & E-Plane polar plots
 - Hardware Overview + QR Code footer（QR URL 解析優先序：per-product → per-product-line template → 預設短連結）
-- **依產品線主題**：Cloud 藍色 / Unmanaged·Extender 灰色 / **Transceiver 綠色**
-- **Transceiver 變體**（Accessories）— 封面照片置中 + Overview 滿版、**無 Hardware 頁**、QR 指向 **Contact Us**（無 QSG）
+- **依產品線 4 種版型變體**：
+  - **Cloud 藍色**（預設）/ Unmanaged·Extender **灰色**
+  - **Transceiver 綠色**（Accessories）— 封面照片置中 + Overview 滿版、**無 Hardware 頁**、QR 指向 **Contact Us**（無 QSG）
+  - **Data Center navy**（Edge Network Appliance / AI Server）— 深藍 hero 封面 + 8 個賣點區塊、
+    全系列共用的 EDCC 管理平台頁、全寬單機規格表（自動分頁）、Hardware Overview 最多 2 張圖、Contact Us QR。
+    封面賣點文案可由 Google Sheet 的 `DS Feature Groups` 列維護（「標籤 | 標題: + 說明」格式）
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
 - **Drive 自動建資料夾** — 第一次產 zh / ja PDF 時自動建立 `Cloud Camera_zh` / `Cloud Camera_ja` 等 sibling 資料夾（PM 不需要事先手動建）
