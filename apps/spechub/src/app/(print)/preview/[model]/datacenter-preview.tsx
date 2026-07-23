@@ -297,8 +297,11 @@ body {
   font-size: 7pt; color: #58595b;
 }
 
+/* Page titles (EDCC / Technical Specifications / Hardware Overview).
+   Weight 600 at 17pt reads as the same emphasis as the 24pt/500 cover
+   headline — smaller type needs a touch more weight to match. */
 .section-title {
-  font-family: 'Manrope', sans-serif; font-weight: 300;
+  font-family: 'Manrope', sans-serif; font-weight: 600;
   font-size: 17pt; color: ${BLUE};
 }
 
