@@ -32,6 +32,47 @@ const NAVY = "#16355c";
 const BLUE = "#0073bf";
 const YELLOW = "#f4d768";
 
+/**
+ * EDCC page copy — live text (was baked into a page image, which made the
+ * type sizes fight the rest of the datasheet). Only the screenshots and
+ * their callouts stay as images. Wording follows the reference PDF, with
+ * "EAS Series Servers" generalised since this page is shared by BOTH Data
+ * Center lines, and the stray space in "license- free" fixed.
+ */
+const EDCC_INTRO =
+  "The EnGenius Data Center Controller (EDCC) is the cornerstone of simplified, " +
+  "efficient management for your EnGenius data center servers. This powerful, " +
+  "license-free platform provides comprehensive out-of-band management capabilities, " +
+  "empowering IT teams with unparalleled control and visibility over their entire " +
+  "server fleet from a single interface.";
+
+const EDCC_FEATURES: { title: string; text: string }[] = [
+  {
+    title: "Simplified Firmware Updates",
+    text: "Push unified firmware updates to multiple servers simultaneously, ensuring consistency and reducing maintenance overhead.",
+  },
+  {
+    title: "Visual POD View",
+    text: "Gain a physical-to-logical view of server groupings with intuitive POD visualization, enabling more efficient resource mapping, configuration, and infrastructure monitoring.",
+  },
+  {
+    title: "Out-of-Band Control",
+    text: "Manage servers even if the operating system is unresponsive or powered off, ensuring continuous uptime and remote troubleshooting.",
+  },
+  {
+    title: "Remote Diagnostics & Troubleshooting",
+    text: "Gain real-time insights into server health, performance metrics, and system logs, enabling proactive issue identification and rapid resolution from anywhere.",
+  },
+  {
+    title: "Unified Device Management",
+    text: "Centralized control over all EnGenius servers, eliminating the need for individual server access.",
+  },
+  {
+    title: "Scalable Deployment",
+    text: "Designed to manage a growing number of servers, providing seamless scalability as your data center expands.",
+  },
+];
+
 interface DcQueryRow extends Product {
   product_lines: ProductLine;
   spec_sections: (SpecSection & { spec_items: SpecItem[] })[];
@@ -205,54 +246,67 @@ body {
   font-size: 8pt;
 }
 
-/* ── Cover ─────────────────────────────────────────────────────────── */
+/* ── Cover ─────────────────────────────────────────────────────────────
+   Geometry traced from the reference PDF's cover (its page is 613×860, so
+   vertical values are scaled ×0.921 to Letter). Key traits of that layout:
+   a TALL solid header band, an oversized ExtraLight headline, the yellow
+   model line, Manrope body copy, and a wide product render sitting just
+   below the hero's centre. */
 .cover-header {
-  position: absolute; top: 0; left: 0; right: 0; height: 64pt;
-  background: ${NAVY};
+  position: absolute; top: 0; left: 0; right: 0; height: 100pt;
+  background: ${BLUE};
 }
 .cover-header .logo-img {
-  position: absolute; left: 36pt; top: 50%; transform: translateY(-50%); height: 24pt;
+  position: absolute; left: 36pt; top: 50%; transform: translateY(-50%); height: 27pt;
 }
 .cover-header .solution-label {
   position: absolute; right: 36pt; top: 50%; transform: translateY(-50%);
-  font-family: 'Manrope', sans-serif; font-weight: 300; font-size: 13pt; color: white;
+  font-family: 'Manrope', sans-serif; font-weight: 200; font-size: 14pt; color: white;
 }
+/* Reference structure: full-width headline across the top, then a row of
+   copy (left) beside the product render (right). FLOW, not fixed offsets —
+   headlines run 2 or 3 lines depending on the model and fixed tops made a
+   3-line headline collide with the model line. */
 .hero {
-  position: absolute; top: 64pt; left: 0; right: 0; height: 348pt;
-  background: linear-gradient(118deg, #10294a 0%, ${NAVY} 42%, #1e5288 72%, ${BLUE} 120%);
+  position: absolute; top: 100pt; left: 0; right: 0; height: 300pt;
+  background: linear-gradient(118deg, #10294a 0%, ${NAVY} 40%, #1c4d84 74%, ${BLUE} 122%);
   overflow: hidden;
+  padding: 26pt 20pt 20pt 36pt;
 }
 .hero-headline {
-  position: absolute; left: 40pt; top: 42pt; width: 330pt;
-  font-family: 'Manrope', sans-serif; font-weight: 300;
-  font-size: 22pt; line-height: 1.25; color: white;
+  font-family: 'Manrope', sans-serif; font-weight: 200;
+  font-size: 24pt; line-height: 1.28; color: white; max-width: 520pt;
 }
+.hero-lower { display: flex; gap: 16pt; margin-top: 14pt; }
+.hero-copy { flex: 1 1 auto; min-width: 0; max-width: 280pt; }
 .hero-model {
-  position: absolute; left: 40pt; top: 148pt;
-  font-family: 'Manrope', sans-serif; font-weight: 400;
-  font-size: 14pt; color: ${YELLOW};
+  font-family: 'Manrope', sans-serif; font-weight: 300;
+  font-size: 15pt; color: ${YELLOW}; margin-bottom: 8pt;
 }
 .hero-overview {
-  position: absolute; left: 40pt; top: 178pt; width: 290pt;
-  font-weight: 300; font-size: 9pt; line-height: 1.65; color: rgba(255,255,255,0.92);
+  font-family: 'Manrope', sans-serif; font-weight: 200;
+  font-size: 10pt; line-height: 1.55; color: rgba(255,255,255,0.95);
 }
-/* fixed box on the hero's right half; the (sync-trimmed) render centers
-   inside it so flat 1U units and tall towers both sit balanced */
+/* Wide render column; flat 1U units fill the width, taller chassis the
+   height. Centres against the copy block beside it. */
 .hero-product-box {
-  position: absolute; right: 24pt; top: 96pt; width: 252pt; height: 210pt;
+  flex: 0 0 288pt;
   display: flex; align-items: center; justify-content: center;
 }
-.hero-product-box img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.hero-product-box img { max-width: 100%; max-height: 168pt; object-fit: contain; }
 .hero-product-ph {
-  width: 100%; height: 165pt;
+  width: 100%; height: 130pt;
   background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.45);
   color: rgba(255,255,255,0.6);
 }
 
-/* features under the hero — chip groups, 2 columns × 3 rows */
+/* features under the hero — chip groups, 2 columns × 3 rows.
+   Fixed height + space-between spreads the rows down the WHOLE lower
+   half instead of stacking them at the top with dead space beneath. */
 .cover-features {
-  position: absolute; top: 432pt; left: 36pt; right: 36pt;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 15pt 24pt;
+  position: absolute; top: 424pt; left: 36pt; right: 36pt; height: 330pt;
+  display: grid; grid-template-columns: 1fr 1fr; column-gap: 26pt;
+  align-content: space-between;
 }
 .feature-chip {
   display: inline-block; background: ${BLUE}; color: white;
@@ -276,9 +330,23 @@ body {
 .flat-bullet .dot { color: ${BLUE}; flex: none; }
 
 /* ── EDCC shared page ──────────────────────────────────────────────── */
-.edcc-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; bottom: 40pt;
-  display: flex; align-items: flex-start; justify-content: center; padding-top: 14pt; }
-.edcc-page img { max-width: 540pt; max-height: 706pt; object-fit: contain; }
+/* Copy is LIVE TEXT (crisp at any zoom, editable); only the product
+   screenshots + their callouts come from the reference PDF as images. */
+.edcc-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; padding-top: 22pt; }
+.edcc-intro {
+  font-size: 8pt; line-height: 1.6; color: #525355; margin: 8pt 0 14pt;
+}
+.edcc-visual { display: flex; justify-content: center; }
+.edcc-visual img { width: 492pt; object-fit: contain; }
+.edcc-visual.panels { margin-top: 10pt; }
+.edcc-features {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16pt 26pt; margin-top: 22pt;
+}
+.edcc-feature { border-left: 2pt solid ${BLUE}; padding-left: 8pt; }
+.edcc-feature-title {
+  font-size: 10pt; font-weight: 400; color: #231f20; margin-bottom: 3pt;
+}
+.edcc-feature-text { font-size: 7.5pt; line-height: 1.5; color: #525355; }
 
 /* ── Technical specifications ─────────────────────────────────────── */
 .specs-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; }
@@ -305,9 +373,15 @@ body {
 .hw-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; }
 .hw-title-row { padding: 22pt 0 4pt; }
 .hw-subtitle { font-size: 10.5pt; color: #231f20; font-weight: 400; margin-bottom: 10pt; }
-.hw-images { display: flex; flex-direction: column; align-items: center; gap: 18pt; }
-.hw-images img { max-width: 500pt; max-height: 250pt; object-fit: contain; }
-.hw-images.single img { max-height: 380pt; }
+/* Two renders share the page evenly (one per half) rather than stacking
+   at the top; a single render centres in the whole area. */
+.hw-images {
+  display: flex; flex-direction: column; align-items: center;
+  height: 596pt; justify-content: space-around;
+}
+.hw-images img { max-width: 500pt; max-height: 270pt; object-fit: contain; }
+.hw-images.single { justify-content: center; }
+.hw-images.single img { max-height: 400pt; }
 .hw-ph { width: 440pt; height: 220pt; }
 
 /* ── Footer (last page) ────────────────────────────────────────────── */
@@ -338,21 +412,25 @@ body {
         </div>
         <div className="hero">
           <div className="hero-headline">{product.headline || product.full_name}</div>
-          <div className="hero-model">{product.model_name}</div>
-          <div className="hero-overview">{product.overview}</div>
-          <div className="hero-product-box">
-            {productImage ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img src={productImage} alt={product.model_name} />
-            ) : (
-              <Placeholder slot={`${product.model_name}_product.png`} className="hero-product-ph" />
-            )}
+          <div className="hero-lower">
+            <div className="hero-copy">
+              <div className="hero-model">{product.model_name}</div>
+              <div className="hero-overview">{product.overview}</div>
+            </div>
+            <div className="hero-product-box">
+              {productImage ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={productImage} alt={product.model_name} />
+              ) : (
+                <Placeholder slot={`${product.model_name}_product.png`} className="hero-product-ph" />
+              )}
+            </div>
           </div>
         </div>
 
         {useGroups ? (
           <div className="cover-features">
-            {dsGroups.slice(0, 6).map((g, gi) => {
+            {dsGroups.slice(0, 8).map((g, gi) => {
               const [chip, ...rest] = g.title.split("|");
               const boldTitle = rest.length > 0 ? rest.join("|").trim() : "";
               return (
@@ -386,8 +464,26 @@ body {
       <div className="page">
         <div className="top-bar" />
         <div className="edcc-page">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/datacenter/edcc-page.png" alt="EnGenius Data Center Controller" />
+          <span className="section-title">
+            EnGenius Data Center Controller Centralized Management
+          </span>
+          <div className="edcc-intro">{EDCC_INTRO}</div>
+          <div className="edcc-visual">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/datacenter/edcc-dashboard.png" alt="EDCC dashboard" />
+          </div>
+          <div className="edcc-visual panels">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/datacenter/edcc-panels.png" alt="EDCC node and POD views" />
+          </div>
+          <div className="edcc-features">
+            {EDCC_FEATURES.map((f) => (
+              <div key={f.title} className="edcc-feature">
+                <div className="edcc-feature-title">{f.title}</div>
+                <div className="edcc-feature-text">{f.text}</div>
+              </div>
+            ))}
+          </div>
         </div>
         <div className="page-number">{pad(2)}</div>
       </div>
