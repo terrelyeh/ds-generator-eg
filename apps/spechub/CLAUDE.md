@@ -288,6 +288,22 @@ npm run lint
 53. **新產品線設定容易把 `drive_folder_id` 跟 `ds_images_folder_id` 填反** — drive_folder_id
     是「產品線」資料夾、ds_images_folder_id 是裡面的「DS Images」子資料夾。設定時跟 PM 確認層級。
 
+59. **locale 的「可否生成」與「版號」都不能掉回英文**（2026-07-23 ECW260 ja 事件）——
+    preview 渲染的是 locale 解析後的內容（`localeHardwareImage || EN`、翻譯後 overview/
+    features），但 `canGenerate` 當時檢查英文欄位，導致「日文版齊全但英文硬體圖缺」的
+    ECW260 永遠無法生成。**gate 一定要跟 render 讀同一組值**。同一支也踩到:
+    ① transceiver 本來就沒有 hardware image，gate 要比照 product-detail 豁免;
+    ② `version` 掉回 `product.current_version` 會讓沒產過的 ja 顯示「Regenerate v1.1」——
+    locale 版號互相獨立，沒有就是 `0.0`（toolbar 的 never-generated sentinel）。
+    另注意 **Model page 的 🌐 語言選單走另一條路徑（只 gate `confirmed`）**，所以會出現
+    「preview 擋、Model page 可生成」的不一致。
+
+60. **`products.product_image` / `hardware_image` 是 `NOT NULL DEFAULT ''`** —— sync 的
+    「Drive 檔案已刪 → 清空 DB」分支曾寫入 `null`，觸發 23502 但 supabase-js 只回
+    `{error}` 不 throw（pitfall #45 同源），整句 update 靜默失效 —— 連同一句裡的
+    `sheet_last_modified/editor` 也一起沒寫進去。要清空請寫 `""`。
+    推論法則：**空字串 = 從沒填過**（欄位 default），不是「被清掉」。
+
 ## 詳細文件
 
 - [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md) — 拆分藍圖（歸屬/階段/驗收/回滾）
