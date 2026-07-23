@@ -303,6 +303,24 @@ npm run lint
     `{error}` 不 throw（pitfall #45 同源），整句 update 靜默失效 —— 連同一句裡的
     `sheet_last_modified/editor` 也一起沒寫進去。要清空請寫 `""`。
     推論法則：**空字串 = 從沒填過**（欄位 default），不是「被清掉」。
+    （2026-07-24 補：`/api/upload-image` 的 DELETE 也踩同一坑 —— 刪圖時 Storage/Drive
+    有刪、DB 沒清，等於「刪除圖片」功能一直半殘。已一併改成寫 `""`；
+    `product_translations.hardware_image` 本身 nullable，那裡維持 `null` 才對。）
+
+61. **「依 category 而異」的判斷不要各元件各寫一份** — 同一個特性散在
+    preview/[model]、product-detail、dashboard-content 三處，結果 Data Center 上線後
+    ① 內頁 QR 卡片只認 `isTransceiver`，DC 線落到 `qr.engenius.ai/qsg/{model}`（不存在的頁），
+    但 datasheet 印的是 Contact Us —— **兩個畫面對同一台機器講不同的話**；
+    ② dashboard 的 `isAP` 用 **`category.toLowerCase().includes("ap")`**，
+    `"Edge Network Appliances"` 的 **Appli-ap-ances** 命中 → 長出 Radio Pattern 欄位
+    （另外兩處都是 `=== "APs"`）。**子字串比對 category 是地雷，一律精確比對**。
+    現已集中在 **`lib/datasheet/qr.ts`**（`usesContactUsQr` / `usesTwoHardwareImages`），
+    新增這類特性請加在那裡，不要在元件內就地判斷。
+
+62. **`(main)` 群組的頁面 headless 驗不了** — dashboard / product 內頁受白名單 gate
+    （`(main)/layout.tsx` 的 `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過
+    proxy、仍會 307 到 `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。
+    所以動到 dashboard/內頁時：typecheck+build 之外，要推 branch preview 請使用者點過再 merge。
 
 ## 詳細文件
 
