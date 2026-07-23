@@ -22,6 +22,7 @@ import {
 import { Columns2, History, Languages, Swords } from "lucide-react";
 import type { ProductLine } from "@eg/db/types";
 import { can, type Role } from "@eg/auth/permissions";
+import { usesTwoHardwareImages } from "@/lib/datasheet/qr";
 
 interface ProductSummary {
   id: string;
@@ -33,6 +34,7 @@ interface ProductSummary {
   status: string;
   has_product_image: boolean;
   has_hardware_image: boolean;
+  has_hardware_image_2: boolean;
   has_overview: boolean;
   has_features: boolean;
   has_specs: boolean;
@@ -165,6 +167,9 @@ function ProductTable({
   // Transceivers: one product image (no hardware), and the "Model Name" field
   // is really a description.
   const isTransceiver = lineCategory === "Transceivers";
+  // Data Center lines print two hardware renders (front + rear), so the
+  // readiness row needs a column for each.
+  const twoHardware = usesTwoHardwareImages(lineCategory);
 
   return (
     <Table>
@@ -180,7 +185,10 @@ function ProductTable({
           <TableHead className="w-14 text-center">FT</TableHead>
           <TableHead className="w-14 text-center">SP</TableHead>
           <TableHead className="w-14 text-center">Prod</TableHead>
-          {!isTransceiver && <TableHead className="w-14 text-center">HW</TableHead>}
+          {!isTransceiver && (
+            <TableHead className="w-14 text-center">{twoHardware ? "HW1" : "HW"}</TableHead>
+          )}
+          {twoHardware && <TableHead className="w-14 text-center">HW2</TableHead>}
           {isAP && (
             <TableHead className="w-24 text-center">
               Radio Pattern
@@ -285,6 +293,11 @@ function ProductTable({
             {!isTransceiver && (
               <TableCell className="text-center">
                 <ImgStatus ok={product.has_hardware_image} />
+              </TableCell>
+            )}
+            {twoHardware && (
+              <TableCell className="text-center">
+                <ImgStatus ok={product.has_hardware_image_2} />
               </TableCell>
             )}
             {isAP && (

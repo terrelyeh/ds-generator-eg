@@ -19,6 +19,7 @@ import {
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
 import { can, type Role } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
+import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/datasheet/qr";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
 
@@ -370,7 +371,7 @@ function ImageUploadButton({
   onUploaded,
 }: {
   modelName: string;
-  imageType: "product" | "hardware";
+  imageType: "product" | "hardware" | "hardware_2";
   currentUrl: string;
   onUploaded: () => void;
 }) {
@@ -446,7 +447,12 @@ function ImageUploadButton({
     }
   }
 
-  const label = imageType === "product" ? "Product Image" : "Hardware Image";
+  const label =
+    imageType === "product"
+      ? "Product Image"
+      : imageType === "hardware"
+        ? "Hardware Image"
+        : "Hardware Image 2";
   const hasImage = currentUrl && !currentUrl.startsWith("cache/");
 
   return (
@@ -710,22 +716,20 @@ function RadioPatternSlot({
 function QsgUrlCard({
   modelName,
   lineTemplate,
-  isTransceiver = false,
+  contactOnly = false,
 }: {
   modelName: string;
   lineTemplate: string | null;
-  isTransceiver?: boolean;
+  /** Line has no QSG (transceivers, Data Center) — QR points to Contact Us. */
+  contactOnly?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
-  // Transceivers have no QSG — the QR points to Contact Us.
-  const fallback = isTransceiver
-    ? "https://www.engeniustech.com/contact-us"
-    : "https://qr.engenius.ai/qsg/{model}";
+  const fallback = contactOnly ? CONTACT_US_URL : "https://qr.engenius.ai/qsg/{model}";
   const template = lineTemplate || fallback;
   const url = template.replace("{model}", modelName.toLowerCase());
   const source = lineTemplate
     ? "Per-line template"
-    : isTransceiver
+    : contactOnly
       ? "Contact Us (no QSG)"
       : "Default short URL";
 
@@ -743,7 +747,7 @@ function QsgUrlCard({
     <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
-          {isTransceiver ? "Contact URL" : "QSG URL"}
+          {contactOnly ? "Contact URL" : "QSG URL"}
           <span className="text-[11px] font-normal text-muted-foreground">
             (printed as QR code on the datasheet)
           </span>
@@ -918,8 +922,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   // Transceivers have a single product image and no hardware image — the
   // hardware slot is hidden and not required for PDF generation.
   const isTransceiver = product.product_line.category === "Transceivers";
+  // Category-driven datasheet traits, shared with the preview components so
+  // this page can't advertise a different QR than the datasheet prints.
+  const contactOnlyQr = usesContactUsQr(product.product_line.category);
+  const hasTwoHardwareImages = usesTwoHardwareImages(product.product_line.category);
   const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
   const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
+  const productExt = product as typeof product & { hardware_image_2?: string | null };
+  const hasHardwareImage2 =
+    !!productExt.hardware_image_2 && !productExt.hardware_image_2.startsWith("cache/");
   const hasOverview = !!product.overview && product.overview.trim().length > 0;
   const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
   const hasSpecs = product.spec_sections.length > 0;
@@ -1418,6 +1429,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                 onUploaded={() => router.refresh()}
               />
             )}
+            {/* Data Center lines print two hardware renders (front + rear). */}
+            {hasTwoHardwareImages && (
+              <ImageUploadButton
+                modelName={product.model_name}
+                imageType="hardware_2"
+                currentUrl={productExt.hardware_image_2 ?? ""}
+                onUploaded={() => router.refresh()}
+              />
+            )}
           </div>
 
           {/* Radio Pattern placeholders (AP only) */}
@@ -1469,7 +1489,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         <QsgUrlCard
           modelName={product.model_name}
           lineTemplate={(product.product_line as { qr_url_template?: string | null }).qr_url_template ?? null}
-          isTransceiver={isTransceiver}
+          contactOnly={contactOnlyQr}
         />
       )}
 

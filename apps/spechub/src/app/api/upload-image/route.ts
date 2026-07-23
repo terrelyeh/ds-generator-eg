@@ -44,9 +44,9 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!["product", "hardware", "radio_pattern"].includes(imageType)) {
+  if (!["product", "hardware", "hardware_2", "radio_pattern"].includes(imageType)) {
     return NextResponse.json(
-      { error: "type must be 'product', 'hardware', or 'radio_pattern'" },
+      { error: "type must be 'product', 'hardware', 'hardware_2', or 'radio_pattern'" },
       { status: 400 }
     );
   }
@@ -133,8 +133,13 @@ export async function POST(request: Request) {
   // product_translations.hardware_image via /api/translations/product.
   // Writing to products here would silently overwrite the English URL
   // whenever a translator uploads a locale-specific hardware image.
-  if (!locale && (imageType === "product" || imageType === "hardware")) {
-    const field = imageType === "product" ? "product_image" : "hardware_image";
+  if (!locale && ["product", "hardware", "hardware_2"].includes(imageType)) {
+    const field =
+      imageType === "product"
+        ? "product_image"
+        : imageType === "hardware"
+          ? "hardware_image"
+          : "hardware_image_2";
     await supabase
       .from("products")
       .update({ [field]: publicUrl })
@@ -234,9 +239,9 @@ export async function DELETE(request: Request) {
       { status: 400 },
     );
   }
-  if (!["product", "hardware", "radio_pattern"].includes(imageType)) {
+  if (!["product", "hardware", "hardware_2", "radio_pattern"].includes(imageType)) {
     return NextResponse.json(
-      { error: "type must be 'product', 'hardware', or 'radio_pattern'" },
+      { error: "type must be 'product', 'hardware', 'hardware_2', or 'radio_pattern'" },
       { status: 400 },
     );
   }
@@ -326,13 +331,17 @@ export async function DELETE(request: Request) {
     }
   }
 
-  // 3. Clear DB field
+  // 3. Clear DB field.
+  // products.{product,hardware,hardware_2}_image are NOT NULL DEFAULT '' —
+  // writing null there raises 23502, which supabase-js RETURNS rather than
+  // throws, so the clear silently did nothing (pitfall #60). Write "".
+  // product_translations.hardware_image IS nullable, so null is right there.
   if (imageType === "product") {
     await supabase
       .from("products")
-      .update({ product_image: null })
+      .update({ product_image: "" })
       .eq("id", product.id);
-  } else if (imageType === "hardware") {
+  } else if (imageType === "hardware" || imageType === "hardware_2") {
     if (locale) {
       // Clear product_translations.hardware_image for this locale only
       await supabase
@@ -343,7 +352,9 @@ export async function DELETE(request: Request) {
     } else {
       await supabase
         .from("products")
-        .update({ hardware_image: null })
+        .update(
+          imageType === "hardware" ? { hardware_image: "" } : { hardware_image_2: "" },
+        )
         .eq("id", product.id);
     }
   } else if (imageType === "radio_pattern" && label) {

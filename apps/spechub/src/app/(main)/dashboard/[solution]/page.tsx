@@ -24,6 +24,7 @@ interface ProductRow {
   features: string[];
   product_image: string;
   hardware_image: string;
+  hardware_image_2: string;
   updated_at: string;
   product_line_id: string;
   product_lines: { name: string; label: string; category: string };
@@ -128,6 +129,7 @@ export default async function SolutionDashboardPage({
         features,
         product_image,
         hardware_image,
+        hardware_image_2,
         updated_at,
         product_line_id,
         layout_ack,
@@ -282,6 +284,8 @@ export default async function SolutionDashboardPage({
       !!p.product_image && !p.product_image.startsWith("cache/");
     const hasHardwareImage =
       !!p.hardware_image && !p.hardware_image.startsWith("cache/");
+    const hasHardwareImage2 =
+      !!p.hardware_image_2 && !p.hardware_image_2.startsWith("cache/");
 
     // Layout overflow pre-check (uses conservative heuristics — see
     // lib/datasheet/layout-check.ts). Surfaces as a colored badge so the
@@ -403,6 +407,7 @@ export default async function SolutionDashboardPage({
       has_specs: (specCountMap.get(p.id) || 0) > 0,
       has_product_image: hasProductImage,
       has_hardware_image: hasHardwareImage,
+      has_hardware_image_2: hasHardwareImage2,
       radio_patterns: radioPatterns,
       last_content_changed: latestChange?.edited_at ?? null,
       last_change_by: latestChange?.edited_by ?? null,
