@@ -257,13 +257,17 @@ export async function POST(request: Request) {
               if (imgResult.product_image_url) {
                 updateFields.product_image = imgResult.product_image_url;
               } else if (imgResult.folder_listed && existing.product_image) {
-                // Drive confirmed the file no longer exists → clear DB
-                updateFields.product_image = null;
+                // Drive confirmed the file no longer exists → clear DB.
+                // The column is NOT NULL DEFAULT '' — writing null threw a
+                // 23502 that supabase-js returns rather than raises, so the
+                // whole update (including the sheet metadata above) was
+                // silently dropped and stale images never cleared.
+                updateFields.product_image = "";
               }
               if (imgResult.hardware_image_url) {
                 updateFields.hardware_image = imgResult.hardware_image_url;
               } else if (imgResult.folder_listed && existing.hardware_image) {
-                updateFields.hardware_image = null;
+                updateFields.hardware_image = "";
               }
             } catch { /* image sync failure is non-fatal */ }
 
@@ -339,16 +343,17 @@ export async function POST(request: Request) {
               } : undefined,
               force: forceSync,
             });
-            const imageUpdate: Record<string, string | null> = {};
+            // "" (not null) — the columns are NOT NULL DEFAULT ''.
+            const imageUpdate: Record<string, string> = {};
             if (images.product_image_url) {
               imageUpdate.product_image = images.product_image_url;
             } else if (images.folder_listed && existing?.product_image) {
-              imageUpdate.product_image = null;
+              imageUpdate.product_image = "";
             }
             if (images.hardware_image_url) {
               imageUpdate.hardware_image = images.hardware_image_url;
             } else if (images.folder_listed && existing?.hardware_image) {
-              imageUpdate.hardware_image = null;
+              imageUpdate.hardware_image = "";
             }
             if (Object.keys(imageUpdate).length > 0) {
               await supabase

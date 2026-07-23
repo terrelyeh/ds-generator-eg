@@ -247,6 +247,9 @@ export default async function PreviewPage({
   const features = (isTranslated && translatedFeatures) ? translatedFeatures : (product.features ?? []);
   const headline = (isTranslated && translatedHeadline) ? translatedHeadline : (product.headline || product.full_name);
   const subtitle = (isTranslated && translatedSubtitle) ? translatedSubtitle : product.subtitle;
+  // The hardware page prefers the locale's own render and falls back to EN.
+  // Named here so the readiness gate below can check the SAME value.
+  const effectiveHardwareImage = localeHardwareImage || product.hardware_image;
   // Height-balanced feature columns — previously split at ceil(n/2) which
   // gave visual imbalance when some items wrapped to 3+ lines while others
   // were short (ECW560 had left-col 90pt taller than right). Now each item
@@ -267,7 +270,15 @@ export default async function PreviewPage({
   // correct version being generated, rather than the stale DB value which
   // hasn't been updated yet at render time.
   const currentVersions = product.current_versions as Record<string, string> | null;
-  const version = versionOverride || currentVersions?.[lang] || product.current_version || "1.0";
+  // Locale versions are INDEPENDENT of English. Falling through to
+  // product.current_version made a never-generated ja preview claim the EN
+  // version, so the toolbar offered "Regenerate v1.1" for a PDF that had
+  // never existed. "0.0" is the never-generated sentinel the toolbar reads.
+  const version =
+    versionOverride ||
+    currentVersions?.[lang] ||
+    (isTranslated ? "0.0" : product.current_version) ||
+    "1.0";
   const today = new Date().toLocaleDateString(dict.dateLocale, {
     month: "2-digit",
     day: "2-digit",
@@ -367,10 +378,18 @@ export default async function PreviewPage({
           model={product.model_name}
           currentVersion={version}
           canGenerate={
+            // Readiness must match what this page ACTUALLY renders, i.e. the
+            // locale-resolved content — otherwise a complete ja/zh datasheet
+            // is blocked by gaps in the English record it never uses.
+            // (ECW260 ja: own ja hardware image + confirmed translation, but
+            // no ECW260_hardware.png in the EN folder → wrongly blocked.)
+            // Transceivers legitimately have no hardware image at all — same
+            // exemption product-detail.tsx already makes.
             !!product.product_image && !product.product_image.startsWith("cache/") &&
-            !!product.hardware_image && !product.hardware_image.startsWith("cache/") &&
-            !!product.overview && product.overview.trim().length > 0 &&
-            Array.isArray(product.features) && product.features.length > 0
+            (isTransceiver ||
+              (!!effectiveHardwareImage && !effectiveHardwareImage.startsWith("cache/"))) &&
+            !!overview && overview.trim().length > 0 &&
+            features.length > 0
           }
           locale={lang}
           userRole={userRole}
@@ -944,10 +963,10 @@ ${typo ? `
         <div className="top-bar" />
         <div className="hardware-page">
           <div className="hardware-title">{dict.hardwareOverview}</div>
-          {(localeHardwareImage || product.hardware_image) && (
+          {effectiveHardwareImage && (
             <div className="hardware-image-container">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={localeHardwareImage || product.hardware_image} alt="Hardware Overview" />
+              <img src={effectiveHardwareImage} alt="Hardware Overview" />
             </div>
           )}
         </div>
