@@ -358,6 +358,8 @@ export async function uploadImageToDrive(
 export interface ImageSyncResult {
   product_image_url: string | null;
   hardware_image_url: string | null;
+  /** Optional second hardware render ({model}_hardware_2.*) — DC lines. */
+  hardware_image_2_url: string | null;
   /**
    * True when the Drive folder was successfully listed, so the caller can
    * trust `null` fields to mean "the file is not in Drive" (and therefore
@@ -428,6 +430,7 @@ export interface ImageSyncOptions {
   existingImages?: {
     product_image?: string;
     hardware_image?: string;
+    hardware_image_2?: string;
   };
   /**
    * Force re-download even when Drive modifiedTime <= Storage last-modified.
@@ -581,6 +584,7 @@ export async function syncProductImages(
   const result: ImageSyncResult = {
     product_image_url: null,
     hardware_image_url: null,
+    hardware_image_2_url: null,
     folder_listed: false,
   };
 
@@ -598,6 +602,8 @@ export async function syncProductImages(
   const imageTypes = [
     { suffix: "product", key: "product_image_url" as const, dbField: "product_image" as const },
     { suffix: "hardware", key: "hardware_image_url" as const, dbField: "hardware_image" as const },
+    // Optional second hardware render (e.g. rear view) — Data Center lines.
+    { suffix: "hardware_2", key: "hardware_image_2_url" as const, dbField: "hardware_image_2" as const },
   ];
 
   for (const { suffix, key, dbField } of imageTypes) {

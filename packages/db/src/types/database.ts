@@ -84,6 +84,8 @@ export interface Database {
           ds_features: { title: string; bullets: string[] }[] | null;
           product_image: string;
           hardware_image: string;
+          /** Optional second hardware render ('' = none) — DC lines. */
+          hardware_image_2: string;
           current_version: string;
           current_versions: Record<string, string>;
           status: string;
@@ -106,7 +108,7 @@ export interface Database {
           Partial<
             Pick<
               Database["public"]["Tables"]["products"]["Row"],
-              "id" | "created_at" | "updated_at" | "subtitle" | "full_name" | "headline" | "overview" | "features" | "ds_features" | "product_image" | "hardware_image" | "current_version" | "sheet_last_modified" | "sheet_last_editor"
+              "id" | "created_at" | "updated_at" | "subtitle" | "full_name" | "headline" | "overview" | "features" | "ds_features" | "product_image" | "hardware_image" | "hardware_image_2" | "current_version" | "sheet_last_modified" | "sheet_last_editor"
             >
           >;
         Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;

@@ -6,6 +6,7 @@ import { getDict } from "@/lib/datasheet/locales";
 import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
+import { DataCenterPreview } from "./datacenter-preview";
 import type {
   Product,
   ProductLine,
@@ -20,6 +21,8 @@ interface ProductQueryRow extends Product {
   image_assets: ImageAsset[];
 }
 
+/** Data Center lines render via the dedicated navy layout component. */
+const DC_CATEGORIES = new Set(["Edge Network Appliances", "AI Servers"]);
 /** Non-cloud product lines use gray theme instead of blue */
 const NON_CLOUD_CATEGORIES = new Set(["Unmanaged Switches", "Extenders"]);
 /** Accessories ▸ Transceiver datasheets use a green theme (matches template) */
@@ -118,6 +121,21 @@ export default async function PreviewPage({
 
   const product = data as ProductQueryRow | null;
   if (!product) notFound();
+
+  // Data Center lines use a structurally different navy layout (hero cover,
+  // shared EDCC page, full-width spec table) — rendered by a dedicated
+  // component instead of threading more variants through this page.
+  // Same URL, so generate-pdf / product page links stay unchanged. EN-only.
+  if (DC_CATEGORIES.has(product.product_lines.category)) {
+    return (
+      <DataCenterPreview
+        product={product}
+        showToolbar={showToolbar}
+        userRole={userRole}
+        versionOverride={versionOverride ?? null}
+      />
+    );
+  }
 
   // --- Load translations if non-English ---
   let translatedOverview: string | null = null;

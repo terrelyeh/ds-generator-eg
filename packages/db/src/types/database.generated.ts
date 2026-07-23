@@ -753,6 +753,7 @@ export type Database = {
           ds_features: Json | null
           full_name: string
           hardware_image: string
+          hardware_image_2: string
           headline: string
           id: string
           layout_ack: Json
@@ -774,6 +775,7 @@ export type Database = {
           ds_features?: Json | null
           full_name?: string
           hardware_image?: string
+          hardware_image_2?: string
           headline?: string
           id?: string
           layout_ack?: Json
@@ -795,6 +797,7 @@ export type Database = {
           ds_features?: Json | null
           full_name?: string
           hardware_image?: string
+          hardware_image_2?: string
           headline?: string
           id?: string
           layout_ack?: Json

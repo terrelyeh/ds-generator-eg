@@ -147,7 +147,7 @@ export async function POST(request: Request) {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
             .from("products")
-            .select("id, subtitle, full_name, headline, overview, features, ds_features, status, product_image, hardware_image, current_versions")
+            .select("id, subtitle, full_name, headline, overview, features, ds_features, status, product_image, hardware_image, hardware_image_2, current_versions")
             .eq("model_name", modelName)
             .single();
 
@@ -261,6 +261,7 @@ export async function POST(request: Request) {
                 existingImages: {
                   product_image: existing.product_image || undefined,
                   hardware_image: existing.hardware_image || undefined,
+                  hardware_image_2: existing.hardware_image_2 || undefined,
                 },
                 force: forceSync,
               });
@@ -278,6 +279,11 @@ export async function POST(request: Request) {
                 updateFields.hardware_image = imgResult.hardware_image_url;
               } else if (imgResult.folder_listed && existing.hardware_image) {
                 updateFields.hardware_image = "";
+              }
+              if (imgResult.hardware_image_2_url) {
+                updateFields.hardware_image_2 = imgResult.hardware_image_2_url;
+              } else if (imgResult.folder_listed && existing.hardware_image_2) {
+                updateFields.hardware_image_2 = "";
               }
             } catch { /* image sync failure is non-fatal */ }
 
@@ -351,6 +357,7 @@ export async function POST(request: Request) {
               existingImages: existing ? {
                 product_image: existing.product_image || undefined,
                 hardware_image: existing.hardware_image || undefined,
+                hardware_image_2: existing.hardware_image_2 || undefined,
               } : undefined,
               force: forceSync,
             });
@@ -365,6 +372,11 @@ export async function POST(request: Request) {
               imageUpdate.hardware_image = images.hardware_image_url;
             } else if (images.folder_listed && existing?.hardware_image) {
               imageUpdate.hardware_image = "";
+            }
+            if (images.hardware_image_2_url) {
+              imageUpdate.hardware_image_2 = images.hardware_image_2_url;
+            } else if (images.folder_listed && existing?.hardware_image_2) {
+              imageUpdate.hardware_image_2 = "";
             }
             if (Object.keys(imageUpdate).length > 0) {
               await supabase
