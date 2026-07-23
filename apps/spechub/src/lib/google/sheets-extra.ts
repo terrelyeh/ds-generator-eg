@@ -349,3 +349,50 @@ export async function loadCloudComparison(
 
   return results;
 }
+
+// ---------------------------------------------------------------------------
+// Grouped datasheet features ("DS Feature Groups" row — DC navy layout)
+// NOTE: identical helper exists on feat/edge-ai-box (series datasheets);
+// keep implementations in sync when the branches merge.
+// ---------------------------------------------------------------------------
+
+export interface SeriesFeatureGroup {
+  /** Group title, e.g. "Performance | Efficient Edge Compute" —
+   *  "Chip | Bold Title" split happens at render time. */
+  title: string;
+  bullets: string[];
+}
+
+/**
+ * Parse a grouped-features cell. Contract: a line ending with ":" starts a
+ * group; lines starting with a bullet marker ("-", "•", "*", "–") are
+ * bullets of the current group. A plain line with no open group starts a
+ * group of its own (tolerant); other plain lines continue the previous
+ * bullet (soft wrap).
+ */
+export function parseFeatureGroups(text: string): SeriesFeatureGroup[] {
+  const groups: SeriesFeatureGroup[] = [];
+  for (const rawLine of text.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) continue;
+    const bulletMatch = line.match(/^[-•*–]\s*(.*)$/);
+    if (bulletMatch) {
+      const bullet = bulletMatch[1].trim();
+      if (!bullet) continue;
+      if (groups.length === 0) groups.push({ title: "", bullets: [] });
+      groups[groups.length - 1].bullets.push(bullet);
+    } else if (line.endsWith(":")) {
+      groups.push({ title: line.slice(0, -1).trim(), bullets: [] });
+    } else if (groups.length === 0) {
+      groups.push({ title: line, bullets: [] });
+    } else {
+      const g = groups[groups.length - 1];
+      if (g.bullets.length > 0) {
+        g.bullets[g.bullets.length - 1] += ` ${line}`;
+      } else {
+        groups.push({ title: line, bullets: [] });
+      }
+    }
+  }
+  return groups;
+}

@@ -147,7 +147,7 @@ export async function POST(request: Request) {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
             .from("products")
-            .select("id, subtitle, full_name, headline, overview, features, status, product_image, hardware_image, current_versions")
+            .select("id, subtitle, full_name, headline, overview, features, ds_features, status, product_image, hardware_image, current_versions")
             .eq("model_name", modelName)
             .single();
 
@@ -183,6 +183,16 @@ export async function POST(request: Request) {
                 details.push({ field: "Feature", from: null, to: f, type: "added" });
               for (const f of oldF.filter((x) => !newF.includes(x)))
                 details.push({ field: "Feature", from: f, to: null, type: "removed" });
+            }
+
+            // DS Feature Groups diff (coarse — content lives in one cell).
+            // Without this, edits that ONLY touch the "DS Feature Groups"
+            // row would be invisible to hasChanges and never reach the DB.
+            if (
+              JSON.stringify(existing.ds_features ?? null) !==
+              JSON.stringify(sheetData.ds_features ?? null)
+            ) {
+              details.push({ field: "DS Feature Groups", from: "(previous)", to: "(updated)", type: "modified" });
             }
 
             // Spec-level diff
@@ -313,6 +323,7 @@ export async function POST(request: Request) {
                 headline: sheetData.headline,
                 overview: sheetData.overview,
                 features: sheetData.features,
+                ds_features: sheetData.ds_features,
                 status: sheetData.status,
                 sheet_last_modified: metadata.last_modified,
                 sheet_last_editor: metadata.last_editor,

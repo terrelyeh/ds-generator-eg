@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import { getGoogleAuth } from "./auth";
+import { parseFeatureGroups, type SeriesFeatureGroup } from "./sheets-extra";
 
 /**
  * Category detection rule (pattern-based, no hardcoded list):
@@ -36,6 +37,10 @@ export interface SheetProduct {
   headline: string;
   features: string[];
   status: string;
+  /** From the optional "DS Feature Groups" row — grouped marketing features
+   *  for chip-style datasheet covers (DC navy layout). null when the sheet
+   *  has no such row; the layout then falls back to flat `features`. */
+  ds_features: SeriesFeatureGroup[] | null;
   spec_sections: SheetSpecSection[];
 }
 
@@ -295,11 +300,12 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
 function parseOverviewData(
   rows: unknown[][],
   colIdx: number
-): { full_name: string; headline: string; overview: string; features: string[]; status: string } {
+): { full_name: string; headline: string; overview: string; features: string[]; status: string; ds_features: SeriesFeatureGroup[] | null } {
   let full_name = "";
   let headline = "";
   let overview = "";
   let status = "active";
+  let ds_features: SeriesFeatureGroup[] | null = null;
   const features: string[] = [];
 
   // Build label → row index map
@@ -364,9 +370,12 @@ function parseOverviewData(
   }
 
   // Features — single cell with newline-separated entries
-  // Supports both "* Feature text" (bullet prefix) and plain lines
+  // Supports both "* Feature text" (bullet prefix) and plain lines.
+  // NOTE: the exact label is "Key Feature Lists"; the guard below skips the
+  // OPTIONAL "DS Feature Groups" row, which is parsed separately.
   for (const row of rows) {
     const label = String(row?.[0] ?? "").trim();
+    if (label.includes("DS Feature")) continue;
     if (label.includes("Key Feature Lists") || label.includes("Key Feature")) {
       const cellValue = getCell(row, colIdx);
       if (cellValue) {
@@ -382,7 +391,22 @@ function parseOverviewData(
     }
   }
 
-  return { full_name, headline, overview, features, status };
+  // DS Feature Groups — optional grouped marketing features for chip-style
+  // datasheet covers ("Chip | Bold Title:" + "- description" lines). The
+  // website-facing "Key Feature Lists" row above stays untouched.
+  for (const row of rows) {
+    const label = String(row?.[0] ?? "").trim();
+    if (label === "DS Feature Groups") {
+      const cellValue = getCell(row, colIdx);
+      if (cellValue) {
+        const groups = parseFeatureGroups(cellValue);
+        if (groups.length > 0) ds_features = groups;
+      }
+      break;
+    }
+  }
+
+  return { full_name, headline, overview, features, status, ds_features };
 }
 
 // ---------------------------------------------------------------------------
@@ -502,7 +526,7 @@ export async function loadProductFromSheets(
   const spec_sections = parseSpecSections(detailRows, detailCol);
 
   // Parse overview
-  let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active" };
+  let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active", ds_features: null as import("./sheets-extra").SeriesFeatureGroup[] | null };
   if (overviewCol !== null) {
     overviewData = parseOverviewData(overviewRows, overviewCol);
   }
@@ -515,6 +539,7 @@ export async function loadProductFromSheets(
     overview: overviewData.overview,
     features: overviewData.features,
     status: overviewData.status,
+    ds_features: overviewData.ds_features,
     spec_sections,
   };
 }
@@ -614,7 +639,7 @@ export async function loadAllProductsFromSheet(
 
     // Parse overview from cached overview data
     const overviewCol = findModelColumn(overviewRows, modelNum);
-    let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active" };
+    let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active", ds_features: null as import("./sheets-extra").SeriesFeatureGroup[] | null };
     if (overviewCol !== null) {
       overviewData = parseOverviewData(overviewRows, overviewCol);
     }
@@ -627,6 +652,7 @@ export async function loadAllProductsFromSheet(
       overview: overviewData.overview,
       features: overviewData.features,
       status: overviewData.status,
+      ds_features: overviewData.ds_features,
       spec_sections,
     });
   }

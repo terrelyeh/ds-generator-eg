@@ -78,6 +78,10 @@ export interface Database {
           headline: string;
           overview: string;
           features: string[];
+          /** Optional grouped datasheet features (from the "DS Feature
+           *  Groups" sheet row) — [{title, bullets[]}]; null = use flat
+           *  `features`. First consumer: Data Center navy layout. */
+          ds_features: { title: string; bullets: string[] }[] | null;
           product_image: string;
           hardware_image: string;
           current_version: string;
@@ -102,7 +106,7 @@ export interface Database {
           Partial<
             Pick<
               Database["public"]["Tables"]["products"]["Row"],
-              "id" | "created_at" | "updated_at" | "subtitle" | "full_name" | "headline" | "overview" | "features" | "product_image" | "hardware_image" | "current_version" | "sheet_last_modified" | "sheet_last_editor"
+              "id" | "created_at" | "updated_at" | "subtitle" | "full_name" | "headline" | "overview" | "features" | "ds_features" | "product_image" | "hardware_image" | "current_version" | "sheet_last_modified" | "sheet_last_editor"
             >
           >;
         Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;

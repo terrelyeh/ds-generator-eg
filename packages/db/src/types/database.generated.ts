@@ -750,6 +750,7 @@ export type Database = {
           current_version: string
           current_versions: Json
           features: string[]
+          ds_features: Json | null
           full_name: string
           hardware_image: string
           headline: string
@@ -770,6 +771,7 @@ export type Database = {
           current_version?: string
           current_versions?: Json
           features?: string[]
+          ds_features?: Json | null
           full_name?: string
           hardware_image?: string
           headline?: string
@@ -790,6 +792,7 @@ export type Database = {
           current_version?: string
           current_versions?: Json
           features?: string[]
+          ds_features?: Json | null
           full_name?: string
           hardware_image?: string
           headline?: string
