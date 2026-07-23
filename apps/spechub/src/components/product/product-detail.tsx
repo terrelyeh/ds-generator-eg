@@ -20,6 +20,7 @@ import { ProductTranslationEditor } from "@/components/translations/product-tran
 import { can, type Role } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/datasheet/qr";
+import { radioPatternSlots, hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
 
@@ -893,31 +894,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const currentVer = product.current_version || "0.0";
   const hasExistingVersion = currentVer !== "0.0";
 
-  const isAP = product.product_line.category === "APs";
-
-  // Determine which radio pattern slots to show for AP products
-  // Check "Operating Frequency" spec for 6GHz support
-  const has6G = isAP && product.spec_sections.some((s) =>
-    s.items.some(
-      (i) =>
-        i.label.toLowerCase().includes("operating frequency") &&
-        /6\s*GHz/i.test(i.value)
-    )
-  );
-  const radioPatternSlots = isAP
-    ? [
-        { band: "2.4G", plane: "H-plane" },
-        { band: "2.4G", plane: "E-plane" },
-        { band: "5G", plane: "H-plane" },
-        { band: "5G", plane: "E-plane" },
-        ...(has6G
-          ? [
-              { band: "6G", plane: "H-plane" },
-              { band: "6G", plane: "E-plane" },
-            ]
-          : []),
-      ]
-    : [];
+  // Antenna-pattern slots are derived per product — Cloud AP plots by band,
+  // Broadband EOC's CPEs plot by antenna port. See lib/datasheet/radio-patterns.
+  const showRadioPatterns = hasRadioPatterns(product.product_line.category);
+  const patternSlots = radioPatternSlots({
+    category: product.product_line.category,
+    subtitle: product.subtitle,
+    fullName: product.full_name,
+    specSections: product.spec_sections,
+  });
 
   // Transceivers have a single product image and no hardware image — the
   // hardware slot is hidden and not required for PDF generation.
@@ -1441,7 +1426,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           </div>
 
           {/* Radio Pattern placeholders (AP only) */}
-          {isAP && (
+          {showRadioPatterns && (
             <div className="mt-6">
               <div className="mb-3 flex items-start justify-between gap-4">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -1452,21 +1437,20 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">
-                {radioPatternSlots.map((slot) => {
-                  const slotLabel = `${slot.band} ${slot.plane}`;
+                {patternSlots.map((slot) => {
                   const asset = product.image_assets.find(
                     (a) =>
                       a.image_type === "radio_pattern" &&
-                      a.label === slotLabel
+                      a.label === slot.label
                   );
                   const hasImage = asset && asset.status !== "missing" && asset.file_url;
                   return (
                     <RadioPatternSlot
-                      key={`${slot.band}-${slot.plane}`}
+                      key={slot.label}
                       modelName={product.model_name}
-                      band={slot.band}
+                      band={slot.group}
                       plane={slot.plane}
-                      label={slotLabel}
+                      label={slot.label}
                       hasImage={!!hasImage}
                       imageUrl={hasImage ? asset!.file_url! : undefined}
                       onUploaded={() => router.refresh()}

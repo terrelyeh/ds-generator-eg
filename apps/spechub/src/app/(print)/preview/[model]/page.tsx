@@ -7,6 +7,7 @@ import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { DataCenterPreview } from "./datacenter-preview";
+import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
 import type {
   Product,
   ProductLine,
@@ -20,6 +21,9 @@ interface ProductQueryRow extends Product {
   spec_sections: (SpecSection & { spec_items: SpecItem[] })[];
   image_assets: ImageAsset[];
 }
+
+/** Pretty band names on the Antenna Patterns page; ports pass through. */
+const BAND_DISPLAY: Record<string, string> = { "2.4G": "2.4GHz", "5G": "5GHz", "6G": "6GHz" };
 
 /** Data Center lines render via the dedicated navy layout component. */
 const DC_CATEGORIES = new Set(["Edge Network Appliances", "AI Servers"]);
@@ -216,48 +220,30 @@ export default async function PreviewPage({
   // the bottom row past BOTTOM_MARGIN.
   const specPages = splitIntoPages(specSections, lang);
 
-  // --- Antennas Patterns page (AP only, only if any uploaded) ---
-  // Mirrors the logic in product-detail.tsx: detect AP by product_line
-  // category, detect 6GHz support by scanning Operating Frequency spec.
-  // A radio pattern slot is a (band, plane) pair; we look up its
-  // image_asset by the `<band> <plane>` label. The reference datasheet
-  // (ECW536 v1.3) renders these on a dedicated page BEFORE hardware
-  // overview — so we slot it in there.
-  const isAP = product.product_lines?.category === "APs";
-  const has6G =
-    isAP &&
-    product.spec_sections?.some((s) =>
-      s.spec_items?.some(
-        (i) =>
-          i.label.toLowerCase().includes("operating frequency") &&
-          /6\s*GHz/i.test(i.value),
-      ),
-    );
-  const radioPatternSlots = isAP
-    ? [
-        { band: "2.4G", plane: "H-plane" },
-        { band: "2.4G", plane: "E-plane" },
-        { band: "5G", plane: "H-plane" },
-        { band: "5G", plane: "E-plane" },
-        ...(has6G
-          ? [
-              { band: "6G", plane: "H-plane" },
-              { band: "6G", plane: "E-plane" },
-            ]
-          : []),
-      ]
-    : [];
-  const antennaPatterns = radioPatternSlots
+  // --- Antennas Patterns page (only if any uploaded) ---
+  // Slot shape is per-product (Cloud AP plots by band, Broadband EOC's CPEs
+  // by antenna port) — see lib/datasheet/radio-patterns. The reference
+  // datasheet (ECW536 v1.3) renders these on a dedicated page BEFORE
+  // hardware overview, so we slot it in there.
+  const patternSlots = radioPatternSlots({
+    category: product.product_lines?.category ?? "",
+    subtitle: product.subtitle,
+    fullName: product.full_name,
+    specSections: (product.spec_sections ?? []).map((s) => ({
+      category: s.category,
+      items: (s.spec_items ?? []).map((i) => ({ label: i.label, value: i.value })),
+    })),
+  });
+  const antennaPatterns = patternSlots
     .map((slot) => {
-      const label = `${slot.band} ${slot.plane}`;
       const asset = (product.image_assets ?? []).find(
-        (a) => a.image_type === "radio_pattern" && a.label === label,
+        (a) => a.image_type === "radio_pattern" && a.label === slot.label,
       );
       return asset && asset.status !== "missing" && asset.file_url
         ? { ...slot, url: asset.file_url }
         : null;
     })
-    .filter((x): x is { band: string; plane: string; url: string } => x !== null);
+    .filter((x): x is { group: string; plane: string; label: string; url: string } => x !== null);
   const hasAntennaPage = antennaPatterns.length > 0;
 
   // --- Resolve display content ---
@@ -955,16 +941,16 @@ ${typo ? `
           <div className="top-bar" />
           <div className="antennas-page">
             <div className="antennas-title">{dict.antennasPatterns}</div>
-            <div className={`antennas-grid${has6G ? " has-6g" : ""}`}>
+            <div className={`antennas-grid${antennaPatterns.length > 4 ? " has-6g" : ""}`}>
               {antennaPatterns.map((p) => (
-                <div key={`${p.band}-${p.plane}`} className="antenna-cell">
+                <div key={p.label} className="antenna-cell">
                   <div className="antenna-labels">
-                    <span className="antenna-band">{p.band === "2.4G" ? "2.4GHz" : p.band === "5G" ? "5GHz" : p.band === "6G" ? "6GHz" : p.band}</span>
+                    <span className="antenna-band">{BAND_DISPLAY[p.group] ?? p.group}</span>
                     <span className="antenna-plane">{p.plane === "H-plane" ? "H-Plane" : p.plane === "E-plane" ? "E-Plane" : p.plane}</span>
                   </div>
                   <div className="antenna-image">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={p.url} alt={`${p.band} ${p.plane}`} />
+                    <img src={p.url} alt={p.label} />
                   </div>
                 </div>
               ))}

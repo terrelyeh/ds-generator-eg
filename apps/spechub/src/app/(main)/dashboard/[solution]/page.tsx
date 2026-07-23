@@ -266,7 +266,9 @@ export default async function SolutionDashboardPage({
       if (!radioMap.has(asset.product_id))
         radioMap.set(asset.product_id, new Map());
       const bands = radioMap.get(asset.product_id)!;
-      const bandMatch = asset.label.match(/^([\d.]+G)\s+(H|E)-plane$/i);
+      // Group is a band ("2.4G") or an antenna port ("Port1") — see
+      // lib/datasheet/radio-patterns.
+      const bandMatch = asset.label.match(/^(.+?)\s+(H|E)-plane$/i);
       if (bandMatch) {
         const band = bandMatch[1];
         const plane = bandMatch[2].toLowerCase();

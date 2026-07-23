@@ -23,6 +23,7 @@ import { Columns2, History, Languages, Swords } from "lucide-react";
 import type { ProductLine } from "@eg/db/types";
 import { can, type Role } from "@eg/auth/permissions";
 import { usesTwoHardwareImages } from "@/lib/datasheet/qr";
+import { hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 
 interface ProductSummary {
   id: string;
@@ -163,10 +164,11 @@ function ProductTable({
     );
   }
 
-  // Exact match — matches preview/[model] and product-detail. The old
-  // substring test fired on "Edge Network Appli-AP-nces", putting a Radio
-  // Pattern column on a line that has no radios.
-  const isAP = lineCategory === "APs";
+  // Which lines print antenna-pattern plots — shared predicate, so this
+  // column can't drift from the datasheet. (A substring test used to fire
+  // on "Edge Network Appli-AP-nces", growing the column on a line with no
+  // radios at all.)
+  const isAP = hasRadioPatterns(lineCategory);
   // Transceivers: one product image (no hardware), and the "Model Name" field
   // is really a description.
   const isTransceiver = lineCategory === "Transceivers";
