@@ -85,6 +85,57 @@ function estLines(text: string, charsPerLine: number): number {
     .reduce((sum, seg) => sum + Math.max(1, Math.ceil(seg.trim().length / charsPerLine)), 0);
 }
 
+// ── Cover hero auto-fit ──────────────────────────────────────────────
+// The hero band is a fixed height, but PM-written overviews vary a lot
+// (SE110's ran 11 lines and ate the band's entire bottom padding). Rather
+// than hand-tuning per model, estimate the rendered height and step the
+// overview down a size ladder until it fits with clearance.
+const HERO_HEIGHT = 335;
+const HERO_PAD_TOP = 26;
+const HERO_PAD_BOTTOM = 20;
+const HEADLINE_SIZE = 24;
+const HEADLINE_LINE_HEIGHT = 1.28;
+const HEADLINE_WIDTH = 520;
+const PRODUCT_COL = 268;     // right-hand render column
+const COPY_WIDTH = 272;      // hero inner width − gap − PRODUCT_COL
+const MODEL_BLOCK = 27;      // model line + its margin
+const LOWER_GAP = 14;        // .hero-lower margin-top
+const OVERVIEW_LINE_HEIGHT = 1.55;
+/**
+ * Average glyph advance as a fraction of font size. CALIBRATED against
+ * rendered PDFs (five models, observed lines vs character counts) — an
+ * earlier guess of 0.586 over-counted lines by ~10% and pushed the copy
+ * two steps down the ladder for no reason. Manrope Medium (headline) runs
+ * wider than the Light body copy.
+ */
+const BODY_WIDTH_FACTOR = 0.531;
+const HEADLINE_WIDTH_FACTOR = 0.6;
+
+/** Estimated wrapped line count for `text` in a column of `columnWidth`. */
+function estWrappedLines(text: string, size: number, columnWidth: number, widthFactor: number): number {
+  const charsPerLine = Math.max(1, Math.floor(columnWidth / (widthFactor * size)));
+  return text
+    .split("\n")
+    .reduce((sum, seg) => sum + Math.max(1, Math.ceil(seg.trim().length / charsPerLine)), 0);
+}
+
+/**
+ * Largest size from the ladder whose estimated block fits `available`.
+ * The ladder is deliberately narrow (1pt spread) so the five datasheets in
+ * the family still look like siblings; anything that can't fit at the
+ * floor means the PM's overview is too long for a cover and should be cut
+ * rather than shrunk further.
+ */
+function fitOverviewSize(overview: string, available: number): number {
+  const ladder = [10, 9.5, 9];
+  for (const size of ladder) {
+    const height =
+      estWrappedLines(overview, size, COPY_WIDTH, BODY_WIDTH_FACTOR) * size * OVERVIEW_LINE_HEIGHT;
+    if (height <= available - 8) return size;
+  }
+  return ladder[ladder.length - 1];
+}
+
 interface SpecRow {
   label: string;
   value: string;
@@ -162,6 +213,17 @@ export function DataCenterPreview({
     .replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`;
 
+  // Auto-fit the hero overview to whatever room the headline leaves.
+  const heroHeadline = product.headline || product.full_name;
+  const headlineHeight =
+    estWrappedLines(heroHeadline, HEADLINE_SIZE, HEADLINE_WIDTH, HEADLINE_WIDTH_FACTOR) *
+    HEADLINE_SIZE *
+    HEADLINE_LINE_HEIGHT;
+  const overviewSize = fitOverviewSize(
+    product.overview ?? "",
+    HERO_HEIGHT - HERO_PAD_TOP - HERO_PAD_BOTTOM - headlineHeight - LOWER_GAP - MODEL_BLOCK,
+  );
+
   const version = versionOverride || product.current_version || "1.0";
   const today = new Date().toLocaleDateString(dict.dateLocale, {
     month: "2-digit",
@@ -194,7 +256,7 @@ export function DataCenterPreview({
       <style
         dangerouslySetInnerHTML={{
           __html: `
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500&family=Roboto:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
 
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -268,32 +330,35 @@ body {
    headlines run 2 or 3 lines depending on the model and fixed tops made a
    3-line headline collide with the model line. */
 .hero {
-  position: absolute; top: 100pt; left: 0; right: 0; height: 300pt;
+  position: absolute; top: 100pt; left: 0; right: 0; height: ${HERO_HEIGHT}pt;
   background: linear-gradient(118deg, #10294a 0%, ${NAVY} 40%, #1c4d84 74%, ${BLUE} 122%);
   overflow: hidden;
-  padding: 26pt 20pt 20pt 36pt;
+  padding: ${HERO_PAD_TOP}pt 20pt ${HERO_PAD_BOTTOM}pt 36pt;
 }
+/* Headline + model carry weight; the overview stays light so the
+   hierarchy still reads (all-bold would flatten the block). */
 .hero-headline {
-  font-family: 'Manrope', sans-serif; font-weight: 200;
-  font-size: 24pt; line-height: 1.28; color: white; max-width: 520pt;
+  font-family: 'Manrope', sans-serif; font-weight: 500;
+  font-size: ${HEADLINE_SIZE}pt; line-height: ${HEADLINE_LINE_HEIGHT};
+  color: white; max-width: ${HEADLINE_WIDTH}pt;
 }
-.hero-lower { display: flex; gap: 16pt; margin-top: 14pt; }
-.hero-copy { flex: 1 1 auto; min-width: 0; max-width: 280pt; }
+.hero-lower { display: flex; gap: 16pt; margin-top: ${LOWER_GAP}pt; }
+.hero-copy { flex: 1 1 auto; min-width: 0; max-width: ${COPY_WIDTH}pt; }
 .hero-model {
-  font-family: 'Manrope', sans-serif; font-weight: 300;
+  font-family: 'Manrope', sans-serif; font-weight: 600;
   font-size: 15pt; color: ${YELLOW}; margin-bottom: 8pt;
 }
 .hero-overview {
-  font-family: 'Manrope', sans-serif; font-weight: 200;
-  font-size: 10pt; line-height: 1.55; color: rgba(255,255,255,0.95);
+  font-family: 'Manrope', sans-serif; font-weight: 300;
+  line-height: ${OVERVIEW_LINE_HEIGHT}; color: rgba(255,255,255,0.95);
 }
 /* Wide render column; flat 1U units fill the width, taller chassis the
    height. Centres against the copy block beside it. */
 .hero-product-box {
-  flex: 0 0 288pt;
+  flex: 0 0 ${PRODUCT_COL}pt;
   display: flex; align-items: center; justify-content: center;
 }
-.hero-product-box img { max-width: 100%; max-height: 168pt; object-fit: contain; }
+.hero-product-box img { max-width: 100%; max-height: 180pt; object-fit: contain; }
 .hero-product-ph {
   width: 100%; height: 130pt;
   background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.45);
@@ -304,7 +369,8 @@ body {
    Fixed height + space-between spreads the rows down the WHOLE lower
    half instead of stacking them at the top with dead space beneath. */
 .cover-features {
-  position: absolute; top: 424pt; left: 36pt; right: 36pt; height: 330pt;
+  position: absolute; top: ${100 + HERO_HEIGHT + 24}pt; left: 36pt; right: 36pt;
+  height: ${792 - (100 + HERO_HEIGHT + 24) - 38}pt;
   display: grid; grid-template-columns: 1fr 1fr; column-gap: 26pt;
   align-content: space-between;
 }
@@ -313,7 +379,7 @@ body {
   font-weight: 500; font-size: 8pt; padding: 1.5pt 7pt; margin-bottom: 4pt;
 }
 .feature-title {
-  font-weight: 500; font-size: 10.5pt; color: #6e6e6e; margin-bottom: 3pt;
+  font-weight: 700; font-size: 10.5pt; color: #3f4042; margin-bottom: 3pt;
   line-height: 1.3;
 }
 .feature-text { font-weight: 400; font-size: 7.5pt; color: #525355; line-height: 1.5; }
@@ -415,7 +481,9 @@ body {
           <div className="hero-lower">
             <div className="hero-copy">
               <div className="hero-model">{product.model_name}</div>
-              <div className="hero-overview">{product.overview}</div>
+              <div className="hero-overview" style={{ fontSize: `${overviewSize}pt` }}>
+              {product.overview}
+            </div>
             </div>
             <div className="hero-product-box">
               {productImage ? (
