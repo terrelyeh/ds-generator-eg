@@ -56,6 +56,12 @@ export interface Database {
           ds_images_folder_id: string | null;
           drive_folder_id: string | null;
           ds_prefix: string;
+          /** 'model' (default) | 'series' | 'both' — which datasheet(s) the line ships */
+          ds_scope: string;
+          /** gid of the "[For DS] Overview & Features" tab (line-level shared copy) */
+          ds_overview_gid: string | null;
+          /** gid of the "[For DS] Technical Specifications" tab (series comparison) */
+          ds_specs_gid: string | null;
           solution: string;
           solution_id: string;
           last_synced_at: string | null;

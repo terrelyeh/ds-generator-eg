@@ -614,6 +614,74 @@ export type Database = {
           },
         ]
       }
+      line_datasheets: {
+        Row: {
+          benefits: Json
+          category_label: string | null
+          created_at: string
+          current_version: string | null
+          features: Json
+          footnote: string | null
+          headline: string | null
+          id: string
+          images: Json
+          last_synced_at: string | null
+          overview: string | null
+          product_line_id: string
+          series_name: string | null
+          software_arch: string | null
+          specs: Json
+          updated_at: string
+          version_history: Json
+        }
+        Insert: {
+          benefits?: Json
+          category_label?: string | null
+          created_at?: string
+          current_version?: string | null
+          features?: Json
+          footnote?: string | null
+          headline?: string | null
+          id?: string
+          images?: Json
+          last_synced_at?: string | null
+          overview?: string | null
+          product_line_id: string
+          series_name?: string | null
+          software_arch?: string | null
+          specs?: Json
+          updated_at?: string
+          version_history?: Json
+        }
+        Update: {
+          benefits?: Json
+          category_label?: string | null
+          created_at?: string
+          current_version?: string | null
+          features?: Json
+          footnote?: string | null
+          headline?: string | null
+          id?: string
+          images?: Json
+          last_synced_at?: string | null
+          overview?: string | null
+          product_line_id?: string
+          series_name?: string | null
+          software_arch?: string | null
+          specs?: Json
+          updated_at?: string
+          version_history?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "line_datasheets_product_line_id_fkey"
+            columns: ["product_line_id"]
+            isOneToOne: true
+            referencedRelation: "product_lines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       product_lines: {
         Row: {
           category: string
@@ -624,6 +692,9 @@ export type Database = {
           drive_folder_id: string | null
           ds_images_folder_id: string | null
           ds_prefix: string | null
+          ds_scope: string
+          ds_overview_gid: string | null
+          ds_specs_gid: string | null
           id: string
           label: string
           last_synced_at: string | null
@@ -644,6 +715,9 @@ export type Database = {
           drive_folder_id?: string | null
           ds_images_folder_id?: string | null
           ds_prefix?: string | null
+          ds_scope?: string
+          ds_overview_gid?: string | null
+          ds_specs_gid?: string | null
           id?: string
           label: string
           last_synced_at?: string | null
@@ -664,6 +738,9 @@ export type Database = {
           drive_folder_id?: string | null
           ds_images_folder_id?: string | null
           ds_prefix?: string | null
+          ds_scope?: string
+          ds_overview_gid?: string | null
+          ds_specs_gid?: string | null
           id?: string
           label?: string
           last_synced_at?: string | null

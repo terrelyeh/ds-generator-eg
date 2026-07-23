@@ -396,3 +396,77 @@ export function parseFeatureGroups(text: string): SeriesFeatureGroup[] {
   }
   return groups;
 }
+
+// ---------------------------------------------------------------------------
+// Line-level shared datasheet content ("[For DS] Overview & Features" tab)
+// ---------------------------------------------------------------------------
+
+export interface LineDatasheetContent {
+  headline: string;
+  series_name: string;
+  /** Header-band label, e.g. "EOC Series". Empty → caller derives one. */
+  category_label: string;
+  /** Optional long-form intro (Orin Box uses it; EOC leaves it blank). */
+  overview: string;
+  /** Cover marketing blocks — "Title:" + "- body" (see parseFeatureGroups). */
+  features: SeriesFeatureGroup[];
+  /** Flat "Features & Benefits" bullets, markers stripped. */
+  benefits: string[];
+  /** Paragraph block, e.g. Orin Box's Software Architecture. */
+  software_arch: string;
+  /** e.g. "*Note: Partial functions are available only in specific models." */
+  footnote: string;
+}
+
+/**
+ * Read the line's `[For DS] Overview & Features` tab — a single-column
+ * key-value sheet (col A = label, col B = value) holding the copy that is
+ * shared by EVERY datasheet on the line: the per-model ones AND the series
+ * one. Labels are matched case-insensitively; unknown rows are ignored, so
+ * PMs can annotate the tab freely.
+ *
+ * Returns null when the tab is missing/empty — callers then fall back to
+ * per-product content.
+ */
+export async function loadLineDatasheetContent(
+  sheetId: string,
+  gid: string
+): Promise<LineDatasheetContent | null> {
+  const tabName = await resolveTabName(sheetId, gid);
+  if (!tabName) return null;
+
+  const rows = await fetchTab(sheetId, tabName);
+  if (rows.length === 0) return null;
+
+  const byLabel = new Map<string, string>();
+  for (const row of rows) {
+    const label = cell(row, 0).toLowerCase();
+    if (label) byLabel.set(label, cell(row, 1));
+  }
+
+  /** Strip "-", "•", "*" markers; drop empties. */
+  const bulletList = (text: string): string[] =>
+    text
+      .split("\n")
+      .map((l) => l.trim().replace(/^[-•*–]\s*/, "").trim())
+      .filter(Boolean);
+
+  const content: LineDatasheetContent = {
+    headline: byLabel.get("headline") ?? "",
+    series_name: byLabel.get("product series") ?? "",
+    category_label: byLabel.get("category label") ?? "",
+    overview: byLabel.get("overview") ?? byLabel.get("single overview") ?? "",
+    features: parseFeatureGroups(byLabel.get("ds feature groups") ?? ""),
+    benefits: bulletList(byLabel.get("features & benefits") ?? ""),
+    software_arch: byLabel.get("software architecture") ?? "",
+    footnote: byLabel.get("footnote") ?? "",
+  };
+
+  const hasAnything =
+    content.headline ||
+    content.overview ||
+    content.features.length > 0 ||
+    content.benefits.length > 0 ||
+    content.software_arch;
+  return hasAnything ? content : null;
+}

@@ -12,6 +12,7 @@ import {
   loadRevisionLogs,
   loadComparison,
   loadCloudComparison,
+  loadLineDatasheetContent,
 } from "@/lib/google/sheets-extra";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
@@ -556,6 +557,48 @@ export async function POST(request: Request) {
               sort_order: idx,
             }));
             await supabase.from("cloud_comparisons").insert(batch);
+          }
+        }
+
+        // Line-level shared datasheet content ("[For DS] Overview &
+        // Features" tab). Feeds BOTH the per-model datasheets and the
+        // series one, so it syncs whenever the line configures the tab —
+        // independent of ds_scope.
+        if (pl.ds_overview_gid) {
+          const lineContent = await loadLineDatasheetContent(
+            pl.sheet_id,
+            pl.ds_overview_gid,
+          );
+          if (lineContent) {
+            // Header-band label: explicit row wins, else the line's
+            // category minus its plural "s" ("AI Servers" → "AI Server").
+            const categoryLabel =
+              lineContent.category_label || pl.category.replace(/s\s*$/i, "");
+
+            const upsertRes = await supabase
+              .from("line_datasheets")
+              .upsert(
+                {
+                  product_line_id: pl.id,
+                  headline: lineContent.headline || null,
+                  series_name: lineContent.series_name || null,
+                  category_label: categoryLabel,
+                  overview: lineContent.overview || null,
+                  features: lineContent.features,
+                  benefits: lineContent.benefits,
+                  software_arch: lineContent.software_arch || null,
+                  footnote: lineContent.footnote || null,
+                  last_synced_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+                { onConflict: "product_line_id" },
+              );
+            // Pitfall #45 — supabase writes fail silently unless checked.
+            if (upsertRes.error) {
+              lineResult.errors.push(
+                `Line datasheet content: ${upsertRes.error.message}`,
+              );
+            }
           }
         }
       }
