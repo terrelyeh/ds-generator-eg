@@ -246,20 +246,20 @@ body {
   color: rgba(255,255,255,0.6);
 }
 
-/* features under the hero — 2×2 chip groups */
+/* features under the hero — chip groups, 2 columns × 3 rows */
 .cover-features {
-  position: absolute; top: 440pt; left: 36pt; right: 36pt;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 20pt 24pt;
+  position: absolute; top: 432pt; left: 36pt; right: 36pt;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 15pt 24pt;
 }
 .feature-chip {
   display: inline-block; background: ${BLUE}; color: white;
-  font-weight: 500; font-size: 8.5pt; padding: 1.5pt 7pt; margin-bottom: 5pt;
+  font-weight: 500; font-size: 8pt; padding: 1.5pt 7pt; margin-bottom: 4pt;
 }
 .feature-title {
-  font-weight: 500; font-size: 11pt; color: #6e6e6e; margin-bottom: 4pt;
+  font-weight: 500; font-size: 10.5pt; color: #6e6e6e; margin-bottom: 3pt;
   line-height: 1.3;
 }
-.feature-text { font-weight: 400; font-size: 8pt; color: #525355; line-height: 1.55; }
+.feature-text { font-weight: 400; font-size: 7.5pt; color: #525355; line-height: 1.5; }
 .feature-text .fb { margin-bottom: 3pt; }
 /* flat fallback (no ds_features): plain bullet list, two columns */
 .cover-features-flat {
@@ -347,7 +347,7 @@ body {
 
         {useGroups ? (
           <div className="cover-features">
-            {dsGroups.slice(0, 4).map((g, gi) => {
+            {dsGroups.slice(0, 6).map((g, gi) => {
               const [chip, ...rest] = g.title.split("|");
               const boldTitle = rest.length > 0 ? rest.join("|").trim() : "";
               return (
