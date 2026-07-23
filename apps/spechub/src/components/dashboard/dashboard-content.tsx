@@ -163,7 +163,10 @@ function ProductTable({
     );
   }
 
-  const isAP = lineCategory.toLowerCase().includes("ap");
+  // Exact match — matches preview/[model] and product-detail. The old
+  // substring test fired on "Edge Network Appli-AP-nces", putting a Radio
+  // Pattern column on a line that has no radios.
+  const isAP = lineCategory === "APs";
   // Transceivers: one product image (no hardware), and the "Model Name" field
   // is really a description.
   const isTransceiver = lineCategory === "Transceivers";
