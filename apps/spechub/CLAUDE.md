@@ -14,11 +14,11 @@
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
-**4 個 solution 上線**：**Cloud**（AP / L3 Switch / Switch / Camera / AI-NVS /
-VPN Firewall / Switch Extender / Unmanaged Switch，8 條線）、**Accessories ▸
-Transceiver**（綠色、無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network
-Appliance + AI Server**（navy 專屬版型組件）、**Edge AI Box ▸ Orin Box**（per-model
-已上線;整系列一份的 series datasheet 在未 merge 的 `feat/edge-ai-box`）。
+**5 個 solution 上線**：**Cloud**（8 條線）、**Accessories ▸ Transceiver**（綠色、
+無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network Appliance + AI Server**
+（navy 專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
+與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（per-model;它的 series 實作
+還在未 merge 的 `feat/edge-ai-box`,待收斂到 Broadband 這套雙 scope 架構）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
 下方 Architecture 的 product-line onboarding）。
 另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
@@ -138,10 +138,13 @@ UI fork 自 compare-table。半自動抽取(**↻ sync** datasheet / **🔍 web*
 ### 產品線 onboarding + 各線 datasheet 變體 → [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
 **新增 solution / 產品線前必讀該檔。** 涵蓋:建線 recipe、sheet 契約(含選填的
-`DS Feature Groups` 列 → `products.ds_features`)、圖片命名(`_product`/`_hardware`/
-`_hardware_2` + **PNG 自動裁透明邊**)、**依 `category` 的 datasheet 變體**四種
-(Cloud 藍 / 灰 / Transceiver 綠 / **Data Center navy 專屬組件**)、series-scope、
-以及做新變體時踩過的雷(用 pymupdf 量參考稿、流式排版、自動縮放要校準係數)。
+`DS Feature Groups` 列 → `products.ds_features`,以及線層共用文案的
+`[For DS] Overview & Features` 頁籤 → `line_datasheets`)、圖片命名 + **PNG 自動裁
+透明邊**、**antenna slot 依產品推導**(`lib/datasheet/radio-patterns.ts`)、
+**5 種 datasheet 變體**(Cloud 藍 / 灰 / Transceiver 綠 / DC navy / Broadband 鋼藍)、
+**`ds_scope` 三態**(`model`/`series`/`both`——`both` 用同一個組件渲染兩種 scope,
+版號兩條流)、以及做新變體時踩過的雷(pymupdf 量參考稿、流式排版、自動縮放要校準、
+參考圖內建文字要裁掉、footer 綁最後一頁而非某個 section)。
 **關鍵雷**:① sync 只匯入「Web Overview 有列」的型號,漏列 = 靜默不同步;
 ② **category 判斷一律精確比對且集中在 `lib/datasheet/qr.ts`**(pitfall #61);
 ③ Drive 各線/各語言資料夾**自動建**,但 `drive_folder_id`/`ds_images_folder_id` 常填反。

@@ -70,7 +70,7 @@ Flat files in the line's `DS Images` folder, **single underscore**:
 | `{model}_product.png` | cover product shot |
 | `{model}_hardware.png` | Hardware Overview render |
 | `{model}_hardware_2.png` | 2nd render (front/rear) — Data Center lines |
-| `{model}_radio_{Band}_{Plane}.png` | radio patterns (APs only) |
+| `{model}_{Group}_{Plane}.png` | antenna patterns — see below |
 
 - **PNG transparent padding is auto-trimmed on sync** (sharp `.trim()`).
   PM renders often sit on huge transparent canvases (SE110's product filled
@@ -93,6 +93,18 @@ while the datasheet printed Contact Us, and how a substring `isAP` test grew
 a Radio Pattern column on "Edge Network Appli**ap**nces" (pitfall #61).
 **Always compare categories exactly.**
 
+**Antenna-pattern slots are derived per PRODUCT** (`lib/datasheet/radio-patterns.ts`),
+not per line — Broadband EOC needs two shapes on one line:
+
+| category | slots |
+|---|---|
+| `APs` | `2.4G` / `5G` (+ `6G` when Operating Frequency says so) × H/E |
+| `Broadband APs` | model name says CPE → `Port1` / `Port2`; otherwise `2.4G` / `5G` |
+
+The slot label doubles as the file-name stem (`EOC600_Port1_H-plane.png`),
+so renaming a label orphans uploaded art. A page renders whenever a product
+defines slots — missing plots show placeholders, same as Product Views.
+
 ### Existing variants
 
 | Variant | Categories | Shape |
@@ -101,6 +113,7 @@ a Radio Pattern column on "Edge Network Appli**ap**nces" (pitfall #61).
 | **Gray** | Unmanaged Switches, Extenders | as above, `#58595B` |
 | **Transceiver** | Transceivers | green `#2F855A`; `tx-cover` (image centred, overview full-width); **no hardware page** (footer moves to the last spec page); Contact-Us QR; list drops HW column, Model Name → Description |
 | **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; navy hero + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
+| **Broadband** | Broadband APs | `preview/[model]/broadband-preview.tsx`, steel `#1e6796`; renders BOTH scopes (see §5); cover hero art, Features & Benefits, spec table (single or comparison), Product Views, Antenna Patterns |
 
 Cloud/gray/transceiver live in `preview/[model]/page.tsx` (`getTheme` +
 conditional classes). **A structurally different layout is cleaner as its own
@@ -122,17 +135,56 @@ component**, branched by category near the top of `page.tsx` — the URL stays
 - Keep the size ladder narrow so a family of datasheets still looks alike.
 - Cloud-template pagination constants must track preview CSS
   (pitfalls #50/#51).
+- **Reference art usually has text baked in.** The EOC hero contains its own
+  headline and the deployment diagram its own caption — cropping naively
+  double-printed both. Crop past the baked text, then draw live text.
+- **Anchor the footer to the LAST page, not a section.** Pinning it to the
+  antenna page made it vanish on lines with no plots uploaded.
+- Narrow comparison columns need `overflow-wrap: anywhere`, or tokens like
+  `station(BSU)/subscriber(SU)` bleed out of the cell.
 
-## 5. Series-scope lines (`ds_scope='series'`)
+## 5. Datasheet scope (`product_lines.ds_scope`)
 
-Some lines ship ONE datasheet for the whole line instead of per-model.
-**Code currently lives on the unmerged `feat/edge-ai-box` branch** (Edge AI
-Box ▸ Orin Box), gated by `product_lines.ds_scope` + a `line_datasheets`
-table (migration 00029, already applied to prod). Two extra curated tabs
-(`[For DS] Overview & Features`, `[For DS] Technical Specifications`) feed
-it, images use a `series_*` prefix, and output is
-`/preview/series/[line]` → `POST /api/generate-pdf?line=<name>`.
-Per-model generation is disabled for those lines.
+| scope | ships | per-model generate |
+|---|---|---|
+| `model` (default) | one datasheet per model | yes |
+| `series` | ONE datasheet for the line | hidden |
+| `both` | both, sharing content | yes |
+
+**Line-level shared content** lives in `line_datasheets` (migration 00029 +
+00032) and is fed by an optional `[For DS] Overview & Features` tab —
+a single-column key-value sheet read by `loadLineDatasheetContent`:
+
+| row | feeds |
+|---|---|
+| `Headline` / `Product Series` / `Category Label` | cover identity |
+| `DS Feature Groups` | cover marketing blocks (`Title:` + `- body`) |
+| `Features & Benefits` | flat bullet list |
+| `Software Architecture` / `Footnote` | optional blocks |
+
+Sync writes it whenever the line sets `ds_overview_gid`, **regardless of
+scope** — per-model datasheets consume it too.
+
+Series output is `/preview/series/[line]` → `POST /api/generate-pdf?line=`.
+Its version state is `line_datasheets.current_version` + `version_history`,
+**separate from the per-model `versions` table**, so a `both` line runs two
+numbering streams (EOC's series continues v1.5; each model starts at v1.0).
+Drive reuses the per-model helpers with `"Series"` as the model token.
+
+### Writing a dual-scope layout
+
+Broadband EOC renders both scopes from ONE component
+(`broadband-preview.tsx`, `scope: "model" | "series"`) off the same
+`line_datasheets` rows, so the two PDFs can't drift. But **make the scopes
+say different things** — the first cut was near-indistinguishable:
+
+| | series | per-model |
+|---|---|---|
+| cover | line headline + the shared marketing blocks | THIS model's headline, number, overview and own product shot |
+| next page | the generic Features & Benefits list | the model's own features (they carry real numbers where the line-level list is generic), then the deployment diagram |
+
+Keep series *positioning* ("why this family") in the series sheet only —
+on a per-model sheet it changes the subject mid-document.
 
 ## 6. Verifying your work
 
@@ -154,3 +206,4 @@ Per-model generation is disabled for those lines.
 | **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | per-model synced; SERIES datasheet pending on `feat/edge-ai-box` |
 | **Data Center ▸ Edge Network Appliance** | SE110, SE210 | navy variant |
 | **Data Center ▸ AI Server** | S41, S21, S11 | navy variant; S21/S11 images pending |
+| **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel variant, `ds_scope='both'`; images pending |
