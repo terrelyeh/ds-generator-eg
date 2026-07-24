@@ -12,8 +12,18 @@ import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@e
  * line-level and whose later pages are per-model slices of the same
  * material — so one renderer serves both scopes:
  *
- *   page 1  cover        hero + line headline + shared marketing blocks
- *   page 2  benefits     Features & Benefits + deployment diagram   } shared
+ * The two scopes answer different questions, so their first two pages
+ * differ deliberately — otherwise the PDFs are near-indistinguishable:
+ *
+ *   series   p1 line headline + "EOC Series" + shared marketing blocks
+ *            p2 the generic Features & Benefits list + deployment diagram
+ *   model    p1 THIS model's headline, number, overview and key features
+ *            p2 "Why the <series>" — the shared blocks, demoted to context
+ *
+ * (The line-level benefits list is the generic phrasing of the same points
+ * each product spells out with real numbers, so a per-model sheet showing
+ * both would just repeat itself.)
+ *
  *   page 3+ specs        per-model table  |  series comparison table
  *   page n  product views  per-model callout renders
  *   page n  antenna patterns  band or port plots (radio-patterns.ts)
@@ -27,6 +37,8 @@ const STEEL = "#1e6796";
 const BAND_DARK = "#6c6d71";
 const BAND_LIGHT = "#888b8d";
 const ROW_ALT = "#eff0f0";
+/** Key Features that fit the per-model cover column; the rest roll to p2. */
+const COVER_FEATURE_LIMIT = 7;
 
 export interface LineContent {
   headline: string | null;
@@ -109,7 +121,14 @@ export function BroadbandPreview({
   const dict = getDict("en");
   const isSeries = scope === "series";
 
+  // Cover identity: the series speaks for the family, a model speaks for
+  // itself.
+  const coverHeadline = isSeries
+    ? lineContent?.headline || line.label
+    : focusModel?.headline || lineContent?.headline || line.label;
   const headline = lineContent?.headline || focusModel?.headline || line.label;
+  const modelOverview = focusModel?.overview?.trim() ?? "";
+  const modelFeatures = (focusModel?.features ?? []).filter(Boolean);
   const seriesName = lineContent?.series_name || line.label;
   const categoryLabel = lineContent?.category_label || line.label;
   const blocks = lineContent?.features ?? [];
@@ -318,13 +337,16 @@ body {
   position: absolute; top: 96pt; left: 0; right: 0; height: 359pt;
   overflow: hidden; background: ${STEEL};
 }
-.hero-titles { position: absolute; top: 0; left: 37pt; right: 37pt; height: 86pt; padding-top: 22pt; }
-.hero img {
-  position: absolute; top: 86pt; left: 0; right: 0; bottom: 0;
-  width: 100%; height: 273pt; object-fit: cover;
+.hero-titles {
+  position: absolute; top: 0; left: 37pt; right: 37pt; height: 104pt;
+  padding-top: 20pt;
 }
-.hero-title { font-weight: 500; font-size: 21pt; color: white; line-height: 1.2; }
-.hero-series { font-weight: 400; font-size: 16pt; color: white; margin-top: 3pt; }
+.hero img {
+  position: absolute; top: 104pt; left: 0; right: 0; bottom: 0;
+  width: 100%; height: 255pt; object-fit: cover;
+}
+.hero-title { font-weight: 500; color: white; line-height: 1.18; }
+.hero-series { font-weight: 400; font-size: 15pt; color: white; margin-top: 4pt; }
 .cover-blocks {
   position: absolute; top: 470pt; left: 36pt; right: 36pt; bottom: 46pt;
   display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 24pt;
@@ -334,6 +356,28 @@ body {
   font-weight: 500; font-size: 10pt; color: ${STEEL}; margin-bottom: 5pt;
 }
 .block-body { font-size: 8pt; line-height: 1.55; color: #6f6f6f; }
+/* per-model cover: the model's own overview beside its key features */
+.model-cover {
+  position: absolute; top: 470pt; left: 36pt; right: 36pt; bottom: 46pt;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0 26pt;
+}
+.mc-heading {
+  font-weight: 500; font-size: 10pt; color: ${STEEL}; margin-bottom: 6pt;
+}
+.mc-overview { font-size: 8pt; line-height: 1.6; color: #6f6f6f; }
+.mc-feature {
+  display: flex; gap: 5pt; font-size: 7.5pt; line-height: 1.45;
+  color: #6f6f6f; margin-bottom: 5pt; break-inside: avoid;
+}
+.mc-feature .dot { flex: none; }
+.mc-feature b { font-weight: 700; color: #4a4a4a; }
+.mc-more { font-size: 7pt; color: #a7a9ac; margin-top: 2pt; }
+/* page 2 of a per-model sheet: series context, visually secondary */
+.why-series { padding-top: 4pt; }
+.why-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 24pt;
+  background: #f7f8f8; padding: 14pt 16pt;
+}
 .cover-note {
   position: absolute; left: 316pt; bottom: 30pt;
   font-size: 7pt; font-weight: 300; color: #a7a9ac;
@@ -450,25 +494,65 @@ body {
         </div>
         <div className="hero">
           <div className="hero-titles">
-            <div className="hero-title">{headline}</div>
+            <div
+              className="hero-title"
+              style={{ fontSize: `${coverHeadline.length > 46 ? 17 : 21}pt` }}
+            >
+              {coverHeadline}
+            </div>
             <div className="hero-series">{isSeries ? seriesName : focusModel?.model_name}</div>
           </div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={heroImg} alt="" />
         </div>
-        <div className="cover-blocks">
-          {blocks.map((b, i) => (
-            <div key={i}>
-              <div className="block-title">{b.title}</div>
-              <div className="block-body">{b.bullets.join(" ")}</div>
+        {isSeries ? (
+          <div className="cover-blocks">
+            {blocks.map((b, i) => (
+              <div key={i}>
+                <div className="block-title">{b.title}</div>
+                <div className="block-body">{b.bullets.join(" ")}</div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="model-cover">
+            <div>
+              <div className="mc-heading">Overview</div>
+              <div className="mc-overview">{modelOverview}</div>
             </div>
-          ))}
-        </div>
+            <div>
+              <div className="mc-heading">Key Features</div>
+              {modelFeatures.slice(0, COVER_FEATURE_LIMIT).map((f, i) => {
+                const m = f.match(/^([^:]{2,60}):\s*(.*)$/);
+                return (
+                  <div key={i} className="mc-feature">
+                    <span className="dot">•</span>
+                    <span>
+                      {m ? (
+                        <>
+                          <b>{m[1]}:</b> {m[2]}
+                        </>
+                      ) : (
+                        f
+                      )}
+                    </span>
+                  </div>
+                );
+              })}
+              {modelFeatures.length > COVER_FEATURE_LIMIT && (
+                <div className="mc-more">
+                  {`+ ${modelFeatures.length - COVER_FEATURE_LIMIT} more — see Features & Benefits`}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {footnote && <div className="cover-note">{footnote}</div>}
         <div className="page-number">{nextPage()}</div>
       </div>
 
-      {/* ═══ FEATURES & BENEFITS ═══ */}
+      {/* ═══ FEATURES & BENEFITS (series) / rest-of-features + series
+             context (per-model) ═══ */}
       <div className="page">
         <div className="top-bar" />
         <div className="benefits-page">
@@ -476,7 +560,7 @@ body {
             <span className="section-title">Features &amp; Benefits</span>
           </div>
           <div className="benefits-grid">
-            {benefits.map((b, i) => {
+            {(isSeries ? benefits : modelFeatures.slice(COVER_FEATURE_LIMIT)).map((b, i) => {
               const m = b.match(/^([^:]{2,60}):\s*(.*)$/);
               return (
                 <div key={i} className="benefit">
@@ -495,11 +579,34 @@ body {
             })}
           </div>
           {footnote && <div className="benefits-note">{footnote}</div>}
-          <div className="deploy">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={deployImg} alt="PtP/PtMP deployment applications" />
-          </div>
-          <div className="deploy-caption">PtP/PtMP Deployment Applications Diagram</div>
+
+          {/* A per-model sheet carries the series positioning as CONTEXT,
+              after its own feature list — not as its identity. */}
+          {!isSeries && blocks.length > 0 && (
+            <div className="why-series">
+              <div className="benefits-title">
+                <span className="section-title">Why the {seriesName}</span>
+              </div>
+              <div className="why-grid">
+                {blocks.map((b, i) => (
+                  <div key={i}>
+                    <div className="block-title">{b.title}</div>
+                    <div className="block-body">{b.bullets.join(" ")}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {isSeries && (
+            <>
+              <div className="deploy">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={deployImg} alt="PtP/PtMP deployment applications" />
+              </div>
+              <div className="deploy-caption">PtP/PtMP Deployment Applications Diagram</div>
+            </>
+          )}
         </div>
         <div className="page-number">{nextPage()}</div>
       </div>
