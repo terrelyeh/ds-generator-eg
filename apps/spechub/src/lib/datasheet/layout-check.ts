@@ -14,6 +14,7 @@ import {
   splitIntoPages,
 } from "./pagination";
 import { estimateCoverLayout, FEATURES_MAX_HEIGHT } from "./cover-layout";
+import { usesCloudCoverLayout } from "./qr";
 
 /**
  * Binary status model: only "ok" (green, will fit) or "overflow" (red,
@@ -263,6 +264,27 @@ export interface LayoutReport {
   spec: SpecLayoutReport;
 }
 
+/** Cover report for a line the Cloud capacity model doesn't apply to:
+ *  metrics still reported (useful context), no verdict rendered. */
+function passingCoverReport(params: {
+  overview: string | null | undefined;
+  features: string[] | null | undefined;
+}): CoverLayoutReport {
+  const features = params.features ?? [];
+  return {
+    status: "ok",
+    overview_status: "ok",
+    features_status: "ok",
+    reasons: [],
+    metrics: {
+      overview_chars: (params.overview ?? "").length,
+      features_count: features.length,
+      max_feature_chars: features.reduce((n, f) => Math.max(n, f.length), 0),
+    },
+    long_features: [],
+  };
+}
+
 export function checkProductLayout(params: {
   overview: string | null | undefined;
   features: string[] | null | undefined;
@@ -270,12 +292,17 @@ export function checkProductLayout(params: {
   /** Locale to evaluate against. Pass "ja" / "zh-TW" to check translated
    *  content with CJK typography metrics. Defaults to English. */
   locale?: string;
+  /** Product-line category. Lines with their own datasheet component skip
+   *  the cover check — the Cloud capacity model doesn't describe them. */
+  lineCategory?: string | null;
 }): LayoutReport {
-  const cover = checkCoverLayout({
-    overview: params.overview,
-    features: params.features,
-    locale: params.locale,
-  });
+  const cover = usesCloudCoverLayout(params.lineCategory)
+    ? checkCoverLayout({
+        overview: params.overview,
+        features: params.features,
+        locale: params.locale,
+      })
+    : passingCoverReport(params);
   const spec = checkSpecLayout(params.spec_sections, params.locale);
   return {
     status: worst(cover.status, spec.status),

@@ -120,6 +120,7 @@ export default async function ProductPage({
     overview: productWithSpecs.overview,
     features: productWithSpecs.features as string[] | null,
     spec_sections: specSectionsForCheck,
+    lineCategory: product.product_lines?.category,
   });
 
   // Respect per-locale manual acknowledgements, but only while the
@@ -162,6 +163,7 @@ export default async function ProductPage({
       features,
       spec_sections: specSectionsForCheck,
       locale: t.locale,
+      lineCategory: product.product_lines?.category,
     });
     localizedReports.push({
       locale: t.locale,

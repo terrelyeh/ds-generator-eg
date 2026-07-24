@@ -111,6 +111,11 @@ export default async function SolutionDashboardPage({
     .order("sort_order")) as { data: ProductLine[] | null };
 
   const productLineIds = (productLines ?? []).map((pl) => pl.id);
+  // Layout checking is per-line: lines with their own datasheet component
+  // don't answer to the Cloud cover's capacity model.
+  const lineCategoryById = new Map(
+    (productLines ?? []).map((pl) => [pl.id, pl.category as string]),
+  );
 
   // Fetch products for these product lines
   const { data: products } = productLineIds.length
@@ -308,6 +313,7 @@ export default async function SolutionDashboardPage({
       overview: p.overview,
       features: p.features as string[] | null,
       spec_sections: specMap.get(p.id) ?? [],
+      lineCategory: lineCategoryById.get(p.product_line_id),
     });
     const enHash = computeContentHash(p.overview, p.features as string[] | null);
     const englishLayout = isAckValid(ack.en, enHash)
@@ -332,6 +338,7 @@ export default async function SolutionDashboardPage({
           overview,
           features,
           spec_sections: specMap.get(p.id) ?? [],
+          lineCategory: lineCategoryById.get(p.product_line_id),
           locale,
         });
         const localeHash = computeContentHash(overview, features);

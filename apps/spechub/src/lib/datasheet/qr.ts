@@ -25,6 +25,28 @@ const TWO_HARDWARE_IMAGE_CATEGORIES = new Set([
   "AI Servers",
 ]);
 
+/**
+ * Lines whose datasheet is drawn by its OWN component, not the Cloud
+ * template — so the Cloud cover's capacity model (a fixed-height two-column
+ * features box) says nothing about them.
+ *
+ * EOC620 was flagged "12 items, cut 4" while its page-2 box holds 12
+ * comfortably; the Broadband and Data Center layouts simply have different
+ * room. Keep the layout checker off them rather than inventing thresholds
+ * for each one.
+ */
+const OWN_LAYOUT_CATEGORIES = new Set([
+  "Broadband APs",
+  "Edge Network Appliances",
+  "AI Servers",
+  "Edge AI Computers",
+]);
+
+/** True when the line's datasheet cover is the Cloud template's. */
+export function usesCloudCoverLayout(category: string | null | undefined): boolean {
+  return !category || !OWN_LAYOUT_CATEGORIES.has(category);
+}
+
 export function usesContactUsQr(category: string | null | undefined): boolean {
   return !!category && CONTACT_US_CATEGORIES.has(category);
 }

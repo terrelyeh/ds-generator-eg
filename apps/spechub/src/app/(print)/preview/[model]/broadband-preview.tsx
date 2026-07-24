@@ -409,8 +409,15 @@ body {
 /* per-model p2 shares the page with the full feature list; the diagram
    centres in whatever vertical space that list leaves, so every model
    lands balanced regardless of how many features it has */
-.deploy.compact { flex: 1; margin-top: 0; align-items: center; }
-.deploy.compact img { max-height: 266pt; }
+.deploy.compact {
+  flex: 1; min-height: 0; margin-top: 0; align-items: center;
+  /* guarantees clearance even when the artwork shrinks to fit — EOC655-C23
+     otherwise sat flush against both the list above and the page bottom */
+  padding: 14pt 0;
+}
+/* as large as the leftover space allows, capped so short lists don't blow
+   the artwork up — EOC655-C23's longer list overflowed a flat 300pt */
+.deploy.compact img { max-height: min(300pt, 100%); }
 
 /* ── spec table ────────────────────────────────────────────────────── */
 .specs-page { position: absolute; top: 21pt; left: 34pt; right: 37pt; }
