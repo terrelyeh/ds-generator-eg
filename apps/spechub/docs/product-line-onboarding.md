@@ -114,6 +114,7 @@ defines slots — missing plots show placeholders, same as Product Views.
 | **Transceiver** | Transceivers | green `#2F855A`; `tx-cover` (image centred, overview full-width); **no hardware page** (footer moves to the last spec page); Contact-Us QR; list drops HW column, Model Name → Description |
 | **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; navy hero + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
 | **Broadband** | Broadband APs | `preview/[model]/broadband-preview.tsx`, steel `#1e6796`; renders BOTH scopes (see §5); cover hero art, Features & Benefits, spec table (single or comparison), Product Views, Antenna Patterns |
+| **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, teal `#86c9cf`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
 
 Cloud/gray/transceiver live in `preview/[model]/page.tsx` (`getTheme` +
 conditional classes). **A structurally different layout is cleaner as its own
@@ -162,6 +163,21 @@ a single-column key-value sheet read by `loadLineDatasheetContent`:
 | `Features & Benefits` | flat bullet list |
 | `Software Architecture` / `Footnote` | optional blocks |
 
+⚠️ **Label the cover-blocks row `DS Feature Groups`.** Orin Box's tab called
+it `Key Features & Benefits`, which the shared loader reads as the FLAT list —
+it synced 0 cover blocks until the sheet was relabelled. `Features & Benefits`
+(flat) and `DS Feature Groups` (grouped) are different rows on purpose.
+
+A `series`-scope line can add two more inputs:
+
+| input | feeds |
+|---|---|
+| `ds_specs_gid` → `[For DS] Technical Specifications` | curated comparison table (`loadSeriesSpecs`) |
+| `series_*.png` in DS Images | hero, cover shot, architecture diagram, HW pages (`syncSeriesImages`) |
+
+Broadband needs neither — it builds its table from per-model specs and uses
+per-model imagery.
+
 Sync writes it whenever the line sets `ds_overview_gid`, **regardless of
 scope** — per-model datasheets consume it too.
 
@@ -186,6 +202,9 @@ say different things** — the first cut was near-indistinguishable:
 Keep series *positioning* ("why this family") in the series sheet only —
 on a per-model sheet it changes the subject mid-document.
 
+The series route dispatches on category, so a new series line is a component
+plus one entry there — content loading, generation and versioning are shared.
+
 ## 6. Verifying your work
 
 - **`(print)/preview/*` can be fetched headlessly** with the
@@ -203,7 +222,7 @@ on a per-model sheet it changes the subject mid-document.
 | Solution ▸ Line | Models | Notes |
 |---|---|---|
 | **Accessories ▸ Transceiver** | 13 SFP/QSFP/DAC | green, no hardware page, Contact-Us QR |
-| **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | per-model synced; SERIES datasheet pending on `feat/edge-ai-box` |
+| **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | teal SERIES datasheet, `ds_scope='series'`; `series_*` images pending |
 | **Data Center ▸ Edge Network Appliance** | SE110, SE210 | navy variant |
 | **Data Center ▸ AI Server** | S41, S21, S11 | navy variant; S21/S11 images pending |
 | **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel variant, `ds_scope='both'`; images pending |

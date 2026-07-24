@@ -17,8 +17,8 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 **5 個 solution 上線**：**Cloud**（8 條線）、**Accessories ▸ Transceiver**（綠色、
 無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network Appliance + AI Server**
 （navy 專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
-與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（per-model;它的 series 實作
-還在未 merge 的 `feat/edge-ai-box`,待收斂到 Broadband 這套雙 scope 架構）。
+與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,
+整系列一份,**已收斂到共用管線**——`feat/edge-ai-box` 可刪）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
 下方 Architecture 的 product-line onboarding）。
 另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
@@ -212,8 +212,12 @@ Key tables:
   Changelog Translations | Sync + Lang column 顯示已啟用語言 badges
 - **Product page sticky header**: `sticky top-14 z-20`
 - **Breadcrumb**: `[ProductLine] / [Model]`，ProductLine 連結帶 `?line=` 回正確 tab
-- **Solution sidebar**: 預設收合；**Datasheet 佈景共 4 種變體**（Cloud 藍 / 灰 /
-  Transceiver 綠 / Data Center navy）→ 見 [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
+- **Solution sidebar**: 預設收合；展開 `w-64`。**有產品線的 solution 排在
+  「soon」佔位之前**（在元件內依 `product_line_count` 推導,不是 `sort_order`——
+  這樣新線一上就自動上移）
+- **Datasheet 佈景共 5 種變體**（Cloud 藍 / 灰 / Transceiver 綠 / DC navy /
+  Broadband 鋼藍 + Edge AI teal series）→ 見
+  [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
 ## Current Status
 
@@ -222,11 +226,11 @@ Key tables:
 ### 🔜 Next Steps
 
 **產品線 / 版型**：
-0. **`feat/edge-ai-box` 未 merge** — Orin Box 的 **series datasheet**（整系列一份）功能完成、
-   migration 00029 已在 prod，等 PM 上傳 7 張 `series_*` 圖後驗收再 merge。
-   ⚠️ 該分支與 main 都有一份 `parseFeatureGroups`,merge 時要對齊。
-1. **Data Center 圖片待補** — S21 / S11 的 `_product` / `_hardware` / `_hardware_2`
-   （SE110 / SE210 / S41 已完整）。
+0. **`feat/edge-ai-box` 可刪** — Orin Box 已收斂到共用的 `ds_scope` 管線
+   （`feat/converge-orinbox`）,該分支獨有的東西都搬過來了。
+1. **Datasheet 圖片待補** — S21 / S11 的 `_product` / `_hardware` / `_hardware_2`
+   （SE110 / SE210 / S41 已完整）;**EOC 6 台全缺**（product / hardware×2 / antenna×4）;
+   **Orin Box 缺 7 張 `series_*`**（hero / cover_product / architecture / hw pages）。
 2. **Cloud AP 素材缺口** — 27 台裡 21 台在 Drive 沒有 datasheet 用圖 → 英文版 PDF 生不出來
    （日/中文版不受影響,各語系有自己的 hardware image）。其他線各缺 1–3 台。
 
