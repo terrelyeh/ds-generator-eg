@@ -227,17 +227,16 @@ export function BroadbandPreview({
     year: "numeric",
   });
 
-  // Page 2 carries the model's FULL feature list, which varies 12–17
-  // items — enough that the series-context block below it may not fit.
-  // Both estimates are CALIBRATED against rendered output (EOC655: a
-  // 15-item list measured 355pt and the five blocks 380pt, so the split
-  // only needs to trigger past ~740pt of content).
+  // Page 2 carries the model's FULL feature list (12–17 items) and then
+  // the deployment diagram. Heights are CALIBRATED from rendered output
+  // (EOC655's 15 items measure 377pt); the diagram is capped so both fit
+  // on one page, with a split guard for lines with even longer lists.
   const featureCount = (isSeries ? benefits : modelFeatures).length;
   const featureListHeight = 46 + Math.ceil(featureCount / 2) * 41;
-  const whyBlockHeight = 46 + Math.ceil(blocks.length / 2) * 111;
+  const DIAGRAM_BLOCK = 300;
   const CONTENT_HEIGHT = 726;
-  const whyOnOwnPage =
-    !isSeries && blocks.length > 0 && featureListHeight + whyBlockHeight > CONTENT_HEIGHT;
+  const diagramOnOwnPage =
+    !isSeries && featureListHeight + DIAGRAM_BLOCK > CONTENT_HEIGHT;
 
   const heroImg = "/broadband/eoc-hero.png";
   const deployImg = "/broadband/eoc-deployment.png";
@@ -383,12 +382,6 @@ body {
 .mc-shot { display: flex; align-items: center; justify-content: center; }
 .mc-shot img { max-width: 100%; max-height: 235pt; object-fit: contain; }
 .mc-shot-ph { width: 100%; height: 200pt; }
-/* page 2 of a per-model sheet: series context, visually secondary */
-.why-series { padding-top: 4pt; }
-.why-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 24pt;
-  background: #f7f8f8; padding: 14pt 16pt;
-}
 .cover-note {
   position: absolute; left: 316pt; bottom: 30pt;
   font-size: 7pt; font-weight: 300; color: #a7a9ac;
@@ -410,6 +403,9 @@ body {
 .benefits-note { font-size: 7pt; font-weight: 300; color: #a7a9ac; margin-top: 8pt; }
 .deploy { margin-top: 16pt; display: flex; justify-content: center; }
 .deploy img { max-width: 100%; max-height: 320pt; object-fit: contain; }
+/* per-model p2 shares the page with the full feature list */
+.deploy.compact { margin-top: 12pt; }
+.deploy.compact img { max-height: 252pt; }
 .deploy-caption {
   margin-top: 8pt; text-align: center; font-size: 8pt; color: #4a4a4a;
   background: ${ROW_ALT}; padding: 4pt 0;
@@ -579,27 +575,12 @@ body {
           </div>
           {footnote && <div className="benefits-note">{footnote}</div>}
 
-          {/* A per-model sheet carries the series positioning as CONTEXT,
-              after its own feature list — not as its identity. */}
-          {!isSeries && blocks.length > 0 && !whyOnOwnPage && (
-            <div className="why-series">
-              <div className="benefits-title">
-                <span className="section-title">Why the {seriesName}</span>
-              </div>
-              <div className="why-grid">
-                {blocks.map((b, i) => (
-                  <div key={i}>
-                    <div className="block-title">{b.title}</div>
-                    <div className="block-body">{b.bullets.join(" ")}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {isSeries && (
+          {/* Application context — how the device deploys. A per-model
+              sheet keeps the same neutral framing; the series positioning
+              ("why this family") belongs to the series datasheet. */}
+          {(isSeries || !diagramOnOwnPage) && (
             <>
-              <div className="deploy">
+              <div className={`deploy${isSeries ? "" : " compact"}`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={deployImg} alt="PtP/PtMP deployment applications" />
               </div>
@@ -610,23 +591,16 @@ body {
         <div className="page-number">{nextPage()}</div>
       </div>
 
-      {/* "Why the …" on its own page when the feature list filled page 2 */}
-      {whyOnOwnPage && (
+      {/* Diagram on its own page when the feature list filled page 2 */}
+      {diagramOnOwnPage && (
         <div className="page">
           <div className="top-bar" />
           <div className="benefits-page">
-            <div className="benefits-title">
-              <span className="section-title">Why the {seriesName}</span>
+            <div className="deploy">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={deployImg} alt="PtP/PtMP deployment applications" />
             </div>
-            <div className="why-grid">
-              {blocks.map((b, i) => (
-                <div key={i}>
-                  <div className="block-title">{b.title}</div>
-                  <div className="block-body">{b.bullets.join(" ")}</div>
-                </div>
-              ))}
-            </div>
-            {footnote && <div className="benefits-note">{footnote}</div>}
+            <div className="deploy-caption">PtP/PtMP Deployment Applications Diagram</div>
           </div>
           <div className="page-number">{nextPage()}</div>
         </div>
