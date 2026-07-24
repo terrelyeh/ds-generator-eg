@@ -149,9 +149,24 @@ export async function translate(opts: {
     translated = parsed.translated ?? "";
     notes = parsed.notes ?? "";
   } catch {
-    // Fallback: if AI didn't return valid JSON, use raw text as translation
-    translated = raw.trim();
-    notes = "";
+    // The response looked like JSON but wouldn't parse — usually truncated
+    // mid-object when the model spends its budget on `notes`. Salvage the
+    // translation rather than storing the JSON blob verbatim, which is how
+    // an EOC610 headline ended up reading `{"translated": "…", "notes": "…`
+    // on the datasheet cover.
+    const salvaged = raw.match(/"translated"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (salvaged) {
+      translated = salvaged[1]
+        .replace(/\\n/g, "\n")
+        .replace(/\\"/g, '"')
+        .replace(/\\\\/g, "\\")
+        .trim();
+      notes = "";
+    } else {
+      // Genuinely not JSON — the model answered in plain text.
+      translated = raw.trim();
+      notes = "";
+    }
   }
 
   return { translated, notes, provider: provider.name };

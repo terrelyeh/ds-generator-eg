@@ -22,6 +22,10 @@ export const gemini25Pro: TranslateProvider = {
           generationConfig: {
             temperature: 0.3,
             responseMimeType: "application/json",
+            // Without an explicit ceiling the response can stop mid-object,
+            // leaving unparseable JSON (see the salvage path in index.ts).
+            // Feature lists are the long case — 17 bullets plus notes.
+            maxOutputTokens: 8192,
           },
         }),
       }
