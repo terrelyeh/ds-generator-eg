@@ -16,6 +16,10 @@ interface PrintToolbarProps {
    *  button clicked). Draft-only translations can be previewed but must
    *  not produce official PDFs. Always true for English. */
   translationConfirmed?: boolean;
+  /** Series mode: `model` carries the PRODUCT LINE name and Generate hits
+   *  /api/generate-pdf?line= instead of ?model= — the line ships ONE
+   *  datasheet covering every model. */
+  series?: boolean;
 }
 
 export function PrintToolbar({
@@ -25,6 +29,7 @@ export function PrintToolbar({
   locale = "en",
   userRole = null,
   translationConfirmed = true,
+  series = false,
 }: PrintToolbarProps) {
   const [generating, setGenerating] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
@@ -52,7 +57,9 @@ export function PrintToolbar({
     });
     try {
       const res = await fetch(
-        `/api/generate-pdf?model=${encodeURIComponent(model)}&mode=${mode}&lang=${locale}`,
+        series
+          ? `/api/generate-pdf?line=${encodeURIComponent(model)}&mode=${mode}&lang=${locale}`
+          : `/api/generate-pdf?model=${encodeURIComponent(model)}&mode=${mode}&lang=${locale}`,
         { method: "POST" }
       );
       const data = await res.json();

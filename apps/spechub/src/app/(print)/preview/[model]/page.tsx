@@ -7,6 +7,7 @@ import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { DataCenterPreview } from "./datacenter-preview";
+import { BroadbandPreview } from "./broadband-preview";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
 import type {
   Product,
@@ -25,6 +26,8 @@ interface ProductQueryRow extends Product {
 /** Pretty band names on the Antenna Patterns page; ports pass through. */
 const BAND_DISPLAY: Record<string, string> = { "2.4G": "2.4GHz", "5G": "5GHz", "6G": "6GHz" };
 
+/** Broadband Outdoor lines render via the steel-blue layout component. */
+const BROADBAND_CATEGORIES = new Set(["Broadband APs"]);
 /** Data Center lines render via the dedicated navy layout component. */
 const DC_CATEGORIES = new Set(["Edge Network Appliances", "AI Servers"]);
 /** Non-cloud product lines use gray theme instead of blue */
@@ -130,6 +133,26 @@ export default async function PreviewPage({
   // shared EDCC page, full-width spec table) — rendered by a dedicated
   // component instead of threading more variants through this page.
   // Same URL, so generate-pdf / product page links stay unchanged. EN-only.
+  if (BROADBAND_CATEGORIES.has(product.product_lines.category)) {
+    const { data: ldRow } = await supabase
+      .from("line_datasheets")
+      .select("headline, series_name, category_label, features, benefits, footnote, current_version")
+      .eq("product_line_id", product.product_line_id)
+      .maybeSingle();
+    return (
+      <BroadbandPreview
+        scope="model"
+        line={product.product_lines}
+        lineContent={(ldRow as unknown as import("./broadband-preview").LineContent) ?? null}
+        products={[product]}
+        focusModel={product}
+        showToolbar={showToolbar}
+        userRole={userRole}
+        versionOverride={versionOverride ?? null}
+      />
+    );
+  }
+
   if (DC_CATEGORIES.has(product.product_lines.category)) {
     return (
       <DataCenterPreview
