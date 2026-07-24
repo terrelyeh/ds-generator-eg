@@ -251,7 +251,11 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-</style>
+    .note-inline {
+      display: inline-block; background: #eef2f7; color: #45546b;
+      font-size: 12px; padding: 1px 7px; border-radius: 4px; margin-right: 4px;
+    }
+  </style>
 </head>
 <body>
   <div class="page">
@@ -260,10 +264,41 @@
       <h1>📏 Overview 字數規則</h1>
       <p class="subtitle">Datasheet 封面排版邏輯，給 PM / MKT 參考</p>
 
+      <!-- Scope -->
+      <section class="section">
+        <h2>🎯 這套規則適用哪些產品線？</h2>
+        <p>下面講的字數上限，是<strong>標準 Cloud 版型</strong>的封面算出來的 ——
+           Overview 跟 Features 擠在同一頁、共用一塊固定空間。</p>
+        <div class="lang-grid">
+          <div class="lang-card">
+            <div class="lbl">✅ 套用這套規則</div>
+            <div class="num" style="font-size:15px;line-height:1.5">
+              Cloud 全系列<br><small style="font-size:12px">AP / Switch / L3 Switch / Camera /
+              AI-NVS / VPN Firewall / Extender / Unmanaged Switch</small>
+            </div>
+            <div class="hint">＋ Accessories ▸ Transceiver</div>
+          </div>
+          <div class="lang-card">
+            <div class="lbl">➖ 不檢查</div>
+            <div class="num" style="font-size:15px;line-height:1.5">
+              Broadband Outdoor<br>Data Center<br>Edge AI Box
+            </div>
+            <div class="hint">版型不同，容量也不同</div>
+          </div>
+        </div>
+        <div class="note">
+          <strong>為什麼不檢查？</strong>這三個 solution 的 datasheet 是各自獨立的版型 ——
+          例如 Broadband EOC 把 Features 整個放到第 2 頁、用整頁的兩欄框，放得下 12–17 項；
+          Data Center 用的是 8 格 chip 排版。拿 Cloud 的尺規去量它們只會誤報，所以直接不套用。
+          <strong>規格表（Spec）的檢查則不分產品線，一律生效。</strong>
+        </div>
+      </section>
+
       <!-- Section 1 -->
       <section class="section">
         <h2>📐 為什麼沒有固定字數上限？</h2>
-        <p>Cover 頁的 Overview 跟 Features <strong>共用一塊空間</strong>。Features 越多，Overview 能放的就越少。</p>
+        <p><span class="note-inline">以下皆指標準 Cloud 版型。</span>
+           Cover 頁的 Overview 跟 Features <strong>共用一塊空間</strong>。Features 越多，Overview 能放的就越少。</p>
         <div class="diagram-wrap">
           <div class="diagram">
             <div class="blk blk-fixed">Hero + Hardware Image</div>
@@ -323,6 +358,8 @@
             <li><strong>每個語言獨立判斷</strong> — 英文過不代表日文也過</li>
             <li><strong>紅燈是提示不是禁令</strong> — 確認過版面 OK 就可以 Mark</li>
             <li><strong>順序：</strong>寫完先看 Dashboard → 紅點就預覽確認 → 沒事就 Mark OK</li>
+            <li><strong>Broadband / Data Center / Edge AI 不會有這個紅燈</strong> — 它們版型不同，
+                但還是建議寫完預覽一次</li>
           </ul>
         </div>
       </section>
