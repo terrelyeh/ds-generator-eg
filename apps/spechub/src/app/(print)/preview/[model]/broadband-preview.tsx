@@ -37,8 +37,6 @@ const STEEL = "#1e6796";
 const BAND_DARK = "#6c6d71";
 const BAND_LIGHT = "#888b8d";
 const ROW_ALT = "#eff0f0";
-/** Key Features that fit the per-model cover column; the rest roll to p2. */
-const COVER_FEATURE_LIMIT = 7;
 
 export interface LineContent {
   headline: string | null;
@@ -129,6 +127,10 @@ export function BroadbandPreview({
   const headline = lineContent?.headline || focusModel?.headline || line.label;
   const modelOverview = focusModel?.overview?.trim() ?? "";
   const modelFeatures = (focusModel?.features ?? []).filter(Boolean);
+  const modelShot =
+    focusModel?.product_image && !focusModel.product_image.startsWith("cache/")
+      ? focusModel.product_image
+      : null;
   const seriesName = lineContent?.series_name || line.label;
   const categoryLabel = lineContent?.category_label || line.label;
   const blocks = lineContent?.features ?? [];
@@ -225,6 +227,18 @@ export function BroadbandPreview({
     year: "numeric",
   });
 
+  // Page 2 carries the model's FULL feature list, which varies 12–17
+  // items — enough that the series-context block below it may not fit.
+  // Both estimates are CALIBRATED against rendered output (EOC655: a
+  // 15-item list measured 355pt and the five blocks 380pt, so the split
+  // only needs to trigger past ~740pt of content).
+  const featureCount = (isSeries ? benefits : modelFeatures).length;
+  const featureListHeight = 46 + Math.ceil(featureCount / 2) * 41;
+  const whyBlockHeight = 46 + Math.ceil(blocks.length / 2) * 111;
+  const CONTENT_HEIGHT = 726;
+  const whyOnOwnPage =
+    !isSeries && blocks.length > 0 && featureListHeight + whyBlockHeight > CONTENT_HEIGHT;
+
   const heroImg = "/broadband/eoc-hero.png";
   const deployImg = "/broadband/eoc-deployment.png";
 
@@ -232,6 +246,7 @@ export function BroadbandPreview({
     blocks.length > 0 &&
     benefits.length > 0 &&
     specRows.length > 0 &&
+    (isSeries || !!modelShot) &&
     productViews.every((v) => v.shots.length > 0) &&
     antennaPages.every((a) => a.plots.every((plot) => plot.url));
 
@@ -311,7 +326,7 @@ body {
   font-weight: 300; font-size: 7pt; color: #6f7073;
 }
 .section-title {
-  font-weight: 500; font-size: 14pt; color: ${STEEL};
+  font-weight: 700; font-size: 14pt; color: ${STEEL};
 }
 .img-ph {
   border: 1pt dashed #b9bfc4; background: #f8f9fa; color: #9aa3ab;
@@ -345,7 +360,7 @@ body {
   position: absolute; top: 104pt; left: 0; right: 0; bottom: 0;
   width: 100%; height: 255pt; object-fit: cover;
 }
-.hero-title { font-weight: 500; color: white; line-height: 1.18; }
+.hero-title { font-weight: 700; color: white; line-height: 1.18; }
 .hero-series { font-weight: 400; font-size: 15pt; color: white; margin-top: 4pt; }
 .cover-blocks {
   position: absolute; top: 470pt; left: 36pt; right: 36pt; bottom: 46pt;
@@ -356,22 +371,18 @@ body {
   font-weight: 500; font-size: 10pt; color: ${STEEL}; margin-bottom: 5pt;
 }
 .block-body { font-size: 8pt; line-height: 1.55; color: #6f6f6f; }
-/* per-model cover: the model's own overview beside its key features */
+/* per-model cover: the model's own overview beside its own photo.
+   (Key Features live on page 2 in full — splitting the list across two
+   pages under two different headings read as a mistake.) */
 .model-cover {
   position: absolute; top: 470pt; left: 36pt; right: 36pt; bottom: 46pt;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0 26pt;
+  display: grid; grid-template-columns: 1.05fr 1fr; gap: 0 28pt;
 }
-.mc-heading {
-  font-weight: 500; font-size: 10pt; color: ${STEEL}; margin-bottom: 6pt;
-}
-.mc-overview { font-size: 8pt; line-height: 1.6; color: #6f6f6f; }
-.mc-feature {
-  display: flex; gap: 5pt; font-size: 7.5pt; line-height: 1.45;
-  color: #6f6f6f; margin-bottom: 5pt; break-inside: avoid;
-}
-.mc-feature .dot { flex: none; }
-.mc-feature b { font-weight: 700; color: #4a4a4a; }
-.mc-more { font-size: 7pt; color: #a7a9ac; margin-top: 2pt; }
+.mc-heading { margin-bottom: 8pt; }
+.mc-overview { font-size: 8.5pt; line-height: 1.65; color: #6f6f6f; }
+.mc-shot { display: flex; align-items: center; justify-content: center; }
+.mc-shot img { max-width: 100%; max-height: 235pt; object-fit: contain; }
+.mc-shot-ph { width: 100%; height: 200pt; }
 /* page 2 of a per-model sheet: series context, visually secondary */
 .why-series { padding-top: 4pt; }
 .why-grid {
@@ -517,32 +528,20 @@ body {
         ) : (
           <div className="model-cover">
             <div>
-              <div className="mc-heading">Overview</div>
+              <div className="mc-heading">
+                <span className="section-title">Overview</span>
+              </div>
               <div className="mc-overview">{modelOverview}</div>
             </div>
-            <div>
-              <div className="mc-heading">Key Features</div>
-              {modelFeatures.slice(0, COVER_FEATURE_LIMIT).map((f, i) => {
-                const m = f.match(/^([^:]{2,60}):\s*(.*)$/);
-                return (
-                  <div key={i} className="mc-feature">
-                    <span className="dot">•</span>
-                    <span>
-                      {m ? (
-                        <>
-                          <b>{m[1]}:</b> {m[2]}
-                        </>
-                      ) : (
-                        f
-                      )}
-                    </span>
-                  </div>
-                );
-              })}
-              {modelFeatures.length > COVER_FEATURE_LIMIT && (
-                <div className="mc-more">
-                  {`+ ${modelFeatures.length - COVER_FEATURE_LIMIT} more — see Features & Benefits`}
-                </div>
+            <div className="mc-shot">
+              {modelShot ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={modelShot} alt={focusModel?.model_name ?? ""} />
+              ) : (
+                <Placeholder
+                  slot={`${focusModel?.model_name}_product.png`}
+                  className="mc-shot-ph"
+                />
               )}
             </div>
           </div>
@@ -560,7 +559,7 @@ body {
             <span className="section-title">Features &amp; Benefits</span>
           </div>
           <div className="benefits-grid">
-            {(isSeries ? benefits : modelFeatures.slice(COVER_FEATURE_LIMIT)).map((b, i) => {
+            {(isSeries ? benefits : modelFeatures).map((b, i) => {
               const m = b.match(/^([^:]{2,60}):\s*(.*)$/);
               return (
                 <div key={i} className="benefit">
@@ -582,7 +581,7 @@ body {
 
           {/* A per-model sheet carries the series positioning as CONTEXT,
               after its own feature list — not as its identity. */}
-          {!isSeries && blocks.length > 0 && (
+          {!isSeries && blocks.length > 0 && !whyOnOwnPage && (
             <div className="why-series">
               <div className="benefits-title">
                 <span className="section-title">Why the {seriesName}</span>
@@ -610,6 +609,28 @@ body {
         </div>
         <div className="page-number">{nextPage()}</div>
       </div>
+
+      {/* "Why the …" on its own page when the feature list filled page 2 */}
+      {whyOnOwnPage && (
+        <div className="page">
+          <div className="top-bar" />
+          <div className="benefits-page">
+            <div className="benefits-title">
+              <span className="section-title">Why the {seriesName}</span>
+            </div>
+            <div className="why-grid">
+              {blocks.map((b, i) => (
+                <div key={i}>
+                  <div className="block-title">{b.title}</div>
+                  <div className="block-body">{b.bullets.join(" ")}</div>
+                </div>
+              ))}
+            </div>
+            {footnote && <div className="benefits-note">{footnote}</div>}
+          </div>
+          <div className="page-number">{nextPage()}</div>
+        </div>
+      )}
 
       {/* ═══ TECHNICAL SPECIFICATIONS ═══ */}
       {specPages.map((rows, pi) => (
