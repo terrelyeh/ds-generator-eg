@@ -285,7 +285,14 @@ export function BroadbandPreview({
     !isSeries && featureListHeight + DIAGRAM_BLOCK > CONTENT_HEIGHT;
 
   const heroImg = "/broadband/eoc-hero.png";
-  const deployImg = "/broadband/eoc-deployment.png";
+  // The deployment diagram has its labels and caption drawn into the
+  // artwork, so each locale needs its own file. Locales without one fall
+  // back to English rather than printing nothing. (The hero is cropped
+  // above its baked headline, so it stays shared.)
+  const LOCALISED_DEPLOY = new Set(["ja"]);
+  const deployImg = LOCALISED_DEPLOY.has(locale)
+    ? `/broadband/eoc-deployment_${locale}.png`
+    : "/broadband/eoc-deployment.png";
 
   const canGenerate =
     (!isTranslated || translationConfirmed) &&

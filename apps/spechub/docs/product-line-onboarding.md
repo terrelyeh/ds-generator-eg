@@ -139,6 +139,11 @@ component**, branched by category near the top of `page.tsx` — the URL stays
 - **Reference art usually has text baked in.** The EOC hero contains its own
   headline and the deployment diagram its own caption — cropping naively
   double-printed both. Crop past the baked text, then draw live text.
+- **Baked-in text means the asset needs a per-locale copy.** The EOC
+  deployment diagram labels its scenes inside the artwork, so `ja` gets
+  `eoc-deployment_ja.png`; locales without one fall back to English. The hero
+  is cropped above its headline, so it stays shared. Decide which of the two
+  a new asset is BEFORE wiring it in.
 - **Anchor the footer to the LAST page, not a section.** Pinning it to the
   antenna page made it vanish on lines with no plots uploaded.
 - Narrow comparison columns need `overflow-wrap: anywhere`, or tokens like
