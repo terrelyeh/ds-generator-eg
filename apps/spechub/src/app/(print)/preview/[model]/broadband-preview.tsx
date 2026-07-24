@@ -131,6 +131,20 @@ export function BroadbandPreview({
     focusModel?.product_image && !focusModel.product_image.startsWith("cache/")
       ? focusModel.product_image
       : null;
+  // The cover's Overview has a fixed slot and PMs edit this copy in the
+  // sheet, so pick the largest size that fits instead of letting a longer
+  // overview run off the page. CALIBRATED against rendered output: a 262pt
+  // column, real prose wrapping at ~0.514 x font-size per character (EOC620's
+  // 897 chars measured 15 lines, EOC600's 921 needed 16).
+  const OV_COL_WIDTH = 262;
+  const OV_SLOT_HEIGHT = 222;
+  const OV_WIDTH_FACTOR = 0.514;
+  const overviewFontPt =
+    [8.5, 8, 7.5].find((pt) => {
+      const perLine = OV_COL_WIDTH / (OV_WIDTH_FACTOR * pt);
+      return Math.ceil(modelOverview.length / perLine) * pt * 1.65 <= OV_SLOT_HEIGHT;
+    }) ?? 7.5;
+
   const seriesName = lineContent?.series_name || line.label;
   const categoryLabel = lineContent?.category_label || line.label;
   const blocks = lineContent?.features ?? [];
@@ -380,7 +394,7 @@ body {
   display: grid; grid-template-columns: 1.05fr 1fr; gap: 0 28pt;
 }
 .mc-heading { margin-bottom: 8pt; }
-.mc-overview { font-size: 8.5pt; line-height: 1.65; color: #6f6f6f; }
+.mc-overview { line-height: 1.65; color: #6f6f6f; }
 .mc-shot { display: flex; align-items: center; justify-content: center; }
 .mc-shot img { max-width: 100%; max-height: 235pt; object-fit: contain; }
 .mc-shot-ph { width: 100%; height: 200pt; }
@@ -537,7 +551,9 @@ body {
               <div className="mc-heading">
                 <span className="section-title">Overview</span>
               </div>
-              <div className="mc-overview">{modelOverview}</div>
+              <div className="mc-overview" style={{ fontSize: `${overviewFontPt}pt` }}>
+                {modelOverview}
+              </div>
             </div>
             <div className="mc-shot">
               {modelShot ? (
