@@ -64,47 +64,14 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
 ## Directory Structure
 
-```
-src/
-  app/
-    (main)/
-      dashboard/[solution]/page.tsx    # Per-solution dashboard (reads ?line= for tab)
-      compare/[line]/page.tsx
-      changelog/[line]/page.tsx
-      product/[model]/page.tsx         # Product detail (sticky header, tabs: Detail/Translations)
-      translations/[line]/page.tsx     # Per-product-line spec label translations
-      battlecard/[line]/page.tsx       # Internal competitor battlecard (Cloud AP MVP)
-      docs/sync/page.tsx
-      settings/                        # hub + glossary / typography / users
-    auth/                              # Google OAuth flow（與 engenie 各持一份）
-    (print)/preview/[model]/page.tsx   # Datasheet HTML preview（?lang=ja&mode=full&toolbar=false）
-    api/
-      sync/route.ts                    # Sheets → Supabase sync + 觸發 EnGenie re-index
-      generate-pdf/route.ts            # Puppeteer PDF + generation lock
-      resync-product/、resync-versions/、detect-locale-version/
-      upload-image/route.ts            # Upload to Supabase + Google Drive
-      translate/route.ts               # AI translation endpoint (multi-provider)
-      translations/{product,spec-labels}/、glossary/
-      settings/{providers,typography,fonts}/  # providers 與 engenie 各持一份
-      products/[model]/layout-ack/
-      battlecard/{value,matchup,resync,websearch,confirm-all}/  # 競品比較 CRUD + 抽取
-      notify/、users/*                  # Telegram 通知、admin user management
-  proxy.ts                             # session refresh + auth gate + Puppeteer automation bypass（已簡化）
-  components/
-    layout/{navbar,main-shell,user-menu,engenie-widget}.tsx
-    dashboard/、product/、compare/、changelog/、translations/、preview/、battlecard/
-    settings/{settings-page,glossary-editor,typography-editor,users-manager}.tsx
-    ui/                                # shadcn（與 engenie 各持一份）
-  lib/
-    google/{auth,sheets,sheets-extra,drive-versions,drive-images}.ts
-    datasheet/                         # cover-layout、pagination、layout-check、layout-ack、typography、locales/
-    translate/                         # prompts + providers (claude/openai/gemini)
-    battlecard/spec-mapping.ts         # dimension_key → EnGenius spec label 對應(自家值 seed 用)
-    notifications/
-packages/（repo root）
-  db/    → @eg/db：supabase server/client/admin、settings(getApiKey)、DB types、supabase/migrations/
-  auth/  → @eg/auth：session(gate/gateOrCron)、permissions(can/矩陣)、page-guards(adminOnly…)
-```
+完整檔案地圖見 [`docs/file-structure.md`](docs/file-structure.md)。要記住的是：
+
+- **`(main)/`** = 受白名單 gate 的頁面（dashboard / product / compare / settings…），
+  **headless 驗不了**（pitfall #62）；**`(print)/preview/*`** 帶 bypass header 可以直接抓
+- **`lib/datasheet/`** 放版面計算與「依 category 而異」的規則
+  （`qr.ts`、`radio-patterns.ts` —— 不要在元件內就地判斷 category）
+- **`lib/google/`** 是所有 Sheets / Drive 存取的入口
+- 共用碼在 repo root 的 `packages/`：`@eg/db`（含 **migrations 唯一來源**）、`@eg/auth`
 
 ## Architecture & Data Flow
 
@@ -157,41 +124,22 @@ UI fork 自 compare-table。半自動抽取(**↻ sync** datasheet / **🔍 web*
 
 ## Database Tables
 
+完整 schema、欄位語意與擁有權見 [`docs/schema.md`](docs/schema.md)。
+
 ```
 solutions → product_lines → products → spec_sections → spec_items
                              products → image_assets, change_logs, versions
-             product_lines → comparisons, cloud_comparisons, revision_logs
+             product_lines → line_datasheets        (線層共用 datasheet 內容)
 auth.users → profiles ← email_whitelist.invited_by
 ```
 
-本 app 擁有 schema 演進權：products、product_lines、versions、product_translations、
-spec_label_translations、translation_glossary、profiles、email_whitelist、app_settings。
-EnGenie 擁有：documents、ask_workspaces、api_keys、chat_sessions、topology_icons。
-共同：`solutions`（本 app 管產品 solution；engenie 只加 `kind='knowledge'` 列）。
-
-Key tables:
-- `solutions` — id, name, slug, label, color_primary, ds_template, sort_order, **kind**
-  ('product'|'knowledge')。**dashboard sidebar 只顯示 `kind='product'`;沒有 product line 的
-  solution 以灰階 disabled「soon」佔位呈現(2026-06-16 起不再用 `product_line_count>0` 過濾掉)**
-- `product_lines` — solution_id (FK), ds_prefix, ds_images_folder_id, drive_folder_id,
-  sort_order, **spec_footnote** + **spec_footnote_translations** (JSONB), **qr_url_template**
-  (NULL=用 dict default;`{model}` 替換 lowercase model_name。Cloud AP/Camera 維持短連結
-  `qr.engenius.ai/qsg/<model>`;VPN FW/NVS/Switch/L3 Switch/Extender 用 doc.engenius.ai 結構)。
-  Resolution priority：`product_translations.qr_url` → `qr_url_template` → `dict.defaultQrUrl`
-- `products` — status, current_version, **current_versions** (JSONB: `{"en":"1.1","ja":"1.0"}`)
-- `versions` — version, **locale**, pdf_storage_path, changes。**UNIQUE (product_id, version, locale)**（pitfall #45）
-- `product_translations` — per-product per-locale: headline, **subtitle**, overview, features,
-  hardware_image, qr_label, qr_url, translation_mode, **confirmed**
-- `spec_label_translations` — per-line per-locale label 翻譯；`translation_glossary` — 詞庫
-- `app_settings` — key-value: API keys（LLM）、`typography_${locale}`、`custom_fonts_${locale}`、
-  `pdf_lock_{model}_{lang}`（**與 EnGenie 共用**;keys 管理 UI 在 EnGenie）
-- `profiles` — role TEXT CHECK (admin/editor/pm/viewer)；`email_whitelist` — 邀請制白名單
-- **Battlecard**（內部競品比較,Cloud AP MVP,migration `00025`）— `competitors`(品牌)→
-  `competitor_products`(型號,FK product_line + datasheet_url)；`competitor_matchups`
-  (anchor_model_name × competitor_product_id × **tier**;tier 是**關係層**,同一競品對不同自家機型可不同 tier)；
-  `battlecard_dimensions`(per-line 比較維度模板=表格的列)；`battlecard_values`(每格值;兩個 nullable FK
-  `anchor_model_name`|`competitor_product_id` + CHECK 互斥 + partial unique index;帶 **confirmed** +
-  source_url + captured_at + extraction_method)。**RLS:authenticated 唯讀,寫入一律走 admin client**
+- **本 app 擁有 products / product_lines / line_datasheets / versions / 翻譯相關表的
+  schema 演進權**；documents / ask_workspaces / api_keys 等屬 EnGenie。改共用表前要
+  確認 EnGenie 的 ingest 不受影響
+- **migrations 一律放 `packages/db/supabase/migrations/`**，新表要手動加進
+  `database.generated.ts`
+- 兩個最常踩的欄位雷：`versions` 的 UNIQUE 要含 **locale**（pitfall #45）、
+  products 的三個 image 欄位是 **`NOT NULL DEFAULT ''`**，清空寫 `""`（pitfall #60）
 
 ## Conventions
 
@@ -338,6 +286,8 @@ npm run lint
 ## 詳細文件
 
 - [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md) — 拆分藍圖（歸屬/階段/驗收/回滾）
+- [`docs/file-structure.md`](docs/file-structure.md) — 完整檔案地圖 + 放東西的規則
+- [`docs/schema.md`](docs/schema.md) — DB schema:關係圖、擁有權、各表欄位語意
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步
