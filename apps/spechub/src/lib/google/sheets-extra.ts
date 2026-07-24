@@ -470,3 +470,66 @@ export async function loadLineDatasheetContent(
     content.software_arch;
   return hasAnything ? content : null;
 }
+
+// ---------------------------------------------------------------------------
+// Curated series comparison table ("[For DS] Technical Specifications")
+// ---------------------------------------------------------------------------
+
+export interface SeriesSpecsColumn {
+  /** e.g. "Orin BOX 67 / Orin BOX 67W" */
+  name: string;
+  /** e.g. "E5-NA08 / E5-NA08W" */
+  number: string;
+}
+
+export interface SeriesSpecsData {
+  columns: SeriesSpecsColumn[];
+  rows: { label: string; values: string[] }[];
+}
+
+/**
+ * Load the "[For DS] Technical Specifications" tab — a flat comparison
+ * table already CURATED for the datasheet: row 1 = Model Name (columns,
+ * possibly paired "A / B"), row 2 = Model Number, then flat spec rows.
+ * No category headers; paired values live in the sheet as-is.
+ */
+export async function loadSeriesSpecs(
+  sheetId: string,
+  gid: string
+): Promise<SeriesSpecsData | null> {
+  const tabName = await resolveTabName(sheetId, gid);
+  if (!tabName) return null;
+
+  const rows = await fetchTab(sheetId, tabName);
+  if (rows.length < 3) return null;
+
+  // Locate the two header rows (tolerate leading junk rows)
+  let nameRow = -1;
+  let numberRow = -1;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    const label = cell(rows[i], 0).toLowerCase();
+    if (label === "model name") nameRow = i;
+    if (label === "model number" || label === "model #") numberRow = i;
+  }
+  if (nameRow < 0 || numberRow < 0) return null;
+
+  // Columns = non-empty cells of the Model Name row
+  const columns: SeriesSpecsColumn[] = [];
+  const colIdx: number[] = [];
+  for (let c = 1; c < (rows[nameRow]?.length ?? 0); c++) {
+    const name = cell(rows[nameRow], c);
+    if (!name) continue;
+    columns.push({ name, number: cell(rows[numberRow], c) });
+    colIdx.push(c);
+  }
+  if (columns.length === 0) return null;
+
+  const specRows: SeriesSpecsData["rows"] = [];
+  for (let i = Math.max(nameRow, numberRow) + 1; i < rows.length; i++) {
+    const label = cell(rows[i], 0);
+    if (!label) continue;
+    specRows.push({ label, values: colIdx.map((c) => cell(rows[i], c)) });
+  }
+
+  return { columns, rows: specRows };
+}

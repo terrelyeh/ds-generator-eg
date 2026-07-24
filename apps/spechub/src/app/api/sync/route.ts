@@ -6,13 +6,18 @@ import {
   loadProductFromSheets,
   getSheetMetadata,
 } from "@/lib/google/sheets";
-import { syncProductImages, syncLocalizedHardwareImage } from "@/lib/google/drive-images";
+import {
+  syncProductImages,
+  syncLocalizedHardwareImage,
+  syncSeriesImages,
+} from "@/lib/google/drive-images";
 import { sendNotifications } from "@/lib/notifications";
 import {
   loadRevisionLogs,
   loadComparison,
   loadCloudComparison,
   loadLineDatasheetContent,
+  loadSeriesSpecs,
 } from "@/lib/google/sheets-extra";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
@@ -575,11 +580,39 @@ export async function POST(request: Request) {
             const categoryLabel =
               lineContent.category_label || pl.category.replace(/s\s*$/i, "");
 
+            // Series-scope lines also carry a curated comparison table and
+            // series_* imagery; per-model lines need neither.
+            const wantsSeries = pl.ds_scope === "series" || pl.ds_scope === "both";
+
+            const seriesSpecs =
+              wantsSeries && pl.ds_specs_gid
+                ? await loadSeriesSpecs(pl.sheet_id, pl.ds_specs_gid)
+                : null;
+
+            let seriesImages = null;
+            if (wantsSeries) {
+              const { data: lineProducts } = (await supabase
+                .from("products")
+                .select("model_name")
+                .eq("product_line_id", pl.id)) as {
+                  data: { model_name: string }[] | null;
+                };
+              const res = await syncSeriesImages({
+                lineName: pl.name,
+                dsImagesFolderId: pl.ds_images_folder_id,
+                modelNames: (lineProducts ?? []).map((p) => p.model_name),
+                supabase,
+              });
+              if (res.folder_listed) seriesImages = res.images;
+            }
+
             const upsertRes = await supabase
               .from("line_datasheets")
               .upsert(
                 {
                   product_line_id: pl.id,
+                  ...(seriesSpecs ? { specs: seriesSpecs } : {}),
+                  ...(seriesImages ? { images: seriesImages } : {}),
                   headline: lineContent.headline || null,
                   series_name: lineContent.series_name || null,
                   category_label: categoryLabel,

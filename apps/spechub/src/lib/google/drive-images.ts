@@ -708,3 +708,119 @@ export async function syncProductImages(
 
   return result;
 }
+
+// ---------------------------------------------------------------------------
+// Series datasheet images (ds_scope='series' lines)
+// ---------------------------------------------------------------------------
+
+/**
+ * Images JSONB shape stored on line_datasheets.images.
+ * hw_pages entries are ORDERED: page 1 = base models (no "W" suffix),
+ * page 2 = "W" variants. A page with no images is omitted.
+ */
+export interface SeriesImages {
+  hero: string | null;
+  cover_product: string | null;
+  architecture: string | null;
+  hw_pages: { subtitle: string; images: string[] }[];
+}
+
+/**
+ * Naming rule (flat files in the line's DS Images folder — NO global
+ * Drive fallback, unlike per-model images):
+ *   series_hero.{png|jpg|jpeg|webp}          — cover full-bleed background
+ *   series_cover_product.*                   — cover floating product shot
+ *   series_architecture.*                    — architecture diagram (page 2;
+ *                                              caption baked into the image)
+ *   series_hw1_a.* / series_hw1_b.*          — Hardware Overview page 1
+ *                                              (non-W models), top / bottom
+ *   series_hw2_a.* / series_hw2_b.*          — Hardware Overview page 2
+ *                                              ("W" models), top / bottom
+ *
+ * Always re-downloads on sync (7 small files; skipping the smart HEAD check
+ * keeps this simple and immune to the Drive move/timestamp pitfalls).
+ */
+export async function syncSeriesImages(params: {
+  lineName: string;
+  dsImagesFolderId: string | null | undefined;
+  /** model_names of the line — used to derive hw-page subtitles */
+  modelNames: string[];
+  supabase: ReturnType<typeof import("@eg/db/admin").createAdminClient>;
+}): Promise<{ images: SeriesImages; folder_listed: boolean }> {
+  const { lineName, dsImagesFolderId, modelNames, supabase } = params;
+
+  // Subtitles derived by W-variant grouping, alphabetical (matches the
+  // draft: "E5-NA08/ E5-NB08/ E5-NB16").
+  const sorted = [...modelNames].sort((a, b) => a.localeCompare(b));
+  const baseModels = sorted.filter((m) => !/w$/i.test(m));
+  const wModels = sorted.filter((m) => /w$/i.test(m));
+
+  const images: SeriesImages = {
+    hero: null,
+    cover_product: null,
+    architecture: null,
+    hw_pages: [],
+  };
+
+  if (!dsImagesFolderId) return { images, folder_listed: false };
+
+  const fileMap = await listFilesInFolder(dsImagesFolderId);
+  if (!fileMap) return { images, folder_listed: false };
+
+  const lineSlug = lineName.replace(/\s+/g, "_");
+
+  /** Find series_{slot}.{ext} in the folder, upload to Storage, return URL. */
+  async function pull(slot: string): Promise<string | null> {
+    for (const ext of ["png", "jpg", "jpeg", "webp"]) {
+      const fileName = `series_${slot}.${ext}`;
+      const file = fileMap!.get(fileName.toLowerCase());
+      if (!file) continue;
+      try {
+        const buffer = await trimTransparentEdges(await downloadFile(file.id), file.mimeType);
+        const storagePath = `images/_series/${lineSlug}/${fileName}`;
+        const { error } = await supabase.storage
+          .from("datasheets")
+          .upload(storagePath, buffer, { contentType: file.mimeType, upsert: true });
+        if (error) {
+          console.error(`[syncSeriesImages] upload ${fileName} failed:`, error.message);
+          return null;
+        }
+        const { data } = supabase.storage.from("datasheets").getPublicUrl(storagePath);
+        return data.publicUrl;
+      } catch (err) {
+        console.error(
+          `[syncSeriesImages] ${fileName} failed:`,
+          err instanceof Error ? err.message : String(err),
+        );
+        return null;
+      }
+    }
+    return null;
+  }
+
+  const [hero, coverProduct, architecture, hw1a, hw1b, hw2a, hw2b] =
+    await Promise.all([
+      pull("hero"),
+      pull("cover_product"),
+      pull("architecture"),
+      pull("hw1_a"),
+      pull("hw1_b"),
+      pull("hw2_a"),
+      pull("hw2_b"),
+    ]);
+
+  images.hero = hero;
+  images.cover_product = coverProduct;
+  images.architecture = architecture;
+
+  const hw1 = [hw1a, hw1b].filter((u): u is string => !!u);
+  const hw2 = [hw2a, hw2b].filter((u): u is string => !!u);
+  if (hw1.length > 0 || baseModels.length > 0) {
+    images.hw_pages.push({ subtitle: baseModels.join("/ "), images: hw1 });
+  }
+  if (hw2.length > 0 || wModels.length > 0) {
+    images.hw_pages.push({ subtitle: wModels.join("/ "), images: hw2 });
+  }
+
+  return { images, folder_listed: true };
+}
