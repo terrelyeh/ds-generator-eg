@@ -84,12 +84,19 @@ export async function POST(request: Request) {
   if (denied) return denied;
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
+  const lineParam = searchParams.get("line");
   const mode = searchParams.get("mode") ?? "regenerate"; // "regenerate" | "new"
   const lang = searchParams.get("lang") ?? "en";
 
+  // Series datasheet: ONE PDF covering a whole product line. Lines opt in
+  // via ds_scope 'series' (series only) or 'both' (series + per-model).
+  if (!model && lineParam) {
+    return generateSeriesPdf(lineParam, mode);
+  }
+
   if (!model) {
     return NextResponse.json(
-      { error: "Missing ?model= parameter" },
+      { error: "Missing ?model= or ?line= parameter" },
       { status: 400 }
     );
   }
@@ -523,6 +530,316 @@ export async function POST(request: Request) {
         details: err instanceof Error ? err.message : String(err),
       },
       { status: 500 }
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Series datasheet generation (?line= — ds_scope 'series' or 'both')
+// ---------------------------------------------------------------------------
+
+/**
+ * Print a preview path to PDF with the same headless-Chromium setup as the
+ * per-model flow (bypass header, base-URL resolution, gate guard).
+ */
+async function printPreviewPdf(previewPath: string): Promise<Buffer> {
+  const chromium = (await import("@sparticuz/chromium-min")).default;
+  const puppeteer = (await import("puppeteer-core")).default;
+
+  const executablePath = process.env.VERCEL
+    ? await chromium.executablePath(CHROMIUM_URL)
+    : process.platform === "darwin"
+      ? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+      : "/usr/bin/google-chrome";
+
+  const browser = await puppeteer.launch({
+    args: chromium.args,
+    defaultViewport: { width: 612, height: 792 },
+    executablePath,
+    headless: true,
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+    if (bypassSecret) {
+      await page.setExtraHTTPHeaders({
+        "x-vercel-protection-bypass": bypassSecret,
+        "x-vercel-set-bypass-cookie": "true",
+      });
+    }
+
+    // Preview deployments print their OWN URL — the prod alias may not have
+    // the route being tested yet (see the per-model flow for the same rule).
+    const baseUrl =
+      process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : process.env.PDF_PREVIEW_BASE_URL ||
+          (process.env.VERCEL_PROJECT_PRODUCTION_URL
+            ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+            : process.env.VERCEL_URL
+              ? `https://${process.env.VERCEL_URL}`
+              : `http://localhost:${process.env.PORT || 3000}`);
+
+    const previewUrl = `${baseUrl}${previewPath}`;
+    await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 30000 });
+
+    const pageTitle = await page.title();
+    if (/log in to vercel|authentication required|404/i.test(pageTitle)) {
+      throw new Error(
+        `Preview page not reachable. pageTitle="${pageTitle}" previewUrl="${previewUrl}" hasBypassSecret=${!!bypassSecret}`,
+      );
+    }
+
+    return Buffer.from(
+      await page.pdf({
+        format: "Letter",
+        printBackground: true,
+        margin: { top: 0, right: 0, bottom: 0, left: 0 },
+      }),
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
+interface SeriesVersionEntry {
+  version: string;
+  pdf_storage_path: string;
+  generated_at: string;
+  changes: string;
+}
+
+/**
+ * Generate the SERIES datasheet for a product line.
+ *
+ * Version state lives on `line_datasheets` (current_version +
+ * version_history) — deliberately independent of the per-model `versions`
+ * table, so a line running ds_scope 'both' keeps two separate numbering
+ * streams (EOC: series continues v1.5, each model starts at v1.0).
+ *
+ * Drive layout reuses the per-model helpers with "Series" as the model
+ * token: <Line>/<ds_prefix>_Series/<ds_prefix>_Series_v1.5.pdf
+ */
+async function generateSeriesPdf(lineName: string, mode: string) {
+  const supabase = createAdminClient();
+  const lockKey = getLockKey(`series_${lineName}`, "en");
+
+  const { data: existingLock } = await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", lockKey)
+    .single() as { data: { value: string } | null };
+
+  if (existingLock?.value) {
+    try {
+      const lock: PdfLock = JSON.parse(existingLock.value);
+      if (Date.now() - new Date(lock.locked_at).getTime() < LOCK_TTL_MS) {
+        return NextResponse.json(
+          { error: `Series PDF is already being generated for ${lineName}. Please wait.` },
+          { status: 409 },
+        );
+      }
+    } catch { /* stale lock — proceed */ }
+  }
+
+  await supabase
+    .from("app_settings" as "products")
+    .upsert(
+      {
+        key: lockKey,
+        value: JSON.stringify({
+          locked_at: new Date().toISOString(),
+          model: `series:${lineName}`,
+          lang: "en",
+        } satisfies PdfLock),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+
+  async function releaseLock() {
+    await supabase.from("app_settings" as "products").delete().eq("key", lockKey);
+  }
+
+  const { data: plData } = (await supabase
+    .from("product_lines")
+    .select("*")
+    .eq("name", lineName)
+    .single()) as { data: ProductLine | null };
+
+  if (!plData) {
+    await releaseLock();
+    return NextResponse.json({ error: `Product line "${lineName}" not found` }, { status: 404 });
+  }
+  const pl = plData as ProductLine & { ds_scope?: string };
+  if (pl.ds_scope !== "series" && pl.ds_scope !== "both") {
+    await releaseLock();
+    return NextResponse.json(
+      { error: `"${lineName}" does not ship a series datasheet (ds_scope=${pl.ds_scope})` },
+      { status: 400 },
+    );
+  }
+
+  const { data: ldRow } = await supabase
+    .from("line_datasheets")
+    .select("features, benefits, current_version, version_history")
+    .eq("product_line_id", pl.id)
+    .maybeSingle() as {
+      data: {
+        features: unknown[] | null;
+        benefits: unknown[] | null;
+        current_version: string | null;
+        version_history: SeriesVersionEntry[] | null;
+      } | null;
+    };
+
+  if (!ldRow) {
+    await releaseLock();
+    return NextResponse.json(
+      { error: `No line-level datasheet content for "${lineName}" — run a Sync first` },
+      { status: 404 },
+    );
+  }
+
+  const missing: string[] = [];
+  if (!Array.isArray(ldRow.features) || ldRow.features.length === 0) missing.push("cover blocks");
+  if (!Array.isArray(ldRow.benefits) || ldRow.benefits.length === 0) missing.push("features & benefits");
+  if (missing.length > 0) {
+    await releaseLock();
+    return NextResponse.json(
+      { error: `Series datasheet incomplete — missing: ${missing.join(", ")}` },
+      { status: 409 },
+    );
+  }
+
+  try {
+    const dsPrefix = pl.ds_prefix ?? "DS";
+
+    // Drive is authoritative for the version, DB is the fallback.
+    let driveVersion = null;
+    if (pl.drive_folder_id) {
+      try {
+        driveVersion = await detectLatestVersion(pl.drive_folder_id, dsPrefix, "Series");
+      } catch (err) {
+        console.warn(
+          "Drive series version detection failed:",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
+    const currentVer = driveVersion?.version || ldRow.current_version || "0.0";
+    const isRegenerate = mode === "regenerate";
+    const hasExisting = currentVer !== "0.0";
+
+    let newVersion: string;
+    if (isRegenerate && hasExisting) {
+      newVersion = currentVer;
+    } else if (driveVersion) {
+      newVersion = bumpVersion(driveVersion);
+    } else if (currentVer === "0.0") {
+      newVersion = "1.0";
+    } else {
+      const [major, minor] = currentVer.split(".");
+      newVersion = `${parseInt(major) || 1}.${(parseInt(minor) || 0) + 1}`;
+    }
+
+    const pdfBuffer = await printPreviewPdf(
+      `/preview/series/${encodeURIComponent(lineName)}?toolbar=false&version=${encodeURIComponent(newVersion)}`,
+    );
+
+    const fileName = `${dsPrefix}_Series_v${newVersion}.pdf`;
+    const lineSlug = lineName.replace(/\s+/g, "_");
+    const storagePath = `_series/${lineSlug}/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("datasheets")
+      .upload(storagePath, pdfBuffer, { contentType: "application/pdf", upsert: true });
+    if (uploadError) {
+      await releaseLock();
+      return NextResponse.json(
+        { error: "PDF upload to Supabase failed", details: uploadError.message },
+        { status: 500 },
+      );
+    }
+    const { data: urlData } = supabase.storage.from("datasheets").getPublicUrl(storagePath);
+    const pdfUrl = urlData.publicUrl;
+
+    let driveResult = null;
+    if (pl.drive_folder_id) {
+      try {
+        driveResult = await uploadPdfToDrive(
+          pl.drive_folder_id,
+          dsPrefix,
+          "Series",
+          newVersion,
+          pdfBuffer,
+          null,
+        );
+      } catch (err) {
+        console.error(
+          "Drive upload failed (series PDF still saved to Supabase):",
+          err instanceof Error ? err.message : String(err),
+        );
+      }
+    }
+
+    const history: SeriesVersionEntry[] = Array.isArray(ldRow.version_history)
+      ? ldRow.version_history
+      : [];
+    const entry: SeriesVersionEntry = {
+      version: newVersion,
+      pdf_storage_path: pdfUrl,
+      generated_at: new Date().toISOString(),
+      changes:
+        isRegenerate && hasExisting
+          ? "PDF regenerated"
+          : hasExisting
+            ? "PDF generated (new version)"
+            : "PDF generated (initial)",
+    };
+
+    const updateRes = await supabase
+      .from("line_datasheets")
+      .update({
+        current_version: newVersion,
+        version_history: [...history.filter((h) => h.version !== newVersion), entry],
+        updated_at: new Date().toISOString(),
+      })
+      .eq("product_line_id", pl.id);
+    // Pitfall #45 — supabase writes fail silently unless checked.
+    if (updateRes.error) {
+      throw new Error(`line_datasheets version update failed: ${updateRes.error.message}`);
+    }
+
+    await supabase.from("change_logs").insert({
+      product_id: null,
+      product_line_id: pl.id,
+      changes_summary: `${entry.changes} — series v${newVersion}`,
+    });
+
+    await releaseLock();
+
+    return NextResponse.json({
+      ok: true,
+      line: lineName,
+      version: newVersion,
+      fileName,
+      pdfUrl,
+      driveFileId: driveResult?.fileId ?? null,
+      driveLink: driveResult?.webViewLink ?? null,
+    });
+  } catch (err) {
+    await releaseLock();
+    console.error("Series PDF generation error:", err);
+    return NextResponse.json(
+      {
+        error: "Series PDF generation failed",
+        details: err instanceof Error ? err.message : String(err),
+      },
+      { status: 500 },
     );
   }
 }

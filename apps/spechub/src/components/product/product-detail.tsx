@@ -910,6 +910,13 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   // Category-driven datasheet traits, shared with the preview components so
   // this page can't advertise a different QR than the datasheet prints.
   const contactOnlyQr = usesContactUsQr(product.product_line.category);
+  // ds_scope: 'model' (default) | 'series' (line ships ONE datasheet, so
+  // per-model generation is off) | 'both' (per-model stays, plus a link
+  // across to the series sheet).
+  const lineScope =
+    (product.product_line as { ds_scope?: string }).ds_scope ?? "model";
+  const seriesOnly = lineScope === "series";
+  const hasSeriesSheet = lineScope === "series" || lineScope === "both";
   const hasTwoHardwareImages = usesTwoHardwareImages(product.product_line.category);
   const hasProductImage = !!product.product_image && !product.product_image.startsWith("cache/");
   const hasHardwareImage = !!product.hardware_image && !product.hardware_image.startsWith("cache/");
@@ -1146,12 +1153,24 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
             )}
           </div>
           )}
-          <Link href={`/preview/${product.model_name}`} target="_blank">
-            <Button variant="outline" size="default">
-              Preview Datasheet
-            </Button>
-          </Link>
-          {roleCanGenerate && (
+          {!seriesOnly && (
+            <Link href={`/preview/${product.model_name}`} target="_blank">
+              <Button variant="outline" size="default">
+                Preview Datasheet
+              </Button>
+            </Link>
+          )}
+          {hasSeriesSheet && (
+            <Link
+              href={`/preview/series/${encodeURIComponent(product.product_line.name)}`}
+              target="_blank"
+            >
+              <Button variant="outline" size="default">
+                Series Datasheet
+              </Button>
+            </Link>
+          )}
+          {roleCanGenerate && !seriesOnly && (
           <div className="relative">
             {!canGenerate && (
               <p className="absolute -top-6 right-0 text-[11px] text-red-500 whitespace-nowrap">

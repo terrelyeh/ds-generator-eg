@@ -19,7 +19,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Columns2, History, Languages, Swords } from "lucide-react";
+import { Columns2, FileText, History, Languages, Swords } from "lucide-react";
 import type { ProductLine } from "@eg/db/types";
 import { can, type Role } from "@eg/auth/permissions";
 import { usesTwoHardwareImages } from "@/lib/datasheet/qr";
@@ -610,6 +610,19 @@ export function DashboardContent({
           {/* Battlecard — internal competitor comparison. Shown for any line
               that has a battlecard dimension template (auto-detected server-side).
               Gated by battlecard.view (admin/editor/pm). */}
+          {/* Series datasheet — one PDF for the whole line. Shown for
+              ds_scope 'series' (series only) and 'both' (series + per-model). */}
+          {(activeLine?.ds_scope === "series" || activeLine?.ds_scope === "both") && (
+            <a
+              href={`/preview/series/${encodeURIComponent(activeLine.name)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium text-engenius-blue hover:bg-muted transition-colors"
+            >
+              <FileText className="h-3.5 w-3.5" />
+              Series Datasheet
+            </a>
+          )}
           {canViewBattlecard && battlecardLines.includes(activeLine?.name ?? "") && (
             <Link
               href={`/battlecard/${encodeURIComponent(activeLine?.name ?? "")}`}
