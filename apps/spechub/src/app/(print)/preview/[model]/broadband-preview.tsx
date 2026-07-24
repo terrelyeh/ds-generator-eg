@@ -175,18 +175,17 @@ export function BroadbandPreview({
           items: (s.spec_items ?? []).map((i) => ({ label: i.label, value: i.value })),
         })),
       });
-      const plots = slots
-        .map((slot) => {
-          const a = (p.image_assets ?? []).find(
-            (x) => x.image_type === "radio_pattern" && x.label === slot.label,
-          );
-          return a && a.status !== "missing" && a.file_url
-            ? { ...slot, url: a.file_url }
-            : null;
-        })
-        .filter((x): x is typeof slots[0] & { url: string } => x !== null);
+      const plots = slots.map((slot) => {
+        const a = (p.image_assets ?? []).find(
+          (x) => x.image_type === "radio_pattern" && x.label === slot.label,
+        );
+        const url = a && a.status !== "missing" && a.file_url ? a.file_url : null;
+        return { ...slot, url };
+      });
       return { product: p, plots };
     })
+    // Keep the page whenever the product defines slots — missing plots show
+    // placeholders (same as Product Views) so PMs can see what's expected.
     .filter((x) => x.plots.length > 0);
 
   // ── footer / QR ─────────────────────────────────────────────────────
@@ -214,7 +213,8 @@ export function BroadbandPreview({
     blocks.length > 0 &&
     benefits.length > 0 &&
     specRows.length > 0 &&
-    (isSeries || !!focusModel?.product_image);
+    productViews.every((v) => v.shots.length > 0) &&
+    antennaPages.every((a) => a.plots.every((plot) => plot.url));
 
   let pageNo = 0;
   const nextPage = () => ++pageNo;
@@ -419,6 +419,7 @@ body {
   justify-content: center; height: 200pt;
 }
 .ant-plot img { max-width: 100%; max-height: 190pt; object-fit: contain; }
+.ant-ph { width: 100%; height: 100%; border: none; background: transparent; font-size: 7pt; }
 
 /* ── footer ────────────────────────────────────────────────────────── */
 .footer {
@@ -603,8 +604,15 @@ body {
                       <span className="ant-plane">{plot.plane}</span>
                     </div>
                     <div className="ant-plot">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={plot.url} alt={plot.label} />
+                      {plot.url ? (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={plot.url} alt={plot.label} />
+                      ) : (
+                        <Placeholder
+                          slot={`${p.model_name}_${plot.label.replace(/\s+/g, "_")}.png`}
+                          className="ant-ph"
+                        />
+                      )}
                     </div>
                   </div>
                 ))}
