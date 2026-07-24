@@ -374,7 +374,9 @@ body {
    (Key Features live on page 2 in full — splitting the list across two
    pages under two different headings read as a mistake.) */
 .model-cover {
-  position: absolute; top: 470pt; left: 36pt; right: 36pt; bottom: 46pt;
+  /* sits a little below the hero rather than right against it — the block
+     read as crowding the image at 470pt */
+  position: absolute; top: 496pt; left: 36pt; right: 36pt; bottom: 46pt;
   display: grid; grid-template-columns: 1.05fr 1fr; gap: 0 28pt;
 }
 .mc-heading { margin-bottom: 8pt; }
