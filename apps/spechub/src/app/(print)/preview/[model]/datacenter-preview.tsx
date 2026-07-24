@@ -171,14 +171,34 @@ export function DataCenterPreview({
   showToolbar,
   userRole,
   versionOverride,
+  locale = "en",
+  translation,
+  translationConfirmed = true,
 }: {
   product: DcQueryRow;
   showToolbar: boolean;
   userRole: import("@eg/auth/permissions").Role | null;
   versionOverride: string | null;
+  locale?: string;
+  /** Resolved product_translations row for `locale`, when non-English. */
+  translation?: {
+    headline: string | null;
+    overview: string | null;
+    features: string[] | null;
+    hardware_image: string | null;
+  } | null;
+  translationConfirmed?: boolean;
 }) {
-  const dict = getDict("en");
+  const dict = getDict(locale);
   const line = product.product_lines;
+
+  // Render the locale's copy where it exists, falling back per field. The
+  // gate below reads the SAME values — checking English while rendering
+  // another language is what blocked ECW260 (pitfall #59).
+  const isTranslated = locale !== "en";
+  const headline = (isTranslated ? translation?.headline : null) || product.headline;
+  const overview = (isTranslated ? translation?.overview : null) ?? product.overview;
+  const features = (isTranslated ? translation?.features : null) ?? product.features;
 
   // Grouped features (chip | bold title + bullets); fall back to flat list.
   const dsGroups = (product.ds_features ?? []).filter(
@@ -200,8 +220,11 @@ export function DataCenterPreview({
   // First spec page: title(70) + band(22) + 2 model bands(40) → ~600pt of rows.
   const specPages = paginateSpecRows(specRows, 590, 655);
 
-  const hw1 = product.hardware_image && !product.hardware_image.startsWith("cache/")
-    ? product.hardware_image : null;
+  // Locales carry their own hardware render — its callouts are translated
+  // in the image itself.
+  const hwPrimary =
+    (isTranslated ? translation?.hardware_image : null) || product.hardware_image;
+  const hw1 = hwPrimary && !hwPrimary.startsWith("cache/") ? hwPrimary : null;
   const hw2 = product.hardware_image_2 && !product.hardware_image_2.startsWith("cache/")
     ? product.hardware_image_2 : null;
   const productImage = product.product_image && !product.product_image.startsWith("cache/")
@@ -214,13 +237,13 @@ export function DataCenterPreview({
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`;
 
   // Auto-fit the hero overview to whatever room the headline leaves.
-  const heroHeadline = product.headline || product.full_name;
+  const heroHeadline = headline || product.full_name;
   const headlineHeight =
     estWrappedLines(heroHeadline, HEADLINE_SIZE, HEADLINE_WIDTH, HEADLINE_WIDTH_FACTOR) *
     HEADLINE_SIZE *
     HEADLINE_LINE_HEIGHT;
   const overviewSize = fitOverviewSize(
-    product.overview ?? "",
+    overview ?? "",
     HERO_HEIGHT - HERO_PAD_TOP - HERO_PAD_BOTTOM - headlineHeight - LOWER_GAP - MODEL_BLOCK,
   );
 
@@ -234,8 +257,9 @@ export function DataCenterPreview({
   const canGenerate =
     !!productImage &&
     !!hw1 &&
-    !!product.overview && product.overview.trim().length > 0 &&
-    (useGroups || (Array.isArray(product.features) && product.features.length > 0)) &&
+    (!isTranslated || translationConfirmed) &&
+    !!overview && overview.trim().length > 0 &&
+    (useGroups || (Array.isArray(features) && features.length > 0)) &&
     specRows.length > 0;
 
   const totalPages = 2 + specPages.length + 1;
@@ -248,9 +272,9 @@ export function DataCenterPreview({
           model={product.model_name}
           currentVersion={product.current_version || "0.0"}
           canGenerate={canGenerate}
-          locale="en"
+          locale={locale}
           userRole={userRole}
-          translationConfirmed
+          translationConfirmed={!isTranslated || translationConfirmed}
         />
       )}
       <style
@@ -519,7 +543,7 @@ body {
           </div>
         ) : (
           <div className="cover-features-flat">
-            {(product.features ?? []).map((f, fi) => (
+            {(features ?? []).map((f, fi) => (
               <div key={fi} className="flat-bullet">
                 <span className="dot">●</span>
                 <span>{f}</span>
@@ -565,7 +589,7 @@ body {
           <div className="top-bar" />
           <div className="specs-page">
             <div className="specs-title-row">
-              <span className="section-title">Technical Specifications</span>
+              <span className="section-title">{dict.technicalSpecifications}</span>
             </div>
             <table className="specs-table">
               <colgroup>
@@ -610,7 +634,7 @@ body {
         <div className="top-bar" />
         <div className="hw-page">
           <div className="hw-title-row">
-            <span className="section-title">Hardware Overview</span>
+            <span className="section-title">{dict.hardwareOverview}</span>
           </div>
           <div className="hw-subtitle">
             {product.model_name} ({product.subtitle})

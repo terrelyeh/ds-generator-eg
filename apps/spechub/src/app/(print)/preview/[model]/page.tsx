@@ -129,41 +129,6 @@ export default async function PreviewPage({
   const product = data as ProductQueryRow | null;
   if (!product) notFound();
 
-  // Data Center lines use a structurally different navy layout (hero cover,
-  // shared EDCC page, full-width spec table) — rendered by a dedicated
-  // component instead of threading more variants through this page.
-  // Same URL, so generate-pdf / product page links stay unchanged. EN-only.
-  if (BROADBAND_CATEGORIES.has(product.product_lines.category)) {
-    const { data: ldRow } = await supabase
-      .from("line_datasheets")
-      .select("headline, series_name, category_label, features, benefits, footnote, current_version")
-      .eq("product_line_id", product.product_line_id)
-      .maybeSingle();
-    return (
-      <BroadbandPreview
-        scope="model"
-        line={product.product_lines}
-        lineContent={(ldRow as unknown as import("./broadband-preview").LineContent) ?? null}
-        products={[product]}
-        focusModel={product}
-        showToolbar={showToolbar}
-        userRole={userRole}
-        versionOverride={versionOverride ?? null}
-      />
-    );
-  }
-
-  if (DC_CATEGORIES.has(product.product_lines.category)) {
-    return (
-      <DataCenterPreview
-        product={product}
-        showToolbar={showToolbar}
-        userRole={userRole}
-        versionOverride={versionOverride ?? null}
-      />
-    );
-  }
-
   // --- Load translations if non-English ---
   let translatedOverview: string | null = null;
   let translatedFeatures: string[] | null = null;
@@ -218,6 +183,66 @@ export default async function PreviewPage({
         }
       }
     }
+  }
+
+  // Data Center and Broadband lines use structurally different layouts,
+  // rendered by dedicated components instead of threading more variants
+  // through this page. Same URL, so generate-pdf / product page links stay
+  // unchanged. Translations are resolved ABOVE this point — these branches
+  // return early, so loading them later left both layouts English-only.
+  if (BROADBAND_CATEGORIES.has(product.product_lines.category)) {
+    const { data: ldRow } = await supabase
+      .from("line_datasheets")
+      .select("headline, series_name, category_label, features, benefits, footnote, current_version")
+      .eq("product_line_id", product.product_line_id)
+      .maybeSingle();
+    return (
+      <BroadbandPreview
+        scope="model"
+        line={product.product_lines}
+        lineContent={(ldRow as unknown as import("./broadband-preview").LineContent) ?? null}
+        products={[product]}
+        focusModel={product}
+        showToolbar={showToolbar}
+        userRole={userRole}
+        versionOverride={versionOverride ?? null}
+        locale={lang}
+        translation={
+          isTranslated
+            ? {
+                headline: translatedHeadline,
+                overview: translatedOverview,
+                features: translatedFeatures,
+                hardware_image: localeHardwareImage,
+              }
+            : null
+        }
+        translationConfirmed={translationConfirmed}
+      />
+    );
+  }
+
+  if (DC_CATEGORIES.has(product.product_lines.category)) {
+    return (
+      <DataCenterPreview
+        product={product}
+        showToolbar={showToolbar}
+        userRole={userRole}
+        versionOverride={versionOverride ?? null}
+        locale={lang}
+        translation={
+          isTranslated
+            ? {
+                headline: translatedHeadline,
+                overview: translatedOverview,
+                features: translatedFeatures,
+                hardware_image: localeHardwareImage,
+              }
+            : null
+        }
+        translationConfirmed={translationConfirmed}
+      />
+    );
   }
 
   // --- Build spec sections (with optional label translation) ---

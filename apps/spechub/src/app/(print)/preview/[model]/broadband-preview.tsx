@@ -104,6 +104,9 @@ export function BroadbandPreview({
   showToolbar,
   userRole,
   versionOverride,
+  locale = "en",
+  translation,
+  translationConfirmed = true,
 }: {
   scope: "model" | "series";
   line: ProductLine;
@@ -115,18 +118,42 @@ export function BroadbandPreview({
   showToolbar: boolean;
   userRole: import("@eg/auth/permissions").Role | null;
   versionOverride: string | null;
+  /** "en" | "ja" | "zh-TW" — series datasheets stay English for now. */
+  locale?: string;
+  /** Resolved product_translations row for `locale`, when non-English. */
+  translation?: {
+    headline: string | null;
+    overview: string | null;
+    features: string[] | null;
+    hardware_image: string | null;
+  } | null;
+  /** False blocks generation while the translation is still a Draft. */
+  translationConfirmed?: boolean;
 }) {
-  const dict = getDict("en");
+  const dict = getDict(locale);
   const isSeries = scope === "series";
+  // A per-model sheet renders the locale's copy where it exists and falls
+  // back to English per field. The gate below must read the SAME values —
+  // checking English while rendering Japanese is what blocked ECW260
+  // (pitfall #59).
+  const isTranslated = locale !== "en" && !isSeries;
 
   // Cover identity: the series speaks for the family, a model speaks for
   // itself.
   const coverHeadline = isSeries
     ? lineContent?.headline || line.label
-    : focusModel?.headline || lineContent?.headline || line.label;
+    : (isTranslated ? translation?.headline : null) ||
+      focusModel?.headline ||
+      lineContent?.headline ||
+      line.label;
   const headline = lineContent?.headline || focusModel?.headline || line.label;
-  const modelOverview = focusModel?.overview?.trim() ?? "";
-  const modelFeatures = (focusModel?.features ?? []).filter(Boolean);
+  const modelOverview =
+    ((isTranslated ? translation?.overview : null) ?? focusModel?.overview ?? "").trim();
+  const modelFeatures = (
+    (isTranslated ? translation?.features : null) ??
+    focusModel?.features ??
+    []
+  ).filter(Boolean);
   const modelShot =
     focusModel?.product_image && !focusModel.product_image.startsWith("cache/")
       ? focusModel.product_image
@@ -194,7 +221,12 @@ export function BroadbandPreview({
   const viewProducts = isSeries ? orderedProducts : focusModel ? [focusModel] : [];
   const productViews = viewProducts.map((p) => {
     const ext = p as BroadbandProduct & { hardware_image_2?: string | null };
-    const shots = [p.hardware_image, ext.hardware_image_2]
+    // Locales carry their own hardware render (callouts are translated in
+    // the image itself), so prefer it — EOC610 has a ja render but no en one.
+    const primary =
+      (isTranslated && p === focusModel ? translation?.hardware_image : null) ||
+      p.hardware_image;
+    const shots = [primary, ext.hardware_image_2]
       .filter((u): u is string => !!u && !u.startsWith("cache/"));
     return { product: p, shots };
   });
@@ -256,8 +288,11 @@ export function BroadbandPreview({
   const deployImg = "/broadband/eoc-deployment.png";
 
   const canGenerate =
+    (!isTranslated || translationConfirmed) &&
     blocks.length > 0 &&
-    benefits.length > 0 &&
+    (isSeries
+      ? benefits.length > 0
+      : modelFeatures.length > 0 && !!modelOverview) &&
     specRows.length > 0 &&
     (isSeries || !!modelShot) &&
     productViews.every((v) => v.shots.length > 0) &&
@@ -304,9 +339,9 @@ export function BroadbandPreview({
           model={isSeries ? line.name : focusModel?.model_name ?? line.name}
           currentVersion={currentVersion}
           canGenerate={canGenerate}
-          locale="en"
+          locale={isSeries ? "en" : locale}
           userRole={userRole}
-          translationConfirmed
+          translationConfirmed={!isTranslated || translationConfirmed}
           series={isSeries}
         />
       )}
@@ -549,7 +584,7 @@ body {
           <div className="model-cover">
             <div>
               <div className="mc-heading">
-                <span className="section-title">Overview</span>
+                <span className="section-title">{dict.overview}</span>
               </div>
               <div className="mc-overview" style={{ fontSize: `${overviewFontPt}pt` }}>
                 {modelOverview}
@@ -578,7 +613,7 @@ body {
         <div className="top-bar" />
         <div className="benefits-page">
           <div className="benefits-title">
-            <span className="section-title">Features &amp; Benefits</span>
+            <span className="section-title">{dict.featuresAndBenefits}</span>
           </div>
           <div className="benefits-grid">
             {(isSeries ? benefits : modelFeatures).map((b, i) => {
@@ -636,7 +671,7 @@ body {
           <div className="top-bar" />
           <div className="specs-page">
             <div className="specs-title">
-              <span className="section-title">Technical Specifications</span>
+              <span className="section-title">{dict.technicalSpecifications}</span>
             </div>
             <table className="specs-table">
               <colgroup>
@@ -689,7 +724,7 @@ body {
           <div className="top-bar" />
           <div className="views-page">
             <div className="views-title">
-              <span className="section-title">Product Views</span>
+              <span className="section-title">{dict.hardwareOverview}</span>
             </div>
             <div className="views-model">{p.model_name}</div>
             <div className={`views-grid${shots.length === 1 ? " single" : ""}`}>
@@ -719,7 +754,7 @@ body {
             <div className="top-bar" />
             <div className="ant-page">
               <div className="ant-title">
-                <span className="section-title">Antenna Patterns</span>
+                <span className="section-title">{dict.antennasPatterns}</span>
               </div>
               <div className="ant-model">{p.model_name}</div>
               <div className="ant-grid">
