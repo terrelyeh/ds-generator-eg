@@ -278,6 +278,15 @@ npm run lint
     現已集中在 **`lib/datasheet/qr.ts`**（`usesContactUsQr` / `usesTwoHardwareImages`），
     新增這類特性請加在那裡，不要在元件內就地判斷。
 
+63. **新做自訂版型時最容易漏掉多語言**（2026-07-24 EOC610 ja 事件）—— Broadband
+    與 Data Center 兩個組件都寫死 `getDict("en")` / `locale="en"`,而且
+    `page.tsx` 的翻譯載入區塊原本在**版型分派之後**,那兩個分支 early return
+    根本跑不到。症狀:日文 preview 出英文、Generate 產出英文版又卡在英文硬體圖缺。
+    新增版型組件時**必收 `locale` + `translation` 兩個 prop**,並且:
+    ① 標題走 `dict` 不要寫字串;② 硬體圖優先用該語系的（callout 印在圖裡）;
+    ③ `PrintToolbar` 要收真 locale + `translationConfirmed`;④ `canGenerate`
+    讀「該語系實際渲染的值」(同 pitfall #59)。
+
 62. **`(main)` 群組的頁面 headless 驗不了** — dashboard / product 內頁受白名單 gate
     （`(main)/layout.tsx` 的 `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過
     proxy、仍會 307 到 `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。
