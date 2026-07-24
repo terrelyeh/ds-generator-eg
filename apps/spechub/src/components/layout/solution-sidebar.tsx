@@ -63,13 +63,18 @@ export function SolutionSidebar({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(true);
 
+  const orderedSolutions = [...solutions].sort((a, b) => {
+    const ready = (x: typeof a) => (x.product_line_count > 0 ? 0 : 1);
+    return ready(a) - ready(b);
+  });
+
   // Extract current solution slug from pathname: /dashboard/cloud → cloud
   const currentSlug = pathname.split("/")[2] ?? "";
 
   return (
     <aside
       className={`relative flex flex-col border-r bg-muted/30 transition-all duration-200 ${
-        collapsed ? "w-14" : "w-52"
+        collapsed ? "w-14" : "w-64"
       }`}
     >
       {/* Collapse toggle */}
@@ -98,9 +103,12 @@ export function SolutionSidebar({
         )}
       </div>
 
-      {/* Solution list */}
+      {/* Solution list — solutions that have product lines come first, the
+          "soon" placeholders after. Derived rather than baked into
+          sort_order so a solution moves up on its own the moment its first
+          product line lands; sort_order still orders within each group. */}
       <nav className="flex-1 space-y-0.5 px-2">
-        {solutions.map((s) => {
+        {orderedSolutions.map((s) => {
           const isActive = s.slug === currentSlug;
           // Solutions with no product lines yet are shown as disabled
           // placeholders — visible so users know they're coming, but not
