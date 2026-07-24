@@ -388,7 +388,10 @@ body {
 }
 
 /* ── benefits page ─────────────────────────────────────────────────── */
-.benefits-page { position: absolute; top: 21pt; left: 36pt; right: 36pt; }
+.benefits-page {
+  position: absolute; top: 21pt; left: 36pt; right: 36pt; bottom: 46pt;
+  display: flex; flex-direction: column;
+}
 .benefits-title { padding: 22pt 0 12pt; }
 .benefits-grid {
   display: grid; grid-template-columns: 1fr 1fr; gap: 0 26pt;
@@ -403,13 +406,11 @@ body {
 .benefits-note { font-size: 7pt; font-weight: 300; color: #a7a9ac; margin-top: 8pt; }
 .deploy { margin-top: 16pt; display: flex; justify-content: center; }
 .deploy img { max-width: 100%; max-height: 320pt; object-fit: contain; }
-/* per-model p2 shares the page with the full feature list */
-.deploy.compact { margin-top: 12pt; }
-.deploy.compact img { max-height: 252pt; }
-.deploy-caption {
-  margin-top: 8pt; text-align: center; font-size: 8pt; color: #4a4a4a;
-  background: ${ROW_ALT}; padding: 4pt 0;
-}
+/* per-model p2 shares the page with the full feature list; the diagram
+   centres in whatever vertical space that list leaves, so every model
+   lands balanced regardless of how many features it has */
+.deploy.compact { flex: 1; margin-top: 0; align-items: center; }
+.deploy.compact img { max-height: 266pt; }
 
 /* ── spec table ────────────────────────────────────────────────────── */
 .specs-page { position: absolute; top: 21pt; left: 34pt; right: 37pt; }
@@ -584,7 +585,6 @@ body {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={deployImg} alt="PtP/PtMP deployment applications" />
               </div>
-              <div className="deploy-caption">PtP/PtMP Deployment Applications Diagram</div>
             </>
           )}
         </div>
@@ -600,7 +600,6 @@ body {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={deployImg} alt="PtP/PtMP deployment applications" />
             </div>
-            <div className="deploy-caption">PtP/PtMP Deployment Applications Diagram</div>
           </div>
           <div className="page-number">{nextPage()}</div>
         </div>
