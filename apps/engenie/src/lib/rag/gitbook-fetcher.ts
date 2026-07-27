@@ -37,13 +37,24 @@ function parseSitemap(xml: string): { url: string; lastModified?: string }[] {
     return entries;
   }
 
-  // Regular sitemap — extract URL entries
-  const urlRegex = /<url>\s*<loc>(.*?)<\/loc>(?:\s*<lastmod>(.*?)<\/lastmod>)?/g;
-  let match;
-  while ((match = urlRegex.exec(xml)) !== null) {
+  // Regular sitemap — extract URL entries.
+  //
+  // Match each <url>…</url> block first, then pull <loc> and <lastmod> out of it
+  // independently. The children can appear in any order and with anything in
+  // between — GitBook emits <loc>, <priority>, <lastmod> — so a single regex that
+  // expects <lastmod> to directly follow </loc> silently loses every date.
+  // Losing lastModified is not a cosmetic bug: ingest-gitbook's incremental skip
+  // is keyed on it, so a whole space gets re-fetched (and re-Visioned) on every
+  // sync, which is slow enough to hit the function timeout on large spaces.
+  const blockRegex = /<url>([\s\S]*?)<\/url>/g;
+  let block;
+  while ((block = blockRegex.exec(xml)) !== null) {
+    const loc = block[1].match(/<loc>(.*?)<\/loc>/);
+    if (!loc) continue;
+    const lastmod = block[1].match(/<lastmod>(.*?)<\/lastmod>/);
     entries.push({
-      url: match[1].trim(),
-      lastModified: match[2]?.trim(),
+      url: loc[1].trim(),
+      lastModified: lastmod?.[1]?.trim(),
     });
   }
 
