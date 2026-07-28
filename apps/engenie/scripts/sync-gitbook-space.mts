@@ -30,7 +30,7 @@ for (const f of [".env.local", ".env"]) {
   }
 }
 
-const { ingestGitbook } = await import("../src/lib/rag/ingest-gitbook.ts");
+const { ingestGitbook } = await import("../src/lib/rag/ingest-gitbook");
 
 const argv = process.argv.slice(2);
 const flags = new Set(argv.filter((a) => a.startsWith("--")));
