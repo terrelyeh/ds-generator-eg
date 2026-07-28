@@ -1,6 +1,7 @@
 import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
+import { cjkFontFor } from "@/lib/datasheet/typography";
 import type {
   Product,
   ProductLine,
@@ -196,6 +197,10 @@ export function DataCenterPreview({
   // gate below reads the SAME values — checking English while rendering
   // another language is what blocked ECW260 (pitfall #59).
   const isTranslated = locale !== "en";
+  // Neither Roboto nor Manrope carries CJK glyphs (pitfall #64).
+  const cjk = cjkFontFor(locale);
+  const bodyFont = cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif";
+  const displayFont = cjk ? `'${cjk.family}', 'Manrope', sans-serif` : "'Manrope', sans-serif";
   const headline = (isTranslated ? translation?.headline : null) || product.headline;
   const overview = (isTranslated ? translation?.overview : null) ?? product.overview;
   const features = (isTranslated ? translation?.features : null) ?? product.features;
@@ -281,6 +286,7 @@ export function DataCenterPreview({
         dangerouslySetInnerHTML={{
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
+${cjk ? `@import url('${cjk.importUrl}');` : ""}
 
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -290,7 +296,7 @@ html, body {
   color-adjust: exact !important;
 }
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: ${bodyFont};
   color: #525355;
   font-size: 8pt;
   line-height: 1.4;
@@ -317,7 +323,7 @@ body {
 
 .page-number {
   position: absolute; right: 24pt; bottom: 16pt;
-  font-family: 'Manrope', sans-serif; font-weight: 200;
+  font-family: ${displayFont}; font-weight: 200;
   font-size: 7pt; color: #58595b;
 }
 
@@ -325,7 +331,7 @@ body {
    Weight 600 at 17pt reads as the same emphasis as the 24pt/500 cover
    headline — smaller type needs a touch more weight to match. */
 .section-title {
-  font-family: 'Manrope', sans-serif; font-weight: 600;
+  font-family: ${displayFont}; font-weight: 600;
   font-size: 17pt; color: ${BLUE};
 }
 
@@ -350,7 +356,7 @@ body {
 }
 .cover-header .solution-label {
   position: absolute; right: 36pt; top: 50%; transform: translateY(-50%);
-  font-family: 'Manrope', sans-serif; font-weight: 200; font-size: 14pt; color: white;
+  font-family: ${displayFont}; font-weight: 200; font-size: 14pt; color: white;
 }
 /* Reference structure: full-width headline across the top, then a row of
    copy (left) beside the product render (right). FLOW, not fixed offsets —
@@ -365,18 +371,18 @@ body {
 /* Headline + model carry weight; the overview stays light so the
    hierarchy still reads (all-bold would flatten the block). */
 .hero-headline {
-  font-family: 'Manrope', sans-serif; font-weight: 500;
+  font-family: ${displayFont}; font-weight: 500;
   font-size: ${HEADLINE_SIZE}pt; line-height: ${HEADLINE_LINE_HEIGHT};
   color: white; max-width: ${HEADLINE_WIDTH}pt;
 }
 .hero-lower { display: flex; gap: 16pt; margin-top: ${LOWER_GAP}pt; }
 .hero-copy { flex: 1 1 auto; min-width: 0; max-width: ${COPY_WIDTH}pt; }
 .hero-model {
-  font-family: 'Manrope', sans-serif; font-weight: 600;
+  font-family: ${displayFont}; font-weight: 600;
   font-size: 15pt; color: ${YELLOW}; margin-bottom: 8pt;
 }
 .hero-overview {
-  font-family: 'Manrope', sans-serif; font-weight: 300;
+  font-family: ${displayFont}; font-weight: 300;
   line-height: ${OVERVIEW_LINE_HEIGHT}; color: rgba(255,255,255,0.95);
 }
 /* Wide render column; flat 1U units fill the width, taller chassis the

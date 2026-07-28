@@ -118,3 +118,33 @@ export function parseGoogleFontUrl(url: string): { value: string; label: string;
   const name = decodeURIComponent(slug.replace(/\+/g, " "));
   return { value: name, label: name, import: slug };
 }
+
+/**
+ * Resolve the CJK webfont for a locale, for layouts that set their own
+ * font-family rather than consuming the full TypographySettings.
+ *
+ * Roboto — the Latin face the Broadband and Data Center layouts are drawn
+ * in — has no CJK glyphs, so a ja datasheet rendered as a page of tofu
+ * boxes. Latin-only locales get `null` and keep their own stack untouched.
+ *
+ * Returns the Google Fonts URL to @import plus the family to put in FRONT
+ * of the layout's own stack, so Latin text still renders in Roboto and only
+ * CJK falls through to the CJK face.
+ */
+export function cjkFontFor(
+  locale: string,
+  override?: string | null,
+): { importUrl: string; family: string } | null {
+  const defaults = TYPOGRAPHY_DEFAULTS[locale];
+  if (!defaults) return null;
+
+  const family = override || defaults.font_family;
+  const slug =
+    (FONT_OPTIONS[locale] ?? []).find((f) => f.value === family)?.import ??
+    family.replace(/\s+/g, "+");
+
+  return {
+    importUrl: `https://fonts.googleapis.com/css2?family=${slug}:wght@300;400;500;600;700&display=swap`,
+    family,
+  };
+}

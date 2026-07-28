@@ -9,6 +9,7 @@ import {
   getLocaleSuffix,
 } from "@/lib/google/drive-versions";
 import type { ProductLine } from "@eg/db/types";
+import type { Page } from "puppeteer-core";
 
 // Chromium binary URL for @sparticuz/chromium-min (downloaded at runtime).
 // Must match the @sparticuz/chromium-min version in package.json — Vercel is
@@ -79,6 +80,42 @@ export async function GET(request: Request) {
  * 6. Bumps version in Supabase (with optimistic locking)
  * 7. Releases lock
  */
+/**
+ * Block until every glyph on the page has its webfont.
+ *
+ * `networkidle0` only means the network went quiet, and `document.fonts.ready`
+ * only covers faces the browser has already decided to fetch. Google Fonts
+ * serves CJK families as hundreds of unicode-range shards pulled lazily as
+ * glyphs are laid out, so both can resolve while shards are still missing.
+ * Whatever hasn't arrived falls back to a system font — and Vercel's Chromium
+ * has no Japanese one, so those characters print as blanks. That is how
+ * EOC610's ja datasheet shipped with 屋 and パ punched out (pitfall #64).
+ *
+ * So: ask explicitly for the page's own text in the page's own fonts, which
+ * forces every shard it needs, then wait out the resulting fetches.
+ */
+async function waitForFonts(page: Page): Promise<void> {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+
+    const families = new Set<string>();
+    for (const el of document.querySelectorAll<HTMLElement>("*")) {
+      const ff = getComputedStyle(el).fontFamily;
+      if (ff) families.add(ff);
+    }
+    const text = document.body.innerText;
+
+    await Promise.all(
+      [...families].flatMap((family) =>
+        ["300", "400", "500", "600", "700"].map((weight) =>
+          document.fonts.load(`${weight} 12pt ${family}`, text).catch(() => []),
+        ),
+      ),
+    );
+    await document.fonts.ready;
+  });
+}
+
 export async function POST(request: Request) {
   const denied = await gate("pdf.generate");
   if (denied) return denied;
@@ -339,6 +376,8 @@ export async function POST(request: Request) {
       timeout: 30000,
     });
 
+    await waitForFonts(page);
+
     // Guard: if Vercel Deployment Protection (or any other gate) intercepted
     // the request, the page will be Vercel's OAuth login. Detect by title
     // and fail loudly with diagnostics instead of printing the login page.
@@ -584,6 +623,7 @@ async function printPreviewPdf(previewPath: string): Promise<Buffer> {
 
     const previewUrl = `${baseUrl}${previewPath}`;
     await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 30000 });
+    await waitForFonts(page);
 
     const pageTitle = await page.title();
     if (/log in to vercel|authentication required|404/i.test(pageTitle)) {

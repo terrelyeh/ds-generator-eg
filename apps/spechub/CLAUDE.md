@@ -278,6 +278,20 @@ npm run lint
     現已集中在 **`lib/datasheet/qr.ts`**（`usesContactUsQr` / `usesTwoHardwareImages`），
     新增這類特性請加在那裡，不要在元件內就地判斷。
 
+64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
+    兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,
+    兩者都沒有 CJK 字符;② `/api/generate-pdf` 只等 `networkidle0`。
+    **本機 macOS 有 PingFang TC 會自動 fallback,所以這個 bug 在本地永遠重現不了**
+    （CDP `CSS.getPlatformFontsForNode` 一問就知道:本機連 Cloud 版型也是走系統字型,
+    webfont 從沒真的上場）。Vercel 的 chromium 沒有日文字型 → 缺字直接印成空白
+    （PDF 裡是 `\x00`,同事在 Windows 開就是豆腐）。
+    **`document.fonts.ready` 不夠** —— 實測 ready 之後 loaded 分片是 **0**;
+    Google Fonts 的 CJK 是數百個 unicode-range 分片、排版時才 lazy 抓。
+    現在 route 用 `waitForFonts(page)`:蒐集頁面所有 font-family × weight,
+    對 `document.body.innerText` 呼叫 `document.fonts.load()` 逼出所有需要的分片,
+    再等一次 ready。**新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**
+    （`lib/datasheet/typography.ts` 的 `cjkFontFor`）。
+
 63. **新做自訂版型時最容易漏掉多語言**（2026-07-24 EOC610 ja 事件）—— Broadband
     與 Data Center 兩個組件都寫死 `getDict("en")` / `locale="en"`,而且
     `page.tsx` 的翻譯載入區塊原本在**版型分派之後**,那兩個分支 early return

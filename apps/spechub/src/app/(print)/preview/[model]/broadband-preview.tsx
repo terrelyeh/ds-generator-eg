@@ -2,6 +2,7 @@ import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
+import { cjkFontFor } from "@/lib/datasheet/typography";
 import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@eg/db/types";
 
 /**
@@ -171,6 +172,11 @@ export function BroadbandPreview({
       const perLine = OV_COL_WIDTH / (OV_WIDTH_FACTOR * pt);
       return Math.ceil(modelOverview.length / perLine) * pt * 1.65 <= OV_SLOT_HEIGHT;
     }) ?? 7.5;
+
+  // Roboto has no CJK glyphs — a ja sheet rendered as tofu boxes. Put the
+  // locale's face in front of it so Latin still sets in Roboto.
+  const cjk = cjkFontFor(locale);
+  const bodyFont = cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif";
 
   const seriesName = lineContent?.series_name || line.label;
   const categoryLabel = lineContent?.category_label || line.label;
@@ -360,11 +366,12 @@ export function BroadbandPreview({
         dangerouslySetInnerHTML={{
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+${cjk ? `@import url('${cjk.importUrl}');` : ""}
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 body {
-  font-family: 'Roboto', sans-serif; color: #6f6f6f; font-size: 8pt;
+  font-family: ${bodyFont}; color: #6f6f6f; font-size: 8pt;
   line-height: 1.4; background: #e0e0e0;
   padding-top: ${showToolbar ? "48px" : "0"};
 }
