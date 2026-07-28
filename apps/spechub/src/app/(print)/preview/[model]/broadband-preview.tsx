@@ -176,7 +176,11 @@ export function BroadbandPreview({
   const categoryLabel = lineContent?.category_label || line.label;
   const blocks = lineContent?.features ?? [];
   const benefits = lineContent?.benefits ?? [];
-  const footnote = lineContent?.footnote ?? null;
+  // "*Partial functions are available only in specific models" — a
+  // disclaimer about which models in the FAMILY have what. On a per-model
+  // sheet there is no family to qualify, so it just makes the one product's
+  // own feature list look hedged. Series only.
+  const footnote = isSeries ? lineContent?.footnote ?? null : null;
 
   // ── spec table ──────────────────────────────────────────────────────
   // Per-model: one value column. Series: one column per product, rows
