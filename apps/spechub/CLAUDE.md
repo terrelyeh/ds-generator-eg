@@ -1,12 +1,13 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-07-24。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-07-29。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
 > **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth`。RAG/Ask 的事去看
 > [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
-> 近期：Data Center solution（navy 專屬版型）上線、`ds_features` / `hardware_image_2` /
-> PNG 自動裁邊 三個 sync 能力、locale 生成 gate 修復（pitfalls #59–#62）。
+> 近期：**Broadband Outdoor ▸ EOC 上線**（鋼藍;一套組件同時出單機版與系列版）、
+> Orin Box 收斂到共用的 `ds_scope` 管線、**自訂版型補上多語言**（原本寫死英文,
+> pitfall #63）、**CJK 字型修復**（PDF 缺字印成空白,pitfall #64 —— 本機重現不了）。
 
 ## Project Overview
 
@@ -17,8 +18,9 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 **5 個 solution 上線**：**Cloud**（8 條線）、**Accessories ▸ Transceiver**（綠色、
 無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network Appliance + AI Server**
 （navy 專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
-與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,
-整系列一份,**已收斂到共用管線**——`feat/edge-ai-box` 可刪）。
+與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,整系列一份）。
+**Broadband / Data Center / Edge AI 三種自訂版型都吃 `?lang=`**（ja/zh-TW 走
+`product_translations` + 該語系的 CJK 字型）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
 下方 Architecture 的 product-line onboarding）。
 另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
@@ -174,34 +176,38 @@ auth.users → profiles ← email_whitelist.invited_by
 ### 🔜 Next Steps
 
 **產品線 / 版型**：
-0. **`feat/edge-ai-box` 可刪** — Orin Box 已收斂到共用的 `ds_scope` 管線
-   （`feat/converge-orinbox`）,該分支獨有的東西都搬過來了。
-1. **Datasheet 圖片待補** — S21 / S11 的 `_product` / `_hardware` / `_hardware_2`
-   （SE110 / SE210 / S41 已完整）;**EOC 6 台全缺**（product / hardware×2 / antenna×4）;
-   **Orin Box 缺 7 張 `series_*`**（hero / cover_product / architecture / hw pages）。
-2. **Cloud AP 素材缺口** — 27 台裡 21 台在 Drive 沒有 datasheet 用圖 → 英文版 PDF 生不出來
+1. **PM 待補圖** — **EOC 6 台全缺**（`_product` / `_hardware` ×2 / antenna ×4）;
+   **AI Server S21 / S11 全缺**（SE110 / SE210 / S41 已完整）;
+   **Orin Box 缺 7 張 `series_*`**。⚠️ 檔名**單底線**（S41 曾因 `S41__product.png`
+   雙底線靜默同步不到,改名後才進來）。
+2. **EOC 日文版待 PM 在翻譯頁 Confirm** — 6 台都已翻好但還是 Draft,Confirm 前
+   生不出正式 PDF。內容/架構圖/字型都已就緒。
+3. **EOC sheet 有筆錯誤待 PM 修** — EOC600/610/620 的第一條 feature 寫
+   "supports up to 16 devices in PtMP",但規格表 Max Subscribers = **4**
+   （那句是從 EOC655 複製的）。會印在 datasheet 第 2 頁。
+4. **Cloud AP 素材缺口** — 27 台裡 21 台在 Drive 沒有 datasheet 用圖 → 英文版 PDF 生不出來
    （日/中文版不受影響,各語系有自己的 hardware image）。其他線各缺 1–3 台。
 
 **Datasheet 系統**：
-3. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
-4. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
-5. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
+5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
+6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
+7. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
    三張需再加一欄 + upload API 型別
-6. **Resync versions per-locale** — `/api/resync-versions` 目前只更新 EN
-7. **新增第 4 個翻譯語言（如 es）** — 動 8 個檔案：`locales/types.ts`(union+SUPPORTED_LOCALES)、
+8. **Resync versions per-locale** — `/api/resync-versions` 目前只更新 EN
+9. **新增第 4 個翻譯語言（如 es）** — 動 8 個檔案：`locales/types.ts`(union+SUPPORTED_LOCALES)、
    `locales/es.ts`、`locales/index.ts`、`cover-layout.ts` LOCALE_METRICS、`typography.ts`
    TYPOGRAPHY_DEFAULTS、`translate/prompts/locales/es.ts`、`translate/index.ts` 註冊、
    `getLocaleSuffix()` fall-through 免動
 
 **系統**：
-8. **Review Workflow** — PM approve content → MKT generate。需要 `products.review_approval`
+10. **Review Workflow** — PM approve content → MKT generate。需要 `products.review_approval`
    JSONB + content-hash bound + `/api/generate-pdf` approval gate
-9. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
+11. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
 **Battlecard**（MVP 已上線,功能詳見 README）：
-10. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
+12. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
    5 維度(MLO/Recommended Users/BSS Coloring/Warranty/MSRP)刻意留白給 PM
-11. **擴到其他產品線** — 目前只有 Cloud AP 有 dimension 模板 + matchup;Switch/NVS/VPN FW 待建
+13. **擴到其他產品線** — 目前只有 Cloud AP 有 dimension 模板 + matchup;Switch/NVS/VPN FW 待建
    （dashboard toolbar 的 Battlecard 連結目前也只在 Cloud AP 顯示）
 （註:使用者 2026-06-16 決定 ↻sync 與 🔍web 維持兩顆手動按鈕,不自動串接）
 
@@ -227,27 +233,19 @@ npm run lint
 
 ## Common Pitfalls
 
-> Pitfalls #1–#44, #46–#49 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> Pitfalls #1–#44, #46–#49, #51–#53 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 > #54–#58（RAG/聊天相關）搬到 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 45. **Supabase silent insert/update 是這個系統最久的雷** — supabase-js 的 write 不 throw on
     error，回 `{ data, error }`。歷史教訓：`versions` unique constraint 漏 locale → INSERT 撞
     dup key → silent fail → UI 顯示假狀態。慣例：所有 write 一律 `throwIfDbError(label)(res)`。
 
+
 50. **Pagination 常數一定要對齊實際 CSS** — `AVAILABLE_HEIGHT = 792 - TOP_BAR - SPEC_TITLE -
     BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、CATEGORY_HEADER 22pt；
     **CJK row metrics 更大**（JA 24pt / zh-TW 25pt）。`splitIntoPages(sections, locale)` 必須傳
     locale。每改 preview CSS 必須同步檢查這些常數。
 
-51. **`balanceColumns` 要用「高度」+ `splitOccurred` flag 必設** — 枚舉 split index 挑
-    `|leftH - rightH| + overflow_penalty` 最小；fitSection 兩個分支都要 set 旗標，否則好版面被
-    count-based 覆寫。
-
-52. **Features 排列 = balanced column-first** — 順序填左欄到接近總高一半，剩下進右欄（保留
-    PM 優先順序 + 視覺平衡，不要 height-greedy 交錯）。
-
-53. **新產品線設定容易把 `drive_folder_id` 跟 `ds_images_folder_id` 填反** — drive_folder_id
-    是「產品線」資料夾、ds_images_folder_id 是裡面的「DS Images」子資料夾。設定時跟 PM 確認層級。
 
 59. **locale 的「可否生成」與「版號」都不能掉回英文**（2026-07-23 ECW260 ja 事件）——
     preview 渲染的是 locale 解析後的內容（`localeHardwareImage || EN`、翻譯後 overview/
@@ -259,6 +257,7 @@ npm run lint
     另注意 **Model page 的 🌐 語言選單走另一條路徑（只 gate `confirmed`）**，所以會出現
     「preview 擋、Model page 可生成」的不一致。
 
+
 60. **`products.product_image` / `hardware_image` 是 `NOT NULL DEFAULT ''`** —— sync 的
     「Drive 檔案已刪 → 清空 DB」分支曾寫入 `null`，觸發 23502 但 supabase-js 只回
     `{error}` 不 throw（pitfall #45 同源），整句 update 靜默失效 —— 連同一句裡的
@@ -267,6 +266,7 @@ npm run lint
     （2026-07-24 補：`/api/upload-image` 的 DELETE 也踩同一坑 —— 刪圖時 Storage/Drive
     有刪、DB 沒清，等於「刪除圖片」功能一直半殘。已一併改成寫 `""`；
     `product_translations.hardware_image` 本身 nullable，那裡維持 `null` 才對。）
+
 
 61. **「依 category 而異」的判斷不要各元件各寫一份** — 同一個特性散在
     preview/[model]、product-detail、dashboard-content 三處，結果 Data Center 上線後
@@ -277,6 +277,23 @@ npm run lint
     （另外兩處都是 `=== "APs"`）。**子字串比對 category 是地雷，一律精確比對**。
     現已集中在 **`lib/datasheet/qr.ts`**（`usesContactUsQr` / `usesTwoHardwareImages`），
     新增這類特性請加在那裡，不要在元件內就地判斷。
+
+
+62. **`(main)` 群組的頁面 headless 驗不了** — dashboard / product 內頁受白名單 gate
+    （`(main)/layout.tsx` 的 `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過
+    proxy、仍會 307 到 `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。
+    所以動到 dashboard/內頁時：typecheck+build 之外，要推 branch preview 請使用者點過再 merge。
+
+
+63. **新做自訂版型時最容易漏掉多語言**（2026-07-24 EOC610 ja 事件）—— Broadband
+    與 Data Center 兩個組件都寫死 `getDict("en")` / `locale="en"`,而且
+    `page.tsx` 的翻譯載入區塊原本在**版型分派之後**,那兩個分支 early return
+    根本跑不到。症狀:日文 preview 出英文、Generate 產出英文版又卡在英文硬體圖缺。
+    新增版型組件時**必收 `locale` + `translation` 兩個 prop**,並且:
+    ① 標題走 `dict` 不要寫字串;② 硬體圖優先用該語系的（callout 印在圖裡）;
+    ③ `PrintToolbar` 要收真 locale + `translationConfirmed`;④ `canGenerate`
+    讀「該語系實際渲染的值」(同 pitfall #59)。
+
 
 64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
     兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,
@@ -291,20 +308,6 @@ npm run lint
     對 `document.body.innerText` 呼叫 `document.fonts.load()` 逼出所有需要的分片,
     再等一次 ready。**新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**
     （`lib/datasheet/typography.ts` 的 `cjkFontFor`）。
-
-63. **新做自訂版型時最容易漏掉多語言**（2026-07-24 EOC610 ja 事件）—— Broadband
-    與 Data Center 兩個組件都寫死 `getDict("en")` / `locale="en"`,而且
-    `page.tsx` 的翻譯載入區塊原本在**版型分派之後**,那兩個分支 early return
-    根本跑不到。症狀:日文 preview 出英文、Generate 產出英文版又卡在英文硬體圖缺。
-    新增版型組件時**必收 `locale` + `translation` 兩個 prop**,並且:
-    ① 標題走 `dict` 不要寫字串;② 硬體圖優先用該語系的（callout 印在圖裡）;
-    ③ `PrintToolbar` 要收真 locale + `translationConfirmed`;④ `canGenerate`
-    讀「該語系實際渲染的值」(同 pitfall #59)。
-
-62. **`(main)` 群組的頁面 headless 驗不了** — dashboard / product 內頁受白名單 gate
-    （`(main)/layout.tsx` 的 `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過
-    proxy、仍會 307 到 `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。
-    所以動到 dashboard/內頁時：typecheck+build 之外，要推 branch preview 請使用者點過再 merge。
 
 ## 詳細文件
 

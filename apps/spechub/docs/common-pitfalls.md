@@ -121,3 +121,19 @@ folder rules, PDF Generation locale handling).
 47. **Browser popup blocker 會擋 async-after `window.open`** — 修法：`toast.success(..., { action: { label: "Open PDF", onClick: () => window.open(...) } })` — toast 上的 click 是真實 user gesture
 
 49. **Translation Save & Confirm 不能綁 `dirty`** — Save 條件 = 「有翻譯內容 AND (locale 還是 Draft OR dirty)」；Preview 對 Draft locale 跳 toast；Draft 狀態按鈕 amber + pulse。三層一起做
+
+---
+
+## 從 CLAUDE.md 移入（2026-07-29）
+
+Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完整說明的一條。
+
+51. **`balanceColumns` 要用「高度」+ `splitOccurred` flag 必設** — 枚舉 split index 挑
+    `|leftH - rightH| + overflow_penalty` 最小；fitSection 兩個分支都要 set 旗標，否則好版面被
+    count-based 覆寫。
+
+52. **Features 排列 = balanced column-first** — 順序填左欄到接近總高一半，剩下進右欄（保留
+    PM 優先順序 + 視覺平衡，不要 height-greedy 交錯）。
+
+53. **新產品線設定容易把 `drive_folder_id` 跟 `ds_images_folder_id` 填反** — drive_folder_id
+    是「產品線」資料夾、ds_images_folder_id 是裡面的「DS Images」子資料夾。設定時跟 PM 確認層級。

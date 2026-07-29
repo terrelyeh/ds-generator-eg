@@ -136,6 +136,12 @@ component**, branched by category near the top of `page.tsx` — the URL stays
 - Keep the size ladder narrow so a family of datasheets still looks alike.
 - Cloud-template pagination constants must track preview CSS
   (pitfalls #50/#51).
+- **Name the locale's CJK font, and wait for it before printing.** Roboto and
+  Manrope carry no CJK glyphs, so a layout that names only those prints
+  Japanese as blanks on Vercel — whose Chromium has no system fallback. Use
+  `cjkFontFor(locale)` (typography.ts) to put the locale's face first.
+  **This cannot be reproduced on macOS**, which falls back to PingFang TC;
+  CDP's `CSS.getPlatformFontsForNode` will show you the truth (pitfall #64).
 - **Reference art usually has text baked in.** The EOC hero contains its own
   headline and the deployment diagram its own caption — cropping naively
   double-printed both. Crop past the baked text, then draw live text.
@@ -205,7 +211,14 @@ say different things** — the first cut was near-indistinguishable:
 | next page | the generic Features & Benefits list | the model's own features (they carry real numbers where the line-level list is generic), then the deployment diagram |
 
 Keep series *positioning* ("why this family") in the series sheet only —
-on a per-model sheet it changes the subject mid-document.
+on a per-model sheet it changes the subject mid-document. Same goes for the
+line-level **footnote**: "*Partial functions are available only in specific
+models" qualifies a FAMILY, and on a single-model sheet it just makes that
+product's own feature list read as hedged.
+
+A per-model sheet is also where the locale matters most: a custom layout must
+accept `locale` + the resolved `product_translations` row, or it silently
+renders English no matter what `?lang=` says (pitfall #63).
 
 The series route dispatches on category, so a new series line is a component
 plus one entry there — content loading, generation and versioning are shared.
@@ -230,4 +243,4 @@ plus one entry there — content loading, generation and versioning are shared.
 | **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | teal SERIES datasheet, `ds_scope='series'`; `series_*` images pending |
 | **Data Center ▸ Edge Network Appliance** | SE110, SE210 | navy variant |
 | **Data Center ▸ AI Server** | S41, S21, S11 | navy variant; S21/S11 images pending |
-| **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel variant, `ds_scope='both'`; images pending |
+| **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel, `ds_scope='both'`; ja translated (Draft); images pending |

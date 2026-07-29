@@ -6,7 +6,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 
 ### Dashboard
 - **多產品線 / 多 Solution** tab 切換 —— Cloud（8 條線）、Accessories ▸ Transceiver、
-  Data Center（Edge Network Appliance / AI Server）、Edge AI Box ▸ Orin Box
+  Data Center（Edge Network Appliance / AI Server）、Broadband Outdoor ▸ Broadband EOC、
+  Edge AI Box ▸ Orin Box
 - **Solution sidebar**（可收合）— 支援多 Solution 架構擴展
 - 產品清單：Model、版本、OV/FT/Prod/HW 就緒狀態、Radio Pattern（AP）。
   有兩張硬體圖的產品線（Data Center）顯示 HW1 / HW2 兩欄
@@ -46,14 +47,21 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
 - **規格表備註區**（per-product-line, optional）— VPN Firewall 等產品線可在最後一頁 spec 下方放免責備註（如 `*Note: Performance figures are estimates…`），支援多語言
-- **Antennas Patterns**（AP 專用）— 上傳 radio pattern 圖後，PDF 自動新增一頁顯示 2.4G / 5G / 6G H-Plane & E-Plane polar plots
+- **Antennas Patterns**（Cloud AP / Broadband）— 上傳 radio pattern 圖後 PDF 自動新增一頁。
+  繪製維度依產品推導：Cloud AP 用頻段（2.4G / 5G / 6G），Broadband CPE 用天線埠（Port1 / Port2），
+  各含 H-Plane & E-Plane polar plots
 - Hardware Overview + QR Code footer（QR URL 解析優先序：per-product → per-product-line template → 預設短連結）
-- **依產品線 4 種版型變體**：
+- **依產品線 5 種版型變體**：
   - **Cloud 藍色**（預設）/ Unmanaged·Extender **灰色**
   - **Transceiver 綠色**（Accessories）— 封面照片置中 + Overview 滿版、**無 Hardware 頁**、QR 指向 **Contact Us**（無 QSG）
   - **Data Center navy**（Edge Network Appliance / AI Server）— 深藍 hero 封面 + 8 個賣點區塊、
     全系列共用的 EDCC 管理平台頁、全寬單機規格表（自動分頁）、Hardware Overview 最多 2 張圖、Contact Us QR。
     封面賣點文案可由 Google Sheet 的 `DS Feature Groups` 列維護（「標籤 | 標題: + 說明」格式）
+  - **Broadband 鋼藍**（Broadband Outdoor）— 封面主視覺 + Features & Benefits + 部署應用圖、
+    Product Views、Antenna Patterns。**同一套組件同時產「單機」與「整系列」兩種 datasheet**，
+    共用同一份線層文案所以不會走鐘；系列版另有跨機型比較表
+  - **Edge AI teal**（Edge AI Box）— **只出整系列一份**：封面 + 軟體架構頁 + 人工整理的比較表 +
+    各變體 Hardware Overview
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
 - **Drive 自動建資料夾** — 第一次產 zh / ja PDF 時自動建立 `Cloud Camera_zh` / `Cloud Camera_ja` 等 sibling 資料夾（PM 不需要事先手動建）
@@ -179,7 +187,10 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 Cloud lines above belong to the **EnGenius Cloud** solution; **Transceiver** is the first
 line under the **Accessories** solution (green theme, single product image, no hardware page).
 
-Future Solutions: EnGenius Fit, Broadband Outdoor, Network Management, Data Center, Legacy
+**Datasheet 範圍（`ds_scope`）** — 一條產品線可以出「每台一份」、「整系列一份」，或兩者都出。
+Broadband EOC 兩種都出且共用同一份線層文案；Orin Box 只出系列版。系列版的版號自成一條流水號。
+
+Future Solutions: EnGenius Fit, Network Management, Legacy
 
 ## Deployment
 
