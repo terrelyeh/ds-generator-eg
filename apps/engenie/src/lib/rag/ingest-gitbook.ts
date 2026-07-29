@@ -48,6 +48,8 @@ export interface IngestGitbookOptions {
 export interface IngestGitbookResult {
   processed: number;
   skipped: number;
+  /** Content-unchanged chunks whose metadata was refreshed without re-embedding. */
+  metadata_refreshed: number;
   pages_fetched: number;
   pages_skipped: number;
   images_described: number;
@@ -244,6 +246,31 @@ async function fetchPagesWithConcurrency(
 /**
  * Main ingestion function for Gitbook spaces.
  */
+/**
+ * Merge freshly-computed metadata over what's stored, dropping `undefined`
+ * values so they don't overwrite existing keys with null. Undefined fields are
+ * absent from stored JSON, so they must be treated as "not set", not "cleared".
+ */
+function mergeMeta(
+  stored: Record<string, unknown>,
+  fresh: Record<string, unknown>,
+): Record<string, unknown> {
+  const out = { ...stored };
+  for (const [k, v] of Object.entries(fresh)) {
+    if (v !== undefined) out[k] = v;
+  }
+  return out;
+}
+
+/** True when merging `fresh` into `stored` would actually change something. */
+function metadataDrifted(
+  stored: Record<string, unknown>,
+  fresh: Record<string, unknown>,
+): boolean {
+  const merged = mergeMeta(stored, fresh);
+  return JSON.stringify(merged) !== JSON.stringify(stored);
+}
+
 export async function ingestGitbook(
   options: IngestGitbookOptions
 ): Promise<IngestGitbookResult> {
@@ -259,7 +286,8 @@ export async function ingestGitbook(
     sitemapEntries = await fetchGitbookSitemap(spaceUrl);
   } catch (err) {
     return {
-      processed: 0, skipped: 0, pages_fetched: 0, pages_skipped: 0,
+      processed: 0, skipped: 0, metadata_refreshed: 0,
+      pages_fetched: 0, pages_skipped: 0,
       images_described: 0,
       errors: [`Sitemap fetch failed: ${err instanceof Error ? err.message : String(err)}`],
     };
@@ -332,21 +360,41 @@ export async function ingestGitbook(
   const baseUrl = spaceUrl.replace(/\/$/, "");
   const allChunks: ChunkToEmbed[] = [];
 
-  // Fetch existing hashes for change detection
+  // Fetch existing chunks (hash + metadata). content_hash gates whether we
+  // re-embed; metadata is refreshed separately so a new/renamed metadata field
+  // backfills onto content-unchanged chunks WITHOUT a forced re-embed.
+  // (Same rule as ingest-products — see Pitfall 60.) This matters here because
+  // the incremental page skip is keyed on `last_modified`: without a metadata-
+  // only path, a page whose content never changes would never get that field
+  // and would be re-fetched (and re-Visioned) on every single sync.
   const supabase = createAdminClient();
   const { data: existingDocs } = await supabase
     .from("documents" as "products")
-    .select("source_id, chunk_index, content_hash")
+    .select("source_id, chunk_index, content_hash, metadata")
     .eq("source_type", "gitbook") as {
-    data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
+    data: {
+      source_id: string;
+      chunk_index: number;
+      content_hash: string;
+      metadata: Record<string, unknown> | null;
+    }[] | null;
   };
 
-  const hashMap = new Map<string, string>();
+  const existingMap = new Map<string, { hash: string; metadata: Record<string, unknown> }>();
   for (const doc of existingDocs ?? []) {
-    hashMap.set(`${doc.source_id}:${doc.chunk_index}`, doc.content_hash);
+    existingMap.set(`${doc.source_id}:${doc.chunk_index}`, {
+      hash: doc.content_hash,
+      metadata: doc.metadata ?? {},
+    });
   }
 
   let skipped = 0;
+  // Content-unchanged chunks whose metadata drifted — refreshed without re-embedding.
+  const metaRefreshes: {
+    sourceId: string;
+    chunkIndex: number;
+    metadata: Record<string, unknown>;
+  }[] = [];
 
   for (const [url, page] of pages) {
     // Skip empty/nav pages
@@ -375,10 +423,32 @@ export async function ingestGitbook(
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const hash = contentHash(chunk.content);
+      const chunkMeta = {
+        space_url: baseUrl,
+        space_label: spaceLabel,
+        last_modified: lastModByUrl.get(url),
+        breadcrumb,
+        page_title: page.title,
+        has_images: chunk.images.length > 0,
+        images_count: chunk.images.length,
+        image_urls: chunk.images.length > 0 ? chunk.images : undefined,
+        solution: tax.solution,
+        product_lines: tax.product_lines,
+        models: tax.models,
+      };
 
-      // Skip unchanged chunks
-      if (!force && hashMap.get(`${sourceId}:${i}`) === hash) {
-        skipped++;
+      // Content unchanged → keep the embedding, but refresh metadata if it drifted.
+      const existing = existingMap.get(`${sourceId}:${i}`);
+      if (!force && existing?.hash === hash) {
+        if (metadataDrifted(existing.metadata, chunkMeta)) {
+          metaRefreshes.push({
+            sourceId,
+            chunkIndex: i,
+            metadata: mergeMeta(existing.metadata, chunkMeta),
+          });
+        } else {
+          skipped++;
+        }
         continue;
       }
 
@@ -389,19 +459,7 @@ export async function ingestGitbook(
         content: chunk.content,
         title: chunk.title,
         hash,
-        metadata: {
-          space_url: baseUrl,
-          space_label: spaceLabel,
-          last_modified: lastModByUrl.get(url),
-          breadcrumb,
-          page_title: page.title,
-          has_images: chunk.images.length > 0,
-          images_count: chunk.images.length,
-          image_urls: chunk.images.length > 0 ? chunk.images : undefined,
-          solution: tax.solution,
-          product_lines: tax.product_lines,
-          models: tax.models,
-        },
+        metadata: chunkMeta,
       });
     }
   }
@@ -461,8 +519,30 @@ export async function ingestGitbook(
       const chunkIndex = FOCUSED_CHUNK_OFFSET + focusedIndex++;
       const hash = contentHash(focusedContent);
 
-      if (!force && hashMap.get(`${sourceId}:${chunkIndex}`) === hash) {
-        skipped++;
+      const focusedMeta = {
+        space_url: baseUrl,
+        space_label: spaceLabel,
+        last_modified: lastModByUrl.get(url),
+        breadcrumb,
+        page_title: page.title,
+        chunk_type: "focused_led_table",
+        source_image_url: imageUrl,
+        solution: tax.solution,
+        product_lines: tax.product_lines,
+        models: tax.models,
+      };
+
+      const existingFocused = existingMap.get(`${sourceId}:${chunkIndex}`);
+      if (!force && existingFocused?.hash === hash) {
+        if (metadataDrifted(existingFocused.metadata, focusedMeta)) {
+          metaRefreshes.push({
+            sourceId,
+            chunkIndex,
+            metadata: mergeMeta(existingFocused.metadata, focusedMeta),
+          });
+        } else {
+          skipped++;
+        }
         continue;
       }
 
@@ -473,18 +553,7 @@ export async function ingestGitbook(
         content: focusedContent,
         title: focusedTitle,
         hash,
-        metadata: {
-          space_url: baseUrl,
-          space_label: spaceLabel,
-          last_modified: lastModByUrl.get(url),
-          breadcrumb,
-          page_title: page.title,
-          chunk_type: "focused_led_table",
-          source_image_url: imageUrl,
-          solution: tax.solution,
-          product_lines: tax.product_lines,
-          models: tax.models,
-        },
+        metadata: focusedMeta,
       });
 
       // Only emit one focused LED chunk per page (first match wins)
@@ -492,10 +561,27 @@ export async function ingestGitbook(
     }
   }
 
+  // Flush metadata-only refreshes (no re-embedding) for content-unchanged chunks.
+  // This runs BEFORE the early return below: a space whose content is entirely
+  // unchanged produces zero chunks to embed, and that is exactly the case where
+  // a missing `last_modified` needs backfilling.
+  let metadataRefreshed = 0;
+  for (const r of metaRefreshes) {
+    const { error } = await supabase
+      .from("documents" as "products")
+      .update({ metadata: r.metadata } as Record<string, unknown>)
+      .eq("source_type", "gitbook")
+      .eq("source_id", r.sourceId)
+      .eq("chunk_index", r.chunkIndex);
+    if (error) errors.push(`${r.sourceId} chunk ${r.chunkIndex} meta refresh: ${JSON.stringify(error)}`);
+    else metadataRefreshed++;
+  }
+
   if (allChunks.length === 0) {
     return {
       processed: 0,
       skipped,
+      metadata_refreshed: metadataRefreshed,
       pages_fetched: pages.size,
       pages_skipped: pagesSkipped,
       images_described: imagesDescribed,
@@ -582,6 +668,7 @@ export async function ingestGitbook(
   return {
     processed,
     skipped,
+    metadata_refreshed: metadataRefreshed,
     pages_fetched: pages.size,
     pages_skipped: pagesSkipped,
     images_described: imagesDescribed,

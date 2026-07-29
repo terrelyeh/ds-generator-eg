@@ -58,6 +58,7 @@ console.log(`  pages fetched : ${r.pages_fetched}`);
 console.log(`  pages skipped : ${r.pages_skipped}   (unchanged per sitemap lastmod)`);
 console.log(`  chunks written: ${r.processed}`);
 console.log(`  chunks skipped: ${r.skipped}   (content_hash unchanged)`);
+console.log(`  metadata refreshed: ${r.metadata_refreshed}   (unchanged content, drifted metadata)`);
 if (r.images_described !== undefined) console.log(`  images described: ${r.images_described}`);
 if (r.errors.length) {
   console.log(`\n  errors (${r.errors.length}):`);
