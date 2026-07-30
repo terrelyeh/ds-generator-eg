@@ -6,11 +6,15 @@ the datasheet output varies by product-line `category`.
 ## 1. Adding a product line (no UI — DB row + sync)
 
 1. **Inspect the line's Google Sheet** to get the tab **GIDs** + verify
-   structure. The sheet must be shared with the service account. One-off:
-   `node --env-file=apps/spechub/.env.local script.mjs` using `googleapis` +
-   `GOOGLE_SERVICE_ACCOUNT_JSON` → `sheets.spreadsheets.get` lists tabs
-   (sheetId = gid + title). **`GOOGLE_SERVICE_ACCOUNT_JSON` is base64** —
-   decode before `JSON.parse`.
+   structure, and walk its Drive folder. The sheet must be shared with the
+   service account.
+   ```
+   node apps/spechub/scripts/inspect-line-sources.mjs <sheet-url> [folder-url]
+   ```
+   It maps each tab to the column it feeds, demotes the also-matched tabs
+   (PM sheets carry five "Comparison" tabs and a `Web Detail Specs(待刪)`),
+   prints the folder tree with ids, and flags a trashed folder before its id
+   reaches the DB (§3, pitfall #65).
 2. **Insert a `product_lines` row**: name, label, **category** (drives the
    datasheet variant — see §4), solution + solution_id, sheet_id,
    overview_gid, detail_specs_gid, comparison_gid, revision_log_gid,
@@ -93,6 +97,12 @@ while the datasheet printed Contact Us, and how a substring `isAP` test grew
 a Radio Pattern column on "Edge Network Appli**ap**nces" (pitfall #61).
 **Always compare categories exactly.**
 
+The Cloud template's own QR was the last holdout: it kept a local
+`isTransceiver` test, so adding a category to `CONTACT_US_CATEGORIES` changed
+the product page but not the datasheet. Station Outdoor printed a `/qsg/` link
+to a page that doesn't exist until it was switched to `usesContactUsQr()`
+(2026-07-30). Adding a category to the Set is now enough.
+
 **Antenna-pattern slots are derived per PRODUCT** (`lib/datasheet/radio-patterns.ts`),
 not per line — Broadband EOC needs two shapes on one line:
 
@@ -100,6 +110,13 @@ not per line — Broadband EOC needs two shapes on one line:
 |---|---|
 | `APs` | `2.4G` / `5G` (+ `6G` when Operating Frequency says so) × H/E |
 | `Broadband APs` | model name says CPE → `Port1` / `Port2`; otherwise `2.4G` / `5G` |
+| `Station APs` | Operating Frequency says 2.4 GHz → `2.4G` / `5G`; otherwise `Port1` / `Port2` |
+
+⚠️ **Don't assume the CPE name test ports to a new line.** Station's sheet puts
+a form factor in `Model Name` ("Station6 2x2 Dish") and the word CPE only in
+the headline — which isn't part of `RadioPatternSource` — so reusing Broadband's
+rule would have silently given every Station model band plots. It reads the
+radio instead: single-band directional client → ports, dual-radio AP → bands.
 
 The slot label doubles as the file-name stem (`EOC600_Port1_H-plane.png`),
 so renaming a label orphans uploaded art. A page renders whenever a product
@@ -115,11 +132,17 @@ defines slots — missing plots show placeholders, same as Product Views.
 | **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; navy hero + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
 | **Broadband** | Broadband APs | `preview/[model]/broadband-preview.tsx`, steel `#1e6796`; renders BOTH scopes (see §5); cover hero art, Features & Benefits, spec table (single or comparison), Product Views, Antenna Patterns |
 | **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, teal `#86c9cf`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
+| **Station** | Station APs | steel navy `#3a4d78` (band `#445c88`, features box `#f0f2f6`, spec labels `#555e6e`) — a `getTheme()` entry, NOT a component: the v1.3 InDesign reference is the Cloud skeleton recolored. Contact-Us QR; antenna page |
 
-Cloud/gray/transceiver live in `preview/[model]/page.tsx` (`getTheme` +
+Cloud/gray/transceiver/station live in `preview/[model]/page.tsx` (`getTheme` +
 conditional classes). **A structurally different layout is cleaner as its own
 component**, branched by category near the top of `page.tsx` — the URL stays
 `/preview/{model}` so generate-pdf and product links need no changes.
+
+**Measure the reference before assuming it needs a component.** Station's
+reference PDF traced back to the Cloud skeleton exactly — same cover split,
+2-column specs, antenna page, hardware page — so it cost a `getTheme()` entry
+instead of a fifth preview component. Trace first, then decide.
 
 ### Building a new variant — what bit us
 
@@ -244,3 +267,5 @@ plus one entry there — content loading, generation and versioning are shared.
 | **Data Center ▸ Edge Network Appliance** | SE110, SE210 | navy variant |
 | **Data Center ▸ AI Server** | S41, S21, S11 | navy variant; S21/S11 images pending |
 | **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel, `ds_scope='both'`; ja translated (Draft); images pending |
+| **Cloud ▸ Cloud PDU** | ECP106/214, ECP106-INT/212-INT | default blue, no antenna page, keeps the QSG QR; images pending |
+| **Station Outdoor ▸ Station AP** | ENH500-AX, EnStation6, ENS621EXT | steel navy; Contact-Us QR; ENH500-AX/EnStation6 plot `Port1/Port2`, ENS621EXT `2.4G/5G`; images pending |

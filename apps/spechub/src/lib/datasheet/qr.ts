@@ -17,6 +17,7 @@ const CONTACT_US_CATEGORIES = new Set([
   "Transceivers",
   "Edge Network Appliances",
   "AI Servers",
+  "Station APs",
 ]);
 
 /** Lines whose Hardware Overview page shows two renders (front + rear). */

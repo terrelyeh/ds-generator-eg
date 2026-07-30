@@ -75,10 +75,21 @@ export function radioPatternSlots(src: RadioPatternSource): RadioPatternSlot[] {
     return slotsFor(isCpe ? ["Port1", "Port2"] : ["2.4G", "5G"]);
   }
 
+  // Station Outdoor splits the same two ways as Broadband, but the CPE name
+  // test can't be reused: its "Model Name" row holds a form factor ("Station6
+  // 2x2 Dish"), and the word CPE lives only in the headline, which isn't part
+  // of this source. Read the radio instead — a single-band directional client
+  // plots per antenna port, a dual-radio AP plots per band. That matches the
+  // v1.3 references, where ENH500-AX and EnStation6 both print Port1/Port2.
+  if (src.category === "Station APs") {
+    const dualRadio = specMatches(src.specSections, "operating frequency", /2\.4\s*GHz/i);
+    return slotsFor(dualRadio ? ["2.4G", "5G"] : ["Port1", "Port2"]);
+  }
+
   return [];
 }
 
 /** True when the line prints an Antenna Patterns page at all. */
 export function hasRadioPatterns(category: string): boolean {
-  return category === "APs" || category === "Broadband APs";
+  return category === "APs" || category === "Broadband APs" || category === "Station APs";
 }

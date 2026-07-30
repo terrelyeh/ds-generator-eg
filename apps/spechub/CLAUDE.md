@@ -15,10 +15,13 @@
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
-**5 個 solution 上線**：**Cloud**（8 條線）、**Accessories ▸ Transceiver**（綠色、
+**6 個 solution 上線**：**Cloud**（9 條線,含 **Cloud PDU**——ECP 四台,預設藍、
+無天線頁、保留 QSG QR）、**Accessories ▸ Transceiver**（綠色、
 無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network Appliance + AI Server**
 （navy 專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
-與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,整系列一份）。
+與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,整系列一份）、
+**Station Outdoor ▸ Station AP**（鋼藍 navy;Contact-Us QR;**只是 `getTheme()` 一組配色,
+不是新組件**——參考稿量測後就是 Cloud 骨架換色）。
 **Broadband / Data Center / Edge AI 三種自訂版型都吃 `?lang=`**（ja/zh-TW 走
 `product_translations` + 該語系的 CJK 字型）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
@@ -110,7 +113,9 @@ UI fork 自 compare-table。半自動抽取(**↻ sync** datasheet / **🔍 web*
 `DS Feature Groups` 列 → `products.ds_features`,以及線層共用文案的
 `[For DS] Overview & Features` 頁籤 → `line_datasheets`)、圖片命名 + **PNG 自動裁
 透明邊**、**antenna slot 依產品推導**(`lib/datasheet/radio-patterns.ts`)、
-**5 種 datasheet 變體**(Cloud 藍 / 灰 / Transceiver 綠 / DC navy / Broadband 鋼藍)、
+**6 種 datasheet 變體**(Cloud 藍 / 灰 / Transceiver 綠 / DC navy / Broadband 鋼藍 /
+Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 量完發現就是 Cloud
+骨架換色,只花一組 `getTheme()`)、
 **`ds_scope` 三態**(`model`/`series`/`both`——`both` 用同一個組件渲染兩種 scope,
 版號兩條流)、以及做新變體時踩過的雷(pymupdf 量參考稿、流式排版、自動縮放要校準、
 參考圖內建文字要裁掉、footer 綁最後一頁而非某個 section)。
@@ -165,8 +170,8 @@ auth.users → profiles ← email_whitelist.invited_by
 - **Solution sidebar**: 預設收合；展開 `w-64`。**有產品線的 solution 排在
   「soon」佔位之前**（在元件內依 `product_line_count` 推導,不是 `sort_order`——
   這樣新線一上就自動上移）
-- **Datasheet 佈景共 5 種變體**（Cloud 藍 / 灰 / Transceiver 綠 / DC navy /
-  Broadband 鋼藍 + Edge AI teal series）→ 見
+- **Datasheet 佈景共 6 種變體**（Cloud 藍 / 灰 / Transceiver 綠 / DC navy /
+  Broadband 鋼藍 / Station navy + Edge AI teal series）→ 見
   [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
 ## Current Status
@@ -176,7 +181,10 @@ auth.users → profiles ← email_whitelist.invited_by
 ### 🔜 Next Steps
 
 **產品線 / 版型**：
-1. **PM 待補圖** — **EOC 6 台全缺**（`_product` / `_hardware` ×2 / antenna ×4）;
+1. **PM 待補圖** — **Cloud PDU 4 台全缺**（`_product` / `_hardware`;DS Images 空的）;
+   **Station AP 3 台全缺**（`_product` / `_hardware` + antenna:ENH500-AX 與 EnStation6
+   要 `_Port1/_Port2 × H/E-plane`,ENS621EXT 要 `_2.4G/_5G × H/E-plane`）;
+   **EOC 6 台全缺**（`_product` / `_hardware` ×2 / antenna ×4）;
    **AI Server S21 / S11 全缺**（SE110 / SE210 / S41 已完整）;
    **Orin Box 缺 7 張 `series_*`**。⚠️ 檔名**單底線**（S41 曾因 `S41__product.png`
    雙底線靜默同步不到,改名後才進來）。
@@ -277,6 +285,11 @@ npm run lint
     （另外兩處都是 `=== "APs"`）。**子字串比對 category 是地雷，一律精確比對**。
     現已集中在 **`lib/datasheet/qr.ts`**（`usesContactUsQr` / `usesTwoHardwareImages`），
     新增這類特性請加在那裡，不要在元件內就地判斷。
+    （2026-07-30 補：**Cloud 模板自己的 QR 是最後一個沒收編的**——`preview/[model]/page.tsx`
+    還留著本地的 `isTransceiver` 判斷，所以把 category 加進 `CONTACT_US_CATEGORIES`
+    只改到產品頁、datasheet 依然印 `/qsg/`。Station Outdoor 上線時就中這招:兩個畫面
+    又對同一台機器講不同的話,而且指向一個不存在的頁。已改吃 `usesContactUsQr()`,
+    現在加進那個 Set 就真的兩邊都生效。）
 
 
 62. **`(main)` 群組的頁面 headless 驗不了** — dashboard / product 內頁受白名單 gate

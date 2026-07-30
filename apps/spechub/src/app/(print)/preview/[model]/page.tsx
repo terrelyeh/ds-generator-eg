@@ -13,6 +13,7 @@ import {
   type OrinSeriesContent,
 } from "../series/[line]/edge-ai-series-preview";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
+import { usesContactUsQr, CONTACT_US_URL } from "@/lib/datasheet/qr";
 import type {
   Product,
   ProductLine,
@@ -40,8 +41,29 @@ const EDGE_AI_CATEGORIES = new Set(["Edge AI Computers"]);
 const NON_CLOUD_CATEGORIES = new Set(["Unmanaged Switches", "Extenders"]);
 /** Accessories ▸ Transceiver datasheets use a green theme (matches template) */
 const GREEN_CATEGORIES = new Set(["Transceivers"]);
+/** Station Outdoor keeps the Cloud skeleton in the steel-navy sub-brand palette. */
+const STATION_CATEGORIES = new Set(["Station APs"]);
 
 function getTheme(category: string) {
+  // Station Outdoor: the InDesign reference (DS_Station_ENH500-AX v1.3) is the
+  // Cloud layout in the "EnGenius | Station" palette — same cover split, spec
+  // pages, antenna page and hardware page — so it recolors rather than forking
+  // a component. Values sampled off that PDF: header band #445c88, subtitle
+  // #3a4d78, spec labels #555e6e, features box #f0f2f6.
+  if (STATION_CATEGORIES.has(category)) {
+    const stationNavy = "#3a4d78";
+    return {
+      isCloud: false,
+      primary: stationNavy,
+      headerBg: "#445c88",
+      modelColor: stationNavy,
+      sectionTitle: stationNavy,
+      specLabel: "#555e6e",
+      featuresBox: "#f0f2f6",
+      subtitleColor: stationNavy,
+      antennaPlaneBg: "#e8ecf3",
+    };
+  }
   // Green theme for Transceiver datasheets.
   if (GREEN_CATEGORIES.has(category)) {
     const green = "#2F855A";
@@ -54,6 +76,7 @@ function getTheme(category: string) {
       specLabel: green,
       featuresBox: "#e9f5ee",
       subtitleColor: green,
+      antennaPlaneBg: "#E8E9EB",
     };
   }
   const isCloud = !NON_CLOUD_CATEGORIES.has(category);
@@ -66,6 +89,7 @@ function getTheme(category: string) {
     specLabel: isCloud ? "#03a9f4" : "#231f20",
     featuresBox: isCloud ? "#ebf8fe" : "#f2f2f2",
     subtitleColor: isCloud ? "#03a9f4" : "#58595B",
+    antennaPlaneBg: isCloud ? "#E5F5FD" : "#E8E9EB",
   };
 }
 
@@ -415,8 +439,12 @@ export default async function PreviewPage({
     null;
 
   // QR: custom per-product-translation > locale default.
-  // Transceivers have no QSG, so the QR is "Contact Us" → Contact page.
-  const qrLabel = customQrLabel || (isTransceiver ? "Contact Us" : dict.defaultQrLabel);
+  // Lines with no Quick Start Guide point the QR at Contact Us instead. This
+  // asks lib/datasheet/qr rather than testing the category here — the local
+  // `isTransceiver` test used to own this, so Station Outdoor (also QSG-less)
+  // kept printing a /qsg/ link that resolves to nothing (pitfall #61).
+  const contactUsQr = usesContactUsQr(productLine.category);
+  const qrLabel = customQrLabel || (contactUsQr ? "Contact Us" : dict.defaultQrLabel);
   // QR URL resolution priority:
   //   1. product_translations.qr_url (per-product per-locale override)
   //   2. product_lines.qr_url_template (per-line template — most product
@@ -425,15 +453,15 @@ export default async function PreviewPage({
   //   3. dict.defaultQrUrl (e.g. https://qr.engenius.ai/qsg/{model} — used
   //      by Cloud AP and Cloud Camera which keep the short URL)
   // {model} placeholder gets replaced with lowercase model_name.
-  // Transceiver fallback: zh/ja dict defaults are already Contact Us URLs; EN's
+  // Contact-Us fallback: zh/ja dict defaults are already Contact Us URLs; EN's
   // default is the QSG link, so substitute a Contact Us URL there.
-  const transceiverQrFallback = dict.defaultQrUrl.includes("/qsg/")
-    ? "https://www.engeniustech.com/contact-us"
+  const contactUsQrFallback = dict.defaultQrUrl.includes("/qsg/")
+    ? CONTACT_US_URL
     : dict.defaultQrUrl;
   const qrUrlTemplate =
     customQrUrl ||
     productLineExt.qr_url_template ||
-    (isTransceiver ? transceiverQrFallback : dict.defaultQrUrl);
+    (contactUsQr ? contactUsQrFallback : dict.defaultQrUrl);
   const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
   // cover + specs + antennas (optional) + hardware (skipped for transceivers)
@@ -750,7 +778,7 @@ body {
 }
 .antenna-plane {
   font-weight: 500; font-size: 9pt; color: ${theme.sectionTitle};
-  background: ${theme.isCloud ? "#E5F5FD" : "#E8E9EB"};
+  background: ${theme.antennaPlaneBg};
   padding: 2pt 10pt;
   min-width: 56pt;
   text-align: center;
