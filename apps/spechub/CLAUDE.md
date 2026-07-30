@@ -182,8 +182,9 @@ auth.users → profiles ← email_whitelist.invited_by
 
 **產品線 / 版型**：
 1. **PM 待補圖** — **Cloud PDU 4 台全缺**（`_product` / `_hardware`;DS Images 空的）;
-   **Station AP 3 台全缺**（`_product` / `_hardware` + antenna:ENH500-AX 與 EnStation6
-   要 `_Port1/_Port2 × H/E-plane`,ENS621EXT 要 `_2.4G/_5G × H/E-plane`）;
+   **Station AP 3 台全缺**（`_product` / `_hardware` + antenna:**三台都是
+   `_Port1/_Port2 × H/E-plane`**——Station 線不分頻段,ENS621EXT 雖是 dual-radio
+   也一樣走 port）;
    **EOC 6 台全缺**（`_product` / `_hardware` ×2 / antenna ×4）;
    **AI Server S21 / S11 全缺**（SE110 / SE210 / S41 已完整）;
    **Orin Box 缺 7 張 `series_*`**。⚠️ 檔名**單底線**（S41 曾因 `S41__product.png`

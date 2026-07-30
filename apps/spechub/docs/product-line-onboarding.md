@@ -110,13 +110,15 @@ not per line — Broadband EOC needs two shapes on one line:
 |---|---|
 | `APs` | `2.4G` / `5G` (+ `6G` when Operating Frequency says so) × H/E |
 | `Broadband APs` | model name says CPE → `Port1` / `Port2`; otherwise `2.4G` / `5G` |
-| `Station APs` | Operating Frequency says 2.4 GHz → `2.4G` / `5G`; otherwise `Port1` / `Port2` |
+| `Station APs` | always `Port1` / `Port2` — every model, dual-radio included |
 
-⚠️ **Don't assume the CPE name test ports to a new line.** Station's sheet puts
-a form factor in `Model Name` ("Station6 2x2 Dish") and the word CPE only in
-the headline — which isn't part of `RadioPatternSource` — so reusing Broadband's
-rule would have silently given every Station model band plots. It reads the
-radio instead: single-band directional client → ports, dual-radio AP → bands.
+⚠️ **Neither of Broadband's halves ports over — confirm the split, don't infer
+it.** Station's sheet puts a form factor in `Model Name` ("Station6 2x2 Dish")
+and the word CPE only in the headline, which isn't part of `RadioPatternSource`,
+so the CPE name test silently fails. Reading the radio instead looked right —
+it reproduced the two v1.3 references — but it was wrong for the third model:
+ENS621EXT is dual-radio and still plots per port, because on a directional unit
+the pattern belongs to the port, not the band. The line simply has no split.
 
 The slot label doubles as the file-name stem (`EOC600_Port1_H-plane.png`),
 so renaming a label orphans uploaded art. A page renders whenever a product
