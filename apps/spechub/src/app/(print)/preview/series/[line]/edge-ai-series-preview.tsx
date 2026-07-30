@@ -6,17 +6,20 @@ import type { SeriesFeatureGroup, SeriesSpecsData } from "@/lib/google/sheets-ex
 import type { SeriesImages } from "@/lib/google/drive-images";
 
 /**
- * EDGE AI BOX series datasheet — teal layout traced from the DS_Orin Box
- * draft. This line ships ONE datasheet for the whole series
- * (`ds_scope='series'`), so there is no per-model variant.
+ * EDGE AI BOX datasheet — teal layout traced from the DS_Orin Box draft.
  *
- * Fixed 5-page structure: cover (hero + product shot + grouped features) /
- * Software Architecture / curated comparison table / Hardware Overview per
- * variant group (base vs "W") + Contact-Us footer.
+ * `ds_scope='both'`, so ONE renderer serves both documents off the same
+ * `line_datasheets` row and they cannot drift apart:
  *
- * Content comes from the same `line_datasheets` row every scope reads —
- * `loadLineDatasheetContent` fills the copy, `loadSeriesSpecs` the table,
- * `syncSeriesImages` the artwork.
+ *   series   cover speaks for the family; comparison table lists every
+ *            variant; a Hardware Overview page per variant group
+ *   model    cover speaks for THAT box (its own headline, overview and
+ *            product shot); spec table narrows to its one column; only its
+ *            own Hardware Overview page
+ *
+ * Shared either way: Software Architecture, the teal treatment, Contact-Us
+ * QR. `loadLineDatasheetContent` fills the copy, `loadSeriesSpecs` the
+ * table, `syncSeriesImages` the artwork.
  */
 
 const TEAL = "#86c9cf";
@@ -43,31 +46,78 @@ function Placeholder({ slot, className }: { slot: string; className?: string }) 
 }
 
 export function EdgeAiSeriesPreview({
+  scope = "series",
   line,
   content: ld,
   productImages,
+  focusModel,
   showToolbar,
   userRole,
   versionOverride,
 }: {
+  scope?: "model" | "series";
   line: ProductLine;
   content: OrinSeriesContent;
   /** model_name → product_image, for the spec table's column thumbnails */
   productImages: Map<string, string | null>;
+  /** the product being rendered when scope="model" */
+  focusModel?: {
+    model_name: string;
+    headline: string | null;
+    subtitle: string | null;
+    overview: string | null;
+    features: string[] | null;
+    product_image: string | null;
+    /** this product's own specs — see the spec table note below */
+    specSections?: { items: { label: string; value: string }[] }[];
+  } | null;
   showToolbar: boolean;
   userRole: import("@eg/auth/permissions").Role | null;
   versionOverride: string | null;
 }) {
   const dict = getDict("en");
+  const isSeries = scope === "series";
   const pl = line;
-  const headline = ld.headline ?? "";
+  // The two documents answer different questions: the series speaks for the
+  // family, a single box speaks for itself. Fall back to line-level copy so
+  // a model with nothing of its own still renders.
+  const headline = (isSeries ? ld.headline : focusModel?.headline || ld.headline) ?? "";
   const seriesName = ld.series_name ?? pl.label;
+  // Under the headline: the family name on a series cover, but on a model
+  // cover the box itself — its model number, plus the marketing name the
+  // sheet carries in `subtitle` ("Orin BOX 67") when there is one.
+  const coverSubline = isSeries
+    ? seriesName
+    : [focusModel?.model_name, focusModel?.subtitle].filter(Boolean).join("  ·  ") ||
+      seriesName;
   const categoryLabel = ld.category_label ?? pl.category;
-  const overview = ld.overview ?? "";
-  const features = Array.isArray(ld.features) ? ld.features : [];
+  const overview = (isSeries ? ld.overview : focusModel?.overview || ld.overview) ?? "";
+  const lineFeatures = Array.isArray(ld.features) ? ld.features : [];
+  // A model's own Key Features are a flat list; the line's are grouped
+  // chips. Present each in its native shape rather than forcing one into
+  // the other.
+  const modelFeatures = (focusModel?.features ?? []).filter(Boolean);
+  const features = isSeries ? lineFeatures : [];
   const softwareArch = ld.software_arch ?? "";
-  const specColumns = ld.specs?.columns ?? [];
-  const specRows = ld.specs?.rows ?? [];
+  // Series: the curated comparison table, one column per variant group.
+  //
+  // Per model: that product's OWN spec_sections instead. The curated sheet
+  // deliberately pairs a base and its "W" variant in a single column
+  // ("E5-NB16 / E5-NB16W", "N/A / Wi-Fi6 2x2"), which is right for a
+  // comparison and wrong for one box's datasheet — it would advertise the
+  // sibling's wireless on a model that has none.
+  const specColumns = isSeries
+    ? ld.specs?.columns ?? []
+    : [{ name: focusModel?.subtitle ?? "", number: focusModel?.model_name ?? "" }];
+  const specRows = isSeries
+    ? ld.specs?.rows ?? []
+    : (focusModel?.specSections ?? []).flatMap((sec) =>
+        (sec.items ?? [])
+          // These already sit in the table's own header rows.
+          .filter((i) => !/^model\s*(name|#|number)/i.test(i.label.trim()))
+          .filter((i) => i.value.trim() && i.value.trim().toUpperCase() !== "N/A")
+          .map((i) => ({ label: i.label, values: [i.value] })),
+      );
   const images: SeriesImages = {
     hero: ld.images?.hero ?? null,
     cover_product: ld.images?.cover_product ?? null,
@@ -100,33 +150,55 @@ export function EdgeAiSeriesPreview({
     year: "numeric",
   });
 
+
+  // A model's cover carries its own product shot; the series cover carries
+  // the family lineup render.
+  const modelShot =
+    focusModel?.product_image && !focusModel.product_image.startsWith("cache/")
+      ? focusModel.product_image
+      : null;
+  const coverShot = isSeries ? images.cover_product : modelShot;
+  const coverShotAlt = isSeries ? seriesName : focusModel?.model_name ?? seriesName;
+  const coverShotSlot = isSeries
+    ? "series_cover_product.png"
+    : `${focusModel?.model_name}_product.png`;
+
+  // Hardware Overview: the series walks every variant group, a model shows
+  // only the group it belongs to.
+  const hwPages = isSeries
+    ? images.hw_pages
+    : images.hw_pages.filter((hw) =>
+        String(hw.subtitle ?? "")
+          .split("/")
+          .map((x) => x.trim().toLowerCase())
+          .includes((focusModel?.model_name ?? "").toLowerCase()),
+      );
+  const totalPages = 3 + hwPages.length;
+
   // Official PDF requires the full content + every image slot filled
   // (2 renders per hardware page, like the draft). Preview renders dashed
   // placeholders for anything missing so MKT can see what to chase.
   const canGenerate =
     !!overview &&
-    features.length > 0 &&
+    (isSeries ? features.length > 0 : modelFeatures.length > 0) &&
     specRows.length > 0 &&
     !!images.hero &&
-    !!images.cover_product &&
+    !!coverShot &&
     !!images.architecture &&
-    images.hw_pages.length > 0 &&
-    images.hw_pages.every((p) => p.images.length >= 2);
-
-  const hwPages = images.hw_pages;
-  const totalPages = 3 + hwPages.length;
+    hwPages.length > 0 &&
+    hwPages.every((p) => p.images.length >= 2);
 
   return (
     <>
       {showToolbar && (
         <PrintToolbar
-          model={pl.name}
+          model={isSeries ? pl.name : focusModel?.model_name ?? pl.name}
           currentVersion={currentVersion}
           canGenerate={canGenerate}
           locale="en"
           userRole={userRole}
           translationConfirmed
-          series
+          series={isSeries}
         />
       )}
       <style
@@ -369,12 +441,12 @@ body {
             <Placeholder slot="series_hero.png" className="hero-ph" />
           )}
           <div className="hero-title">{headline}</div>
-          <div className="hero-series">{seriesName}</div>
-          {images.cover_product ? (
+          <div className="hero-series">{coverSubline}</div>
+          {coverShot ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img className="hero-product" src={images.cover_product} alt={seriesName} />
+            <img className="hero-product" src={coverShot} alt={coverShotAlt} />
           ) : (
-            <Placeholder slot="series_cover_product.png" className="hero-product-ph" />
+            <Placeholder slot={coverShotSlot} className="hero-product-ph" />
           )}
         </div>
 
@@ -386,17 +458,37 @@ body {
         <div className="cover-features">
           <div className="section-title">Key Features &amp; Benefits</div>
           <div className="features-box">
-            {features.map((g, gi) => (
-              <div key={gi} className="feature-group">
-                {g.title && <div className="feature-group-title">{g.title}:</div>}
-                {g.bullets.map((b, bi) => (
-                  <div key={bi} className="feature-bullet">
-                    <span className="dot">•</span>
-                    <span>{b}</span>
+            {isSeries
+              ? features.map((g, gi) => (
+                  <div key={gi} className="feature-group">
+                    {g.title && <div className="feature-group-title">{g.title}:</div>}
+                    {g.bullets.map((b, bi) => (
+                      <div key={bi} className="feature-bullet">
+                        <span className="dot">•</span>
+                        <span>{b}</span>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ))}
+                ))
+              : modelFeatures.map((f, fi) => {
+                  // "Label: body" renders with the label in bold, matching
+                  // the series groups' visual weight.
+                  const m = f.match(/^([^:]{2,60}):\s*(.*)$/);
+                  return (
+                    <div key={fi} className="feature-bullet">
+                      <span className="dot">•</span>
+                      <span>
+                        {m ? (
+                          <>
+                            <b>{m[1]}:</b> {m[2]}
+                          </>
+                        ) : (
+                          f
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
           </div>
         </div>
 
@@ -491,7 +583,9 @@ body {
             <div className="top-bar" />
             <div className="hw-page">
               <div className="section-title">{dict.hardwareOverview}</div>
-              <div className="hw-subtitle">{hw.subtitle}</div>
+              <div className="hw-subtitle">
+                {isSeries ? hw.subtitle : focusModel?.model_name ?? hw.subtitle}
+              </div>
               <div className={`hw-images${isLast ? " with-footer" : ""}`}>
                 {hw.images.length > 0 ? (
                   hw.images.map((url, ii) => (

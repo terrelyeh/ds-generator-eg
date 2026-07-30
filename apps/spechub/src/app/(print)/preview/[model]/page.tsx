@@ -8,6 +8,10 @@ import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { DataCenterPreview } from "./datacenter-preview";
 import { BroadbandPreview } from "./broadband-preview";
+import {
+  EdgeAiSeriesPreview,
+  type OrinSeriesContent,
+} from "../series/[line]/edge-ai-series-preview";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
 import type {
   Product,
@@ -30,6 +34,8 @@ const BAND_DISPLAY: Record<string, string> = { "2.4G": "2.4GHz", "5G": "5GHz", "
 const BROADBAND_CATEGORIES = new Set(["Broadband APs"]);
 /** Data Center lines render via the dedicated navy layout component. */
 const DC_CATEGORIES = new Set(["Edge Network Appliances", "AI Servers"]);
+/** Edge AI Box renders via the teal layout — same component as its series. */
+const EDGE_AI_CATEGORIES = new Set(["Edge AI Computers"]);
 /** Non-cloud product lines use gray theme instead of blue */
 const NON_CLOUD_CATEGORIES = new Set(["Unmanaged Switches", "Extenders"]);
 /** Accessories ▸ Transceiver datasheets use a green theme (matches template) */
@@ -218,6 +224,57 @@ export default async function PreviewPage({
             : null
         }
         translationConfirmed={translationConfirmed}
+      />
+    );
+  }
+
+  // Edge AI Box: the teal layout serves both scopes, so a single box renders
+  // through the same component as the series sheet off the same
+  // line_datasheets row — see edge-ai-series-preview.tsx.
+  if (EDGE_AI_CATEGORIES.has(product.product_lines.category)) {
+    const [{ data: ldRow }, { data: prodRows }] = await Promise.all([
+      supabase
+        .from("line_datasheets")
+        .select(
+          "headline, series_name, category_label, overview, features, software_arch, specs, images, current_version",
+        )
+        .eq("product_line_id", product.product_line_id)
+        .maybeSingle(),
+      supabase
+        .from("products")
+        .select("model_name, product_image")
+        .eq("product_line_id", product.product_line_id),
+    ]);
+    if (!ldRow) notFound();
+    const productImages = new Map(
+      ((prodRows ?? []) as { model_name: string; product_image: string | null }[]).map(
+        (p) => [p.model_name, p.product_image],
+      ),
+    );
+    return (
+      <EdgeAiSeriesPreview
+        scope="model"
+        line={product.product_lines}
+        content={ldRow as unknown as OrinSeriesContent}
+        productImages={productImages}
+        focusModel={{
+          model_name: product.model_name,
+          headline: product.headline,
+          subtitle: product.subtitle,
+          overview: product.overview,
+          features: product.features as string[] | null,
+          product_image: product.product_image,
+          specSections: [...(product.spec_sections ?? [])]
+            .sort((a, b) => a.sort_order - b.sort_order)
+            .map((sec) => ({
+              items: [...(sec.spec_items ?? [])]
+                .sort((a, b) => a.sort_order - b.sort_order)
+                .map((i) => ({ label: i.label, value: i.value })),
+            })),
+        }}
+        showToolbar={showToolbar}
+        userRole={userRole}
+        versionOverride={versionOverride ?? null}
       />
     );
   }
