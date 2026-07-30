@@ -302,6 +302,46 @@ export async function detectLocaleVersion(
  *
  * @returns The Google Drive file ID and web view link of the uploaded PDF
  */
+/**
+ * Throw unless `folderId` is a folder we can actually put files into.
+ *
+ * Catches the three ways a configured folder goes bad: trashed (writes
+ * still succeed, so the upload silently vanishes), deleted outright, and
+ * an id that points at a file rather than a folder.
+ */
+async function assertFolderUsable(
+  drive: ReturnType<typeof google.drive>,
+  folderId: string,
+  label: string,
+): Promise<void> {
+  let info;
+  try {
+    const res = await drive.files.get({
+      fileId: folderId,
+      fields: "id, name, trashed, mimeType",
+      supportsAllDrives: true,
+    });
+    info = res.data;
+  } catch (err) {
+    throw new Error(
+      `Drive folder ${folderId} (${label}) can't be read — deleted, or the ` +
+        `service account lost access. Original error: ${(err as Error).message}`,
+    );
+  }
+  if (info.trashed) {
+    throw new Error(
+      `Drive folder "${info.name}" (${label} = ${folderId}) is in the trash. ` +
+        `Restore it in Drive, or point the product line at a different folder — ` +
+        `uploading into a trashed folder appears to work but hides the PDF.`,
+    );
+  }
+  if (info.mimeType !== "application/vnd.google-apps.folder") {
+    throw new Error(
+      `Drive id ${folderId} (${label}) is not a folder (mimeType=${info.mimeType}).`,
+    );
+  }
+}
+
 export async function uploadPdfToDrive(
   driveFolderId: string,        // EN product line folder
   dsPrefix: string,
@@ -325,6 +365,13 @@ export async function uploadPdfToDrive(
   // For locale uploads, parent must be the SIBLING locale line folder
   // (e.g. "Cloud Camera_zh"), not the EN line. Earlier bug used EN
   // directly so locale PDFs ended up nested under the wrong parent.
+  // A folder in the trash still accepts writes over the API, so uploading
+  // into one "succeeds" and the PDF then isn't anywhere the user can see.
+  // That is exactly what happened to Broadband EOC: someone trashed its
+  // Model Datasheet folder, generation kept reporting success, and two
+  // English datasheets quietly landed in the bin. Fail loudly instead.
+  await assertFolderUsable(drive, driveFolderId, "product_lines.drive_folder_id");
+
   let parentLineFolderId = driveFolderId;
   if (locale && locale !== "en") {
     if (!lineName) {

@@ -295,6 +295,17 @@ npm run lint
     讀「該語系實際渲染的值」(同 pitfall #59)。
 
 
+65. **Drive 目標資料夾進了垃圾桶 → 系統會「成功」但檔案消失**（2026-07-30
+    Broadband EOC 事件）—— 垃圾桶裡的資料夾**API 仍可寫入**,所以 generate-pdf
+    照樣回報成功,兩份英文版 PDF 靜靜躺在垃圾桶。圖片那邊反而更陰:資料夾被
+    連帶刪除時裡面的圖也標記 trashed,`trashed = false` 查詢**回空清單而非報錯**,
+    呼叫端會把「列得到但空的」當成「PM 把圖刪了」→ 清空 DB 欄位。
+    現在兩條路徑都有防護:`assertFolderUsable`（drive-versions,直接 throw）與
+    `folderUnavailable`（drive-images,降級成「沒看到」不動 DB）。
+    ⚠️ **`drive_folder_id` / `ds_images_folder_id` 指向的資料夾會被 PM 手動刪掉**
+    —— EOC 與 Orin Box 都被 engenius.ad 刪過（新建的線他們不認識）。建線後要跟
+    PM 說一聲那個資料夾是系統在用的。
+
 64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
     兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,
     兩者都沒有 CJK 字符;② `/api/generate-pdf` 只等 `networkidle0`。

@@ -600,6 +600,37 @@ export async function syncLocalizedHardwareImage(params: {
   return { url: publicUrl, folder_listed: true };
 }
 
+/**
+ * True when the folder is missing or in the trash.
+ *
+ * Matters because a trashed folder still LISTS cleanly — its children are
+ * trashed too, so the query returns zero files rather than an error. Callers
+ * that treat "listed, but empty" as "the PM deleted the images" would then
+ * wipe the DB columns. Treat it as "couldn't look" instead.
+ */
+async function folderUnavailable(folderId: string): Promise<boolean> {
+  const auth = getGoogleAuth();
+  const drive = google.drive({ version: "v3", auth });
+  try {
+    const { data } = await drive.files.get({
+      fileId: folderId,
+      fields: "trashed, name",
+      supportsAllDrives: true,
+    });
+    if (data.trashed) {
+      console.warn(
+        `[drive-images] folder "${data.name}" (${folderId}) is in the trash — ` +
+          `treating as unreadable so its images aren't mistaken for deletions.`,
+      );
+      return true;
+    }
+    return false;
+  } catch (err) {
+    console.warn(`[drive-images] folder ${folderId} unreadable: ${(err as Error).message}`);
+    return true;
+  }
+}
+
 export async function syncProductImages(
   modelName: string,
   supabase: ReturnType<typeof import("@eg/db/admin").createAdminClient>,
@@ -614,8 +645,10 @@ export async function syncProductImages(
   };
 
   // No folder → nothing to sync, nothing to delete (caller should keep
-  // whatever it already has).
+  // whatever it already has). Same for a trashed one: it lists as empty,
+  // which would otherwise read as "every image was deleted".
   if (!dsImagesFolderId) return result;
+  if (await folderUnavailable(dsImagesFolderId)) return result;
 
   // One list call gives us a complete view of what's in the folder. If
   // this fails we leave folder_listed = false so the caller doesn't
