@@ -320,6 +320,21 @@ npm run lint
     —— EOC 與 Orin Box 都被 engenius.ad 刪過（新建的線他們不認識）。建線後要跟
     PM 說一聲那個資料夾是系統在用的。
 
+66. **`max-width`/`max-height` 只封頂、不放大 —— 圖片尺寸會變成「PNG 像素數說了算」**
+    （2026-08-03 Cloud 封面產品圖事件）—— 封面本來寫 `max-width:290pt; max-height:100%`,
+    於是渲染尺寸 = 該檔的像素數 ×0.75,超過才被壓到 290pt。結果 ECW230 印出 **290×296pt**
+    （InDesign 原稿是 193×195）、ECW230S 290×312（原稿 183×184）;而 ECW260 看起來正常
+    **純粹是它的檔案剛好夠小**。引爆點是 **pitfall 裡那個為 SE110 加的 `sharp.trim()`**——
+    它對每條線每張 PNG 都生效,會同時改寫像素數**和長寬比**（ECW230S: 3800×2138 寬圖 →
+    1313×1413 高圖,渲染高度 163pt → 312pt）。**透明邊距一直在無意間當縮放控制**,裁掉後
+    就從「太小」盪到「太大」。修法:**框決定尺寸,不是檔案** —— 容器固定成參考稿量到的
+    `x 311-587, y 269-464`,img 改 `width/height:100% + object-fit:contain`。
+    ⚠️ 同一支還埋了**寫死的 4pt 重疊**:`.overview-section` 到 x306pt,舊容器卻從 x292pt 起,
+    只要圖寬到撞上限就一定壓到文字（五台實測都是精準 4.0pt）。**改共用版面 CSS 前先去量
+    InDesign 原稿**（`pymupdf` 抽 image bbox）,不要憑感覺調。
+    Transceiver 用 `width/height:auto` opt-out —— tx-cover 是另一種構圖,別讓它繼承填滿規則。
+    **hardware 圖（`max-width:530pt; max-height:480pt`）還是同一個寫法,尚未處理。**
+
 64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
     兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,
     兩者都沒有 CJK 字符;② `/api/generate-pdf` 只等 `networkidle0`。
