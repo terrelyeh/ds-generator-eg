@@ -142,9 +142,15 @@ export function ProductTranslationEditor({
   const [headlineTrans, setHeadlineTrans] = useState(existing?.headline ?? "");
   const [subtitleTrans, setSubtitleTrans] = useState(existing?.subtitle ?? "");
   const [overview, setOverview] = useState(existing?.overview ?? "");
-  const [features, setFeatures] = useState<string[]>(
-    existing?.features ?? englishFeatures.map(() => "")
-  );
+  // Always as long as the CURRENT English list. A stored translation can be
+  // longer — features get deleted from the sheet after it was written — and
+  // the rows below only iterate englishFeatures, so a stale tail would sit
+  // here unseen and be posted back on the next save. ECP106's zh-TW datasheet
+  // printed two orphaned bullets that way.
+  const alignToSource = (stored: string[] | null | undefined) =>
+    englishFeatures.map((_, i) => stored?.[i] ?? "");
+
+  const [features, setFeatures] = useState<string[]>(alignToSource(existing?.features));
   const [hwImage, setHwImage] = useState(existing?.hardware_image ?? "");
   const [hwUploading, setHwUploading] = useState(false);
   const [hwDeleting, setHwDeleting] = useState(false);
@@ -160,7 +166,7 @@ export function ProductTranslationEditor({
     setHeadlineTrans(t?.headline ?? "");
     setSubtitleTrans(t?.subtitle ?? "");
     setOverview(t?.overview ?? "");
-    setFeatures(t?.features ?? englishFeatures.map(() => ""));
+    setFeatures(alignToSource(t?.features));
     setHwImage(t?.hardware_image ?? "");
     setQrLabel(t?.qr_label ?? "");
     setQrUrl(t?.qr_url ?? "");

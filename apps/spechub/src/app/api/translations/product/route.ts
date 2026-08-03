@@ -40,6 +40,29 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  // A translated feature list must be exactly as long as the English one it
+  // renders against. When a feature is deleted from the sheet the stored
+  // translation keeps its old length, and the editor only draws
+  // englishFeatures.length rows — so the extra tail is invisible there and
+  // gets posted straight back, then prints on the datasheet. ECP106 zh-TW
+  // shipped two orphaned bullets that way (2026-08-03). Trim here too, so
+  // the invariant doesn't depend on the client that happens to be calling.
+  let alignedFeatures = features ?? null;
+  if (alignedFeatures) {
+    const { data: product } = (await supabase
+      .from("products")
+      .select("features")
+      .eq("model_name", product_id)
+      .single()) as { data: { features: string[] | null } | null };
+    const sourceLength = product?.features?.length;
+    if (sourceLength !== undefined && alignedFeatures.length !== sourceLength) {
+      console.warn(
+        `[translations] ${product_id}/${locale}: ${alignedFeatures.length} translated features vs ${sourceLength} source — aligning.`,
+      );
+      alignedFeatures = Array.from({ length: sourceLength }, (_, i) => alignedFeatures![i] ?? "");
+    }
+  }
+
   const upsertData: Record<string, unknown> = {
     product_id,
     locale,
@@ -47,7 +70,7 @@ export async function POST(request: Request) {
     headline: headline?.trim() || null,
     subtitle: subtitle?.trim() || null,
     overview: overview?.trim() || null,
-    features: features ?? null,
+    features: alignedFeatures,
     hardware_image: hardware_image?.trim() || null,
     qr_label: qr_label?.trim() || null,
     qr_url: qr_url?.trim() || null,
