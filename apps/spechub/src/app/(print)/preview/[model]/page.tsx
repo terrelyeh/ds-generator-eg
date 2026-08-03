@@ -639,14 +639,28 @@ body {
   font-weight: 500; font-size: 24pt; color: #231f20; line-height: 1.15;
 }
 
+/* Geometry traced off the InDesign originals (DS_Cloud_ECW230 v1.2 /
+   ECW230S v1.1 / ECP106 v1.3): their product shots occupy x 311-587,
+   y 269-464. The left edge matters — .overview-section runs to x 306pt,
+   and the old box started at 292pt, so any image wide enough to reach its
+   cap printed 4pt on top of the overview text.
+
+   The image FILLS this box rather than being capped by it. max-width
+   only clamps, never upscales, so the rendered size used to be the PNG's
+   own pixel count (px x 0.75) — ECW230 came out 290x296pt, half again the
+   original's 193x195, while ECW260 looked right purely because its file
+   happened to be small. Sync trims transparent padding (for SE110, which
+   rendered tiny), which rewrites both the pixel count and the aspect
+   ratio — ECW230S went 3800x2138 to 1313x1413 — so file dimensions can't
+   be allowed to decide layout at all. */
 .product-image-container {
-  position: absolute; right: 10pt;
-  top: 210pt; bottom: 260pt;
-  width: 310pt;
+  position: absolute; right: 25pt;
+  top: 269pt; height: 195pt;
+  width: 276pt;
   display: flex; align-items: center; justify-content: center;
 }
 .product-image-container img {
-  max-width: 290pt; max-height: 100%; object-fit: contain;
+  width: 100%; height: 100%; object-fit: contain;
 }
 
 .section-title {
@@ -671,7 +685,12 @@ body {
   height: 150pt; width: auto;
   display: flex; align-items: center; justify-content: center;
 }
+/* Transceivers keep natural sizing: their cover is a different layout and
+   wasn't part of the cover-scale fix above. The width/height auto pair is
+   load bearing — it opts out of the fill rule, which would otherwise
+   stretch these across the full-width tx container. */
 .tx-cover .product-image-container img {
+  width: auto; height: auto;
   max-width: 340pt; max-height: 150pt; object-fit: contain;
 }
 .tx-cover .overview-section {
