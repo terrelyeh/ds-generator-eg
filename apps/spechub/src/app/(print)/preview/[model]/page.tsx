@@ -764,7 +764,21 @@ body {
   padding-top: 31pt; margin-bottom: 16pt;
 }
 .hardware-image-container { text-align: center; margin: 10pt auto; }
-.hardware-image-container img { max-width: 530pt; max-height: 480pt; object-fit: contain; }
+/* Same fix as the cover: width is set, not capped, so the box decides the
+   scale instead of the PNG's pixel count. 49 of the 50 Cloud-template
+   models already rendered at exactly 530pt because their composed hardware
+   PNGs are wider than the cap — this only changes ECW526, whose 664x566
+   file fell short of it and printed 6% small.
+
+   height:auto (not 100%) is deliberate: the container is in normal flow
+   and its height tracks the image, so pinning a height here would open a
+   gap under short hardware shots. max-height still guards the tall ones —
+   the shallowest file today is ratio 1.111 against the box's 1.104, so
+   none are height-limited yet, but a squarer upload would letterbox
+   correctly rather than run into the footer. */
+.hardware-image-container img {
+  width: 530pt; height: auto; max-height: 480pt; object-fit: contain;
+}
 
 /* Antennas Patterns page — AP only, renders radio pattern polar plots.
    Grid layout mirrors reference PDF (ECW536 v1.3): 2 columns (H / E
