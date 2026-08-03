@@ -320,6 +320,19 @@ npm run lint
     —— EOC 與 Orin Box 都被 engenius.ad 刪過（新建的線他們不認識）。建線後要跟
     PM 說一聲那個資料夾是系統在用的。
 
+67. **翻譯的 feature 陣列不會跟著英文縮短 —— 多出來的尾巴 UI 看不見卻會印出來**
+    （2026-08-03 ECP106 zh-TW 事件）—— PM 7/31 從 sheet 拿掉 2 條 feature（其實是把
+    `Safety`/`Integration` 的項目符號拔掉,那兩行本來就是小標題,sync 正確地不再匯入）,
+    英文 12 → 10。但 `product_translations.features` 還是 12 條:編輯器的 state 直接
+    `existing?.features` 照抄,而畫面是 `englishFeatures.map(...)` 只畫 10 列 →
+    **第 11、12 條在 UI 完全看不到,存檔時卻原封不動送回去,datasheet 就印出來**。
+    使用者看到的「重複」是巧合:刪掉第 6、10 條後,新的第 9、10 條剛好就是舊第 11、12 條
+    的來源句。已在**兩層**對齊（編輯器 `alignToSource()` + `/api/translations/product`
+    伺服端截齊,不依賴呼叫端）。**新增「陣列跟著另一個陣列長度走」的欄位時,務必在讀取端
+    和寫入端都對齊**;spec_labels 也是同款契約。
+    附帶:`Return EXACTLY the same number of lines` 只寫在 prompt 裡,程式沒驗證 ——
+    AI 翻譯那條路徑靠 `englishFeatures.map((_, i) => lines[i] ?? "")` 夾取才沒出事。
+
 66. **`max-width`/`max-height` 只封頂、不放大 —— 圖片尺寸會變成「PNG 像素數說了算」**
     （2026-08-03 Cloud 封面產品圖事件）—— 封面本來寫 `max-width:290pt; max-height:100%`,
     於是渲染尺寸 = 該檔的像素數 ×0.75,超過才被壓到 290pt。結果 ECW230 印出 **290×296pt**
