@@ -790,10 +790,13 @@ body {
   font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
   padding-top: 31pt; margin-bottom: 14pt;
 }
+/* Row gap is 30pt, not the column's 24pt: a row break has to read as a
+   bigger separation than a column one, or the plot above lands almost on
+   top of the next row's band pill. */
 .antennas-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 18pt 24pt;
+  gap: 30pt 24pt;
 }
 .antenna-cell {
   break-inside: avoid;
@@ -817,11 +820,11 @@ body {
   text-align: center;
 }
 .antenna-image {
-  text-align: center; margin-top: 8pt;
+  text-align: center; margin-top: 14pt;
 }
 /* The COLUMN decides the size, never the file (pitfall #66). Each plot
    fills its grid column (259pt = (612 - 2*35 padding - 24 gap) / 2) and
-   takes whatever height its own aspect ratio asks for.
+   takes whatever height its own aspect ratio asks for, up to max-height.
 
    This used to be a square 158pt x 158pt box, which cost
    size twice over: PM plots are landscape (a legend sits beside the
@@ -830,26 +833,28 @@ body {
    itself only 61% of the column. The two together printed the chart at
    about a third of the area the reference datasheet uses.
 
-   max-height is a backstop, not the design: it only bites on square-ish
-   sources, and its job is to keep the tallest possible row inside the
-   72pt bottom margin (pagination.ts) —
-     2 rows: 2 * (19pt labels + 8pt gap + H) + 18pt row-gap + 86pt grid
-             top <= 720pt  →  H <= 282pt, so a square source at the full
-             259pt column height is already safe.
-     3 rows (6G): same arithmetic gives H <= 172pt. At the median 1.37
-             ratio a plot draws 236x172 — still nearly double the old
-             125x91 — and squarer sources letterbox to 172pt tall with
-             transparent gutters rather than pushing row 3 off the page.
-   Changing the row gap, label size or grid padding moves these ceilings;
-   re-measure before touching them. */
+   max-height is what keeps the page from feeling packed, and it is
+   deliberately tighter than the page-height budget allows:
+     2 rows: the budget is H <= 262pt (2 * (17pt labels + 14pt gap + H)
+             + 30pt row-gap + 86pt grid top <= the 720pt bottom margin
+             from pagination.ts). 207pt is used instead, because a SQUARE
+             source — ECW215, ECW510L — would otherwise take the full
+             259pt column height and leave the second row's band pill
+             sitting right under the first row's plot. Landscape sources
+             ask for ~187–209pt anyway, so this only bites on the tall
+             ones, which are exactly the pages that looked cramped.
+     3 rows (6G): the budget is H <= 160pt; 150pt keeps the same air
+             between rows that the 2-row page has.
+   Changing the row gap, label size or grid padding moves the budget
+   ceilings; re-measure before touching them. */
 .antenna-image img {
   width: 100%;
   height: auto;
-  max-height: 259pt;
+  max-height: 207pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  max-height: 170pt;
+  max-height: 150pt;
 }
 
 /* Footer */
