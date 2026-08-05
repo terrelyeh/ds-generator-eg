@@ -380,6 +380,46 @@ async function trimTransparentEdges(buffer: Buffer, mimeType: string): Promise<B
   }
 }
 
+/**
+ * Crop the flat margin around an antenna-pattern plot.
+ *
+ * Same idea as trimTransparentEdges with one deliberate difference: this
+ * also trims OPAQUE borders, so the white surround on a JPG export goes
+ * too. That is safe here and wrong there — a radio pattern is a lab plot
+ * whose border is padding, while a product photo's white edge may be part
+ * of the shot.
+ *
+ * Why it matters: PM exports of the same 850x620 canvas run anywhere from
+ * 84% to 100% content fill, so two plots that look identical in Drive used
+ * to print at noticeably different sizes. Trimming makes the datasheet
+ * column the ONLY thing that decides how big a plot prints.
+ *
+ * Threshold 15/255 tolerates JPEG ringing around the border without
+ * reaching the chart's lightest gridline (measured across all 72 uploaded
+ * plots: same crop as a per-channel Pillow reference, no over-trims).
+ * Failures pass the buffer through — an untrimmed plot still renders.
+ */
+export async function trimPlotMargin(
+  buffer: Buffer,
+  mimeType: string,
+): Promise<Buffer> {
+  if (!["image/png", "image/jpeg", "image/jpg", "image/webp"].includes(mimeType)) {
+    return buffer;
+  }
+  try {
+    const sharp = (await import("sharp")).default;
+    // No format call: sharp re-encodes as the input format, so the URL's
+    // extension keeps matching the bytes behind it.
+    return await sharp(buffer).trim({ threshold: 15 }).toBuffer();
+  } catch (err) {
+    console.warn(
+      "[trimPlotMargin] pass-through:",
+      err instanceof Error ? err.message : String(err),
+    );
+    return buffer;
+  }
+}
+
 export interface ImageSyncResult {
   product_image_url: string | null;
   hardware_image_url: string | null;

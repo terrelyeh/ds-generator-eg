@@ -1452,7 +1452,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                   Radio Patterns
                 </h4>
                 <div className="text-[11px] leading-relaxed text-muted-foreground max-w-md text-right">
-                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長寬 ≥ 500px 的方形圖</strong>（純 polar plot 即可，不含側邊 legend）。PDF 會渲染為 158×158pt，解析度低會略模糊。
+                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長邊 ≥ 800px</strong>。<strong className="text-foreground">比例不拘、四周留白會自動裁掉</strong>，PDF 會把圖放大到欄寬（2 頻段最大 259pt 寬；含 6GHz 為三排，高度上限 170pt）——所以圖愈大愈清楚，長邊 800px 以下列印會略糊。
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">

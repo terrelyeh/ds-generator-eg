@@ -3,6 +3,7 @@ import { createAdminClient } from "@eg/db/admin";
 import {
   deleteDriveFilesByPrefix,
   resolveLocaleDsImagesFolder,
+  trimPlotMargin,
   uploadImageToDrive,
 } from "@/lib/google/drive-images";
 import { getLocaleSuffix } from "@/lib/google/drive-versions";
@@ -101,10 +102,19 @@ export async function POST(request: Request) {
 
   const storagePath = `images/${model}/${fileName}`;
 
-  // 1. Upload to Supabase Storage
+  // 1. Upload to Supabase Storage.
+  //
+  // Radio patterns get their dead margin cropped on the way in. Drive keeps
+  // the untouched original below (Drive = what the PM handed over, Storage =
+  // what the datasheet renders), which is the same split Drive sync uses.
+  const storageBuffer =
+    imageType === "radio_pattern"
+      ? await trimPlotMargin(buffer, file.type)
+      : buffer;
+
   const { error: uploadError } = await supabase.storage
     .from("datasheets")
-    .upload(storagePath, buffer, {
+    .upload(storagePath, storageBuffer, {
       contentType: file.type,
       upsert: true,
     });
