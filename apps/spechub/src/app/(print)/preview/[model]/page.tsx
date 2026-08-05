@@ -816,30 +816,40 @@ body {
   min-width: 56pt;
   text-align: center;
 }
-/* Image sizing depends on row count. Reference datasheets render
-   images at ~250pt wide (nearly full column). ECW560's images are
-   square (no side legend), so width and height are equal — hence the
-   2-row layout just uses a width cap and lets height follow naturally
-   (up to a generous safety cap that never bites for typical inputs).
-   3-row layout (with 6G) must cap height explicitly to fit all three
-   rows within one page. */
 .antenna-image {
   text-align: center; margin-top: 8pt;
 }
-/* Explicit width forces the image to render at this size regardless
-   of source file dimensions. Without this, small source images (e.g.
-   150x150 PNGs) would display at natural size instead of scaling up
-   to fill the target size — causing the "images look tiny" problem
-   we chased for several rounds. object-fit: contain preserves aspect
-   ratio so non-square sources don't distort. */
+/* The COLUMN decides the size, never the file (pitfall #66). Each plot
+   fills its grid column (259pt = (612 - 2*35 padding - 24 gap) / 2) and
+   takes whatever height its own aspect ratio asks for.
+
+   This used to be a square 158pt x 158pt box, which cost
+   size twice over: PM plots are landscape (a legend sits beside the
+   polar chart — the uploads run 1.00–1.42 wide, median 1.37), so
+   object-fit letterboxed them down to 158x115 inside a box that was
+   itself only 61% of the column. The two together printed the chart at
+   about a third of the area the reference datasheet uses.
+
+   max-height is a backstop, not the design: it only bites on square-ish
+   sources, and its job is to keep the tallest possible row inside the
+   72pt bottom margin (pagination.ts) —
+     2 rows: 2 * (19pt labels + 8pt gap + H) + 18pt row-gap + 86pt grid
+             top <= 720pt  →  H <= 282pt, so a square source at the full
+             259pt column height is already safe.
+     3 rows (6G): same arithmetic gives H <= 172pt. At the median 1.37
+             ratio a plot draws 236x172 — still nearly double the old
+             125x91 — and squarer sources letterbox to 172pt tall with
+             transparent gutters rather than pushing row 3 off the page.
+   Changing the row gap, label size or grid padding moves these ceilings;
+   re-measure before touching them. */
 .antenna-image img {
-  width: 158pt;
-  height: 158pt;
+  width: 100%;
+  height: auto;
+  max-height: 259pt;
   object-fit: contain;
 }
 .antennas-grid.has-6g .antenna-image img {
-  width: 125pt;
-  height: 125pt;
+  max-height: 170pt;
 }
 
 /* Footer */
