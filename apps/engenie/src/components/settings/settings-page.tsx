@@ -78,6 +78,18 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
       </svg>
     ),
   },
+  {
+    title: "AI 用量與餘額",
+    description: "OpenRouter 剩餘額度、燒錢速率與預估可用天數，以及近 30 天各模型花費排行。",
+    href: "/settings/ai-usage",
+    group: "system",
+    roles: ["admin"],
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M4 4a2 2 0 00-2 2v8a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2H4zm0 2h12v2H4V6zm0 4h5v4H4v-4z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
 ];
 
 const GROUPS: { key: "ask" | "system"; label: string }[] = [

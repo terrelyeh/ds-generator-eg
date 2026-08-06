@@ -47,6 +47,8 @@ export type Permission =
   // review workflow (Phase 2)
   | "review.approve"
   | "review.self_approve"
+  // billing / spend visibility
+  | "billing.view"
   // settings
   | "settings.view"
   | "settings.edit_typography"
@@ -81,6 +83,10 @@ const PERMISSIONS: Record<Permission, Role[]> = {
 
   "review.approve": ["admin", "pm"],
   "review.self_approve": ["admin", "editor"],
+
+  // Company AI spend. Admin-only for the same reason API keys are —
+  // it's account-level financial data, not content.
+  "billing.view": ["admin"],
 
   // Editor gets settings access for Glossary + Typography only. Personas
   // and API Keys remain admin-only because they're cross-cutting config.
