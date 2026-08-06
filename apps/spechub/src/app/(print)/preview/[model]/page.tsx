@@ -3,7 +3,7 @@ import { createClient } from "@eg/db/server";
 import { splitIntoPages, filterRenderableSections } from "@/lib/datasheet/pagination";
 import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
-import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS } from "@/lib/datasheet/typography";
+import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS, isCjkLocale } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { DataCenterPreview } from "./datacenter-preview";
@@ -467,7 +467,7 @@ export default async function PreviewPage({
   // cover + specs + antennas (optional) + hardware (skipped for transceivers)
   const totalPages = 1 + specPages.length + (hasAntennaPage ? 1 : 0) + (isTransceiver ? 0 : 1);
 
-  const isCJK = lang === "ja" || lang === "zh-TW";
+  const isCJK = isCjkLocale(lang);
 
   // Load typography settings from DB (with defaults fallback)
   let typo: TypographySettings | null = null;

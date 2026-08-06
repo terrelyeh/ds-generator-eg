@@ -16,6 +16,24 @@ export interface TypographySettings {
   text_color: string;
 }
 
+/**
+ * Locales that need their own webfont and their own type metrics.
+ *
+ * Per-locale typography exists because CJK needs a different face, larger
+ * body sizes and taller leading than the Latin default. Latin locales
+ * (en, es) render in Roboto with the English metrics and must NOT get a
+ * TYPOGRAPHY_DEFAULTS entry — see the warning on cjkFontFor().
+ *
+ * Keep this list explicit. It used to be inferred from "does this locale
+ * have a TYPOGRAPHY_DEFAULTS entry", which silently made any new locale
+ * with defaults a CJK locale (same class of bug as pitfall #61).
+ */
+export const CJK_LOCALES = new Set(["ja", "zh-TW"]);
+
+export function isCjkLocale(locale: string | null | undefined): boolean {
+  return !!locale && CJK_LOCALES.has(locale);
+}
+
 /** Google Fonts suitable for each locale */
 export const FONT_OPTIONS: Record<string, { value: string; label: string; import: string }[]> = {
   ja: [
@@ -130,11 +148,18 @@ export function parseGoogleFontUrl(url: string): { value: string; label: string;
  * Returns the Google Fonts URL to @import plus the family to put in FRONT
  * of the layout's own stack, so Latin text still renders in Roboto and only
  * CJK falls through to the CJK face.
+ *
+ * ⚠️ Gated on CJK_LOCALES, not on "has a TYPOGRAPHY_DEFAULTS entry". Those
+ * were the same thing until `es` arrived; had this kept inferring, giving
+ * Spanish a defaults entry would have pushed Roboto ahead of Manrope in the
+ * Data Center layout and quietly restyled that datasheet.
  */
 export function cjkFontFor(
   locale: string,
   override?: string | null,
 ): { importUrl: string; family: string } | null {
+  if (!isCjkLocale(locale)) return null;
+
   const defaults = TYPOGRAPHY_DEFAULTS[locale];
   if (!defaults) return null;
 

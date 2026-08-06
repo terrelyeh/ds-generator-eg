@@ -80,6 +80,24 @@ export interface LocaleMetrics {
   coverGapPt: number;
 }
 
+/**
+ * `es` deliberately has NO entry — it falls through to `default`.
+ *
+ * Spanish renders in Roboto at the English sizes, so the font-derived
+ * numbers (chars-per-line, line-height) are identical to English by
+ * construction. A duplicated `es` block would drift from `default` the
+ * first time anyone tuned one and not the other.
+ *
+ * What Spanish changes is the CONTENT, not the metrics: it runs ~15-25%
+ * longer than English, so the same source overflows where English fit.
+ * ECS1552FP measured against this algorithm (2026-08-06):
+ *   en → features 280pt, overview 145pt / 186pt available  → fits
+ *   es → features 325pt (over the 320pt cap) → overview space collapses
+ *        to 146pt for a 145pt block → 1pt spare, fails the 12pt buffer
+ * Both red flags trace to features 8-10 each gaining one wrapped line.
+ * The fix belongs in the translation prompt (cap each bullet at the
+ * source's line count), not in these numbers.
+ */
 export const LOCALE_METRICS: Record<string, LocaleMetrics> = {
   default: {
     overviewCharsPerLine: 54,

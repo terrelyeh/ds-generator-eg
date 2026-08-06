@@ -5,6 +5,7 @@ import { gemini25Pro } from "./providers/gemini";
 import { basePrompt } from "./prompts/base";
 import { jaLocalePrompt } from "./prompts/locales/ja";
 import { zhTWLocalePrompt } from "./prompts/locales/zh-TW";
+import { esLocalePrompt } from "./prompts/locales/es";
 import { cloudCameraPrompt } from "./prompts/product-lines/cloud-camera";
 import { contentTypePrompts } from "./prompts/content-types";
 import type { TranslateProvider, ProviderId } from "./types";
@@ -32,6 +33,7 @@ function getProvider(id: string): TranslateProvider {
 const localePrompts: Record<string, string> = {
   ja: jaLocalePrompt,
   "zh-TW": zhTWLocalePrompt,
+  es: esLocalePrompt,
 };
 
 // --- Product line prompts ---

@@ -203,10 +203,17 @@ auth.users → profiles ← email_whitelist.invited_by
 7. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
    三張需再加一欄 + upload API 型別
 8. **Resync versions per-locale** — `/api/resync-versions` 目前只更新 EN
-9. **新增第 4 個翻譯語言（如 es）** — 動 8 個檔案：`locales/types.ts`(union+SUPPORTED_LOCALES)、
-   `locales/es.ts`、`locales/index.ts`、`cover-layout.ts` LOCALE_METRICS、`typography.ts`
-   TYPOGRAPHY_DEFAULTS、`translate/prompts/locales/es.ts`、`translate/index.ts` 註冊、
-   `getLocaleSuffix()` fall-through 免動
+9. ~~**新增第 4 個翻譯語言（如 es）**~~ — **es 已上（`feat/locale-es`, 2026-08-06）**，
+   墨西哥認證帶起來的需求，首波 ECS1528FP / ECS1552FP。實作與當初預估的差異:
+   ① **`cover-layout.ts` / `pagination.ts` 都不用加 entry** —— 拉丁語系走 `default`
+   本來就是對的，複製一份反而會漂移;② **不要加 `TYPOGRAPHY_DEFAULTS.es`**
+   （見 pitfall #68）;③ 多改了 `typography-editor` 與 typography API 的語言過濾。
+   QR 沿用英文 URL、label 在地化。**剩下兩塊**:
+   **(a) 行數預算注入翻譯 prompt**（防破版主防線，見下）、
+   **(b) 翻譯審核流程**（分公司審稿，見系統項 #10）。
+   ⚠️ 已量測:ECS1552FP 的英文內容直翻西文**封面會爆版**——features 需 325pt / 上限 320pt，
+   連帶把 overview 可用空間壓到 146pt（需 145pt，過不了 12pt 安全緩衝）。
+   肇因是第 8/9/10 條各多一個 wrap line。**要守的是「行數不超過原文」，不是字數比例**。
 
 **系統**：
 10. **Review Workflow** — PM approve content → MKT generate。需要 `products.review_approval`
@@ -383,6 +390,18 @@ npm run lint
     對 `document.body.innerText` 呼叫 `document.fonts.load()` 逼出所有需要的分片,
     再等一次 ready。**新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**
     （`lib/datasheet/typography.ts` 的 `cjkFontFor`）。
+
+68. **「是不是 CJK」不要用「有沒有 TYPOGRAPHY_DEFAULTS」來推導**（2026-08-06 加 es 時發現）——
+    `cjkFontFor()` 原本寫 `const defaults = TYPOGRAPHY_DEFAULTS[locale]; if (!defaults) return null;`。
+    在只有 ja / zh-TW 的世界裡「有 defaults」和「是 CJK」是同一件事,所以看不出問題。
+    加西文時如果照舊 recipe 補上 `TYPOGRAPHY_DEFAULTS.es`,`cjkFontFor("es")` 就會回
+    Roboto,被塞到 **Data Center 版型的 Manrope 前面**,整份 DC 西文 datasheet 悄悄換字體。
+    **同一類錯誤的第三次**（#61 用子字串比對 category、#63 版型寫死 locale）——
+    現在改成明確的 `CJK_LOCALES` set + `isCjkLocale()`,`preview/[model]`、
+    `typography-editor`、typography API 三處共用。
+    衍生規則:**per-locale typography 是 CJK 專屬功能**。拉丁語系（en / es）用 Roboto +
+    英文 metrics,不要有 defaults entry、不要出現在 typography 設定頁
+    （否則是一個按了 Save 卻不影響 datasheet 的面板）。
 
 ## 詳細文件
 

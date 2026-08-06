@@ -155,6 +155,11 @@ export interface LocaleRowMetrics {
   baseRowHeight: number;
   lineExtra: number;
 }
+//   es: no entry — Latin face at Latin sizes, so `default` is already
+//       correct. Spec VALUES are mostly numbers and units that don't
+//       translate; only the labels grow. If a real Spanish PDF shows the
+//       last row of a column kissing BOTTOM_MARGIN, add `es` here with a
+//       measured baseRowHeight rather than guessing one up front.
 export const LOCALE_ROW_METRICS: Record<string, LocaleRowMetrics> = {
   // EN bumped 22→23 (real ~22.3pt). 0.7pt over-estimate per row provides
   // a safety margin that accumulates ~25pt for dense 36-item ESG datasheets,

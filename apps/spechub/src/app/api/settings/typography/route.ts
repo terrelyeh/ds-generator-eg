@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { TYPOGRAPHY_DEFAULTS } from "@/lib/datasheet/typography";
+import { TYPOGRAPHY_DEFAULTS, isCjkLocale } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { gate } from "@eg/auth/session";
 
@@ -18,7 +18,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing locale" }, { status: 400 });
   }
 
-  const defaults = TYPOGRAPHY_DEFAULTS[locale] ?? TYPOGRAPHY_DEFAULTS["ja"];
+  // Per-locale typography is a CJK-only feature — the preview only loads it
+  // for those locales. Without this guard `?locale=es` silently returns the
+  // JAPANESE defaults and a Save would write a typography_es row that
+  // nothing ever reads.
+  if (!isCjkLocale(locale)) {
+    return NextResponse.json(
+      { error: `Typography settings apply to CJK locales only, not "${locale}"` },
+      { status: 400 },
+    );
+  }
+
+  const defaults = TYPOGRAPHY_DEFAULTS[locale];
 
   const supabase = createAdminClient();
   const { data } = await supabase

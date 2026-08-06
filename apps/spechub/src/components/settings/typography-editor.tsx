@@ -13,6 +13,7 @@ import {
   FONT_OPTIONS,
   TYPOGRAPHY_GROUPS,
   parseGoogleFontUrl,
+  isCjkLocale,
 } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 
@@ -23,7 +24,11 @@ interface FontOption {
 }
 
 export function TypographyEditor() {
-  const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
+  // CJK locales only. Latin locales (en, es) render in Roboto with the
+  // English metrics, and the preview never loads per-locale typography for
+  // them — listing Spanish here would be a panel whose Save button changes
+  // nothing on the datasheet.
+  const localeOptions = SUPPORTED_LOCALES.filter((l) => isCjkLocale(l.value));
   const [locale, setLocale] = useState<string>(localeOptions[0]?.value ?? "ja");
   const [settings, setSettings] = useState<TypographySettings | null>(null);
   const [defaults, setDefaults] = useState<TypographySettings | null>(null);

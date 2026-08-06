@@ -23,10 +23,14 @@ export interface DatasheetDict {
   bullet: string;
 }
 
-export type SupportedLocale = "en" | "ja" | "zh-TW";
+export type SupportedLocale = "en" | "ja" | "zh-TW" | "es";
 
 export const SUPPORTED_LOCALES: { value: SupportedLocale; label: string; flag: string }[] = [
   { value: "en", label: "English", flag: "\u{1F1FA}\u{1F1F8}" },
   { value: "ja", label: "Japanese", flag: "\u{1F1EF}\u{1F1F5}" },
   { value: "zh-TW", label: "Traditional Chinese", flag: "\u{1F1F9}\u{1F1FC}" },
+  // Latin America / Mexico. Flagged 🇲🇽 because the Mexico certification
+  // push is what it was built for — widen the flag if other LatAm markets
+  // adopt it.
+  { value: "es", label: "Spanish", flag: "\u{1F1F2}\u{1F1FD}" },
 ];
