@@ -47,6 +47,12 @@ export async function getApiKey(
 
 /** Well-known settings keys and their env var fallbacks */
 export const API_KEY_MAP = {
+  // Preferred path for all chat completions — one key, every vendor.
+  openrouter_api_key: "OPENROUTER_API_KEY",
+  // Direct-vendor keys. Retained as fallback while the OpenRouter
+  // migration lands, EXCEPT openai_api_key which is permanent: RAG
+  // embeddings (text-embedding-3-small, 1536-dim) don't go through
+  // OpenRouter and can't change model without a full re-index.
   anthropic_api_key: "ANTHROPIC_API_KEY",
   openai_api_key: "OPENAI_API_KEY",
   google_ai_api_key: "GOOGLE_AI_API_KEY",

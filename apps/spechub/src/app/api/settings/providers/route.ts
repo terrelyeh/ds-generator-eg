@@ -12,15 +12,25 @@ export async function GET() {
   const { data } = await supabase
     .from("app_settings" as "products")
     .select("key")
-    .in("key", ["anthropic_api_key", "openai_api_key", "google_ai_api_key"]) as {
+    .in("key", [
+      "openrouter_api_key",
+      "anthropic_api_key",
+      "openai_api_key",
+      "google_ai_api_key",
+    ]) as {
     data: { key: string }[] | null;
   };
 
   const dbKeys = new Set((data ?? []).map((r) => r.key));
 
-  const anthropic = dbKeys.has("anthropic_api_key") || !!process.env.ANTHROPIC_API_KEY;
-  const openai = dbKeys.has("openai_api_key") || !!process.env.OPENAI_API_KEY;
-  const google = dbKeys.has("google_ai_api_key") || !!process.env.GOOGLE_AI_API_KEY;
+  // One OpenRouter key reaches every vendor, so it satisfies all three at
+  // once. Only when it's absent does availability fall back to asking
+  // whether each vendor's own key happens to be configured.
+  const openrouter = dbKeys.has("openrouter_api_key") || !!process.env.OPENROUTER_API_KEY;
+
+  const anthropic = openrouter || dbKeys.has("anthropic_api_key") || !!process.env.ANTHROPIC_API_KEY;
+  const openai = openrouter || dbKeys.has("openai_api_key") || !!process.env.OPENAI_API_KEY;
+  const google = openrouter || dbKeys.has("google_ai_api_key") || !!process.env.GOOGLE_AI_API_KEY;
 
   // Availability is keyed by the checkKey ids each consumer references.
   // Ask SpecHub (ask-chat) checks the latest-gen ids; the translate UI

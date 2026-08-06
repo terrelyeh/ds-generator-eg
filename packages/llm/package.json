@@ -1,0 +1,12 @@
+{
+  "name": "@eg/llm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared LLM access: OpenRouter chat client + key resolution (openrouter)",
+  "exports": {
+    "./openrouter": "./src/openrouter.ts"
+  },
+  "dependencies": {
+    "@eg/db": "*"
+  }
+}

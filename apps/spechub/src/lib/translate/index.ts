@@ -9,24 +9,63 @@ import { esLocalePrompt } from "./prompts/locales/es";
 import { cloudCameraPrompt } from "./prompts/product-lines/cloud-camera";
 import { contentTypePrompts } from "./prompts/content-types";
 import { lineParityBudget } from "@/lib/datasheet/cover-layout";
+import { openRouterEnabled } from "@eg/llm/openrouter";
+import { createOpenRouterProvider } from "./providers/openrouter";
+import { AVAILABLE_PROVIDERS } from "./types";
 import type { TranslateProvider, ProviderId } from "./types";
 
-export { AVAILABLE_PROVIDERS } from "./types";
+export { AVAILABLE_PROVIDERS, VENDOR_KEY } from "./types";
 export type { ProviderId };
 
 // --- Provider registry ---
 
-const providers: Record<string, TranslateProvider> = {
+/**
+ * Direct-vendor clients, kept as the fallback route.
+ *
+ * They stay until OpenRouter is proven in prod — without them, deploying
+ * this before the key is configured would take translation from "works
+ * via OpenAI/Gemini" to "completely broken". Once a translation has run
+ * through OpenRouter successfully these three files can go, along with
+ * anthropic_api_key and google_ai_api_key. openai_api_key stays either
+ * way: RAG embeddings need it.
+ */
+const directProviders: Record<string, TranslateProvider> = {
   "claude-sonnet": claudeSonnet,
   "claude-opus": claudeOpus,
   "gpt-4o": gpt4o,
   "gemini-2.5-pro": gemini25Pro,
 };
 
-function getProvider(id: string): TranslateProvider {
-  const p = providers[id];
-  if (!p) throw new Error(`Unknown provider: ${id}`);
-  return p;
+export interface ResolvedProvider {
+  provider: TranslateProvider;
+  /** The model string actually sent, for the audit trail. */
+  model: string;
+  route: "openrouter" | "direct";
+}
+
+/**
+ * OpenRouter when a key is configured, the vendor's own client otherwise.
+ *
+ * Note this makes claude-sonnet — the code-wide default — work for the
+ * first time: there has never been an anthropic_api_key in app_settings
+ * or on Vercel, so the default provider always threw, and the battlecard
+ * routes that hard-require it have been returning 400 in production.
+ */
+async function resolveProvider(id: string): Promise<ResolvedProvider> {
+  const spec = AVAILABLE_PROVIDERS.find((p) => p.id === id);
+  if (!spec) throw new Error(`Unknown provider: ${id}`);
+
+  if (await openRouterEnabled()) {
+    return {
+      provider: createOpenRouterProvider(spec.id, spec.name, spec.openrouter),
+      model: spec.openrouter,
+      route: "openrouter",
+    };
+  }
+
+  const direct = directProviders[id];
+  if (!direct) throw new Error(`Unknown provider: ${id}`);
+  return { provider: direct, model: id, route: "direct" };
 }
 
 // --- Locale prompts ---
@@ -214,7 +253,14 @@ export async function translate(opts: {
   contentType: "headline" | "overview" | "features" | "spec_labels";
   productLine?: string;
   providerId?: ProviderId;
-}): Promise<{ translated: string; notes: string; provider: string }> {
+}): Promise<{
+  translated: string;
+  notes: string;
+  provider: string;
+  /** Model string actually sent — an OpenRouter slug, or the legacy id. */
+  model: string;
+  route: "openrouter" | "direct";
+}> {
   const {
     source,
     targetLocale,
@@ -223,7 +269,7 @@ export async function translate(opts: {
     providerId = "claude-sonnet",
   } = opts;
 
-  const provider = getProvider(providerId);
+  const { provider, model, route } = await resolveProvider(providerId);
   const systemPrompt = await buildSystemPrompt(
     targetLocale,
     productLine,
@@ -266,5 +312,5 @@ export async function translate(opts: {
     }
   }
 
-  return { translated, notes, provider: provider.name };
+  return { translated, notes, provider: provider.name, model, route };
 }

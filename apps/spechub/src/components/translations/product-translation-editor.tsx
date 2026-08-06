@@ -12,7 +12,7 @@ import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
 
 /** Safe JSON parse for API responses — handles non-JSON error pages */
-async function safeJson(res: Response): Promise<{ ok?: boolean; translated?: string; notes?: string; provider?: string; error?: string }> {
+async function safeJson(res: Response): Promise<{ ok?: boolean; translated?: string; notes?: string; provider?: string; model?: string; error?: string }> {
   const text = await res.text();
   try {
     return JSON.parse(text);
@@ -116,6 +116,10 @@ export function ProductTranslationEditor({
   const [confirmedLocales, setConfirmedLocales] = useState<Set<string>>(
     new Set(existingTranslations.filter((t) => t.confirmed).map((t) => t.locale))
   );
+  // Model that produced the text currently in the editor, recorded on Save
+  // as product_translations.translated_by. Nothing wrote that column before,
+  // which is why no existing row can be traced back to a model.
+  const [lastModel, setLastModel] = useState<string | null>(null);
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const [activeLocale, setActiveLocale] = useState<string>(
@@ -262,6 +266,7 @@ export function ProductTranslationEditor({
         setOverview(data.translated ?? "");
         setOverviewNotes(data.notes || "");
         setDirty(true);
+        if (data.model) setLastModel(data.model);
         toast.success(`Overview translated by ${data.provider}`);
       } else {
         toast.error(`Translation failed: ${data.error}`);
@@ -295,6 +300,7 @@ export function ProductTranslationEditor({
         setFeatures(result);
         setFeaturesNotes(data.notes || "");
         setDirty(true);
+        if (data.model) setLastModel(data.model);
         toast.success(`${lines.length} features translated by ${data.provider}`);
       } else {
         toast.error(`Translation failed: ${data.error}`);
@@ -323,6 +329,7 @@ export function ProductTranslationEditor({
           hardware_image: hwImage || null,
           qr_label: qrLabel || null,
           qr_url: qrUrl || null,
+          translated_by: lastModel,
           confirm: true,
         }),
       });
@@ -652,6 +659,7 @@ export function ProductTranslationEditor({
                   setHeadlineTrans(data.translated ?? "");
                   setHeadlineNotes(data.notes || "");
                   setDirty(true);
+                  if (data.model) setLastModel(data.model);
                   toast.success(`Headline translated by ${data.provider}`);
                 } else {
                   toast.error(`Translation failed: ${data.error}`);

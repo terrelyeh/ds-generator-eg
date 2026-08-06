@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
-import { getApiKey } from "@eg/db/settings";
+import { chatComplete, openRouterEnabled } from "@eg/llm/openrouter";
+import { BATTLECARD_EXTRACT_MODEL } from "@/lib/llm/models";
 
 /**
  * POST /api/battlecard/websearch  { competitorProductId }
@@ -54,8 +55,7 @@ interface Extracted {
 async function extract(
   missing: { dimension_key: string; label: string; unit: string | null }[],
   sources: string,
-  label: string,
-  anthropicKey: string
+  label: string
 ): Promise<Extracted[]> {
   const template = missing
     .map((d) => `${d.dimension_key} | ${d.label}${d.unit ? ` (${d.unit})` : ""}`)
@@ -66,26 +66,16 @@ async function extract(
     "Prefer manufacturer/spec pages over forums/retailers. Return ONLY a JSON array.";
   const user = `Find these MISSING spec dimensions for "${label}" (machine_key | label):\n${template}\n\nWeb search results (each block starts with its URL):\n${sources}\n\nReturn a JSON array, one object per dimension_key you can fill: {"dimension_key":"...","value":"<concise, comparable, matching unit>","found":true|false,"source_url":"<the result URL the value came from>"}. If a value isn't in the sources, set found=false, value="", source_url="". source_url MUST be one of the result URLs. Use compact notation (e.g. "38 W", "4 × 4:4", "1× 2.5GbE"). Do not output keys outside the list.`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
+  const text = await chatComplete({
+    model: BATTLECARD_EXTRACT_MODEL,
+    system,
+    user,
+    maxTokens: 4096,
   });
-  if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  const text: string = json.content?.[0]?.text ?? "";
+
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
-  if (start < 0 || end < 0) throw new Error("Claude returned no JSON array");
+  if (start < 0 || end < 0) throw new Error("Model returned no JSON array");
   return JSON.parse(text.slice(start, end + 1)) as Extracted[];
 }
 
@@ -105,9 +95,11 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  const anthropicKey = await getApiKey("anthropic_api_key", "ANTHROPIC_API_KEY");
-  if (!anthropicKey) {
-    return NextResponse.json({ error: "Anthropic API key not configured (Settings)." }, { status: 400 });
+  if (!(await openRouterEnabled())) {
+    return NextResponse.json(
+      { error: "OpenRouter API key not configured (Settings)." },
+      { status: 400 },
+    );
   }
 
   const supabase = createAdminClient();
@@ -163,7 +155,7 @@ export async function POST(request: Request) {
       .map((r) => `URL: ${r.url}\n${(r.markdown || r.description || "").slice(0, PER_RESULT)}`)
       .join("\n\n---\n\n")
       .slice(0, MAX_SOURCES);
-    extracted = await extract(missing, sources, label, anthropicKey);
+    extracted = await extract(missing, sources, label);
   } catch (e) {
     return NextResponse.json(
       { error: "Web search failed", details: e instanceof Error ? e.message : String(e) },

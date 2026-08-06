@@ -14,7 +14,8 @@
 │   └── engenie/        # EnGenie — Knowledge RAG + Ask（Vercel: engenie-eg, port 3100）
 ├── packages/
 │   ├── db/             # @eg/db — supabase server/client/admin + settings accessor + DB types + supabase/migrations（唯一來源）
-│   └── auth/           # @eg/auth — session.ts(gate/RBAC) + permissions.ts + page-guards.ts
+│   ├── auth/           # @eg/auth — session.ts(gate/RBAC) + permissions.ts + page-guards.ts
+│   └── llm/            # @eg/llm — OpenRouter chat client（chat completions 統一入口；**embedding 不走這裡**）
 └── package.json        # npm workspaces：apps/*, packages/*
 ```
 

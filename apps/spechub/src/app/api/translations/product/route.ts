@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   const denied = await gate("translation.edit");
   if (denied) return denied;
   const body = await request.json();
-  const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, confirm } = body as {
+  const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, translated_by, confirm } = body as {
     product_id: string;
     locale: string;
     translation_mode: "light" | "full";
@@ -31,6 +31,7 @@ export async function POST(request: Request) {
     hardware_image?: string | null;
     qr_label?: string | null;
     qr_url?: string | null;
+    translated_by?: string | null;
     confirm?: boolean;
   };
 
@@ -76,6 +77,13 @@ export async function POST(request: Request) {
     qr_url: qr_url?.trim() || null,
     translated_at: new Date().toISOString(),
   };
+
+  // Only stamp when the client actually ran a translation this session —
+  // a hand-edit shouldn't relabel the row as machine-produced, and an
+  // absent value shouldn't wipe what an earlier run recorded.
+  if (translated_by) {
+    upsertData.translated_by = translated_by;
+  }
 
   // Only set confirmed=true on explicit Save, never set it back to false
   if (confirm) {

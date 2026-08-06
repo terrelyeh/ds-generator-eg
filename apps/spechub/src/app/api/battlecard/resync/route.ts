@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
-import { getApiKey } from "@eg/db/settings";
+import { chatComplete, openRouterEnabled } from "@eg/llm/openrouter";
+import { BATTLECARD_EXTRACT_MODEL } from "@/lib/llm/models";
 
 /**
  * POST /api/battlecard/resync  { competitorProductId }
@@ -38,8 +39,7 @@ interface Extracted {
 async function extractSpecs(
   dimensions: { dimension_key: string; label: string; unit: string | null }[],
   markdown: string,
-  competitorLabel: string,
-  anthropicKey: string
+  competitorLabel: string
 ): Promise<Extracted[]> {
   const template = dimensions
     .map((d) => `${d.dimension_key} | ${d.label}${d.unit ? ` (${d.unit})` : ""}`)
@@ -50,27 +50,17 @@ async function extractSpecs(
     "Return ONLY a JSON array, no prose.";
   const user = `Battlecard dimension template (machine_key | label):\n${template}\n\nOfficial spec source for "${competitorLabel}" (markdown):\n${markdown}\n\nReturn a JSON array with one object per dimension_key: {"dimension_key": "...", "value": "<concise, battlecard-comparable, matching the unit>", "found": true|false}. If a value is not in the source, set found=false and value="". Use compact comparable notation (e.g. "4 × 4:4", "320 MHz", "2.5GbE ×1"). Do not output keys outside the template.`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": anthropicKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 4096,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
+  const text = await chatComplete({
+    model: BATTLECARD_EXTRACT_MODEL,
+    system,
+    user,
+    maxTokens: 4096,
   });
-  if (!res.ok) throw new Error(`Claude ${res.status}: ${await res.text()}`);
-  const data = await res.json();
-  const text: string = data.content?.[0]?.text ?? "";
+
   // Be tolerant of code fences / stray prose around the JSON array.
   const start = text.indexOf("[");
   const end = text.lastIndexOf("]");
-  if (start < 0 || end < 0) throw new Error("Claude returned no JSON array");
+  if (start < 0 || end < 0) throw new Error("Model returned no JSON array");
   return JSON.parse(text.slice(start, end + 1)) as Extracted[];
 }
 
@@ -109,9 +99,11 @@ export async function POST(request: Request) {
     );
   }
 
-  const anthropicKey = await getApiKey("anthropic_api_key", "ANTHROPIC_API_KEY");
-  if (!anthropicKey) {
-    return NextResponse.json({ error: "Anthropic API key not configured (Settings)." }, { status: 400 });
+  if (!(await openRouterEnabled())) {
+    return NextResponse.json(
+      { error: "OpenRouter API key not configured (Settings)." },
+      { status: 400 },
+    );
   }
 
   // Dimension template + existing values (to skip confirmed cells).
@@ -138,7 +130,7 @@ export async function POST(request: Request) {
   let extracted: Extracted[];
   try {
     const markdown = await scrapeMarkdown(cp.datasheet_url, firecrawlKey);
-    extracted = await extractSpecs(dimensions, markdown, cp.display_name || cp.model_name, anthropicKey);
+    extracted = await extractSpecs(dimensions, markdown, cp.display_name || cp.model_name);
   } catch (e) {
     return NextResponse.json(
       { error: "Extraction failed", details: e instanceof Error ? e.message : String(e) },

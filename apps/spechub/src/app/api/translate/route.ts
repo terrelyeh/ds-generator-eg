@@ -63,6 +63,11 @@ export async function POST(request: Request) {
       translated: result.translated,
       notes: result.notes,
       provider: result.provider,
+      // Exact model + transport, so the caller can record what produced
+      // this text. product_translations.translated_by had no writer at
+      // all before, which is why existing rows can't be traced.
+      model: result.model,
+      route: result.route,
     });
   } catch (err) {
     console.error("Translation error:", err);

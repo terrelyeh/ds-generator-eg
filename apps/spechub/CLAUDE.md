@@ -45,6 +45,13 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
    navbar**；要瀏覽整個知識庫請直接去 EnGenie 站。
 3. **LLM provider keys 管理 UI 在 EnGenie**（settings 首頁有連結卡）；本 app 的
    translate runtime 直接讀共用 `app_settings`（`@eg/db/settings` 的 `getApiKey`）。
+   **2026-08-06 起 chat completions 改走 OpenRouter**（`@eg/llm/openrouter`，
+   單一 `openrouter_api_key`）：translate 走 OpenRouter、**沒設 key 才 fallback 回
+   三家直連**；battlecard 兩支是 **OpenRouter only**（它們本來就因為沒有
+   `anthropic_api_key` 一直回 400，沒有可退的路）。Ask（engenie）還沒搬。
+   ⚠️ **`openai_api_key` 永久保留** —— RAG embedding（`text-embedding-3-small`,
+   1536 維）不走 OpenRouter，換 embedding model 等於全量重建索引。
+   查 model slug：`npx tsx scripts/list-openrouter-models.ts <關鍵字>`。
 4. **產品表 schema 演進權在本 app**；改 products/product_lines schema 前要確認
    EnGenie 的 ingest-products/taxonomy 不受影響。migrations 一律放
    `packages/db/supabase/migrations/`。
