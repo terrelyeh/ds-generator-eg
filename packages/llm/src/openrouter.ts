@@ -27,18 +27,20 @@ export const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completion
  * shared key, so adding a purpose never breaks a surface that has no key
  * of its own.
  */
-export type KeyPurpose = "default" | "ask" | "translate";
+export type KeyPurpose = "default" | "ask" | "translate" | "battlecard";
 
 const PURPOSE_SETTINGS_KEY: Record<KeyPurpose, string> = {
   default: "openrouter_api_key",
   ask: "openrouter_api_key_ask",
   translate: "openrouter_api_key_translate",
+  battlecard: "openrouter_api_key_battlecard",
 };
 
 const PURPOSE_ENV: Record<KeyPurpose, string> = {
   default: "OPENROUTER_API_KEY",
   ask: "OPENROUTER_API_KEY_ASK",
   translate: "OPENROUTER_API_KEY_TRANSLATE",
+  battlecard: "OPENROUTER_API_KEY_BATTLECARD",
 };
 
 /**
@@ -76,10 +78,18 @@ export interface ChatOptions {
    * this off rather than risk a 400 from a model that lacks it.
    */
   json?: boolean;
-  /** Which surface is spending — picks that surface's key. See KeyPurpose. */
+  /**
+   * Which surface is spending. Picks that surface's key AND tags the spend
+   * in llm_usage_events, so the value that chooses the key is the same one
+   * that attributes the cost.
+   */
   purpose?: KeyPurpose;
+  /** Free-form attribution: product model, workspace slug, line name… */
+  ref?: string;
   /** BYOK override — used instead of the stored key, never persisted. */
   apiKey?: string;
+  /** Skip ledger recording (health checks, throwaway probes). */
+  skipRecord?: boolean;
   signal?: AbortSignal;
 }
 
@@ -137,5 +147,60 @@ export async function chatComplete(opts: ChatOptions): Promise<string> {
       `OpenRouter returned no content (${opts.model}): ${JSON.stringify(data).slice(0, 300)}`,
     );
   }
+
+  if (!opts.skipRecord) {
+    // Deliberately not awaited: a ledger write must never delay or fail a
+    // translation. Errors are logged and dropped.
+    void recordUsage(data, opts).catch((e) =>
+      console.warn("[openrouter] usage not recorded:", e?.message ?? e),
+    );
+  }
+
   return text;
+}
+
+/**
+ * Append one row to our own spend ledger.
+ *
+ * The completions response carries `usage.cost` (plus `is_byok`), which is
+ * the only reliable per-call cost signal available — OpenRouter's public
+ * API cannot break spend down per API key. See 00033_llm_usage_events.sql.
+ */
+async function recordUsage(
+  data: {
+    id?: string;
+    model?: string;
+    usage?: {
+      cost?: number;
+      is_byok?: boolean;
+      prompt_tokens?: number;
+      completion_tokens?: number;
+      total_tokens?: number;
+    };
+  },
+  opts: ChatOptions,
+): Promise<void> {
+  const u = data.usage;
+  if (!u) return;
+
+  const { createAdminClient } = await import("@eg/db/admin");
+  const supabase = createAdminClient();
+
+  const { error } = await supabase.from("llm_usage_events" as "products").insert({
+    surface: opts.purpose ?? "default",
+    // What OpenRouter says it billed, which can differ from what we asked
+    // for when a request is routed to a variant.
+    model: data.model ?? opts.model,
+    cost: u.cost ?? 0,
+    prompt_tokens: u.prompt_tokens ?? null,
+    completion_tokens: u.completion_tokens ?? null,
+    total_tokens: u.total_tokens ?? null,
+    // BYOK spend is the workspace's, not ours — kept for volume stats but
+    // excluded from company totals.
+    is_byok: u.is_byok ?? !!opts.apiKey,
+    ref: opts.ref ?? null,
+    generation_id: data.id ?? null,
+  } as never);
+
+  if (error) throw new Error(error.message);
 }

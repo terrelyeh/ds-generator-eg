@@ -60,10 +60,25 @@ export interface ActivityRow {
   reasoning_tokens: number;
 }
 
+/** A row of OUR ledger, not OpenRouter's — see 00033_llm_usage_events.sql. */
+export interface SpendRow {
+  surface: string;
+  model: string;
+  cost: number;
+  calls: number;
+  tokens: number;
+}
+
 export interface UsageSnapshot {
   key: KeyInfo | null;
   credits: Credits | null;
   activity: ActivityRow[] | null;
+  /**
+   * Per-surface / per-model spend from our own ledger. This is the only
+   * way to answer "did Ask or datasheet translation spend that" —
+   * OpenRouter's public API has no per-key grouping.
+   */
+  spend: SpendRow[] | null;
   /** Human-readable reasons a section is missing, shown in the UI. */
   warnings: string[];
   managementKeyConfigured: boolean;
@@ -136,10 +151,28 @@ export async function getUsageSnapshot(force = false): Promise<UsageSnapshot> {
     }
   }
 
+  // Our own ledger — needs no OpenRouter credential at all, so it stays
+  // useful even when both keys are missing.
+  let spend: SpendRow[] | null = null;
+  try {
+    const { createAdminClient } = await import("@eg/db/admin");
+    const { data, error } = await createAdminClient().rpc(
+      "llm_spend_summary" as never,
+      { days: 30 } as never,
+    );
+    if (error) throw new Error(error.message);
+    spend = (data ?? []) as unknown as SpendRow[];
+  } catch (e) {
+    warnings.push(
+      `讀取內部用量帳本失敗（migration 00033 是否已套用？）：${e instanceof Error ? e.message : String(e)}`,
+    );
+  }
+
   const snapshot: UsageSnapshot = {
     key: keyRes.status === "fulfilled" ? keyRes.value : null,
     credits: creditsRes.status === "fulfilled" ? creditsRes.value : null,
     activity: activityRes.status === "fulfilled" ? activityRes.value : null,
+    spend,
     warnings,
     managementKeyConfigured: !!managementKey,
     fetchedAt: new Date().toISOString(),

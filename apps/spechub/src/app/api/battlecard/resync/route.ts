@@ -55,6 +55,8 @@ async function extractSpecs(
     system,
     user,
     maxTokens: 4096,
+    purpose: "battlecard",
+    ref: competitorLabel,
   });
 
   // Be tolerant of code fences / stray prose around the JSON array.
@@ -99,7 +101,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!(await openRouterEnabled())) {
+  if (!(await openRouterEnabled("battlecard"))) {
     return NextResponse.json(
       { error: "OpenRouter API key not configured (Settings)." },
       { status: 400 },

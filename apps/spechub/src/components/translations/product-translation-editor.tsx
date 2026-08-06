@@ -259,6 +259,7 @@ export function ProductTranslationEditor({
           content_type: "overview",
           product_line: productLineName,
           provider: selectedProvider,
+          ref: modelName,
         }),
       });
       const data = await safeJson(res);
@@ -291,6 +292,7 @@ export function ProductTranslationEditor({
           content_type: "features",
           product_line: productLineName,
           provider: selectedProvider,
+          ref: modelName,
         }),
       });
       const data = await safeJson(res);
@@ -652,6 +654,7 @@ export function ProductTranslationEditor({
                     content_type: "headline",
                     product_line: productLineName,
                     provider: selectedProvider,
+                    ref: modelName,
                   }),
                 });
                 const data = await safeJson(res);

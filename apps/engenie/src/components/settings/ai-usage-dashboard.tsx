@@ -34,14 +34,30 @@ interface ActivityRow {
   reasoning_tokens: number;
 }
 
+interface SpendRow {
+  surface: string;
+  model: string;
+  cost: number;
+  calls: number;
+  tokens: number;
+}
+
 interface Snapshot {
   key: KeyInfo | null;
   credits: Credits | null;
   activity: ActivityRow[] | null;
+  spend: SpendRow[] | null;
   warnings: string[];
   managementKeyConfigured: boolean;
   fetchedAt: string;
 }
+
+const SURFACE_LABEL: Record<string, string> = {
+  translate: "Datasheet 翻譯",
+  battlecard: "Battlecard 競品抽取",
+  ask: "EnGenie Ask",
+  default: "其他 / 未標記",
+};
 
 /** LLM line items are often fractions of a cent — flat 2dp would read $0.00. */
 function usd(n: number | null | undefined): string {
@@ -116,7 +132,21 @@ export function AiUsageDashboard() {
   }
   if (!data) return null;
 
-  const { key, credits, activity, warnings } = data;
+  const { key, credits, activity, spend, warnings } = data;
+
+  // Roll our ledger up by surface. OpenRouter's own API can't do this —
+  // it has no per-key grouping — so this section is the only place that
+  // answers "which feature spent the money".
+  const bySurface = new Map<string, { cost: number; calls: number; models: Set<string> }>();
+  for (const r of spend ?? []) {
+    const s = bySurface.get(r.surface) ?? { cost: 0, calls: 0, models: new Set<string>() };
+    s.cost += Number(r.cost) || 0;
+    s.calls += Number(r.calls) || 0;
+    s.models.add(r.model);
+    bySurface.set(r.surface, s);
+  }
+  const surfaces = [...bySurface.entries()].sort((a, b) => b[1].cost - a[1].cost);
+  const surfaceTotal = surfaces.reduce((s, [, v]) => s + v.cost, 0);
 
   const remaining = credits ? credits.total_credits - credits.total_usage : null;
 
@@ -218,6 +248,50 @@ export function AiUsageDashboard() {
           {key.is_free_tier && <> · free tier</>}
         </p>
       )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">各功能花費（近 30 天）</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {surfaces.length === 0 ? (
+            <p className="text-sm text-slate-400">
+              還沒有記錄。這份帳本從我們自己的呼叫累積 —— OpenRouter 的公開 API
+              無法依 key 拆分花費，所以每次呼叫的成本是我們自己記下來的。
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {surfaces.map(([surface, v]) => {
+                const pct = surfaceTotal > 0 ? (v.cost / surfaceTotal) * 100 : 0;
+                return (
+                  <div key={surface}>
+                    <div className="flex items-baseline justify-between gap-3 text-sm">
+                      <span className="font-medium text-[#231f20]">
+                        {SURFACE_LABEL[surface] ?? surface}
+                      </span>
+                      <span className="tabular-nums text-slate-500">
+                        {usd(v.cost)}
+                        <span className="ml-2 text-xs text-slate-400">
+                          {compact(v.calls)} 次 · {v.models.size} 個模型
+                        </span>
+                      </span>
+                    </div>
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                      <div
+                        className="h-full rounded-full bg-[#03a9f4]"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+              <p className="pt-1 text-xs text-slate-400">
+                不含 BYOK 呼叫（workspace 自帶 key 的花費不算公司成本）。
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {days.length > 0 && (
         <Card>

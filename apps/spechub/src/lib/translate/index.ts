@@ -51,13 +51,13 @@ export interface ResolvedProvider {
  * or on Vercel, so the default provider always threw, and the battlecard
  * routes that hard-require it have been returning 400 in production.
  */
-async function resolveProvider(id: string): Promise<ResolvedProvider> {
+async function resolveProvider(id: string, ref?: string): Promise<ResolvedProvider> {
   const spec = AVAILABLE_PROVIDERS.find((p) => p.id === id);
   if (!spec) throw new Error(`Unknown provider: ${id}`);
 
-  if (await openRouterEnabled()) {
+  if (await openRouterEnabled("translate")) {
     return {
-      provider: createOpenRouterProvider(spec.id, spec.name, spec.openrouter),
+      provider: createOpenRouterProvider(spec.id, spec.name, spec.openrouter, ref),
       model: spec.openrouter,
       route: "openrouter",
     };
@@ -253,6 +253,8 @@ export async function translate(opts: {
   contentType: "headline" | "overview" | "features" | "spec_labels";
   productLine?: string;
   providerId?: ProviderId;
+  /** Product model, for spend attribution. Falls back to the product line. */
+  ref?: string;
 }): Promise<{
   translated: string;
   notes: string;
@@ -267,9 +269,10 @@ export async function translate(opts: {
     contentType,
     productLine,
     providerId = "claude-sonnet",
+    ref,
   } = opts;
 
-  const { provider, model, route } = await resolveProvider(providerId);
+  const { provider, model, route } = await resolveProvider(providerId, ref ?? productLine);
   const systemPrompt = await buildSystemPrompt(
     targetLocale,
     productLine,

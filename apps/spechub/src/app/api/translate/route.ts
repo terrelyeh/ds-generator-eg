@@ -28,12 +28,14 @@ export async function POST(request: Request) {
     content_type,
     product_line,
     provider = "claude-sonnet",
+    ref,
   } = body as {
     source: string;
     target_locale: string;
     content_type: "headline" | "overview" | "features" | "spec_labels";
     product_line?: string;
     provider?: string;
+    ref?: string;
   };
 
   if (!source || !target_locale || !content_type) {
@@ -56,6 +58,7 @@ export async function POST(request: Request) {
       contentType: content_type,
       productLine: product_line,
       providerId: provider as ProviderId,
+      ref,
     });
 
     return NextResponse.json({

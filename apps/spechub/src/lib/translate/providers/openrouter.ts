@@ -20,7 +20,10 @@ import type { TranslateProvider } from "../types";
 export function createOpenRouterProvider(
   id: string,
   name: string,
-  model: string
+  model: string,
+  /** Product model being translated — tags the spend so "which datasheet
+   *  was expensive" is answerable. Falls back to the product line. */
+  ref?: string
 ): TranslateProvider {
   return {
     id,
@@ -33,6 +36,7 @@ export function createOpenRouterProvider(
         maxTokens: 8192,
         temperature: 0.3,
         purpose: "translate",
+        ref,
       });
     },
   };

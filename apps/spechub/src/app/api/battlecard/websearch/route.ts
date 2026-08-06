@@ -71,6 +71,8 @@ async function extract(
     system,
     user,
     maxTokens: 4096,
+    purpose: "battlecard",
+    ref: label,
   });
 
   const start = text.indexOf("[");
@@ -95,7 +97,7 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-  if (!(await openRouterEnabled())) {
+  if (!(await openRouterEnabled("battlecard"))) {
     return NextResponse.json(
       { error: "OpenRouter API key not configured (Settings)." },
       { status: 400 },
