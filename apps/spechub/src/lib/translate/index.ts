@@ -8,6 +8,7 @@ import { zhTWLocalePrompt } from "./prompts/locales/zh-TW";
 import { esLocalePrompt } from "./prompts/locales/es";
 import { cloudCameraPrompt } from "./prompts/product-lines/cloud-camera";
 import { contentTypePrompts } from "./prompts/content-types";
+import { lineParityBudget } from "@/lib/datasheet/cover-layout";
 import type { TranslateProvider, ProviderId } from "./types";
 
 export { AVAILABLE_PROVIDERS } from "./types";
@@ -83,12 +84,69 @@ IMPORTANT: Always use the glossary terms above. Do not use alternative translati
   }
 }
 
-// --- Assemble system prompt from 5 layers ---
+// --- Layer 6: Per-item length budget computed from the source ---
+
+/**
+ * Turns the source text into an explicit character budget per item.
+ *
+ * "Do NOT make the text longer than necessary" in the base prompt is a
+ * wish; this is a number. Spanish ECS1552FP is why it exists — translated
+ * without a budget, three bullets each gained a wrapped line and pushed
+ * the features box 5pt past its cap, which then collapsed the overview's
+ * remaining space to 1pt of headroom.
+ *
+ * Applies to every locale, not just es. CJK overflows the same box for
+ * the same reason, and the budget is computed from each locale's own
+ * metrics (see lineParityBudget).
+ */
+function buildLengthBudgetPrompt(
+  source: string,
+  contentType: string,
+  targetLocale: string
+): string {
+  if (contentType !== "features" && contentType !== "overview") return "";
+
+  const texts =
+    contentType === "features"
+      ? source.split(/\n+/).map((l) => l.trim()).filter(Boolean)
+      : [source];
+  if (texts.length === 0) return "";
+
+  const budgets = lineParityBudget({
+    texts,
+    block: contentType === "features" ? "features" : "overview",
+    targetLocale,
+  });
+
+  const rows = budgets.map((b) =>
+    contentType === "features"
+      ? `- Line ${b.index}: max ${b.maxChars} characters (source wraps to ${b.sourceLines} line${b.sourceLines === 1 ? "" : "s"})`
+      : `- Whole paragraph: max ${b.maxChars} characters (source wraps to ${b.sourceLines} lines)`
+  );
+
+  return `## Length Budget — HARD CONSTRAINT
+
+The datasheet cover is a fixed-height layout. What breaks it is the number
+of wrapped LINES, not the character count, so each item below has a budget
+that keeps it on the same number of lines as the English source. One line
+over on a single bullet is enough to overflow the two-column features box.
+
+${rows.join("\n")}
+
+Stay within every budget. If a faithful translation doesn't fit: drop
+filler ("designed to", "allows you to"), choose the shorter synonym, or
+cut a redundant qualifier. Losing a nuance is acceptable; going over is
+not. Do NOT drop technical facts, model names, numbers or units to fit —
+if only those remain, get as close to the budget as you can.`;
+}
+
+// --- Assemble system prompt from 6 layers ---
 
 async function buildSystemPrompt(
   targetLocale: string,
   productLine: string | undefined,
-  contentType: string
+  contentType: string,
+  source: string
 ): Promise<string> {
   const parts = [basePrompt];
 
@@ -113,10 +171,42 @@ async function buildSystemPrompt(
     parts.push(glossaryPrompt);
   }
 
+  // Layer 6: length budget. Last on purpose — it's the constraint most
+  // likely to get dropped once the model is deep in terminology, so it
+  // sits closest to the output.
+  const budgetPrompt = buildLengthBudgetPrompt(source, contentType, targetLocale);
+  if (budgetPrompt) {
+    parts.push(budgetPrompt);
+  }
+
   return parts.join("\n\n");
 }
 
 // --- Public API ---
+
+/**
+ * The assembled system prompt, without running a translation.
+ *
+ * Exists so the length budget can be inspected without spending an LLM
+ * call or holding a key — the budget is the one layer computed from the
+ * source at request time, so "is it actually in there" isn't answerable
+ * by reading the prompt files.
+ *
+ * See scripts/check-translation-budget.ts --dry-run.
+ */
+export async function previewSystemPrompt(opts: {
+  source: string;
+  targetLocale: string;
+  contentType: "headline" | "overview" | "features" | "spec_labels";
+  productLine?: string;
+}): Promise<string> {
+  return buildSystemPrompt(
+    opts.targetLocale,
+    opts.productLine,
+    opts.contentType,
+    opts.source
+  );
+}
 
 export async function translate(opts: {
   source: string;
@@ -134,7 +224,12 @@ export async function translate(opts: {
   } = opts;
 
   const provider = getProvider(providerId);
-  const systemPrompt = await buildSystemPrompt(targetLocale, productLine, contentType);
+  const systemPrompt = await buildSystemPrompt(
+    targetLocale,
+    productLine,
+    contentType,
+    source
+  );
 
   const userMessage = `Translate the following to ${targetLocale}:\n\n${source}`;
 

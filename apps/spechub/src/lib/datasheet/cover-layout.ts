@@ -27,6 +27,8 @@
  * check flags overflow.
  */
 
+import { isCjkLocale } from "./typography";
+
 // ─── Zone constants (pt) ────────────────────────────────────────────
 export const COVER_ZONE_TOP = 270;         // where overview starts
 export const COVER_ZONE_BOTTOM = 756;      // where features-wrapper ends (792 - 36 bottom margin)
@@ -287,4 +289,63 @@ export function estimateCoverLayout(params: {
     willOverflow: featuresCapped || overviewOverflow,
     featuresWantedHeight,
   };
+}
+
+// ─── Translation length budget ──────────────────────────────────────
+
+export interface LineParityBudget {
+  /** 1-based position within the block (features), or 1 for overview. */
+  index: number;
+  /** Wrapped lines the English source occupies. */
+  sourceLines: number;
+  /** Characters the translation may use before it costs an extra line. */
+  maxChars: number;
+}
+
+/**
+ * Character budget that keeps a translation on the same number of wrapped
+ * lines as its English source.
+ *
+ * The cover is a fixed 486pt zone with a hard 320pt cap on the features
+ * box, so what breaks the layout is LINES, not characters. ECS1552FP is
+ * the worked example: one Spanish bullet grew 11% and stayed on 4 lines
+ * (harmless) while another grew 37% and took a 5th (overflowed the box).
+ * A "keep it within 1.05x" rule would have blocked the first and allowed
+ * the second — exactly backwards.
+ *
+ * Hold every block to its source line count and the cover's geometry is
+ * preserved by construction, whatever the target language.
+ *
+ * Lives here rather than in lib/translate so the budget and the red-flag
+ * check can never disagree — both use this file's metrics and countLines.
+ *
+ * CJK targets: budget is computed in char-slots (a CJK glyph occupies 2)
+ * and halved to express it as characters. Mixed strings with Latin
+ * technical terms therefore come out slightly under-budgeted, which is
+ * the safe direction — a short translation never breaks the box.
+ *
+ * Only overview and features have a fixed-height ceiling. Headlines have
+ * their own zone and spec labels feed a table that auto-paginates, so
+ * neither gets a budget.
+ */
+export function lineParityBudget(params: {
+  texts: string[];
+  block: "overview" | "features";
+  targetLocale?: string;
+}): LineParityBudget[] {
+  const field =
+    params.block === "overview" ? "overviewCharsPerLine" : "featureCharsPerLine";
+  const sourceWidth = LOCALE_METRICS.default[field];
+  const targetWidth = metricsFor(params.targetLocale)[field];
+  const targetIsCjk = isCjkLocale(params.targetLocale);
+
+  return params.texts.map((text, i) => {
+    const sourceLines = countLines(text, sourceWidth);
+    const slots = sourceLines * targetWidth;
+    return {
+      index: i + 1,
+      sourceLines,
+      maxChars: targetIsCjk ? Math.floor(slots / 2) : slots,
+    };
+  });
 }

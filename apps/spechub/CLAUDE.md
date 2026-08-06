@@ -208,9 +208,14 @@ auth.users → profiles ← email_whitelist.invited_by
    ① **`cover-layout.ts` / `pagination.ts` 都不用加 entry** —— 拉丁語系走 `default`
    本來就是對的，複製一份反而會漂移;② **不要加 `TYPOGRAPHY_DEFAULTS.es`**
    （見 pitfall #68）;③ 多改了 `typography-editor` 與 typography API 的語言過濾。
-   QR 沿用英文 URL、label 在地化。**剩下兩塊**:
-   **(a) 行數預算注入翻譯 prompt**（防破版主防線，見下）、
-   **(b) 翻譯審核流程**（分公司審稿，見系統項 #10）。
+   QR 沿用英文 URL、label 在地化。
+   **(a) 行數預算已完成** —— 翻譯 prompt 多了 **Layer 6**（`buildLengthBudgetPrompt`），
+   從原文算出每條 feature 的字元預算（`lineParityBudget()` 在 `cover-layout.ts`，
+   刻意跟版面 metrics 放同一支，兩邊不可能不一致）。**對所有語系生效，不只 es**；
+   CJK 目標會把 char-slot 預算除以 2。驗證用
+   `scripts/check-translation-budget.ts <MODEL> <locale> [--dry-run]`
+   （`--dry-run` 不用 key、不花錢，直接印出注入的預算段）。
+   **剩 (b) 翻譯審核流程**（分公司審稿，見系統項 #10）。
    ⚠️ 已量測:ECS1552FP 的英文內容直翻西文**封面會爆版**——features 需 325pt / 上限 320pt，
    連帶把 overview 可用空間壓到 146pt（需 145pt，過不了 12pt 安全緩衝）。
    肇因是第 8/9/10 條各多一個 wrap line。**要守的是「行數不超過原文」，不是字數比例**。
