@@ -27,4 +27,12 @@
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）
 - 兩個 app 共用同一個 Supabase（project `xzolvtlqafwkxfuaryec`）；Vercel 各自一個專案、Root Directory 指到 `apps/<name>`，region 都釘 `hnd1`
+- **兩個 app 都走 Vercel 原生 Git 整合部署**（2026-08-06 統一）。engenie 曾經因為
+  「Vercel 雲端建置對新專案會失敗」而改用 GitHub Actions 建好再上傳（`deploy-engenie.yml`），
+  Ignored Build Step 設成永遠跳過。**實測後發現真正的原因是 `apps/engenie` import 了
+  `shadcn` 卻沒宣告依賴**（只宣告在 spechub，靠 workspace hoisting 在本機和 CI 蒙過去，
+  Vercel 的單 app 安裝抓不到）。補上依賴後 Vercel 自己建得起來，workflow 已刪、
+  Ignored Build Step 已改回 Automatic。
+  ⚠️ **依賴一定要宣告在「真正 import 它的那個 app」** —— 同一天踩了兩次（`@eg/llm`、`shadcn`），
+  兩次都是本機 build 全綠、只有 Vercel 會爆。**本機 build 過不代表依賴宣告對了。**
 - **進 app 工作前先讀該 app 的 CLAUDE.md**：[apps/spechub/CLAUDE.md](apps/spechub/CLAUDE.md) · [apps/engenie/CLAUDE.md](apps/engenie/CLAUDE.md)
