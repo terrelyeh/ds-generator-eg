@@ -21,8 +21,10 @@
 
 create table if not exists public.llm_usage_events (
   id                uuid primary key default gen_random_uuid(),
-  -- Which surface spent it. Matches KeyPurpose in @eg/llm/openrouter so
-  -- the value that picks the key is also the value that tags the spend.
+  -- Which key paid: 'spechub' or 'ask'. Matches Surface in
+  -- @eg/llm/openrouter — one value picks the key and tags the spend, so
+  -- the two can't drift. Left as text rather than a check constraint so
+  -- adding a third key later needs no migration.
   surface           text not null,
   -- OpenRouter slug actually billed, e.g. "anthropic/claude-sonnet-4.6".
   model             text not null,

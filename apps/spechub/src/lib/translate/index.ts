@@ -55,7 +55,7 @@ async function resolveProvider(id: string, ref?: string): Promise<ResolvedProvid
   const spec = AVAILABLE_PROVIDERS.find((p) => p.id === id);
   if (!spec) throw new Error(`Unknown provider: ${id}`);
 
-  if (await openRouterEnabled("translate")) {
+  if (await openRouterEnabled("spechub")) {
     return {
       provider: createOpenRouterProvider(spec.id, spec.name, spec.openrouter, ref),
       model: spec.openrouter,

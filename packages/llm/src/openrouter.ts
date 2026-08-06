@@ -18,51 +18,55 @@ import { getApiKey } from "@eg/db/settings";
 export const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
 /**
- * Which surface is spending. Each can hold its own OpenRouter key so spend
- * is attributable and a leak is separately revocable — Ask especially,
- * since it is reachable from public workspaces, the embed widget and the
- * demo page, while datasheet generation is staff-only.
+ * One value picks the key AND tags the spend, because the reporting
+ * granularity we want is exactly the key split: two keys, two buckets.
  *
- * Purpose-specific keys are OPT-IN: an unset purpose falls back to the
- * shared key, so adding a purpose never breaks a surface that has no key
- * of its own.
+ * Two keys by decision (2026-08-06): SpecHub (datasheet translation and
+ * battlecard) on one, EnGenie Ask on the other. Ask is the split worth
+ * having because it is the surface reachable from public workspaces, the
+ * embed widget and the demo page — a leak there should be revocable
+ * without taking datasheet generation down, and it is the one that wants
+ * its own spend cap. Everything SpecHub does is staff-only, so splitting
+ * it further would add rotation work and buy nothing.
+ *
+ * Finer attribution is still recoverable without a schema change: every
+ * ledger row carries `ref` (product model, workspace slug), so "which
+ * datasheet was expensive" can be answered from the data whenever it's
+ * worth building a view for.
  */
-export type KeyPurpose = "default" | "ask" | "translate" | "battlecard";
+export type Surface = "spechub" | "ask";
 
-const PURPOSE_SETTINGS_KEY: Record<KeyPurpose, string> = {
-  default: "openrouter_api_key",
+const SURFACE_SETTINGS: Record<Surface, string> = {
+  spechub: "openrouter_api_key",
   ask: "openrouter_api_key_ask",
-  translate: "openrouter_api_key_translate",
-  battlecard: "openrouter_api_key_battlecard",
 };
 
-const PURPOSE_ENV: Record<KeyPurpose, string> = {
-  default: "OPENROUTER_API_KEY",
+const SURFACE_ENV: Record<Surface, string> = {
+  spechub: "OPENROUTER_API_KEY",
   ask: "OPENROUTER_API_KEY_ASK",
-  translate: "OPENROUTER_API_KEY_TRANSLATE",
-  battlecard: "OPENROUTER_API_KEY_BATTLECARD",
 };
 
 /**
- * Resolve the key for a surface: its own key if configured, else the
- * shared one.
+ * Resolve the credential: the surface's own key if configured, else the
+ * SpecHub key. So Ask degrades to the SpecHub key rather than failing
+ * when no Ask key has been set yet.
  *
  * For Ask this is only the bottom of a longer chain — a workspace in
  * `byok` mode carries its own key and `user_byok` takes one per request,
  * both of which override this. Only `shared` workspaces (the Marketing
  * demo among them) land here.
  */
-export async function getOpenRouterKey(purpose: KeyPurpose = "default"): Promise<string | null> {
-  if (purpose !== "default") {
-    const own = await getApiKey(PURPOSE_SETTINGS_KEY[purpose], PURPOSE_ENV[purpose]);
+export async function getOpenRouterKey(surface: Surface = "spechub"): Promise<string | null> {
+  if (surface !== "spechub") {
+    const own = await getApiKey(SURFACE_SETTINGS[surface], SURFACE_ENV[surface]);
     if (own) return own;
   }
-  return getApiKey(PURPOSE_SETTINGS_KEY.default, PURPOSE_ENV.default);
+  return getApiKey(SURFACE_SETTINGS.spechub, SURFACE_ENV.spechub);
 }
 
 /** True when OpenRouter is configured and should be preferred over direct vendor calls. */
-export async function openRouterEnabled(purpose: KeyPurpose = "default"): Promise<boolean> {
-  return !!(await getOpenRouterKey(purpose));
+export async function openRouterEnabled(surface: Surface = "spechub"): Promise<boolean> {
+  return !!(await getOpenRouterKey(surface));
 }
 
 export interface ChatOptions {
@@ -78,12 +82,8 @@ export interface ChatOptions {
    * this off rather than risk a 400 from a model that lacks it.
    */
   json?: boolean;
-  /**
-   * Which surface is spending. Picks that surface's key AND tags the spend
-   * in llm_usage_events, so the value that chooses the key is the same one
-   * that attributes the cost.
-   */
-  purpose?: KeyPurpose;
+  /** Which key pays, and which bucket the spend lands in. Default "spechub". */
+  surface?: Surface;
   /** Free-form attribution: product model, workspace slug, line name… */
   ref?: string;
   /** BYOK override — used instead of the stored key, never persisted. */
@@ -100,7 +100,7 @@ const ATTRIBUTION = {
 };
 
 export async function chatComplete(opts: ChatOptions): Promise<string> {
-  const apiKey = opts.apiKey ?? (await getOpenRouterKey(opts.purpose ?? "default"));
+  const apiKey = opts.apiKey ?? (await getOpenRouterKey(opts.surface ?? "spechub"));
   if (!apiKey) {
     throw new Error(
       "OpenRouter API Key 尚未設定。請到 Settings 頁面輸入，或設定 OPENROUTER_API_KEY。",
@@ -187,7 +187,7 @@ async function recordUsage(
   const supabase = createAdminClient();
 
   const { error } = await supabase.from("llm_usage_events" as "products").insert({
-    surface: opts.purpose ?? "default",
+    surface: opts.surface ?? "spechub",
     // What OpenRouter says it billed, which can differ from what we asked
     // for when a request is routed to a variant.
     model: data.model ?? opts.model,

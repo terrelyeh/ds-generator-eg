@@ -17,17 +17,17 @@ interface ApiKeyConfig {
 const API_KEYS: ApiKeyConfig[] = [
   {
     key: "openrouter_api_key",
-    label: "OpenRouter — 主要金鑰",
+    label: "OpenRouter — Product SpecHub",
     description:
-      "所有 chat completions 的統一入口：Datasheet 翻譯、Battlecard 競品抽取。一把 key 通所有廠商，換模型只要改字串。設定後即取代下方三家的直連路徑。",
+      "SpecHub 全部的 chat completions：Datasheet 翻譯 + Battlecard 競品抽取。一把 key 通所有廠商，換模型只要改字串。設定後即取代下方三家的直連路徑。Ask 若未另設專屬 key，也會回退到這一把。",
     placeholder: "sk-or-v1-...",
     docsUrl: "https://openrouter.ai/settings/keys",
   },
   {
     key: "openrouter_api_key_ask",
-    label: "OpenRouter — EnGenie Ask 專用（選填）",
+    label: "OpenRouter — EnGenie Ask",
     description:
-      "只給 Ask 用的獨立 key：問答、部門 workspace、embed widget、Demo。留空就沿用上面那把主要金鑰。分開的好處是花費看得出是誰燒的，而且 Ask 對外暴露面較大（公開 workspace / widget），萬一外洩可單獨撤銷、不影響 datasheet 產出；也可以在 OpenRouter 後台單獨給它設消費上限。注意 workspace 若設為 BYOK，該 workspace 會用自己的 key，不走這把。",
+      "Ask 專用：問答、部門 workspace、embed widget、Marketing Demo。留空會回退到上面那把。分開的理由是 Ask 對外暴露面較大（公開 workspace / widget），外洩時可單獨撤銷而不影響 datasheet 產出，也能在 OpenRouter 後台單獨設消費上限。用量頁的花費也是照這兩把分開統計。注意：workspace 若設為 BYOK，該 workspace 用自己的 key，不走這把。",
     placeholder: "sk-or-v1-...",
     docsUrl: "https://openrouter.ai/settings/keys",
   },

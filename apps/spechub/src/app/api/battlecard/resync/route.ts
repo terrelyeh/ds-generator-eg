@@ -55,7 +55,7 @@ async function extractSpecs(
     system,
     user,
     maxTokens: 4096,
-    purpose: "battlecard",
+    surface: "spechub",
     ref: competitorLabel,
   });
 
@@ -101,7 +101,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!(await openRouterEnabled("battlecard"))) {
+  if (!(await openRouterEnabled("spechub"))) {
     return NextResponse.json(
       { error: "OpenRouter API key not configured (Settings)." },
       { status: 400 },

@@ -52,11 +52,10 @@ interface Snapshot {
   fetchedAt: string;
 }
 
+/** One bucket per key — see Surface in @eg/llm/openrouter. */
 const SURFACE_LABEL: Record<string, string> = {
-  translate: "Datasheet 翻譯",
-  battlecard: "Battlecard 競品抽取",
+  spechub: "Product SpecHub（翻譯 + Battlecard）",
   ask: "EnGenie Ask",
-  default: "其他 / 未標記",
 };
 
 /** LLM line items are often fractions of a cent — flat 2dp would read $0.00. */

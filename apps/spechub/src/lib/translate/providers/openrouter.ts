@@ -35,7 +35,7 @@ export function createOpenRouterProvider(
         user: userMessage,
         maxTokens: 8192,
         temperature: 0.3,
-        purpose: "translate",
+        surface: "spechub",
         ref,
       });
     },
