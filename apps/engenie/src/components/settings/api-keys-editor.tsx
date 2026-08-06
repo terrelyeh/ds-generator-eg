@@ -16,23 +16,33 @@ interface ApiKeyConfig {
 
 const API_KEYS: ApiKeyConfig[] = [
   {
+    key: "openrouter_api_key",
+    label: "OpenRouter — 主要金鑰",
+    description:
+      "所有 chat completions 的統一入口：Datasheet 翻譯、Battlecard 競品抽取。一把 key 通所有廠商，換模型只要改字串。設定後即取代下方三家的直連路徑。",
+    placeholder: "sk-or-v1-...",
+    docsUrl: "https://openrouter.ai/settings/keys",
+  },
+  {
     key: "anthropic_api_key",
-    label: "Anthropic (Claude)",
-    description: "Translation + Ask SpecHub answers. Models: Claude Sonnet / Opus.",
+    label: "Anthropic (Claude) — 舊路徑",
+    description:
+      "OpenRouter 未設定時的翻譯備援。⚠️ 目前系統中並不存在這把 key，所以任何硬性要求它的功能（Battlecard ↻sync / 🔍web）在 OpenRouter 設定前都無法運作。",
     placeholder: "sk-ant-api03-...",
     docsUrl: "https://console.anthropic.com/settings/keys",
   },
   {
     key: "openai_api_key",
-    label: "OpenAI",
-    description: "Embedding (required for Ask SpecHub indexing & search) + Translation + Ask answers. Models: text-embedding-3-small, GPT-4o.",
+    label: "OpenAI — Embedding 必需，請勿刪除",
+    description:
+      "RAG 索引與搜尋的 Embedding（text-embedding-3-small, 1536 維）只走這把 key —— OpenRouter 不提供 embedding，且更換 embedding 模型等同整個知識庫重建索引。即使全面改用 OpenRouter，這把仍必須保留。",
     placeholder: "sk-proj-...",
     docsUrl: "https://platform.openai.com/api-keys",
   },
   {
     key: "google_ai_api_key",
-    label: "Google AI (Gemini)",
-    description: "Translation + Ask SpecHub answers. Models: Gemini 2.5 Pro / Flash.",
+    label: "Google AI (Gemini) — 舊路徑",
+    description: "OpenRouter 未設定時的翻譯備援；PDF 抽取與圖片理解目前仍直連這把 key。",
     placeholder: "AIza...",
     docsUrl: "https://aistudio.google.com/apikey",
   },
