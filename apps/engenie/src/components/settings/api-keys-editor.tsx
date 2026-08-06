@@ -24,6 +24,14 @@ const API_KEYS: ApiKeyConfig[] = [
     docsUrl: "https://openrouter.ai/settings/keys",
   },
   {
+    key: "openrouter_api_key_ask",
+    label: "OpenRouter — EnGenie Ask 專用（選填）",
+    description:
+      "只給 Ask 用的獨立 key：問答、部門 workspace、embed widget、Demo。留空就沿用上面那把主要金鑰。分開的好處是花費看得出是誰燒的，而且 Ask 對外暴露面較大（公開 workspace / widget），萬一外洩可單獨撤銷、不影響 datasheet 產出；也可以在 OpenRouter 後台單獨給它設消費上限。注意 workspace 若設為 BYOK，該 workspace 會用自己的 key，不走這把。",
+    placeholder: "sk-or-v1-...",
+    docsUrl: "https://openrouter.ai/settings/keys",
+  },
+  {
     key: "anthropic_api_key",
     label: "Anthropic (Claude) — 舊路徑",
     description:

@@ -48,7 +48,11 @@ export async function getApiKey(
 /** Well-known settings keys and their env var fallbacks */
 export const API_KEY_MAP = {
   // Preferred path for all chat completions — one key, every vendor.
+  // Per-surface keys are optional and fall back to the shared one; see
+  // KeyPurpose in @eg/llm/openrouter.
   openrouter_api_key: "OPENROUTER_API_KEY",
+  openrouter_api_key_ask: "OPENROUTER_API_KEY_ASK",
+  openrouter_api_key_translate: "OPENROUTER_API_KEY_TRANSLATE",
   // Direct-vendor keys. Retained as fallback while the OpenRouter
   // migration lands, EXCEPT openai_api_key which is permanent: RAG
   // embeddings (text-embedding-3-small, 1536-dim) don't go through
