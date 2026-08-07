@@ -95,6 +95,9 @@ async function main() {
       contentType: "features",
       productLine,
       providerId: provider,
+      // Match what the editor records, so script runs and real usage tag
+      // the ledger at the same granularity instead of product-line vs model.
+      ref: p.model_name,
     }),
     translate({
       source: enOverview,
@@ -102,6 +105,9 @@ async function main() {
       contentType: "overview",
       productLine,
       providerId: provider,
+      // Match what the editor records, so script runs and real usage tag
+      // the ledger at the same granularity instead of product-line vs model.
+      ref: p.model_name,
     }),
   ]);
 
