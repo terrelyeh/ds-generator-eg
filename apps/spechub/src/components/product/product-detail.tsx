@@ -942,6 +942,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const localesWithTranslations = translations.map((t) => t.locale);
   const confirmedLocales = new Set(translations.filter((t) => t.confirmed).map((t) => t.locale));
 
+  // Locales that carry a version number but no generated history. The number
+  // comes from Drive folder names (resync / detect-locale-version); only
+  // /api/generate-pdf ever writes a versions row. Without naming the gap the
+  // card looks like it lost data.
+  const localesWithHistory = new Set(versions.map((v) => v.locale || "en"));
+  const missingHistoryLocales = Object.keys(currentVersions)
+    .filter((l) => currentVersions[l] && !localesWithHistory.has(l))
+    .sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)));
+
   async function handleGeneratePdf(mode: "regenerate" | "new", locale = "en") {
     setShowGenMenu(false);
     setShowLangMenu(false);
@@ -1717,11 +1726,26 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           <CardTitle className="text-base">Version History</CardTitle>
         </CardHeader>
         <CardContent>
-          {versions.length === 0 ? (
+          {/* This card lists PDFs THIS system generated, but current_versions
+              also carries numbers detected from Drive folder names — PDFs made
+              before SpecHub existed, or by hand. Roughly 40% of products have
+              a version number with no matching history, which reads as data
+              loss unless the gap is named. Only shown when that gap exists. */}
+          {missingHistoryLocales.length > 0 && (
+            <p className="mb-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              此處只列出由 SpecHub 產生的 PDF。
+              {missingHistoryLocales.map((l) => {
+                const info = SUPPORTED_LOCALES.find((x) => x.value === l);
+                return `${info ? info.label : l} v${currentVersions[l]}`;
+              }).join("、")}
+              {" "}建立於系統之外（或系統上線前），因此沒有歷史紀錄 —— 檔案仍在 Drive。
+            </p>
+          )}
+          {versions.length === 0 && missingHistoryLocales.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               No versions generated yet.
             </p>
-          ) : (
+          ) : versions.length === 0 ? null : (
             <div className="space-y-6">
               {/* Group versions by locale */}
               {Object.entries(
