@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
+import { streamComplete, getOpenRouterKey } from "@eg/llm/openrouter";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
 import { retrieveDocuments } from "@/lib/rag/retrieve";
@@ -221,29 +221,36 @@ export async function GET(request: Request) {
 // ~18s to ~1.2s with equal answer quality (RAG synthesis doesn't benefit
 // from extended reasoning). Flash models only; Pro keeps default thinking
 // since users pick it precisely for deeper reasoning.
-const MODEL_MAP: Record<string, { fn: "claude" | "openai" | "gemini"; model: string; thinkingBudget?: number }> = {
-  // Claude (dateless IDs are pinned snapshots from the 4.6 generation on)
-  "claude-opus": { fn: "claude", model: "claude-opus-4-8" },
-  "claude-sonnet": { fn: "claude", model: "claude-sonnet-4-6" },
-  "claude-haiku": { fn: "claude", model: "claude-haiku-4-5-20251001" },
+/**
+ * Selectable models, as OpenRouter slugs.
+ *
+ * Was a three-way map of vendor + native model name because each vendor
+ * had its own client; through OpenRouter the slug IS the model, so the
+ * `fn` discriminator is gone along with the three stream functions.
+ *
+ * `reasoningEffort: "none"` replaces Gemini's thinkingBudget:0 and exists
+ * for the same reason (pitfall #61): flash models reason BEFORE the first
+ * streamed token and the thoughts are discarded, so leaving it on spends
+ * 7-15s of visible "generating…" for nothing. Gemini Pro deliberately
+ * keeps its reasoning — choosing Pro is choosing to wait for it.
+ */
+const MODEL_MAP: Record<string, { model: string; reasoningEffort?: "none" }> = {
+  // Claude
+  "claude-opus": { model: "anthropic/claude-opus-4.8" },
+  "claude-sonnet": { model: "anthropic/claude-sonnet-4.6" },
+  "claude-haiku": { model: "anthropic/claude-haiku-4.5" },
   // OpenAI
-  "gpt-5.5": { fn: "openai", model: "gpt-5.5" },
-  "gpt-5.4-mini": { fn: "openai", model: "gpt-5.4-mini" },
-  "gpt-5.4-nano": { fn: "openai", model: "gpt-5.4-nano" },
-  // Gemini (3.x — 3.5 Flash is GA frontier; 3.1 Pro is still preview-only)
-  "gemini-3.1-pro": { fn: "gemini", model: "gemini-3.1-pro-preview" },
-  "gemini-3.5-flash": { fn: "gemini", model: "gemini-3.5-flash", thinkingBudget: 0 },
-  "gemini-3.1-flash-lite": { fn: "gemini", model: "gemini-3.1-flash-lite", thinkingBudget: 0 },
+  "gpt-5.5": { model: "openai/gpt-5.5" },
+  "gpt-5.4-mini": { model: "openai/gpt-5.4-mini" },
+  "gpt-5.4-nano": { model: "openai/gpt-5.4-nano" },
+  // Gemini
+  "gemini-3.1-pro": { model: "google/gemini-3.1-pro-preview" },
+  "gemini-3.5-flash": { model: "google/gemini-3.5-flash", reasoningEffort: "none" },
+  "gemini-3.1-flash-lite": { model: "google/gemini-3.1-flash-lite", reasoningEffort: "none" },
 };
 
 // app_settings key per provider family — lets the LLM key prefetch run in
 // parallel with retrieval instead of after it.
-const PROVIDER_KEY: Record<"claude" | "openai" | "gemini", keyof typeof API_KEY_MAP> = {
-  claude: "anthropic_api_key",
-  openai: "openai_api_key",
-  gemini: "google_ai_api_key",
-};
-
 /**
  * Lightweight language detection for the question text.
  * Returns a human-readable label (e.g. "English", "Traditional Chinese",
@@ -318,7 +325,10 @@ export async function POST(request: Request) {
   const personaId = ws && !ws.allow_switch ? ws.persona : (body.persona ?? ws?.persona ?? "default");
   const profileId = ws && !ws.allow_switch ? ws.profile : (body.profile ?? ws?.profile ?? "default");
   const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? "gemini-3.5-flash");
-  const mapped = MODEL_MAP[provider] ?? { fn: "gemini" as const, model: "gemini-3.5-flash", thinkingBudget: 0 };
+  const mapped = MODEL_MAP[provider] ?? {
+    model: "google/gemini-3.5-flash",
+    reasoningEffort: "none" as const,
+  };
 
   // BYOK generation key. Two flavours:
   //   byok      — the workspace carries ONE admin-set key (shared by all users).
@@ -368,9 +378,13 @@ export async function POST(request: Request) {
           .then(async (p) => p ?? (await getPersona("default")))
           .catch(() => null);
         const topoPromise = buildTopologyHint(supabase, question).catch(() => "");
+        // One OpenRouter key for every model now, so this no longer has to
+        // pick a credential based on which vendor was selected. Prefetched
+        // alongside retrieval (pitfall #63) — streamComplete falls back to
+        // the same cached lookup if this resolves empty.
         const llmKeyPromise: Promise<string | undefined> = llmKeyOverride
           ? Promise.resolve(llmKeyOverride)
-          : getApiKey(PROVIDER_KEY[mapped.fn], API_KEY_MAP[PROVIDER_KEY[mapped.fn]])
+          : getOpenRouterKey("ask")
               .then((k) => k ?? undefined)
               .catch(() => undefined);
 
@@ -502,24 +516,27 @@ IMPORTANT formatting rules:
 2. After your main answer, add a line with just "---" as a separator.
 3. Then list exactly 3 follow-up questions the user might want to ask next, one per line, in ${answerLanguageLabel}. Each MUST be a complete, standalone question that explicitly names the product / model / subject — never use context-dependent pronouns like "it" / "這個" / "該款" / "そちら". Suggested follow-ups are re-submitted verbatim as a brand-new query, so each one must make full sense on its own.`;
 
-        // Step 5: Stream LLM response (key was prefetched in parallel with
-        // retrieval; streamX still falls back to getApiKey — now cached — if
-        // the prefetch came back empty, keeping the old error messages).
+        // Step 5: Stream the answer. The key was prefetched in parallel
+        // with retrieval; streamComplete falls back to the same cached
+        // lookup if that came back empty.
         sendEvent(JSON.stringify({ type: "status", status: "generating" }));
         const llmKey = await llmKeyPromise;
 
-        switch (mapped.fn) {
-          case "claude":
-            await streamClaude(systemPrompt, userMessage, mapped.model, sendEvent, llmKey);
-            break;
-          case "openai":
-            await streamOpenAI(systemPrompt, userMessage, mapped.model, sendEvent, llmKey);
-            break;
-          case "gemini":
-          default:
-            await streamGemini(systemPrompt, userMessage, mapped.model, sendEvent, llmKey, mapped.thinkingBudget);
-            break;
-        }
+        await streamComplete({
+          model: mapped.model,
+          system: systemPrompt,
+          user: userMessage,
+          maxTokens: 16384,
+          reasoningEffort: mapped.reasoningEffort,
+          // BYOK keys are the visitor's or the workspace's, so their spend
+          // isn't ours — recordUsage flags is_byok and the dashboard
+          // excludes it from company totals.
+          apiKey: llmKey,
+          surface: "ask",
+          ref: ws?.slug ?? "internal",
+          onChunk: (text) =>
+            sendEvent(JSON.stringify({ type: "chunk", content: text })),
+        });
 
         // Step 6: Send metadata (sources already went out before the stream)
         sendEvent(JSON.stringify({
@@ -552,170 +569,5 @@ IMPORTANT formatting rules:
   });
 }
 
-/**
- * Stream from Claude (Anthropic) API
- */
-async function streamClaude(
-  systemPrompt: string,
-  userMessage: string,
-  model: string,
-  sendEvent: (data: string) => void,
-  apiKeyOverride?: string
-): Promise<void> {
-  const apiKey = apiKeyOverride || await getApiKey("anthropic_api_key", API_KEY_MAP.anthropic_api_key);
-  if (!apiKey) throw new Error("Anthropic API key not configured");
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 16384,
-      stream: true,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userMessage }],
-    }),
-  });
 
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Claude API error (${res.status}): ${errText.slice(0, 300)}`);
-  }
-
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr || jsonStr === "[DONE]") continue;
-        try {
-          const event = JSON.parse(jsonStr);
-          if (event.type === "content_block_delta" && event.delta?.text) {
-            sendEvent(JSON.stringify({ type: "chunk", content: event.delta.text }));
-          }
-        } catch {
-          // skip unparseable lines
-        }
-      }
-    }
-  }
-}
-
-/**
- * Stream from OpenAI API
- */
-async function streamOpenAI(
-  systemPrompt: string,
-  userMessage: string,
-  model: string,
-  sendEvent: (data: string) => void,
-  apiKeyOverride?: string
-): Promise<void> {
-  const apiKey = apiKeyOverride || await getApiKey("openai_api_key", API_KEY_MAP.openai_api_key);
-  if (!apiKey) throw new Error("OpenAI API key not configured");
-
-  const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ apiKey });
-
-  const response = await client.chat.completions.create({
-    model,
-    stream: true,
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-  });
-
-  for await (const chunk of response) {
-    const text = chunk.choices[0]?.delta?.content;
-    if (text) {
-      sendEvent(JSON.stringify({ type: "chunk", content: text }));
-    }
-  }
-}
-
-/**
- * Stream from Gemini API
- */
-async function streamGemini(
-  systemPrompt: string,
-  userMessage: string,
-  model: string,
-  sendEvent: (data: string) => void,
-  apiKeyOverride?: string,
-  thinkingBudget?: number
-): Promise<void> {
-  const apiKey = apiKeyOverride || await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
-  if (!apiKey) throw new Error("Google AI API key not configured");
-
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`,
-    {
-      method: "POST",
-      // Key in a header (not the URL) so it can't leak via logs / error echoes.
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: "user", parts: [{ text: userMessage }] }],
-        // Thinking happens server-side BEFORE the first streamed token, so an
-        // unbounded budget silently adds many seconds of "generating…" wait.
-        ...(thinkingBudget !== undefined
-          ? { generationConfig: { thinkingConfig: { thinkingBudget } } }
-          : {}),
-      }),
-    }
-  );
-
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Gemini API error (${res.status}): ${errText.slice(0, 300)}`);
-  }
-
-  const reader = res.body!.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (line.startsWith("data: ")) {
-        const jsonStr = line.slice(6).trim();
-        if (!jsonStr) continue;
-        try {
-          const event = JSON.parse(jsonStr);
-          // Gemini returns candidates[].content.parts[] — get text parts, skip thinking
-          const parts = event.candidates?.[0]?.content?.parts;
-          if (parts) {
-            for (const part of parts) {
-              if (part.text !== undefined && !part.thought) {
-                sendEvent(JSON.stringify({ type: "chunk", content: part.text }));
-              }
-            }
-          }
-        } catch {
-          // skip unparseable lines
-        }
-      }
-    }
-  }
-}

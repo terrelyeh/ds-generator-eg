@@ -88,6 +88,13 @@ export interface ChatOptions {
   ref?: string;
   /** BYOK override — used instead of the stored key, never persisted. */
   apiKey?: string;
+  /**
+   * Reasoning effort. "none" is the OpenRouter equivalent of Gemini's
+   * thinkingBudget:0 — flash models think BEFORE the first streamed token
+   * and the thought parts get discarded anyway, so leaving it on spends
+   * 7-15s of visible "generating…" for nothing (pitfall #61).
+   */
+  reasoningEffort?: "none" | "minimal" | "low" | "medium" | "high";
   /** Skip ledger recording (health checks, throwaway probes). */
   skipRecord?: boolean;
   signal?: AbortSignal;
@@ -125,6 +132,7 @@ export async function chatComplete(opts: ChatOptions): Promise<string> {
       ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+      ...(opts.reasoningEffort ? { reasoning: { effort: opts.reasoningEffort } } : {}),
     }),
   });
 
@@ -203,4 +211,104 @@ async function recordUsage(
   } as never);
 
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Streaming variant — one function for every vendor.
+ *
+ * Replaces three hand-rolled SSE readers (Anthropic's `content_block_delta`,
+ * OpenAI's SDK loop, Gemini's `candidates[].content.parts[]` with its
+ * thought-part filtering). OpenRouter normalises all of them to the
+ * OpenAI delta shape, so the vendor-specific parsing disappears.
+ *
+ * Usage still lands in the ledger: OpenRouter always includes a final
+ * usage payload in the stream (its `stream_options.include_usage` is
+ * deprecated precisely because it's unconditional), so streamed answers
+ * are costed the same as non-streamed ones.
+ */
+export async function streamComplete(
+  opts: ChatOptions & { onChunk: (text: string) => void },
+): Promise<void> {
+  const apiKey = opts.apiKey ?? (await getOpenRouterKey(opts.surface ?? "spechub"));
+  if (!apiKey) {
+    throw new Error(
+      "OpenRouter API Key 尚未設定。請到 Settings 頁面輸入，或設定 OPENROUTER_API_KEY。",
+    );
+  }
+
+  const messages: { role: string; content: string }[] = [];
+  if (opts.system) messages.push({ role: "system", content: opts.system });
+  messages.push({ role: "user", content: opts.user });
+
+  const res = await fetch(OPENROUTER_ENDPOINT, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+      ...ATTRIBUTION,
+    },
+    signal: opts.signal,
+    body: JSON.stringify({
+      model: opts.model,
+      messages,
+      stream: true,
+      ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
+      ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
+      ...(opts.reasoningEffort ? { reasoning: { effort: opts.reasoningEffort } } : {}),
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`OpenRouter ${res.status} (${opts.model}): ${(await res.text()).slice(0, 300)}`);
+  }
+  if (!res.body) throw new Error(`OpenRouter returned no stream (${opts.model})`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let usagePayload: { id?: string; model?: string; usage?: Record<string, unknown> } | null = null;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() ?? "";
+
+    for (const line of lines) {
+      // OpenRouter emits ": OPENROUTER PROCESSING" comment lines as
+      // keepalives during long waits. They are not events.
+      if (!line.startsWith("data: ")) continue;
+
+      const payload = line.slice(6).trim();
+      if (!payload || payload === "[DONE]") continue;
+
+      try {
+        const event = JSON.parse(payload);
+
+        // Rate limits and moderation arrive mid-stream with HTTP 200.
+        if (event.error) {
+          throw new Error(
+            `OpenRouter error (${opts.model}): ${event.error.message ?? JSON.stringify(event.error)}`,
+          );
+        }
+
+        const text: string | undefined = event.choices?.[0]?.delta?.content;
+        if (text) opts.onChunk(text);
+
+        // Usage arrives on a late chunk, usually one with no choices.
+        if (event.usage) usagePayload = { id: event.id, model: event.model, usage: event.usage };
+      } catch (err) {
+        // Re-throw our own error envelope; ignore genuinely unparseable lines.
+        if (err instanceof Error && err.message.startsWith("OpenRouter error")) throw err;
+      }
+    }
+  }
+
+  if (usagePayload && !opts.skipRecord) {
+    void recordUsage(usagePayload, opts).catch((e) =>
+      console.warn("[openrouter] usage not recorded:", e?.message ?? e),
+    );
+  }
 }
