@@ -18,19 +18,43 @@ interface GlossaryEntry {
   updated_at: string;
 }
 
-const SCOPE_OPTIONS = [
-  { value: "global", label: "🌐 Global" },
-  { value: "Cloud Camera", label: "📷 Cloud Camera" },
-  { value: "Cloud AP", label: "📡 Cloud AP" },
-  { value: "Cloud Switch", label: "🔌 Cloud Switch" },
-  { value: "Cloud AI-NVS", label: "💾 Cloud NVS" },
-  { value: "Cloud VPN Firewall", label: "🔒 Cloud VPN FW" },
-];
+/**
+ * Scope is two levels, not a tree: a term is either `global` (used when
+ * translating anything) or tied to one product line (used only for that
+ * line). At translation time loadGlossaryPrompt asks for
+ * `["global", <that product's line>]`, so a line's terms sit on top of
+ * the global ones — they don't replace them.
+ *
+ * The list used to be hardcoded and had gone stale by ten product lines,
+ * so those lines silently had no way to carry their own terminology. It
+ * now comes from the DB.
+ */
+const GLOBAL_SCOPE = { value: "global", label: "🌐 Global" };
 
-export function GlossaryEditor() {
+export function GlossaryEditor({
+  initialLocale,
+  productLines = [],
+}: {
+  /** From ?locale= — the translation editor links here per language, and
+   *  landing on Japanese while editing Spanish was just wrong. */
+  initialLocale?: string;
+  productLines?: { name: string; solution: string }[];
+}) {
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
 
-  const [locale, setLocale] = useState(localeOptions[0]?.value ?? "ja");
+  const SCOPE_OPTIONS = [
+    GLOBAL_SCOPE,
+    ...productLines.map((l) => ({
+      value: l.name,
+      label: l.solution ? `${l.solution} › ${l.name}` : l.name,
+    })),
+  ];
+
+  const [locale, setLocale] = useState(
+    initialLocale && localeOptions.some((l) => l.value === initialLocale)
+      ? initialLocale
+      : (localeOptions[0]?.value ?? "ja"),
+  );
   const [scopeFilter, setScopeFilter] = useState("all");
   const [search, setSearch] = useState("");
   const [glossary, setGlossary] = useState<GlossaryEntry[]>([]);
