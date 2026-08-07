@@ -408,7 +408,8 @@ export function DashboardContent({
       const data = (await res.json()) as {
         ok?: boolean;
         scanned?: number;
-        changes?: Array<{ model: string; from: string; to: string }>;
+        changes?: Array<{ model: string; locale?: string; from: string; to: string }>;
+        locales_scanned?: string[];
         unchanged_count?: number;
         not_found_in_drive?: string[];
         errors?: Array<{ model: string; error: string }>;
@@ -420,9 +421,17 @@ export function DashboardContent({
       }
       const changed = data.changes ?? [];
       const errs = data.errors ?? [];
+      // The scan is per locale now, so one model can appear more than once.
+      // Without the language tag "ECS1528FP 0.0→1.0, ECS1528FP 1.2→1.3" reads
+      // like a duplicate rather than two languages.
+      const scannedLangs = data.locales_scanned?.length
+        ? ` (en + ${data.locales_scanned.filter((l) => l !== "en").join(", ")})`
+        : "";
       const summary = changed.length === 0
-        ? `${data.scanned ?? 0} models scanned, all already up to date`
-        : `${changed.length} updated: ${changed.map((c) => `${c.model} ${c.from}→${c.to}`).join(", ")}`;
+        ? `${data.scanned ?? 0} models scanned${scannedLangs}, all already up to date`
+        : `${changed.length} updated: ${changed
+            .map((c) => `${c.model}${c.locale && c.locale !== "en" ? ` [${c.locale}]` : ""} ${c.from}→${c.to}`)
+            .join(", ")}`;
       if (errs.length > 0) {
         toast.warning(`Versions resynced with ${errs.length} error(s)`, {
           id: toastId,
