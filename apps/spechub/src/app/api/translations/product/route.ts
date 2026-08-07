@@ -85,9 +85,13 @@ export async function POST(request: Request) {
     upsertData.translated_by = translated_by;
   }
 
-  // Only set confirmed=true on explicit Save, never set it back to false
+  // `confirmed` is a generated column as of migration 00034 — writing to it
+  // errors. review_status is the stored value it derives from.
+  //
+  // Still only ever moves forward on an explicit Save, never back to draft:
+  // an auto-save for Preview must not un-approve a reviewed translation.
   if (confirm) {
-    upsertData.confirmed = true;
+    upsertData.review_status = "approved";
   }
 
   const { error } = await supabase
