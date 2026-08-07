@@ -16,7 +16,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ROLE_LABELS, type Role, ROLES } from "@eg/auth/permissions";
+import { ROLE_LABELS, type Role, ROLES, can } from "@eg/auth/permissions";
+import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 
 interface ActiveUser {
   id: string;
@@ -24,6 +25,8 @@ interface ActiveUser {
   name: string | null;
   avatar_url: string | null;
   role: string;
+  /** Locales this user may approve. null = all. */
+  review_locales: string[] | null;
   last_sign_in_at: string | null;
   created_at: string;
 }
@@ -103,6 +106,31 @@ export function UsersManager({ currentUserId }: UsersManagerProps) {
       toast.error(err instanceof Error ? err.message : String(err));
     } finally {
       setInviting(false);
+    }
+  }
+
+  async function handleReviewLocalesChange(userId: string, locales: string[] | null) {
+    setPendingId(userId);
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ review_locales: locales }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to update");
+      toast.success(
+        locales === null
+          ? "可審核語言：全部"
+          : locales.length === 0
+            ? "已停用此人的審核範圍"
+            : `可審核語言：${locales.join(", ")}`,
+      );
+      await refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : String(err));
+    } finally {
+      setPendingId(null);
     }
   }
 
@@ -273,6 +301,7 @@ export function UsersManager({ currentUserId }: UsersManagerProps) {
               currentUserId={currentUserId}
               pendingId={pendingId}
               onRoleChange={handleRoleChange}
+              onReviewLocalesChange={handleReviewLocalesChange}
               onRemove={handleRemoveUser}
             />
           ) : (
@@ -320,12 +349,14 @@ function ActiveList({
   currentUserId,
   pendingId,
   onRoleChange,
+  onReviewLocalesChange,
   onRemove,
 }: {
   users: ActiveUser[];
   currentUserId: string;
   pendingId: string | null;
   onRoleChange: (id: string, role: Role) => void | Promise<void>;
+  onReviewLocalesChange: (id: string, locales: string[] | null) => void | Promise<void>;
   onRemove: (id: string, email: string) => void | Promise<void>;
 }) {
   if (users.length === 0) {
@@ -390,6 +421,58 @@ function ActiveList({
                 </option>
               ))}
             </select>
+            {/* Which locales this person may approve. Only shown for roles
+                that can review at all — on a viewer it would be a control
+                with no effect. Assigning a locale here is also what makes
+                that locale require external review at all, so the hint
+                spells the consequence out. */}
+            {can(u.role as Role, "review.approve") && (
+              <div className="flex items-center gap-1" title="可審核的語言。指派後，該語言的翻譯就必須經過審核才能產生 PDF。">
+                <span className="text-[10px] uppercase tracking-wide text-slate-400">審核</span>
+                {SUPPORTED_LOCALES.filter((l) => l.value !== "en").map((l) => {
+                  const all = u.review_locales === null;
+                  const on = all || (u.review_locales?.includes(l.value) ?? false);
+                  return (
+                    <button
+                      key={l.value}
+                      type="button"
+                      disabled={busy}
+                      onClick={() => {
+                        const current = u.review_locales ?? [];
+                        const next = all
+                          ? // Leaving "all" means naming the rest explicitly,
+                            // minus the one just switched off.
+                            SUPPORTED_LOCALES.filter(
+                              (x) => x.value !== "en" && x.value !== l.value,
+                            ).map((x) => x.value as string)
+                          : on
+                            ? current.filter((x) => x !== l.value)
+                            : [...current, l.value];
+                        onReviewLocalesChange(u.id, next);
+                      }}
+                      className={`rounded border px-1.5 py-0.5 text-[11px] transition disabled:opacity-40 ${
+                        on
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                          : "border-slate-200 text-slate-400 hover:border-slate-300"
+                      }`}
+                    >
+                      {l.flag}
+                    </button>
+                  );
+                })}
+                {u.review_locales !== null && (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => onReviewLocalesChange(u.id, null)}
+                    title="改回不限語言"
+                    className="ml-0.5 text-[10px] text-slate-400 underline hover:text-slate-600 disabled:opacity-40"
+                  >
+                    全部
+                  </button>
+                )}
+              </div>
+            )}
             <button
               type="button"
               onClick={() => onRemove(u.id, u.email)}

@@ -18,7 +18,7 @@ export async function GET() {
     // Active users — anyone with a profile row.
     const { data: profilesData, error: profilesErr } = await admin
       .from("profiles")
-      .select("id, email, name, avatar_url, role, last_sign_in_at, created_at")
+      .select("id, email, name, avatar_url, role, review_locales, last_sign_in_at, created_at")
       .order("last_sign_in_at", { ascending: false, nullsFirst: false });
 
     if (profilesErr) throw profilesErr;
