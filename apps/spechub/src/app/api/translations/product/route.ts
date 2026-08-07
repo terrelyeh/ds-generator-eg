@@ -96,12 +96,24 @@ export async function POST(request: Request) {
   // Assigning a reviewer is the only action needed to flip a locale —
   // there is no second setting that could drift out of sync with it.
   //
-  // Either way it only ever moves forward: an auto-save for Preview must
-  // not un-approve something a reviewer already looked at.
+  // An explicit Save on a reviewed locale SUBMITS: it sets draft, rather
+  // than leaving the status alone. Leaving it alone was a bug — an already
+  // approved row stayed approved, so editing Spanish after assigning a
+  // reviewer silently kept the old approval and never reached the queue.
+  // The approval belonged to the old text; new text needs a new one. This
+  // also re-submits a row that was sent back (changes_requested → draft).
+  //
+  // Auto-saves for Preview (confirm falsy) still touch nothing — they're
+  // scratch writes, and they must not un-approve on every keystroke.
   const reviewed = await localeHasDesignatedReviewer(locale);
   const selfApproved = !!confirm && can(user?.role, "review.self_approve") && !reviewed;
   if (selfApproved) {
     upsertData.review_status = "approved";
+  } else if (confirm && reviewed) {
+    upsertData.review_status = "draft";
+    // The pending verdict is about this save, so any earlier one is stale.
+    upsertData.reviewed_by = null;
+    upsertData.reviewed_at = null;
   }
 
   const { error } = await supabase
