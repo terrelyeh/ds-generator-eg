@@ -88,11 +88,17 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   // it's account-level financial data, not content.
   "billing.view": ["admin"],
 
-  // Editor gets settings access for Glossary + Typography only. Personas
-  // and API Keys remain admin-only because they're cross-cutting config.
-  "settings.view": ["admin", "editor"],
+  // Editor gets settings access for Glossary + Typography. Personas and
+  // API Keys remain admin-only because they're cross-cutting config.
+  //
+  // PM is in for the glossary specifically. Reviewers are the people who
+  // disagree with a term choice, and routing every wording change through
+  // an engineer is what stops them raising it at all. The glossary only
+  // shapes translation suggestions, so it's a safe thing to hand over —
+  // typography is not, and stays with admin/editor.
+  "settings.view": ["admin", "editor", "pm"],
   "settings.edit_typography": ["admin", "editor"],
-  "settings.edit_glossary": ["admin", "editor"],
+  "settings.edit_glossary": ["admin", "editor", "pm"],
   "settings.edit_personas": ["admin"],
   "settings.edit_api_keys": ["admin"],
   "settings.manage_api_access": ["admin"],
