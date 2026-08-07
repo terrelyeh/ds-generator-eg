@@ -149,8 +149,10 @@ export function AiUsageDashboard() {
 
   const remaining = credits ? credits.total_credits - credits.total_usage : null;
 
-  // Prefer the 7-day average over today's partial day — a refresh at 09:00
-  // would otherwise read as a near-zero burn rate and inflate the runway.
+  // Runway still drives the colour of the balance tile, but is no longer
+  // shown as its own number: early in a billing period the 7-day average
+  // is built from too few days to quote a day count with a straight face.
+  // As a colour it degrades honestly — as "37 天" it would not.
   const dailyBurn = key ? key.usage_weekly / 7 : null;
   const daysLeft =
     remaining !== null && dailyBurn && dailyBurn > 0 ? remaining / dailyBurn : null;
@@ -215,17 +217,11 @@ export function AiUsageDashboard() {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:grid-cols-3">
         <Stat
           label="剩餘額度"
           value={usd(remaining)}
           sub={credits ? `已儲值 ${usd(credits.total_credits)} · 已用 ${usd(credits.total_usage)}` : "需要 management key"}
-          tone={runwayTone}
-        />
-        <Stat
-          label="預估可用天數"
-          value={daysLeft === null ? "—" : `${Math.floor(daysLeft)} 天`}
-          sub={dailyBurn ? `以每日 ${usd(dailyBurn)} 估算` : undefined}
           tone={runwayTone}
         />
         <Stat
