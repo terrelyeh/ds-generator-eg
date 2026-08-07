@@ -7,9 +7,9 @@
  * budget exists to close: prompt says "stay under N", this proves whether
  * it did, and whether staying under N actually saved the cover.
  *
- * Needs a working LLM key — API_KEY_ENC_SECRET (to decrypt the shared key
- * from app_settings) or ANTHROPIC_API_KEY / OPENAI_API_KEY / GEMINI_API_KEY
- * directly in the environment. Costs one translation call per block.
+ * Needs an OpenRouter key — API_KEY_ENC_SECRET (to decrypt the shared key
+ * from app_settings) or OPENROUTER_API_KEY directly in the environment.
+ * Costs one translation call per block.
  *
  * --dry-run needs neither a key nor a call: it prints the system prompt
  * the model would receive, so you can confirm the budget is really in
@@ -18,12 +18,11 @@
  *
  *   npx tsx scripts/check-translation-budget.ts ECS1552FP es --dry-run
  *   npx tsx scripts/check-translation-budget.ts ECS1552FP es
- *   npx tsx scripts/check-translation-budget.ts ECS1552FP es gpt-4o
+ *   npx tsx scripts/check-translation-budget.ts ECS1552FP es anthropic/claude-opus-4.8
  */
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { translate, previewSystemPrompt } from "../src/lib/translate";
-import type { ProviderId } from "../src/lib/translate";
 import { lineParityBudget, estimateCoverLayout } from "../src/lib/datasheet/cover-layout";
 config({ path: ".env.local" });
 
@@ -32,7 +31,8 @@ const OVERVIEW_SAFETY_BUFFER_PT = 12; // must match layout-check.ts
 async function main() {
   const model = process.argv[2];
   const locale = process.argv[3];
-  const provider = (process.argv[4] as ProviderId) || "claude-sonnet";
+  // Omit to use the catalog default; pass an OpenRouter slug to pin one.
+  const provider = process.argv[4];
 
   if (!model || !locale) {
     console.error("usage: check-translation-budget.ts <MODEL> <locale> [provider]");
@@ -66,7 +66,7 @@ async function main() {
   const enFeatures = p.features ?? [];
   const productLine = p.product_lines?.name;
 
-  console.log(`${p.model_name} — ${productLine ?? "?"} — en → ${locale} via ${provider}`);
+  console.log(`${p.model_name} — ${productLine ?? "?"} — en → ${locale} via ${provider ?? "catalog default"}`);
   console.log(`source: overview ${enOverview.length}ch, ${enFeatures.length} features\n`);
 
   if (process.argv.includes("--dry-run")) {

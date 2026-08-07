@@ -1,34 +1,39 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { AVAILABLE_PROVIDERS } from "./types";
-
-export type ProviderAvailability = Record<string, boolean>;
+import type { TranslateModel } from "./types";
 
 /**
- * Hook that fetches which AI providers have API keys configured.
- * Returns availability map + loading state.
- * Auto-selects the first available provider.
+ * Models offered in the translation picker, from the DB catalog.
+ *
+ * Was a hardcoded list crossed with a per-vendor availability probe: with
+ * three direct clients, "can I use this model" meant "is that vendor's key
+ * set". One OpenRouter key reaches every model, so availability collapsed
+ * to a single question the catalog answers by simply listing the row.
+ *
+ * Auto-selects the catalog's default (it sorts first among defaults).
  */
 export function useProviders() {
-  const [availability, setAvailability] = useState<ProviderAvailability>({});
+  const [models, setModels] = useState<TranslateModel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState("claude-sonnet");
+  const [selectedProvider, setSelectedProvider] = useState<string>("");
 
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/settings/providers");
+        const res = await fetch("/api/settings/models?surface=translate");
         const data = await res.json();
-        setAvailability(data);
+        if (!data.ok) return;
 
-        // Auto-select first available provider
-        const firstAvailable = AVAILABLE_PROVIDERS.find((p) => data[p.id]);
-        if (firstAvailable) {
-          setSelectedProvider(firstAvailable.id);
-        }
+        const rows = (data.models ?? []) as (TranslateModel & { default_for?: string[] })[];
+        setModels(rows);
+
+        const preferred =
+          rows.find((m) => m.default_for?.includes("translate")) ?? rows[0];
+        if (preferred) setSelectedProvider(preferred.slug);
       } catch {
-        // ignore
+        // A failed catalog load leaves the picker empty rather than
+        // pretending a model is available; the API surfaces the reason.
       } finally {
         setLoading(false);
       }
@@ -36,13 +41,11 @@ export function useProviders() {
     load();
   }, []);
 
-  const hasAnyProvider = Object.values(availability).some(Boolean);
-
   return {
-    availability,
+    models,
     loading,
     selectedProvider,
     setSelectedProvider,
-    hasAnyProvider,
+    hasAnyProvider: models.length > 0,
   };
 }

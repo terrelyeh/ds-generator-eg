@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
-import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
 
 interface SpecLabelTranslationsEditorProps {
@@ -41,7 +40,7 @@ export function SpecLabelTranslationsEditor({
   const [aiTranslating, setAiTranslating] = useState(false);
   const [aiNotes, setAiNotes] = useState("");
 
-  const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
+  const { models, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
   const currentLocale = localeOptions.find((l) => l.value === locale) ?? localeOptions[0];
@@ -218,14 +217,11 @@ export function SpecLabelTranslationsEditor({
               onChange={(e) => setSelectedProvider(e.target.value)}
               className="rounded-md border border-input bg-background px-2 py-1 text-xs"
             >
-              {AVAILABLE_PROVIDERS.map((p) => {
-                const available = availability[p.id];
-                return (
-                  <option key={p.id} value={p.id} disabled={!available}>
-                    {available ? "✓ " : "✗ "}{p.name}{!available ? " (no key)" : ""}
-                  </option>
-                );
-              })}
+              {models.map((m) => (
+                <option key={m.slug} value={m.slug}>
+                  {m.label}
+                </option>
+              ))}
             </select>
             <Button
               onClick={handleAiTranslateEmpty}

@@ -1,0 +1,93 @@
+/**
+ * The model catalog — which models the pickers offer, and which is the
+ * default per surface. Replaces two hardcoded lists in two apps.
+ *
+ * Slug-keyed on purpose. The old per-app ids were stable keys whose
+ * display names drifted from what they actually invoked (`gpt-4o` called
+ * gpt-5.5), so a stored value told you nothing about the model used.
+ *
+ * See 00035_llm_models_catalog.sql.
+ */
+import type { Surface } from "./openrouter";
+
+export interface ModelRow {
+  slug: string;
+  label: string;
+  surfaces: string[];
+  default_for: string[];
+  reasoning_effort: "none" | "minimal" | "low" | "medium" | "high" | null;
+  enabled: boolean;
+  sort_order: number;
+  note: string | null;
+}
+
+/**
+ * Read on every Ask request and every translate page load, so it's cached
+ * like the other hot lookups. Invalidated by the admin write path — a
+ * model change should show up immediately, not up to a minute later.
+ */
+let cache: { at: number; rows: ModelRow[] } | null = null;
+const TTL_MS = 60_000;
+
+export function invalidateModelCache(): void {
+  cache = null;
+}
+
+async function loadAll(): Promise<ModelRow[]> {
+  if (cache && Date.now() - cache.at < TTL_MS) return cache.rows;
+
+  const { createAdminClient } = await import("@eg/db/admin");
+  const { data, error } = await createAdminClient()
+    .from("llm_models" as "products")
+    .select("slug, label, surfaces, default_for, reasoning_effort, enabled, sort_order, note")
+    .order("sort_order");
+
+  if (error) throw new Error(error.message);
+
+  const rows = (data ?? []) as unknown as ModelRow[];
+  cache = { at: Date.now(), rows };
+  return rows;
+}
+
+/** Enabled models offered on a surface, in display order. */
+export async function listModels(surface: Surface | "translate"): Promise<ModelRow[]> {
+  const rows = await loadAll();
+  return rows.filter((m) => m.enabled && m.surfaces.includes(surface));
+}
+
+/** Look a model up by slug — enabled or not, so an in-flight request that
+ *  names a just-disabled model still resolves rather than erroring. */
+export async function getModel(slug: string): Promise<ModelRow | null> {
+  const rows = await loadAll();
+  return rows.find((m) => m.slug === slug) ?? null;
+}
+
+/**
+ * The default for a surface.
+ *
+ * Falls back to the first enabled model rather than throwing: a catalog
+ * with no default marked is a misconfiguration, not a reason to take the
+ * surface down.
+ */
+export async function getDefaultModel(surface: Surface | "translate"): Promise<ModelRow | null> {
+  const rows = await loadAll();
+  const offered = rows.filter((m) => m.enabled && m.surfaces.includes(surface));
+  return offered.find((m) => m.default_for.includes(surface)) ?? offered[0] ?? null;
+}
+
+/**
+ * Resolve what a request asked for into something callable: the named
+ * model if it exists, otherwise the surface default. Callers pass whatever
+ * arrived from the client, so an unknown or stale slug degrades to a
+ * working answer instead of a 500.
+ */
+export async function resolveModel(
+  slug: string | null | undefined,
+  surface: Surface | "translate",
+): Promise<ModelRow | null> {
+  if (slug) {
+    const found = await getModel(slug);
+    if (found) return found;
+  }
+  return getDefaultModel(surface);
+}

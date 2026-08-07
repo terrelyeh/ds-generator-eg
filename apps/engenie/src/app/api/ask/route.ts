@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { streamComplete, getOpenRouterKey } from "@eg/llm/openrouter";
+import { resolveModel } from "@eg/llm/models";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
 import { retrieveDocuments } from "@/lib/rag/retrieve";
@@ -221,33 +222,6 @@ export async function GET(request: Request) {
 // ~18s to ~1.2s with equal answer quality (RAG synthesis doesn't benefit
 // from extended reasoning). Flash models only; Pro keeps default thinking
 // since users pick it precisely for deeper reasoning.
-/**
- * Selectable models, as OpenRouter slugs.
- *
- * Was a three-way map of vendor + native model name because each vendor
- * had its own client; through OpenRouter the slug IS the model, so the
- * `fn` discriminator is gone along with the three stream functions.
- *
- * `reasoningEffort: "none"` replaces Gemini's thinkingBudget:0 and exists
- * for the same reason (pitfall #61): flash models reason BEFORE the first
- * streamed token and the thoughts are discarded, so leaving it on spends
- * 7-15s of visible "generating…" for nothing. Gemini Pro deliberately
- * keeps its reasoning — choosing Pro is choosing to wait for it.
- */
-const MODEL_MAP: Record<string, { model: string; reasoningEffort?: "none" }> = {
-  // Claude
-  "claude-opus": { model: "anthropic/claude-opus-4.8" },
-  "claude-sonnet": { model: "anthropic/claude-sonnet-4.6" },
-  "claude-haiku": { model: "anthropic/claude-haiku-4.5" },
-  // OpenAI
-  "gpt-5.5": { model: "openai/gpt-5.5" },
-  "gpt-5.4-mini": { model: "openai/gpt-5.4-mini" },
-  "gpt-5.4-nano": { model: "openai/gpt-5.4-nano" },
-  // Gemini
-  "gemini-3.1-pro": { model: "google/gemini-3.1-pro-preview" },
-  "gemini-3.5-flash": { model: "google/gemini-3.5-flash", reasoningEffort: "none" },
-  "gemini-3.1-flash-lite": { model: "google/gemini-3.1-flash-lite", reasoningEffort: "none" },
-};
 
 // app_settings key per provider family — lets the LLM key prefetch run in
 // parallel with retrieval instead of after it.
@@ -324,11 +298,20 @@ export async function POST(request: Request) {
   // allow_switch=false; otherwise the request (or workspace default) wins.
   const personaId = ws && !ws.allow_switch ? ws.persona : (body.persona ?? ws?.persona ?? "default");
   const profileId = ws && !ws.allow_switch ? ws.profile : (body.profile ?? ws?.profile ?? "default");
-  const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? "gemini-3.5-flash");
-  const mapped = MODEL_MAP[provider] ?? {
-    model: "google/gemini-3.5-flash",
-    reasoningEffort: "none" as const,
-  };
+  // No hardcoded fallback slug — resolveModel falls back to whichever
+  // model the catalog marks as the Ask default, so changing the default is
+  // a row edit rather than a deploy.
+  const provider = ws && !ws.allow_switch ? ws.provider : (body.provider ?? ws?.provider ?? null);
+  // Model comes from the DB catalog now, not a hardcoded map. resolveModel
+  // degrades an unknown or just-disabled slug to the surface default rather
+  // than failing the request.
+  const mapped = await resolveModel(provider, "ask");
+  if (!mapped) {
+    return NextResponse.json(
+      { error: "No Ask model is configured. Add one in Settings → AI Models." },
+      { status: 500 },
+    );
+  }
 
   // BYOK generation key. Two flavours:
   //   byok      — the workspace carries ONE admin-set key (shared by all users).
@@ -523,11 +506,11 @@ IMPORTANT formatting rules:
         const llmKey = await llmKeyPromise;
 
         await streamComplete({
-          model: mapped.model,
+          model: mapped.slug,
           system: systemPrompt,
           user: userMessage,
           maxTokens: 16384,
-          reasoningEffort: mapped.reasoningEffort,
+          reasoningEffort: mapped.reasoning_effort ?? undefined,
           // BYOK keys are the visitor's or the workspace's, so their spend
           // isn't ours — recordUsage flags is_byok and the dashboard
           // excludes it from company totals.

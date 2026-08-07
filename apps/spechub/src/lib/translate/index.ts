@@ -1,7 +1,4 @@
 import { createAdminClient } from "@eg/db/admin";
-import { claudeSonnet, claudeOpus } from "./providers/claude";
-import { gpt4o } from "./providers/openai";
-import { gemini25Pro } from "./providers/gemini";
 import { basePrompt } from "./prompts/base";
 import { jaLocalePrompt } from "./prompts/locales/ja";
 import { zhTWLocalePrompt } from "./prompts/locales/zh-TW";
@@ -9,63 +6,42 @@ import { esLocalePrompt } from "./prompts/locales/es";
 import { cloudCameraPrompt } from "./prompts/product-lines/cloud-camera";
 import { contentTypePrompts } from "./prompts/content-types";
 import { lineParityBudget } from "@/lib/datasheet/cover-layout";
-import { openRouterEnabled } from "@eg/llm/openrouter";
+import { resolveModel } from "@eg/llm/models";
 import { createOpenRouterProvider } from "./providers/openrouter";
-import { AVAILABLE_PROVIDERS } from "./types";
-import type { TranslateProvider, ProviderId } from "./types";
 
-export { AVAILABLE_PROVIDERS, VENDOR_KEY } from "./types";
-export type { ProviderId };
+export { SUPPORTED_SURFACES } from "./types";
+export type { TranslateModel, ModelSurface } from "./types";
 
-// --- Provider registry ---
-
-/**
- * Direct-vendor clients, kept as the fallback route.
- *
- * They stay until OpenRouter is proven in prod — without them, deploying
- * this before the key is configured would take translation from "works
- * via OpenAI/Gemini" to "completely broken". Once a translation has run
- * through OpenRouter successfully these three files can go, along with
- * anthropic_api_key and google_ai_api_key. openai_api_key stays either
- * way: RAG embeddings need it.
- */
-const directProviders: Record<string, TranslateProvider> = {
-  "claude-sonnet": claudeSonnet,
-  "claude-opus": claudeOpus,
-  "gpt-4o": gpt4o,
-  "gemini-2.5-pro": gemini25Pro,
-};
+// --- Model resolution ---
 
 export interface ResolvedProvider {
-  provider: TranslateProvider;
-  /** The model string actually sent, for the audit trail. */
+  provider: ReturnType<typeof createOpenRouterProvider>;
+  /** OpenRouter slug actually sent, for the audit trail. */
   model: string;
-  route: "openrouter" | "direct";
 }
 
 /**
- * OpenRouter when a key is configured, the vendor's own client otherwise.
+ * Resolve a requested model against the DB catalog (llm_models).
  *
- * Note this makes claude-sonnet — the code-wide default — work for the
- * first time: there has never been an anthropic_api_key in app_settings
- * or on Vercel, so the default provider always threw, and the battlecard
- * routes that hard-require it have been returning 400 in production.
+ * The direct-vendor clients that used to back this are gone. They existed
+ * so deploying the OpenRouter migration before a key was configured
+ * couldn't break translation — OpenRouter has since run real translations
+ * in production, so keeping them meant carrying two extra keys and a
+ * second code path for a case that can no longer happen.
+ *
+ * An unknown or just-disabled slug degrades to the catalog's translate
+ * default rather than erroring: the picker's options can change between
+ * a page load and a submit.
  */
-async function resolveProvider(id: string, ref?: string): Promise<ResolvedProvider> {
-  const spec = AVAILABLE_PROVIDERS.find((p) => p.id === id);
-  if (!spec) throw new Error(`Unknown provider: ${id}`);
-
-  if (await openRouterEnabled("spechub")) {
-    return {
-      provider: createOpenRouterProvider(spec.id, spec.name, spec.openrouter, ref),
-      model: spec.openrouter,
-      route: "openrouter",
-    };
+async function resolveProvider(slug?: string, ref?: string): Promise<ResolvedProvider> {
+  const model = await resolveModel(slug, "translate");
+  if (!model) {
+    throw new Error("No translation model is configured. Add one in Settings → AI Models.");
   }
-
-  const direct = directProviders[id];
-  if (!direct) throw new Error(`Unknown provider: ${id}`);
-  return { provider: direct, model: id, route: "direct" };
+  return {
+    provider: createOpenRouterProvider(model.slug, model.label, model.slug, ref),
+    model: model.slug,
+  };
 }
 
 // --- Locale prompts ---
@@ -252,27 +228,27 @@ export async function translate(opts: {
   targetLocale: string;
   contentType: "headline" | "overview" | "features" | "spec_labels";
   productLine?: string;
-  providerId?: ProviderId;
+  /** OpenRouter slug. Omit to use the catalog's translate default. */
+  providerId?: string;
   /** Product model, for spend attribution. Falls back to the product line. */
   ref?: string;
 }): Promise<{
   translated: string;
   notes: string;
   provider: string;
-  /** Model string actually sent — an OpenRouter slug, or the legacy id. */
+  /** OpenRouter slug actually sent. */
   model: string;
-  route: "openrouter" | "direct";
 }> {
   const {
     source,
     targetLocale,
     contentType,
     productLine,
-    providerId = "claude-sonnet",
+    providerId,
     ref,
   } = opts;
 
-  const { provider, model, route } = await resolveProvider(providerId, ref ?? productLine);
+  const { provider, model } = await resolveProvider(providerId, ref ?? productLine);
   const systemPrompt = await buildSystemPrompt(
     targetLocale,
     productLine,
@@ -315,5 +291,5 @@ export async function translate(opts: {
     }
   }
 
-  return { translated, notes, provider: provider.name, model, route };
+  return { translated, notes, provider: provider.name, model };
 }

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { SUPPORTED_LOCALES, getDict } from "@/lib/datasheet/locales";
-import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
 import { ReviewPanel, type ReviewStatus } from "./review-panel";
 import { can } from "@eg/auth/permissions";
@@ -152,7 +151,7 @@ export function ProductTranslationEditor({
   const [previewing, setPreviewing] = useState(false);
   const [disabling, setDisabling] = useState(false);
 
-  const { availability, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
+  const { models, selectedProvider, setSelectedProvider, hasAnyProvider } = useProviders();
 
   // Translation notes from AI
   const [headlineNotes, setHeadlineNotes] = useState("");
@@ -576,14 +575,11 @@ export function ProductTranslationEditor({
               onChange={(e) => setSelectedProvider(e.target.value)}
               className="rounded-md border border-input bg-background px-2 py-1 text-xs"
             >
-              {AVAILABLE_PROVIDERS.map((p) => {
-                const available = availability[p.id];
-                return (
-                  <option key={p.id} value={p.id} disabled={!available}>
-                    {available ? "✓ " : "✗ "}{p.name}{!available ? " (no key)" : ""}
-                  </option>
-                );
-              })}
+              {models.map((m) => (
+                <option key={m.slug} value={m.slug}>
+                  {m.label}
+                </option>
+              ))}
             </select>
           </div>
 

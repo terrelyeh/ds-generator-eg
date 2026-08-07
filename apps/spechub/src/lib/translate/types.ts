@@ -20,31 +20,22 @@ export interface TranslateProvider {
   ) => Promise<string>;
 }
 
-// NOTE: ids are stable internal keys (registry + availability wiring);
-// only display names track the actual model generation. They are kept
-// stable through the OpenRouter migration on purpose — renaming them
-// would orphan stored selections and every translated_by value. Once Ask
-// is on OpenRouter too, id and `openrouter` can collapse into one field
-// and this whole aliasing problem disappears.
-//
-// `openrouter` slugs verified against GET https://openrouter.ai/api/v1/models
-// (2026-08-06); each is the same model the direct client called, so
-// switching routes changes the transport, not the output.
-//
-// Adding a model is now one line here — no new provider file.
-export const AVAILABLE_PROVIDERS = [
-  { id: "claude-sonnet", name: "Claude Sonnet 4.6", openrouter: "anthropic/claude-sonnet-4.6", vendor: "anthropic" },
-  { id: "claude-opus", name: "Claude Opus 4.8", openrouter: "anthropic/claude-opus-4.8", vendor: "anthropic" },
-  { id: "gpt-4o", name: "GPT-5.5", openrouter: "openai/gpt-5.5", vendor: "openai" },
-  { id: "gemini-2.5-pro", name: "Gemini 3.1 Pro", openrouter: "google/gemini-3.1-pro-preview", vendor: "google" },
-] as const;
+/**
+ * Surfaces a model can be offered on. Lives here because both the catalog
+ * API and the pickers validate against it.
+ */
+export const SUPPORTED_SURFACES = ["translate", "ask"] as const;
+export type ModelSurface = (typeof SUPPORTED_SURFACES)[number];
 
-export type ProviderId = (typeof AVAILABLE_PROVIDERS)[number]["id"];
-export type Vendor = (typeof AVAILABLE_PROVIDERS)[number]["vendor"];
+/**
+ * A model as the picker sees it. The catalog is in the DB now
+ * (llm_models, migration 00035) — AVAILABLE_PROVIDERS was a hardcoded
+ * list whose ids had drifted from what they invoked, which is exactly
+ * what keying on the slug fixes.
+ */
+export interface TranslateModel {
+  slug: string;
+  label: string;
+  reasoning_effort: "none" | "minimal" | "low" | "medium" | "high" | null;
+}
 
-/** Settings key each vendor's direct (pre-OpenRouter) client reads. */
-export const VENDOR_KEY: Record<Vendor, string> = {
-  anthropic: "anthropic_api_key",
-  openai: "openai_api_key",
-  google: "google_ai_api_key",
-};
