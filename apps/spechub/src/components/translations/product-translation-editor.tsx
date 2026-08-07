@@ -10,6 +10,9 @@ import { Separator } from "@/components/ui/separator";
 import { SUPPORTED_LOCALES, getDict } from "@/lib/datasheet/locales";
 import { AVAILABLE_PROVIDERS } from "@/lib/translate/types";
 import { useProviders } from "@/lib/translate/use-providers";
+import { ReviewPanel, type ReviewStatus } from "./review-panel";
+import { can } from "@eg/auth/permissions";
+import type { Role } from "@eg/auth/permissions";
 
 /** Safe JSON parse for API responses — handles non-JSON error pages */
 async function safeJson(res: Response): Promise<{ ok?: boolean; translated?: string; notes?: string; provider?: string; model?: string; error?: string }> {
@@ -84,6 +87,7 @@ interface TranslationData {
   qr_label: string | null;
   qr_url: string | null;
   confirmed: boolean;
+  review_status?: ReviewStatus;
 }
 
 interface ProductTranslationEditorProps {
@@ -94,6 +98,9 @@ interface ProductTranslationEditorProps {
   englishOverview: string;
   englishFeatures: string[];
   existingTranslations: TranslationData[];
+  role?: Role;
+  /** Locales this user may approve; null = all. */
+  reviewLocales?: string[] | null;
 }
 
 export function ProductTranslationEditor({
@@ -104,6 +111,8 @@ export function ProductTranslationEditor({
   englishOverview,
   englishFeatures,
   existingTranslations,
+  role,
+  reviewLocales = null,
 }: ProductTranslationEditorProps) {
   const router = useRouter();
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
@@ -120,6 +129,16 @@ export function ProductTranslationEditor({
   // as product_translations.translated_by. Nothing wrote that column before,
   // which is why no existing row can be traced back to a model.
   const [lastModel, setLastModel] = useState<string | null>(null);
+  // Review state per locale, seeded from the server rows. Kept here rather
+  // than inside ReviewPanel so the Save button's copy can react to it.
+  const [reviewStatuses, setReviewStatuses] = useState<Record<string, ReviewStatus>>(
+    Object.fromEntries(
+      existingTranslations.map((t) => [
+        t.locale,
+        t.review_status ?? (t.confirmed ? "approved" : "draft"),
+      ]),
+    ),
+  );
   const [showAddMenu, setShowAddMenu] = useState(false);
 
   const [activeLocale, setActiveLocale] = useState<string>(
@@ -1034,6 +1053,25 @@ export function ProductTranslationEditor({
           </Link>
         </div>
       )}
+
+      {/* Review thread + actions for this locale */}
+      <ReviewPanel
+        key={activeLocale}
+        modelName={modelName}
+        locale={activeLocale}
+        localeLabel={currentLocaleInfo?.label ?? activeLocale}
+        status={reviewStatuses[activeLocale] ?? "draft"}
+        // Mirror the server rule (canReviewLocale) so the buttons only
+        // appear when the API would actually accept the action — a button
+        // that always 403s is worse than no button.
+        canReview={
+          can(role, "review.approve") &&
+          (reviewLocales === null || reviewLocales.includes(activeLocale))
+        }
+        onStatusChange={(s) =>
+          setReviewStatuses((prev) => ({ ...prev, [activeLocale]: s }))
+        }
+      />
 
       {/* Disable language */}
       <div className="flex justify-end">

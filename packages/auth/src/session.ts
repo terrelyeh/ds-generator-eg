@@ -22,6 +22,14 @@ export type AuthUser = {
   name: string | null;
   avatarUrl: string | null;
   role: Role;
+  /**
+   * Locales this user may approve. `null` = all of them.
+   *
+   * Roles are global, so without this a `pm` brought in to review Spanish
+   * could sign off on Japanese just as easily. Scoping lives here rather
+   * than in RLS because every app query runs as service-role.
+   */
+  reviewLocales: string[] | null;
 };
 
 /** Returns the current user, or null if not signed in / not whitelisted. */
@@ -35,7 +43,7 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
   const { data: profile, error: profileErr } = await supabase
     .from("profiles")
-    .select("id, email, name, avatar_url, role")
+    .select("id, email, name, avatar_url, role, review_locales")
     .eq("id", authUser.id)
     .maybeSingle();
 
@@ -48,7 +56,26 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
     name: profile.name,
     avatarUrl: profile.avatar_url,
     role: profile.role,
+    reviewLocales:
+      (profile as { review_locales?: string[] | null }).review_locales ?? null,
   };
+}
+
+/**
+ * May this user approve or send back a translation in `locale`?
+ *
+ * Two independent gates: the role must carry review.approve at all, and
+ * the locale must be inside their scope. An empty array means "no locales"
+ * — only NULL is the wildcard, so scoping someone to nothing is possible
+ * and means what it says.
+ */
+export function canReviewLocale(
+  user: Pick<AuthUser, "role" | "reviewLocales"> | null | undefined,
+  locale: string,
+): boolean {
+  if (!user || !can(user.role, "review.approve")) return false;
+  if (user.reviewLocales === null) return true;
+  return user.reviewLocales.includes(locale);
 }
 
 /** Like getCurrentUser but throws if not authenticated. For API routes. */

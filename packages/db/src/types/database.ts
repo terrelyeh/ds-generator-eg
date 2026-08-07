@@ -323,15 +323,22 @@ export interface Database {
           hardware_image: string | null;
           qr_label: string | null;
           qr_url: string | null;
+          /** Generated from review_status (migration 00034) — read-only. */
           confirmed: boolean;
+          review_status: "draft" | "changes_requested" | "approved";
+          reviewed_by: string | null;
+          reviewed_at: string | null;
           translated_at: string;
           translated_by: string | null;
         };
+        // `confirmed` is generated in Postgres, so it must never appear in a
+        // write payload — omitted here rather than left optional so a stray
+        // write is a type error instead of a runtime one.
         Insert: Omit<
           Database["public"]["Tables"]["product_translations"]["Row"],
-          "id" | "translated_at"
+          "id" | "translated_at" | "confirmed"
         > &
-          Partial<Pick<Database["public"]["Tables"]["product_translations"]["Row"], "id" | "translated_at" | "overview" | "features" | "translated_by">>;
+          Partial<Pick<Database["public"]["Tables"]["product_translations"]["Row"], "id" | "translated_at" | "overview" | "features" | "translated_by" | "review_status" | "reviewed_by" | "reviewed_at">>;
         Update: Partial<Database["public"]["Tables"]["product_translations"]["Insert"]>;
       };
       spec_label_translations: {

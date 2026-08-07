@@ -774,6 +774,9 @@ export type Database = {
           product_id: string
           qr_label: string | null
           qr_url: string | null
+          review_status: string
+          reviewed_at: string | null
+          reviewed_by: string | null
           subtitle: string | null
           translated_at: string | null
           translated_by: string | null
@@ -790,6 +793,9 @@ export type Database = {
           product_id: string
           qr_label?: string | null
           qr_url?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           subtitle?: string | null
           translated_at?: string | null
           translated_by?: string | null
@@ -806,6 +812,9 @@ export type Database = {
           product_id?: string
           qr_label?: string | null
           qr_url?: string | null
+          review_status?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           subtitle?: string | null
           translated_at?: string | null
           translated_by?: string | null
@@ -906,6 +915,7 @@ export type Database = {
           id: string
           last_sign_in_at: string | null
           name: string | null
+          review_locales: string[] | null
           role: string
           updated_at: string
         }
@@ -916,6 +926,7 @@ export type Database = {
           id: string
           last_sign_in_at?: string | null
           name?: string | null
+          review_locales?: string[] | null
           role?: string
           updated_at?: string
         }
@@ -926,6 +937,7 @@ export type Database = {
           id?: string
           last_sign_in_at?: string | null
           name?: string | null
+          review_locales?: string[] | null
           role?: string
           updated_at?: string
         }

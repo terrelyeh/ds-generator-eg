@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gate } from "@eg/auth/session";
+import { gate, getCurrentUser } from "@eg/auth/session";
+import { can } from "@eg/auth/permissions";
 
 /**
  * POST /api/translations/product
@@ -19,6 +20,7 @@ import { gate } from "@eg/auth/session";
 export async function POST(request: Request) {
   const denied = await gate("translation.edit");
   if (denied) return denied;
+  const user = await getCurrentUser();
   const body = await request.json();
   const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, translated_by, confirm } = body as {
     product_id: string;
@@ -88,9 +90,16 @@ export async function POST(request: Request) {
   // `confirmed` is a generated column as of migration 00034 — writing to it
   // errors. review_status is the stored value it derives from.
   //
-  // Still only ever moves forward on an explicit Save, never back to draft:
-  // an auto-save for Preview must not un-approve a reviewed translation.
-  if (confirm) {
+  // Saving and approving are now separate acts. Whoever holds
+  // review.self_approve (today: admin + editor) still gets both from one
+  // click, so nothing changes for the locales MKT signs off on itself.
+  // Take that permission away from a role and its saves land as drafts
+  // for a reviewer — which is the lever that lets the branch office
+  // actually stand between a translation and its PDF.
+  //
+  // Either way it only ever moves forward: an auto-save for Preview must
+  // not un-approve something a reviewer already looked at.
+  if (confirm && can(user?.role, "review.self_approve")) {
     upsertData.review_status = "approved";
   }
 
@@ -105,7 +114,14 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.json({ ok: true, confirmed: !!confirm });
+  const selfApproved = !!confirm && can(user?.role, "review.self_approve");
+  return NextResponse.json({
+    ok: true,
+    confirmed: selfApproved,
+    // Tell the client when a save did NOT approve, so the UI can say the
+    // translation is waiting on a reviewer instead of implying it shipped.
+    awaiting_review: !!confirm && !selfApproved,
+  });
 }
 
 /**

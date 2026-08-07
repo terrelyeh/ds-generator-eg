@@ -183,6 +183,7 @@ export default async function ProductPage({
         localizedLayoutReports={localizedReports}
         englishAcked={enAckValid && layoutReportRaw.status !== "ok"}
         role={role}
+        reviewLocales={user?.reviewLocales ?? null}
       />
     </div>
   );
