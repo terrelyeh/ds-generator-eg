@@ -191,3 +191,51 @@ export async function requirePermissionOrCron(
   // 3. Otherwise, fall back to per-user permission check.
   return requirePermission(permission);
 }
+
+// ── Per-locale review policy ───────────────────────────────────────────
+
+/**
+ * Does this locale have someone explicitly assigned to review it?
+ *
+ * This is the switch between "MKT saves and it ships" and "MKT saves and
+ * a reviewer has to sign off". A locale becomes reviewed simply by
+ * scoping someone to it — no separate setting to keep in sync.
+ *
+ * ⚠️ Only an EXPLICIT list counts. `review_locales IS NULL` means "may
+ * review anything" (admins), and if that counted, the first admin would
+ * silently make every locale externally-reviewed and take one-click
+ * approval away from ja and zh-TW.
+ *
+ * Admins are not locked out by this — they approve through the review
+ * action instead of the save shortcut.
+ */
+const reviewerLocaleCache = new Map<string, { has: boolean; at: number }>();
+const REVIEWER_CACHE_TTL_MS = 60_000;
+
+export function invalidateReviewerLocaleCache(): void {
+  reviewerLocaleCache.clear();
+}
+
+export async function localeHasDesignatedReviewer(locale: string): Promise<boolean> {
+  const hit = reviewerLocaleCache.get(locale);
+  if (hit && Date.now() - hit.at < REVIEWER_CACHE_TTL_MS) return hit.has;
+
+  let has = false;
+  try {
+    const { createAdminClient } = await import("@eg/db/admin");
+    const { data } = await createAdminClient()
+      .from("profiles")
+      .select("id")
+      .not("review_locales", "is", null)
+      .contains("review_locales", [locale])
+      .limit(1);
+    has = (data?.length ?? 0) > 0;
+  } catch {
+    // Fail open: a lookup failure must not block MKT from saving. The
+    // reviewer can still send it back afterwards.
+    has = false;
+  }
+
+  reviewerLocaleCache.set(locale, { has, at: Date.now() });
+  return has;
+}

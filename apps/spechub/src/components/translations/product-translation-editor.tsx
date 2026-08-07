@@ -356,7 +356,23 @@ export function ProductTranslationEditor({
       });
       const data = await res.json();
       if (data.ok) {
+        // A save on a reviewed locale stores the work but does NOT approve
+        // it. Claiming "confirmed" here would tell MKT the datasheet is
+        // ready when a reviewer still has to sign off.
+        if (data.awaiting_review) {
+          setReviewStatuses((prev) => ({ ...prev, [activeLocale]: "draft" }));
+          setDirty(false);
+          toast.success(
+            data.awaiting_reason === "locale_reviewed"
+              ? `已儲存 —— ${currentLocaleInfo?.label} 由指定審核者把關，等待審核通過後才能產生 PDF`
+              : `已儲存 —— 等待審核通過後才能產生 PDF`,
+          );
+          router.refresh();
+          return;
+        }
+
         setConfirmedLocales((prev) => new Set([...prev, activeLocale]));
+        setReviewStatuses((prev) => ({ ...prev, [activeLocale]: "approved" }));
 
         // Detect existing Drive version for this locale (syncs to DB)
         if (!confirmedLocales.has(activeLocale)) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gate, getCurrentUser } from "@eg/auth/session";
+import { gate, getCurrentUser, localeHasDesignatedReviewer } from "@eg/auth/session";
 import { can } from "@eg/auth/permissions";
 
 /**
@@ -90,16 +90,17 @@ export async function POST(request: Request) {
   // `confirmed` is a generated column as of migration 00034 — writing to it
   // errors. review_status is the stored value it derives from.
   //
-  // Saving and approving are now separate acts. Whoever holds
-  // review.self_approve (today: admin + editor) still gets both from one
-  // click, so nothing changes for the locales MKT signs off on itself.
-  // Take that permission away from a role and its saves land as drafts
-  // for a reviewer — which is the lever that lets the branch office
-  // actually stand between a translation and its PDF.
+  // Saving and approving are separate acts, decided PER LOCALE: a locale
+  // with someone scoped to review it routes through that reviewer, while
+  // every other locale keeps the one-click behaviour MKT has always had.
+  // Assigning a reviewer is the only action needed to flip a locale —
+  // there is no second setting that could drift out of sync with it.
   //
   // Either way it only ever moves forward: an auto-save for Preview must
   // not un-approve something a reviewer already looked at.
-  if (confirm && can(user?.role, "review.self_approve")) {
+  const reviewed = await localeHasDesignatedReviewer(locale);
+  const selfApproved = !!confirm && can(user?.role, "review.self_approve") && !reviewed;
+  if (selfApproved) {
     upsertData.review_status = "approved";
   }
 
@@ -114,13 +115,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const selfApproved = !!confirm && can(user?.role, "review.self_approve");
   return NextResponse.json({
     ok: true,
     confirmed: selfApproved,
     // Tell the client when a save did NOT approve, so the UI can say the
     // translation is waiting on a reviewer instead of implying it shipped.
     awaiting_review: !!confirm && !selfApproved,
+    awaiting_reason: !confirm || selfApproved ? null : reviewed ? "locale_reviewed" : "no_permission",
   });
 }
 
