@@ -160,7 +160,10 @@ export function ProductTranslationEditor({
 
   // Build state from existing translations
   const existing = existingTranslations.find((t) => t.locale === activeLocale);
-  const [mode, setMode] = useState<"light" | "full">(existing?.translation_mode ?? "light");
+  // Kept only to satisfy the API's required field. Every render path uses
+  // full for a localised datasheet, so storing anything else would be a
+  // record of a choice the system doesn't honour.
+  const mode = "full" as const;
   const [headlineTrans, setHeadlineTrans] = useState(existing?.headline ?? "");
   const [subtitleTrans, setSubtitleTrans] = useState(existing?.subtitle ?? "");
   const [overview, setOverview] = useState(existing?.overview ?? "");
@@ -184,7 +187,6 @@ export function ProductTranslationEditor({
     if (dirty && !confirm("You have unsaved changes. Switch language anyway?")) return;
     setActiveLocale(locale);
     const t = existingTranslations.find((t) => t.locale === locale);
-    setMode(t?.translation_mode ?? "light");
     setHeadlineTrans(t?.headline ?? "");
     setSubtitleTrans(t?.subtitle ?? "");
     setOverview(t?.overview ?? "");
@@ -551,19 +553,13 @@ export function ProductTranslationEditor({
             </div>
           )}
 
-          <Separator orientation="vertical" className="h-6" />
-
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-muted-foreground">Mode:</label>
-            <select
-              value={mode}
-              onChange={(e) => { setMode(e.target.value as "light" | "full"); setDirty(true); }}
-              className="rounded-md border border-input bg-background px-2 py-1 text-xs"
-            >
-              <option value="light">Light (Headers only)</option>
-              <option value="full">Full (+ Spec Labels)</option>
-            </select>
-          </div>
+          {/* The Light/Full picker used to live here. It set
+              product_translations.translation_mode, which no render path
+              reads: the preview takes ?mode= from the URL and
+              /api/generate-pdf hardcodes "full" for localised PDFs. It was
+              a control that changed nothing while looking like it chose
+              whether spec labels get translated. Spec labels are managed
+              per product line at /translations/[line] instead. */}
 
           <Separator orientation="vertical" className="h-6" />
 
