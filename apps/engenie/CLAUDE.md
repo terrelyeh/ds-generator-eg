@@ -20,7 +20,7 @@ demo `/demo/ask`）+ 對外 RAG Search API（`/api/v1/search`）。
 
 - Next.js 16 (App Router) + TypeScript、Tailwind v4 + shadcn/ui
 - Supabase（共用）via `@eg/db`；RBAC via `@eg/auth`
-- RAG: pgvector (HNSW) + OpenAI Embedding (`text-embedding-3-small`) + multi-LLM (Claude/GPT/Gemini)
+- RAG: pgvector (HNSW) + OpenAI Embedding (`text-embedding-3-small`，**直連，不走 OpenRouter**) + LLM 一律經 **OpenRouter**（`@eg/llm/openrouter`）
 - react-markdown + remark-gfm + highlight.js（聊天渲染）
 - Vercel（專案 `engenie-eg`，region `hnd1` — Supabase 在東京，不要改）
 - dev port **3100**（spechub 用 3000）
@@ -48,7 +48,7 @@ src/
       embed/[slug]/page.tsx          # widget iframe 內容
     auth/                            # 自己一份 sign-in/callback/no-access（邏輯同 spechub）
     api/
-      ask/route.ts                   # RAG SSE stream + workspace 模式 + persona/profile
+      ask/route.ts                   # RAG SSE stream（**經 OpenRouter，單一 streamComplete**）+ workspace 模式 + persona/profile
       v1/search/route.ts             # 對外 Search API（Bearer sk_live_、JSON、scoped、限流）
       documents/{route,upload,file-url} # RAG 索引管理（8 條 ingest pipeline）
       ask-workspaces, knowledge-areas, taxonomy, topology-icons, personas
@@ -83,8 +83,14 @@ src/
 2. **SpecHub 側邊 Ask** = 本 app 的 widget（workspace `spechub`，無 passcode、
    shared LLM、scope 全開）。spechub 端由 `NEXT_PUBLIC_ENGENIE_URL` 載入
    `/widget.js`。**不要刪 `spechub` workspace row**。
-3. **LLM keys 管理 UI 在本 app**（`/settings/api-keys` → `/api/settings`），
-   存共用 `app_settings`；spechub 的 translate runtime 直接讀同一筆（@eg/db settings）。
+3. **LLM keys 管理 UI 在本 app**（`/settings/api-keys` → `/api/settings`），存共用 `app_settings`。
+   **2026-08-06~07 起 chat completions 全部走 OpenRouter**（`@eg/llm`）：
+   兩把 key —— `openrouter_api_key`（SpecHub：翻譯 + battlecard）與
+   `openrouter_api_key_ask`（本 app；沒設會 fallback 回前者）。
+   ⚠️ **embedding 仍直連 OpenAI**（`openai_api_key` 永久保留 —— OpenRouter 不提供 embedding，
+   換模型等於全庫重建索引）。
+   **模型清單在 `llm_models` 表**，管理頁 `/settings/models`（spechub 側，admin only）——
+   Ask 的下拉選單也是讀它，不再寫死在 `MODEL_MAP`。
 4. **產品表唯讀約定**：spechub 改產品表 schema 前要確認本 app 的
    ingest-products/taxonomy 不受影響。migrations 一律放 `packages/db/supabase/migrations/`。
 
@@ -121,7 +127,7 @@ src/
 - **檢索平行化**：persona prompt / LLM key / topology hint 用 `Promise.all` 與 `retrieveDocuments` **同時**跑，不要移回檢索後（見 Pitfall 63）。這些 promise 都 `.catch` 成 fallback，不會 unhandled reject
 - **sources 事件在 LLM 串流之前送**：檢索一完成就 `sendEvent({type:"sources"})`，前端 `use-chat-stream` 掛到串流中的訊息、UI 立即顯示來源（別移回串流結束）
 - **三層 in-process 快取**（各 60s TTL / LRU，寫入時 invalidate）：`getApiKey`（@eg/db settings）、`listPersonas`/`getPersona`、`generateEmbedding`（LRU 300）
-- **Gemini Flash 關 thinking**：`MODEL_MAP` 的 flash/lite 帶 `thinkingBudget:0`（Pitfall 61）
+- **Gemini Flash 關 reasoning**：模型目錄（`llm_models`）的 flash/lite 設 `reasoning_effort='none'`（Pitfall 61）
 - **history 有字元預算**：`trimHistory()` 每則 1.5k / 總 12k 字，長對話不再脹 prefill
 
 ## Common Pitfalls（自 spechub 繼承，編號保留）
@@ -133,7 +139,10 @@ src/
 58. **Workspace token 撤銷機制** — `verifyWorkspaceToken()` 只驗簽章+到期（Edge 粗篩）；版本撤銷的權威檢查在 route handler（`workspaceAuthorized`）。改 token 格式/換 signing secret = 所有現存 token 失效（widget 自動重發、passcode 重輸一次）。
 59. **RAG 檢索 embedding 只用「當前問題」，不要串對話歷史** — 串歷史會讓前一題主題污染這題的向量搜尋（換主題被當成「知識庫只有前一題的內容」）。歷史只進 `/api/ask` 的 LLM prompt；建議追問也要求 LLM 產生「自包問句」（`api/ask/route.ts` 的 follow-up 指示）。
 60. **`product_spec` ingest：`content_hash` 只 gate「重新 embed」，metadata 一律刷新** — 內容沒變但 metadata（taxonomy）漂移時，`ingest-products.ts` 做 metadata-only update（不重 embed）。別把兩者重新耦合，否則新加的 metadata 欄位不會回填舊 chunk（症狀：taxonomy badge 時有時無）。
-61. **Gemini Flash 一律關 thinking（`thinkingBudget:0`）** — flash/lite 的 thinking 發生在第一個 token 之前、且 `streamGemini` 會丟棄 thought parts，等於純浪費 7–15s（實測）。新增 Gemini flash 型號到 `MODEL_MAP` 記得帶 `thinkingBudget:0`；**Gemini Pro 刻意不帶**（選 Pro 就是要深度推理）。`streamGemini` 只在 `thinkingBudget !== undefined` 時才送 `generationConfig`。
+61. **Gemini Flash 一律關 reasoning** — flash/lite 的 thinking 發生在第一個 token 之前、且串流會丟棄 thought parts，等於純浪費 7–15s（實測）。
+    **2026-08-07 起機制改了**：`thinkingBudget:0` → OpenRouter 的 `reasoning: { effort: "none" }`，
+    而且不再寫在程式裡 —— 設在**模型目錄 `llm_models.reasoning_effort`**（`/settings/models` 可改）。
+    新增 flash 型號時記得設成 `none`；**Pro 級刻意留空**（選 Pro 就是要深度推理）。
 62. **`chat_sessions` 綁 `user_id`，所有查詢都要 `.eq("user_id", user.id)`** — 用 `requirePermission("ask.use")` 取得 user，create 寫真實 id、read/update/delete 全部過濾；update 找不到列回 404 不假裝成功。舊 `user_id='anonymous'` 列刻意孤立（不遷移），所以部署後每人的歷史列表從空開始。別用回 `gate()`（它不回 user）。
 63. **Ask 熱路徑快取寫入端一定要 invalidate** — `getApiKey`（settings route 寫完呼叫 `invalidateApiKeyCache`）、personas（`savePersona`/`deletePersona` 內建 invalidate）。新增「會改 app_settings LLM key / persona」的路徑時記得一起清，否則最長 60s 看到舊值。embedding LRU 不用 invalidate（同 model+text 結果恆定）。
 64. **`ingest-web` 有 SSRF 白名單（`isSafePublicUrl`）** — 擋 loopback/RFC1918/link-local/metadata IP + 十進位/十六進位 IP 變形 + `.local`/`.internal`。純 hostname 比對（DNS-rebinding 不在範圍，此功能 admin-gated）。被擋的 URL 進 `errors[]` 不中斷其他頁。

@@ -4,7 +4,7 @@
 每個決定背後都有一個實測過的理由，光看程式碼看不出來，而且好幾個看起來
 像不必要的複雜度。拆掉之前先讀這裡。
 
-commit 範圍：`9530534` … `2c3e64c`（20 個）。
+commit 範圍：`9530534` … `aa2bdf4`（24 個）。
 
 ---
 
@@ -15,6 +15,7 @@ commit 範圍：`9530534` … `2c3e64c`（20 個）。
 | 東西 | 看起來像 | 實際上 |
 |---|---|---|
 | `openai_api_key` 仍然存在 | 都改用 OpenRouter 了還留著？ | **RAG embedding 不走 OpenRouter**，換 embedding model = 整個知識庫重建索引 |
+| 模型目錄用 slug 當識別碼 | 為什麼不用短 id？ | 舊的短 id 顯示名稱早已漂走（`gpt-4o` 實際打 gpt-5.5），存下來的值無法告訴你用了什麼（見 §8）|
 | 我們自己記 LLM 花費 | OpenRouter 後台不是有嗎？ | **公開 API 無法依 key 拆分花費**（見 §4），照它做出來的數字會是錯的 |
 | `review_locales IS NULL` 不算「指定審核者」 | 這個判斷式好奇怪 | 若算的話，**第一個 admin 就會讓所有語言都變成需外審**（見 §5） |
 
@@ -91,7 +92,7 @@ CJK 目標再除以 2）。
 
 | 範圍 | 策略 | 為什麼 |
 |---|---|---|
-| translate | OpenRouter 優先，**沒 key 就 fallback 回三家直連** | 不然在設 key 之前部署，翻譯會從「能用」變「完全不能用」 |
+| translate | 當時：OpenRouter 優先、沒 key 就 fallback 回直連。**fallback 已於 Phase 2 刪除**（見 §8）| 當時是為了「還沒設 key 就部署也不會壞」 |
 | battlecard | **OpenRouter only** | 它本來就一直 400，沒有可退的路 |
 | **embeddings** | **完全不動** | OpenRouter 不提供 embedding；換模型 = 全量重建索引 |
 
@@ -240,7 +241,41 @@ workflow 已刪、Ignored Build Step 已改回 Automatic、`VERCEL_TOKEN` secret
 
 ---
 
-## 8. 還沒做 / 待確認
+## 8. Phase 2：Ask 遷移 + 模型目錄（2026-08-07）
+
+### Ask → OpenRouter
+
+三支手刻 SSE parser（Anthropic `content_block_delta` / OpenAI SDK 迴圈 /
+Gemini `parts[]` 還要濾 thought）收斂成一支 `streamComplete()`，route 少約 150 行。
+
+- **`thinkingBudget: 0` → `reasoning: { effort: "none" }`** —— 同一個 pitfall #61 的修正，
+  換了機制。**而且不再寫在程式裡**，設在 `llm_models.reasoning_effort`。
+- **Ask 花費終於進帳本** —— OpenRouter 串流一律附 usage
+  （`stream_options.include_usage` 已 deprecated 就是因為無條件包含），
+  標 `surface="ask"`、`ref` 是 workspace slug。**這是當初分兩把 key 的目的**。
+- **BYOK 沒被弄壞**：5 個 workspace 全是 `shared` 且沒存 key。但從此
+  **workspace 的 BYOK key 必須是 OpenRouter key，不是廠商 key**。
+
+### 模型目錄（`llm_models`，migration 00035）
+
+兩份寫死清單 → 一張表 + `/settings/models`（admin only）。
+
+> ⚠️ **slug 就是識別碼。** 舊的短 id 是穩定 key，但顯示名稱早就跟實際呼叫的東西漂開
+> （`gpt-4o` 打 gpt-5.5、`gemini-2.5-pro` 打 gemini-3.1-pro），所以**存在任何地方的值
+> 都無法告訴你用了什麼模型**。現在存的就是打的。
+> 轉換 `ask_workspaces.provider` 用**明確對照表**，不是加前綴 —— `claude-sonnet` 是
+> `claude-sonnet-4.6`、`gemini-3.1-pro` 是 `gemini-3.1-pro-preview`，加前綴會產生不存在的模型。
+
+**三家直連的 translate client 已刪除。** 當初留著是為了「還沒設 key 就部署也不會壞」，
+OpenRouter 既然已在 prod 跑過真實翻譯，那個情境不會再發生。per-vendor 的
+「有沒有 key」探測也一起消失 —— 一把 key 通所有模型，「能不能用」＝「這一列在不在」。
+
+未知或剛停用的 slug 會**降級到該 surface 的預設**（picker 的選項可能在載入到送出之間改變），
+但 `/api/translate` 仍會**直接拒絕**未知 slug —— 呼叫端打錯字要當成錯誤，不能默默跑別的模型。
+
+---
+
+## 9. 還沒做 / 待確認
 
 1. **日文規格標籤 0/43** —— `spec_label_translations` 只有 zh-TW 有 445 筆，
    ja 和 es 的分類/欄位名稱是英文。產 PDF 寫死 `mode=full`，所以日文 datasheet
@@ -248,6 +283,6 @@ workflow 已刪、Ignored Build Step 已改回 Automatic、`VERCEL_TOKEN` secret
 2. **ECS1552FP 的西文 PDF 還沒產**（翻譯已核准，但沒有 es 版號）。
 3. **審核尚未啟用** —— 沒有人被指定，所以西文仍是 MKT 一鍵核准。
 4. **是否需要第五個角色**（見 §5）。
-5. **Ask 尚未遷移到 OpenRouter**（Phase 2，streaming + BYOK 較細，估 1–2 天）。
+5. ~~Ask 尚未遷移到 OpenRouter~~ —— **已完成（見 §9）**。
 6. **`translation_mode`（light/full）欄位對渲染沒有作用** —— 編輯器可以設，
    但渲染路徑都吃 URL 的 `mode` 參數，產 PDF 更是寫死 `full`。要嘛接上、要嘛移除。
