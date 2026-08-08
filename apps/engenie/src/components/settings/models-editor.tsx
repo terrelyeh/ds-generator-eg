@@ -73,6 +73,21 @@ export function ModelsEditor() {
     setDirty(true);
   }
 
+  /**
+   * Removal is local until Save — the PUT replaces the catalog wholesale,
+   * so a row left out of the payload is what deletes it. The server refuses
+   * if an Ask workspace still points at that slug.
+   */
+  function removeRow(slug: string) {
+    const row = rows.find((r) => r.slug === slug);
+    const warning = row?.default_for.length
+      ? `${slug} 是 ${row.default_for.map((s) => SURFACE_LABEL[s] ?? s).join("、")} 的預設。\n刪掉之後那個選單會改用清單上第一個啟用的模型。\n\n確定要刪除嗎？`
+      : `確定要從清單移除 ${slug} 嗎？\n（帳本裡已經記錄的花費不受影響）`;
+    if (!confirm(warning)) return;
+    setRows((prev) => prev.filter((r) => r.slug !== slug));
+    setDirty(true);
+  }
+
   function addRow() {
     const slug = newSlug.trim();
     if (!slug) return;
@@ -140,11 +155,24 @@ export function ModelsEditor() {
         </Button>
       </div>
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-xs text-amber-800">
-        新增前先確認 slug 存在，打錯字的 model 要到實際呼叫時才會失敗：
-        <code className="ml-1 rounded bg-amber-100 px-1 py-0.5 font-mono">
-          npx tsx scripts/list-openrouter-models.ts claude
-        </code>
+      <div className="space-y-2.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+        <p>
+          <span className="font-semibold text-slate-700">要換成別的模型？</span>{" "}
+          slug 不能就地改 —— 它是這一列的身分，workspace 和帳本都拿它當參照。
+          改法是<span className="font-semibold text-slate-700">新增一列、把預設移過去、再停用舊的</span>：
+          最下面填新 slug → 勾「出現在」→ 按「設為預設」→ 舊那列取消「啟用」→ 儲存。
+        </p>
+        <p>
+          確定不再需要舊模型後，可以按最右邊的 ✕ 把它從清單刪掉（
+          <span className="font-semibold text-slate-700">帳本裡已經記錄的花費不受影響</span>
+          ）。還被 Ask workspace 指定的模型會擋下來，不會讓你刪成空指向。
+        </p>
+        <p className="text-slate-500">
+          新增前先確認 slug 真的存在 —— 打錯字的 model 要到實際呼叫時才會失敗：
+          <code className="ml-1 rounded bg-slate-200/70 px-1 py-0.5 font-mono">
+            npx tsx apps/spechub/scripts/list-openrouter-models.ts claude
+          </code>
+        </p>
       </div>
 
       <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
@@ -156,6 +184,7 @@ export function ModelsEditor() {
               <th className="px-3 py-2 text-left font-medium">Reasoning</th>
               <th className="px-3 py-2 text-center font-medium">啟用</th>
               <th className="px-3 py-2 text-right font-medium">排序</th>
+              <th className="w-8 px-3 py-2" />
             </tr>
           </thead>
           <tbody>
@@ -234,6 +263,17 @@ export function ModelsEditor() {
                     className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm tabular-nums"
                   />
                 </td>
+                <td className="px-3 py-2 text-right">
+                  <button
+                    type="button"
+                    onClick={() => removeRow(r.slug)}
+                    title={`從清單刪除 ${r.slug}`}
+                    aria-label={`從清單刪除 ${r.slug}`}
+                    className="rounded px-1.5 py-0.5 text-sm text-slate-300 transition hover:bg-red-50 hover:text-red-600"
+                  >
+                    ✕
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -253,10 +293,17 @@ export function ModelsEditor() {
         </Button>
       </div>
 
-      <p className="text-xs text-slate-400">
-        關閉「啟用」會把模型從下拉選單移除，但已經記錄在帳本裡的花費不受影響。
-        Reasoning 設 none 是給 flash 類模型用的 —— 它們的思考發生在第一個 token
-        之前而且結果會被丟掉，開著等於白等 7–15 秒。
+      <p className="text-xs leading-relaxed text-slate-400">
+        關閉「啟用」只是把模型從下拉選單拿掉，那一列還留著（要真的清掉才按 ✕）。
+        Reasoning 壓低是給 flash 類模型用的 —— 它們的思考發生在第一個 token 之前、
+        結果又會被丟掉，開著等於白等 7–15 秒。
+        <span className="text-slate-500">
+          {" "}但不是每個 flash 都吃 <code className="font-mono">none</code>：
+          <code className="font-mono">gemini-3.5-flash</code> 設 none 會被 OpenRouter 直接擋掉
+          （400 Reasoning is mandatory），所以它用 <code className="font-mono">low</code>。
+          設完請實際問一句話確認有回答。
+        </span>{" "}
+        Pro 級刻意留空 —— 選 Pro 就是要它深度推理。
       </p>
     </div>
   );

@@ -134,6 +134,31 @@ export async function PUT(request: Request) {
   // Replace wholesale: the UI edits the list as a unit, and a diff would
   // have to reason about renames it can't see.
   const keep = models.map((m) => m.slug);
+
+  // A workspace stores its model as a slug, so deleting one still in use
+  // leaves a dangling reference — that workspace would silently fall back
+  // to the surface default, which is the exact failure this catalog was
+  // built to end. Name the workspaces and let the admin repoint them.
+  //
+  // chat_sessions.provider is deliberately NOT checked: those are records
+  // of what a past conversation ran, not live configuration, and loading
+  // one already ignores a model that is no longer offered.
+  const wsQuery = supabase.from("ask_workspaces" as "products").select("slug, provider");
+  const { data: inUse } = (await (keep.length
+    ? wsQuery.not("provider", "in", `(${keep.map((s) => `"${s}"`).join(",")})`)
+    : wsQuery.neq("provider", ""))) as { data: { slug: string; provider: string }[] | null };
+
+  if (inUse?.length) {
+    const detail = inUse.map((w) => `${w.slug} → ${w.provider}`).join("、");
+    return NextResponse.json(
+      {
+        error:
+          `不能刪除還在使用中的模型：${detail}。` +
+          `請先到 Settings ▸ Ask Workspaces 把這些 workspace 改成別的模型。`,
+      },
+      { status: 409 },
+    );
+  }
   const { error: delErr } = keep.length
     ? await supabase.from("llm_models" as "products").delete().not("slug", "in", `(${keep.map((s) => `"${s}"`).join(",")})`)
     : await supabase.from("llm_models" as "products").delete().neq("slug", "");
