@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import { Card } from "@/components/ui/card";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
+import { useAskModels } from "@/hooks/use-ask-models";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
@@ -36,51 +37,6 @@ interface SessionSummary {
   updated_at: string;
 }
 
-interface ModelOption {
-  id: string;
-  label: string;
-  tier: string;
-}
-
-interface ProviderGroup {
-  id: string;
-  label: string;
-  checkKeys: string[];
-  models: ModelOption[];
-}
-
-const PROVIDERS: ProviderGroup[] = [
-  {
-    id: "gemini",
-    label: "Gemini",
-    checkKeys: ["gemini-3.5-flash"],
-    models: [
-      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", tier: "Strongest" },
-      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", tier: "Mainstream" },
-      { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite", tier: "Best CP" },
-    ],
-  },
-  {
-    id: "openai",
-    label: "GPT",
-    checkKeys: ["gpt-5.5"],
-    models: [
-      { id: "gpt-5.5", label: "GPT-5.5", tier: "Strongest" },
-      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", tier: "Mainstream" },
-      { id: "gpt-5.4-nano", label: "GPT-5.4 Nano", tier: "Best CP" },
-    ],
-  },
-  {
-    id: "claude",
-    label: "Claude",
-    checkKeys: ["claude-sonnet", "claude-opus"],
-    models: [
-      { id: "claude-opus", label: "Claude Opus 4.8", tier: "Strongest" },
-      { id: "claude-sonnet", label: "Claude Sonnet 4.6", tier: "Mainstream" },
-      { id: "claude-haiku", label: "Claude Haiku 4.5", tier: "Best CP" },
-    ],
-  },
-];
 
 const EXAMPLE_QUESTIONS = [
   "哪些 AP 支援 WiFi 7？",
@@ -488,12 +444,19 @@ export interface AskChatProps {
 
 export function AskChat({ compact = false }: AskChatProps) {
   const [input, setInput] = useState("");
-  const [provider, setProvider] = useState("gemini-3.5-flash");
+  // Catalog-driven. The list used to be hardcoded here with the retired
+  // short ids, so after the slug migration every pick resolved to nothing
+  // and silently fell back to the surface default.
+  const { groups: modelGroups, defaultSlug } = useAskModels();
+  // Derived, not seeded by an effect — the catalog default fills in until the
+  // user picks, and their pick wins from then on.
+  const [provider, setProvider] = useState("");
+  const effectiveProvider = provider || defaultSlug;
+  const allModels = modelGroups.flatMap((g) => g.models);
   const [persona, setPersona] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
   const [profiles, setProfiles] = useState<ProfileOption[]>([]);
   const [profile, setProfile] = useState("default");
-  const [availableProviders, setAvailableProviders] = useState<Record<string, boolean>>({});
   const [welcomeSubtitle, setWelcomeSubtitle] = useState<string | null>(null);
   const [welcomeDescription, setWelcomeDescription] = useState<string | null>(null);
   const [customQuestions, setCustomQuestions] = useState<string[] | null>(null);
@@ -502,7 +465,7 @@ export function AskChat({ compact = false }: AskChatProps) {
   // Shared chat streaming engine — owns messages/loading/status + the
   // stream/abort/regenerate logic (identical to the EnGenie demo).
   const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
-    getParams: () => ({ provider, persona, profile }),
+    getParams: () => ({ provider: effectiveProvider, persona, profile }),
     onComplete: (m) => scheduleSave(m),
   });
 
@@ -531,7 +494,6 @@ export function AskChat({ compact = false }: AskChatProps) {
         if (d.welcome?.example_questions) setCustomQuestions(d.welcome.example_questions);
       }
     }).catch(() => {});
-    fetch("/api/settings/providers").then((r) => r.json()).then((d) => setAvailableProviders(d)).catch(() => {});
     setTimeout(() => inputRef.current?.focus(), 100);
   }, []);
 
@@ -574,7 +536,7 @@ export function AskChat({ compact = false }: AskChatProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id: sessionId || undefined, title, persona, provider, profile,
+          id: sessionId || undefined, title, persona, provider: effectiveProvider, profile,
           messages: msgs.map((m) => ({ role: m.role, content: m.content, sources: m.sources, provider: m.provider, followUps: m.followUps, imageMap: m.imageMap })),
         }),
       });
@@ -582,7 +544,7 @@ export function AskChat({ compact = false }: AskChatProps) {
       if (data.ok && data.id && !sessionId) setSessionId(data.id);
       fetchSessions();
     } catch { /* ignore */ }
-  }, [sessionId, persona, provider, profile, fetchSessions]);
+  }, [sessionId, persona, effectiveProvider, profile, fetchSessions]);
 
   function scheduleSave(msgs: Message[]) {
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
@@ -622,7 +584,11 @@ export function AskChat({ compact = false }: AskChatProps) {
         setMessages(msgs);
         setSessionId(id);
         setPersona(data.session.persona || "default");
-        setProvider(data.session.provider || "gemini-3.5-flash");
+        // Sessions record the model they actually ran, including ones since
+        // retired. Adopt it only while it's still on offer — otherwise the
+        // picker would highlight nothing and the pick wouldn't resolve.
+        const saved = data.session.provider ?? "";
+        setProvider(allModels.some((m) => m.slug === saved) ? saved : "");
         setShowSidebar(false);
         setShowSessionList(false);
       }
@@ -679,7 +645,8 @@ export function AskChat({ compact = false }: AskChatProps) {
   }
 
   const isEmpty = messages.length === 0;
-  const currentModelLabel = PROVIDERS.flatMap((g) => g.models).find((m) => m.id === provider)?.label ?? provider;
+  const currentModelLabel =
+    allModels.find((m) => m.slug === effectiveProvider)?.label ?? effectiveProvider;
   const currentPersonaLabel = personas.find((p) => p.id === persona);
   const currentProfileLabel = profiles.find((p) => p.id === profile);
 
@@ -1007,18 +974,21 @@ export function AskChat({ compact = false }: AskChatProps) {
             {/* Model selector */}
             <div className="flex items-center gap-1.5" ref={dropdownRef}>
               <span className="text-xs text-muted-foreground/50 flex-shrink-0">AI:</span>
-              {PROVIDERS.map((group) => {
-                const isAvailable = group.checkKeys.some((k) => availableProviders[k]);
-                const activeModel = group.models.find((m) => m.id === provider);
+              {modelGroups.map((group) => {
+                // One OpenRouter key reaches every model, so a group is
+                // available whenever the catalog lists it — there is no
+                // longer a per-vendor key to probe for.
+                const isAvailable = group.models.length > 0;
+                const activeModel = group.models.find((m) => m.slug === effectiveProvider);
                 const isActiveGroup = !!activeModel;
-                const isOpen = openDropdown === group.id;
+                const isOpen = openDropdown === group.label;
 
                 return (
-                  <div key={group.id} className="relative">
+                  <div key={group.label} className="relative">
                     <button
                       onClick={() => {
                         if (!isAvailable) return;
-                        if (isOpen) { setOpenDropdown(null); } else { setOpenDropdown(group.id); }
+                        if (isOpen) { setOpenDropdown(null); } else { setOpenDropdown(group.label); }
                       }}
                       disabled={!isAvailable}
                       className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium whitespace-nowrap transition-all ${
@@ -1044,20 +1014,22 @@ export function AskChat({ compact = false }: AskChatProps) {
                         </div>
                         {group.models.map((model) => (
                           <button
-                            key={model.id}
-                            onClick={() => { setProvider(model.id); setOpenDropdown(null); }}
+                            key={model.slug}
+                            onClick={() => { setProvider(model.slug); setOpenDropdown(null); }}
                             className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted/50 transition-colors flex items-center justify-between ${
-                              provider === model.id ? "bg-engenius-blue/5 text-engenius-blue font-medium" : ""
+                              effectiveProvider === model.slug ? "bg-engenius-blue/5 text-engenius-blue font-medium" : ""
                             }`}
                           >
                             <span>{model.label}</span>
-                            <span className={`text-xs px-1.5 py-0.5 rounded ${
-                              model.tier === "Strongest" ? "bg-amber-50 text-amber-700" :
-                              model.tier === "Mainstream" ? "bg-blue-50 text-blue-700" :
-                              "bg-emerald-50 text-emerald-700"
-                            }`}>
-                              {model.tier}
-                            </span>
+                            {model.tier && (
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                model.tier === "Strongest" ? "bg-amber-50 text-amber-700" :
+                                model.tier === "Mainstream" ? "bg-blue-50 text-blue-700" :
+                                "bg-emerald-50 text-emerald-700"
+                              }`}>
+                                {model.tier}
+                              </span>
+                            )}
                           </button>
                         ))}
                       </div>

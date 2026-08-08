@@ -1,1 +1,1 @@
-{"version":"0.0.1","configurations":[{"name":"next-dev","runtimeExecutable":"npm","runtimeArgs":["run","dev"],"port":3000}]}
+{"version": "0.0.1", "configurations": [{"name": "next-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev"], "port": 3000}, {"name": "engenie-dev", "runtimeExecutable": "npm", "runtimeArgs": ["run", "dev", "-w", "engenie"], "port": 3100}]}

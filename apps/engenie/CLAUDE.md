@@ -54,7 +54,6 @@ src/
       ask-workspaces, knowledge-areas, taxonomy, topology-icons, personas
       api-keys/route.ts              # 對外 API key CRUD
       settings/route.ts              # LLM provider keys CRUD（讀寫共用 app_settings）
-      settings/providers/route.ts    # 模型選單（spechub 也有一份同檔）
       ws-auth, demo-auth, chat-sessions
       cron/reindex-web/route.ts      # 每週日 re-crawl web 來源
       cron/reindex-products/route.ts # product_spec re-index：POST(spechub sync 觸發)/GET(每日 cron 09:30 TW 備援)
@@ -131,7 +130,7 @@ src/
 - **檢索平行化**：persona prompt / LLM key / topology hint 用 `Promise.all` 與 `retrieveDocuments` **同時**跑，不要移回檢索後（見 Pitfall 63）。這些 promise 都 `.catch` 成 fallback，不會 unhandled reject
 - **sources 事件在 LLM 串流之前送**：檢索一完成就 `sendEvent({type:"sources"})`，前端 `use-chat-stream` 掛到串流中的訊息、UI 立即顯示來源（別移回串流結束）
 - **三層 in-process 快取**（各 60s TTL / LRU，寫入時 invalidate）：`getApiKey`（@eg/db settings）、`listPersonas`/`getPersona`、`generateEmbedding`（LRU 300）
-- **Gemini Flash 關 reasoning**：模型目錄（`llm_models`）的 flash/lite 設 `reasoning_effort='none'`（Pitfall 61）
+- **Gemini Flash 壓 reasoning**：模型目錄（`llm_models`）的 flash/lite 設低檔位；**`gemini-3.5-flash` 只能 `low`，設 `none` 會被 OpenRouter 400 擋掉**（Pitfall 61）
 - **history 有字元預算**：`trimHistory()` 每則 1.5k / 總 12k 字，長對話不再脹 prefill
 
 ## Common Pitfalls（自 spechub 繼承，編號保留）
@@ -146,11 +145,31 @@ src/
 61. **Gemini Flash 一律關 reasoning** — flash/lite 的 thinking 發生在第一個 token 之前、且串流會丟棄 thought parts，等於純浪費 7–15s（實測）。
     **2026-08-07 起機制改了**：`thinkingBudget:0` → OpenRouter 的 `reasoning: { effort: "none" }`，
     而且不再寫在程式裡 —— 設在**模型目錄 `llm_models.reasoning_effort`**（`/settings/models` 可改）。
-    新增 flash 型號時記得設成 `none`；**Pro 級刻意留空**（選 Pro 就是要深度推理）。
+    **但 `none` 不是每個 flash 都吃** —— `google/gemini-3.5-flash` 會回
+    `400 Reasoning is mandatory for this endpoint and cannot be disabled.`，
+    `gemini-3.1-flash-lite` 則可以。**2026-08-08 實測**：3.5-flash 已改成 `low`。
+    新增 flash 型號時**先打一發 OpenRouter 確認該型號吃不吃 `none`**，別直接照抄；
+    **Pro 級刻意留空**（選 Pro 就是要深度推理）。
 62. **`chat_sessions` 綁 `user_id`，所有查詢都要 `.eq("user_id", user.id)`** — 用 `requirePermission("ask.use")` 取得 user，create 寫真實 id、read/update/delete 全部過濾；update 找不到列回 404 不假裝成功。舊 `user_id='anonymous'` 列刻意孤立（不遷移），所以部署後每人的歷史列表從空開始。別用回 `gate()`（它不回 user）。
 63. **Ask 熱路徑快取寫入端一定要 invalidate** — `getApiKey`（settings route 寫完呼叫 `invalidateApiKeyCache`）、personas（`savePersona`/`deletePersona` 內建 invalidate）。新增「會改 app_settings LLM key / persona」的路徑時記得一起清，否則最長 60s 看到舊值。embedding LRU 不用 invalidate（同 model+text 結果恆定）。
 64. **`ingest-web` 有 SSRF 白名單（`isSafePublicUrl`）** — 擋 loopback/RFC1918/link-local/metadata IP + 十進位/十六進位 IP 變形 + `.local`/`.internal`。純 hostname 比對（DNS-rebinding 不在範圍，此功能 admin-gated）。被擋的 URL 進 `errors[]` 不中斷其他頁。
 65. **passcode 端點（`ws-auth`/`demo-auth`）有 DB-backed 限流** — `passcodeAttemptAllowed(scope, request)` 走 RPC `auth_rate_check`（每 surface+IP 5 分鐘 10 次），放在任何 lookup/hash 比對**之前**（也消 slug 列舉 timing oracle）。fail-open。測試觸發後記得清 `auth_rate_limits` 對應列，免得誤擋真實出口 IP。
+
+66. **模型清單一律來自目錄 `llm_models`，元件裡不准寫死** — 2026-08-08 修：Ask 有
+    **四份**各自寫死的模型清單（`ask-chat`、`engenie-drawer`、`ask-workspaces-manager`、
+    `settings/providers` 的 key 探測），全都還在用 slug 遷移前的短 id（`claude-opus`）。
+    症狀騙人：下拉正常展開、正常打勾，但 `resolveModel()` 查無此 id → **每一次選擇都靜默
+    落回 surface 預設**，選單等於裝飾品；後端 enable 9 個、前端只長出寫死的 6 個。
+    前端一律用 `useAskModels()`（打 `/api/settings/models?surface=ask`），存進 DB 的是 slug。
+    **推論**：改識別碼體系時要把所有消費端找齊再改，本機 build 全綠證明不了這件事。
+67. **`/api/settings/models?surface=` 刻意免登入** — 它同時服務 passcode 門的
+    `/demo`、`/ask/<slug>`、`/embed/<slug>`（那些帶 workspace cookie、不是 Supabase session）。
+    只吐 enabled 模型的 slug/label/tier/default_for，就是選單本來就給那些人看的東西；
+    **無 surface 參數的完整清單仍是 admin-only**。別順手把整條 route 收回 session 後面。
+68. **上游 LLM 失敗要送 `type:"error"` 不要送 `type:"chunk"`** — 送成 chunk 會被前端當成
+    答案文字接上去，整段 outage 讀起來像正常輸出（2026-08-08 就是這樣讓 Ask 壞了好幾天沒人發現：
+    帳本 `llm_usage_events` 一筆 `surface='ask'` 都沒有 = 根本沒成功呼叫過）。
+    **查 Ask 是否真的活著，看帳本有沒有新列，不要只看畫面有沒有字。**
 
 ## Deployment
 

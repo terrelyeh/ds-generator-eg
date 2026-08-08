@@ -4,45 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { EngenieMark } from "./engenie-mark";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { listConversations, deleteConversation, type DemoConversation } from "@/lib/demo/history";
+import type { AskModelGroup } from "@/hooks/use-ask-models";
 
-interface Model {
-  id: string;
-  label: string;
-  tier: string;
-}
-
-interface ModelGroup {
-  label: string;
-  models: Model[];
-}
-
-const MODEL_GROUPS: ModelGroup[] = [
-  {
-    label: "Gemini",
-    models: [
-      { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro", tier: "Strongest" },
-      { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash", tier: "Fast" },
-    ],
-  },
-  {
-    label: "Claude",
-    models: [
-      { id: "claude-opus", label: "Claude Opus 4.8", tier: "Strongest" },
-      { id: "claude-sonnet", label: "Claude Sonnet 4.6", tier: "Balanced" },
-    ],
-  },
-  {
-    label: "GPT",
-    models: [
-      { id: "gpt-5.5", label: "GPT-5.5", tier: "Strongest" },
-      { id: "gpt-5.4-mini", label: "GPT-5.4 Mini", tier: "Fast" },
-    ],
-  },
-];
-
-export function modelLabelOf(id: string): string {
-  return MODEL_GROUPS.flatMap((g) => g.models).find((m) => m.id === id)?.label ?? id;
-}
+/**
+ * The model list comes from the DB catalog (Settings ▸ AI Models), passed
+ * down by the shell. It used to be hardcoded here — which is how this picker
+ * kept offering six retired short ids after the catalog moved to OpenRouter
+ * slugs, and why every pick silently ran the surface default instead.
+ */
 
 function fmtTime(ts: number): string {
   try {
@@ -69,7 +38,9 @@ export interface EngenieDrawerProps {
   open: boolean;
   onClose: () => void;
   provider: string;
-  onProviderChange: (id: string) => void;
+  onProviderChange: (slug: string) => void;
+  /** Enabled Ask models, grouped by vendor — from the DB catalog. */
+  models: AskModelGroup[];
   persona: string;
   onPersonaChange: (id: string) => void;
   personas: PersonaOption[];
@@ -108,10 +79,10 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const allModels = MODEL_GROUPS.flatMap((g) =>
+  const allModels = props.models.flatMap((g) =>
     g.models.map((m) => ({ ...m, groupLabel: g.label })),
   );
-  const currentModel = allModels.find((m) => m.id === props.provider);
+  const currentModel = allModels.find((m) => m.slug === props.provider);
 
   return (
     <>
@@ -211,7 +182,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
             </button>
             {modelExpanded && (
               <div className="mt-2 space-y-4 rounded-2xl border border-black/[0.06] bg-white/60 p-3.5">
-                {MODEL_GROUPS.map((group) => (
+                {props.models.map((group) => (
                   <div key={group.label}>
                     <div className="mb-1.5 font-heading text-[10.5px] font-extrabold uppercase tracking-[0.18em] text-engenius-dark/55">
                       {group.label}
@@ -219,13 +190,13 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
                     <div className="space-y-1">
                       {group.models.map((m) => (
                         <button
-                          key={m.id}
+                          key={m.slug}
                           onClick={() => {
-                            props.onProviderChange(m.id);
+                            props.onProviderChange(m.slug);
                             setModelExpanded(false);
                           }}
                           className={`flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left transition-colors ${
-                            props.provider === m.id
+                            props.provider === m.slug
                               ? "bg-engenius-blue/10 text-engenius-dark"
                               : "hover:bg-black/[0.03]"
                           }`}
@@ -234,7 +205,7 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
                             <span className="text-[14px] font-semibold tracking-tight">{m.label}</span>
                             <span className="text-[11.5px] font-medium text-engenius-dark/45">{m.tier}</span>
                           </div>
-                          {props.provider === m.id && (
+                          {props.provider === m.slug && (
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#03a9f4" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
                               <polyline points="20 6 9 17 4 12" />
                             </svg>

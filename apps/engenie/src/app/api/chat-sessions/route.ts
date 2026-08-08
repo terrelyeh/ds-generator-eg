@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { requirePermission, AuthError, type AuthUser } from "@eg/auth/session";
+import { getDefaultModel } from "@eg/llm/models";
 
 /**
  * Sessions are private per user: every query below is scoped by user_id.
@@ -148,7 +149,7 @@ export async function POST(request: Request) {
     .insert({
       title: title || "New conversation",
       persona: persona || "default",
-      provider: provider || "gemini-3.5-flash",
+      provider: provider || (await getDefaultModel("ask"))?.slug || "",
       messages: messages || [],
       message_count: messages?.length || 0,
       user_id: user.id,

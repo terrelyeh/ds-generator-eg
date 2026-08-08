@@ -2,14 +2,21 @@
 
 import { useEffect, useState } from "react";
 import { EngenieChat } from "./engenie-chat";
-import { EngenieDrawer, modelLabelOf, type PersonaOption, type ProfileOption } from "./engenie-drawer";
+import { EngenieDrawer, type PersonaOption, type ProfileOption } from "./engenie-drawer";
+import { useAskModels } from "@/hooks/use-ask-models";
 import type { DemoConversation } from "@/lib/demo/history";
 import { getUserKey, setUserKey as persistUserKey, clearUserKey } from "@/lib/demo/byok";
 import type { ChatMessage } from "@/hooks/use-chat-stream";
 
-/** Human label for the key family a user_byok workspace expects. */
+/**
+ * Human label for the key family a user_byok workspace expects.
+ *
+ * The fallback reads the vendor off the model slug ("anthropic/claude-...").
+ * It used to test `startsWith("claude")`, which no slug satisfies — so every
+ * workspace without an explicit byok_provider was labelled Google.
+ */
 function familyLabel(byokProvider?: string | null, provider?: string): string {
-  const f = byokProvider ?? (provider?.startsWith("claude") ? "anthropic" : provider?.startsWith("gpt") ? "openai" : "google");
+  const f = byokProvider ?? provider?.split("/")[0] ?? "google";
   return f === "anthropic" ? "Anthropic" : f === "openai" ? "OpenAI" : "Google";
 }
 
@@ -27,7 +34,15 @@ export function EngenieShell({
   compact?: boolean;
 } = {}) {
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [provider, setProvider] = useState("gemini-3.5-flash");
+  const { groups: modelGroups, defaultSlug } = useAskModels();
+  // Derived rather than seeded by an effect: the catalog default only fills in
+  // until something chooses. A workspace's configured provider and the user's
+  // pick both set `provider` directly, and both win over it.
+  const [provider, setProvider] = useState("");
+  const effectiveProvider = provider || defaultSlug;
+  const modelLabel =
+    modelGroups.flatMap((g) => g.models).find((m) => m.slug === effectiveProvider)?.label ??
+    effectiveProvider;
   const [persona, setPersona] = useState("default");
   const [profile, setProfile] = useState("default");
   const [personas, setPersonas] = useState<PersonaOption[]>([]);
@@ -145,13 +160,13 @@ export function EngenieShell({
       <div className="min-h-0 flex-1">
         <EngenieChat
           key={chatKey}
-          provider={provider}
+          provider={effectiveProvider}
           persona={persona}
           profile={profile}
           welcomeSubtitle={welcomeSubtitle}
           welcomeDescription={welcomeDescription}
           exampleQuestions={exampleQuestions}
-          modelLabel={modelLabelOf(provider)}
+          modelLabel={modelLabel}
           personaLabel={personas.find((p) => p.id === persona)?.name}
           profileLabel={profiles.find((p) => p.id === profile)?.label}
           onOpenSettings={() => setDrawerOpen(true)}
@@ -169,8 +184,9 @@ export function EngenieShell({
       <EngenieDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
-        provider={provider}
+        provider={effectiveProvider}
         onProviderChange={setProvider}
+        models={modelGroups}
         persona={persona}
         onPersonaChange={setPersona}
         personas={personas}

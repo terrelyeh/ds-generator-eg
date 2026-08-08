@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { createAdminClient } from "@eg/db/admin";
 import { gate, getCurrentUser } from "@eg/auth/session";
 import { encryptKey } from "@/lib/auth/api-key";
+import { getDefaultModel } from "@eg/llm/models";
 
 /**
  * Admin CRUD for Ask workspaces (per-department /ask/<slug> entries).
@@ -11,9 +12,11 @@ import { encryptKey } from "@/lib/auth/api-key";
  */
 const PERMISSION = "settings.manage_api_access" as const;
 
+/** Vendor of a model, read off the OpenRouter slug ("anthropic/claude-..."). */
 function familyOf(provider: string): "anthropic" | "openai" | "google" {
-  if (provider.startsWith("claude")) return "anthropic";
-  if (provider.startsWith("gpt")) return "openai";
+  const vendor = provider.split("/")[0];
+  if (vendor === "anthropic") return "anthropic";
+  if (vendor === "openai") return "openai";
   return "google";
 }
 
@@ -104,7 +107,9 @@ export async function POST(request: Request) {
   }
   if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
 
-  const provider = body.provider || "gemini-3.5-flash";
+  // No hardcoded fallback: an id that is not in the catalog resolves to
+  // nothing, and the workspace would silently run the surface default.
+  const provider = body.provider || (await getDefaultModel("ask"))?.slug || "";
   const llm_mode = body.llm_mode === "byok" ? "byok" : body.llm_mode === "user_byok" ? "user_byok" : "shared";
 
   // A workspace-level BYOK is unusable without a key — the chat endpoint refuses

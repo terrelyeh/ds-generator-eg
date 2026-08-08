@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
+import { useAskModels } from "@/hooks/use-ask-models";
 import {
   TaxonomyPicker,
   EMPTY_TAXONOMY_VALUE,
@@ -42,17 +43,6 @@ interface Workspace {
 
 interface Opt { id: string; name?: string; label?: string }
 
-const PROVIDERS = [
-  { id: "gemini-3.5-flash", label: "Gemini 3.5 Flash (default)" },
-  { id: "gemini-3.1-pro", label: "Gemini 3.1 Pro" },
-  { id: "gemini-3.1-flash-lite", label: "Gemini 3.1 Flash Lite" },
-  { id: "claude-sonnet", label: "Claude Sonnet" },
-  { id: "claude-opus", label: "Claude Opus" },
-  { id: "claude-haiku", label: "Claude Haiku" },
-  { id: "gpt-5.5", label: "GPT-5.5" },
-  { id: "gpt-5.4-mini", label: "GPT-5.4 Mini" },
-  { id: "gpt-5.4-nano", label: "GPT-5.4 Nano" },
-];
 const SOURCE_TYPES = [
   { id: "product_spec", label: "Product Specs" },
   { id: "gitbook", label: "Gitbook" },
@@ -84,7 +74,11 @@ export function AskWorkspacesManager() {
   const [name, setName] = useState("");
   const [passcode, setPasscode] = useState("");
   const [llmMode, setLlmMode] = useState<"shared" | "byok" | "user_byok">("shared");
-  const [provider, setProvider] = useState("gemini-3.5-flash");
+  // Model options come from the catalog (Settings ▸ AI Models). What gets
+  // stored here is the slug the Ask endpoint resolves against, so a hardcoded
+  // list would write ids that quietly fall back to the surface default.
+  const { groups: modelGroups, defaultSlug } = useAskModels();
+  const [provider, setProvider] = useState("");
   const [byokKey, setByokKey] = useState("");
   const [tax, setTax] = useState<TaxonomyValue>(EMPTY_TAXONOMY_VALUE);
   const [sourceTypes, setSourceTypes] = useState<string[]>([]);
@@ -125,7 +119,7 @@ export function AskWorkspacesManager() {
   }, []);
 
   function resetForm() {
-    setSlug(""); setName(""); setPasscode(""); setLlmMode("shared"); setProvider("gemini-3.5-flash");
+    setSlug(""); setName(""); setPasscode(""); setLlmMode("shared"); setProvider(defaultSlug);
     setByokKey(""); setTax(EMPTY_TAXONOMY_VALUE); setSourceTypes([]); setKnowledgeAreas([]); setPersona("default"); setProfile("default");
     setAllowSwitch(true); setWelcomeSubtitle(""); setWelcomeDescription(""); setExamples(""); setRate(30); setDaily(""); setAllowedOrigins("");
     setEditId(null); setEditHasPasscode(false); setEditHasByok(false);
@@ -363,7 +357,15 @@ export function AskWorkspacesManager() {
                 </div>
                 <label className="mb-1 block text-sm font-medium text-muted-foreground">Model</label>
                 <select value={provider} disabled={saving} onChange={(e) => setProvider(e.target.value)} className="w-full rounded-md border px-3 py-2 text-base">
-                  {PROVIDERS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                  {modelGroups.map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.models.map((m) => (
+                        <option key={m.slug} value={m.slug}>
+                          {m.label}{m.slug === defaultSlug ? " (default)" : ""}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
                 </select>
                 {llmMode === "byok" && (
                   <div className="mt-2">

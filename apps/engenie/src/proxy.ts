@@ -30,6 +30,7 @@ const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/", "/demo/", "/api/v1/", "/as
 // departments, RD/PM, the design team), so they bypass the session redirect.
 // Add a doc here only when it's meant to be shared and contains no secrets.
 const PUBLIC_EXACT_PATHS = [
+  "/api/settings/models",       // model picker list (surface-filtered read only)
   "/api/demo-auth",
   "/api/ws-auth",              // workspace passcode → cookie (self-verifies)
   "/docs/api-search.html",      // external RAG Search API spec (integrators)
@@ -45,7 +46,7 @@ const PUBLIC_EXACT_PATHS = [
 const SERVICE_PATHS = ["/api/cron"];
 // APIs the demo needs, reachable with a valid demo cookie (no Google login).
 // Kept tight: only the read + ask endpoints the EnGenie UI calls.
-const DEMO_API_PREFIXES = ["/api/ask", "/api/settings/providers", "/api/topology-icons"];
+const DEMO_API_PREFIXES = ["/api/ask", "/api/topology-icons"];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))) return true;

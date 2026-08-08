@@ -16,8 +16,8 @@ import { can } from "@eg/auth/permissions";
  * the translation picker — both apps share the database, so each reads
  * directly rather than calling across.
  *
- * GET  ?surface=translate  → models offered on that surface (any signed-in
- *                            user, since the picker needs it)
+ * GET  ?surface=translate  → models offered on that surface (no session —
+ *                            passcode surfaces need it too, see below)
  * GET                      → every row, admin only (the management view)
  * PUT  { models: [...] }   → replace the catalog, admin only
  *
@@ -26,26 +26,39 @@ import { can } from "@eg/auth/permissions";
  */
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const surface = new URL(request.url).searchParams.get("surface");
 
+  // The surface-filtered read needs no session. The Ask picker also runs on
+  // the passcode-gated surfaces (/demo, /ask/<slug>, /embed/<slug>) which
+  // carry a workspace cookie, not a Supabase one — and it returns nothing
+  // those users can't already see, since it IS the list their picker shows.
+  // Only slug/label/tier of enabled models; nothing about keys or spend.
   if (surface) {
     if (!SUPPORTED_SURFACES.includes(surface as (typeof SUPPORTED_SURFACES)[number])) {
       return NextResponse.json({ error: `Unknown surface: ${surface}` }, { status: 400 });
     }
     const models = await listModels(surface as "translate");
-    return NextResponse.json({ ok: true, models });
+    return NextResponse.json({
+      ok: true,
+      models: models.map((m) => ({
+        slug: m.slug,
+        label: m.label,
+        tier: m.tier,
+        default_for: m.default_for,
+      })),
+    });
   }
 
+  // The full row set — including notes and sort order — stays admin-only.
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!can(user.role, "settings.edit_api_keys")) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { data, error } = await createAdminClient()
     .from("llm_models" as "products")
-    .select("id, slug, label, surfaces, default_for, reasoning_effort, enabled, sort_order, note")
+    .select("id, slug, label, surfaces, default_for, reasoning_effort, enabled, sort_order, tier, note")
     .order("sort_order");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -60,6 +73,7 @@ interface ModelInput {
   reasoning_effort: string | null;
   enabled: boolean;
   sort_order: number;
+  tier?: string | null;
   note?: string | null;
 }
 
@@ -133,6 +147,7 @@ export async function PUT(request: Request) {
         surfaces: m.surfaces,
         default_for: m.default_for,
         reasoning_effort: m.reasoning_effort || null,
+        tier: m.tier?.trim() || null,
         enabled: m.enabled,
         sort_order: m.sort_order,
         note: m.note?.trim() || null,

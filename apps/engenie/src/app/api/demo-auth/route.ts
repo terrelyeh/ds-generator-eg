@@ -28,7 +28,7 @@ export async function POST(request: Request) {
   }
 
   // Correct passcode → issue an HMAC-signed demo session cookie. The proxy
-  // and the demo-permitted API handlers (/api/ask, /api/settings/providers)
+  // and the demo-permitted API handlers (/api/ask, /api/topology-icons)
   // verify it so passcode users reach the demo without a Google login.
   const token = await computeDemoToken();
   const res = NextResponse.json({ ok: true });

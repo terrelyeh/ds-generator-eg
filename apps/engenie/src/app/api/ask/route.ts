@@ -535,7 +535,10 @@ IMPORTANT formatting rules:
       } catch (err) {
         const safe = redactSecrets(err instanceof Error ? err.message : String(err));
         console.error("Ask SSE error:", safe);
-        sendEvent(JSON.stringify({ type: "chunk", content: `\n\nError: ${safe}` }));
+        // Structured "error", not a content chunk — an upstream failure
+        // arriving as a chunk is indistinguishable from an answer, which is
+        // how a days-long Ask outage read as normal output.
+        sendEvent(JSON.stringify({ type: "error", content: `\n\nError: ${safe}` }));
         sendEvent("[DONE]");
       } finally {
         controller.close();

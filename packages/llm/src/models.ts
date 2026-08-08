@@ -26,7 +26,19 @@ export interface ModelRow {
   reasoning_effort: "none" | "minimal" | "low" | "medium" | "high" | null;
   enabled: boolean;
   sort_order: number;
+  /** Editorial badge for the picker — "Strongest" / "Mainstream" / "Best CP". */
+  tier: string | null;
   note: string | null;
+}
+
+/**
+ * Vendor label for grouping in a picker, derived from the slug's prefix
+ * rather than stored. The slug already carries it, and a second field
+ * would be one more thing to keep in step.
+ */
+export function vendorOf(slug: string): string {
+  const vendor = slug.split("/")[0] ?? "";
+  return { anthropic: "Claude", openai: "GPT", google: "Gemini" }[vendor] ?? vendor;
 }
 
 /**
@@ -47,7 +59,7 @@ async function loadAll(): Promise<ModelRow[]> {
   const { createAdminClient } = await import("@eg/db/admin");
   const { data, error } = await createAdminClient()
     .from("llm_models" as "products")
-    .select("slug, label, surfaces, default_for, reasoning_effort, enabled, sort_order, note")
+    .select("slug, label, surfaces, default_for, reasoning_effort, enabled, sort_order, tier, note")
     .order("sort_order");
 
   if (error) throw new Error(error.message);
