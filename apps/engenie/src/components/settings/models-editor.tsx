@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { SUPPORTED_SURFACES } from "@/lib/translate/types";
+import { SUPPORTED_SURFACES } from "@eg/llm/models";
 
 interface ModelRow {
   slug: string;

@@ -258,7 +258,9 @@ Gemini `parts[]` 還要濾 thought）收斂成一支 `streamComplete()`，route 
 
 ### 模型目錄（`llm_models`，migration 00035）
 
-兩份寫死清單 → 一張表 + `/settings/models`（admin only）。
+兩份寫死清單 → 一張表 + **EnGenie `/settings/models`**（admin only），跟 API Keys、
+AI 用量並列。（一度放在 spechub，只因為 surface enum 當時在那 —— 結果 AI 設定散在
+兩個 app，使用者找不到頁面。spechub 只留一支唯讀端點給自己的翻譯下拉。）
 
 > ⚠️ **slug 就是識別碼。** 舊的短 id 是穩定 key，但顯示名稱早就跟實際呼叫的東西漂開
 > （`gpt-4o` 打 gpt-5.5、`gemini-2.5-pro` 打 gemini-3.1-pro），所以**存在任何地方的值

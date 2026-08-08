@@ -79,6 +79,18 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     ),
   },
   {
+    title: "AI Models",
+    description: "翻譯與 Ask 的下拉選單提供哪些 OpenRouter 模型、預設是哪一個。換模型是改這裡的一行，不用改程式。",
+    href: "/settings/models",
+    group: "system",
+    roles: ["admin"],
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
     title: "AI 用量與餘額",
     description: "OpenRouter 剩餘額度、燒錢速率與預估可用天數，以及近 30 天各模型花費排行。",
     href: "/settings/ai-usage",

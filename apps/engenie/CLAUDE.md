@@ -40,7 +40,7 @@ src/
       ask/page.tsx                   # 內部全頁 Ask（RAG chat UI）
       knowledge/page.tsx             # Knowledge Base — 索引管理 dashboard
       wifi-regulation/[code]/page.tsx # 各國 WiFi 法規 markdown 檢視（citation 連到這）
-      settings/                      # hub + ask-workspaces / personas / ask-welcome / api-access / api-keys(LLM)
+      settings/                      # hub + ask-workspaces / personas / ask-welcome / api-access / api-keys(LLM) / models(模型目錄) / ai-usage(花費)
       page.tsx                       # / → redirect /ask
     (demo)/                          # 公開區（passcode/token 自帶 gate）
       ask/[slug]/page.tsx            # 部門 workspace 聊天入口
@@ -61,7 +61,7 @@ src/
   components/
     layout/engenie-shell.tsx         # navbar(Ask/Knowledge/Settings) + footer + Toaster
     ask/、demo/、chat/、knowledge/   # 聊天兩 surface、widget、知識庫 UI（原樣自 spechub 搬入）
-    settings/                        # hub + 5 個編輯器
+    settings/                        # hub + 7 個編輯器（含 models-editor / ai-usage-dashboard）
     ui/                              # shadcn（與 spechub 各持一份，品牌可分道）
   hooks/use-chat-stream.ts           # SHARED 串流引擎（兩個聊天 surface 共用）
   hooks/use-stick-to-bottom.ts
@@ -89,8 +89,12 @@ src/
    `openrouter_api_key_ask`（本 app；沒設會 fallback 回前者）。
    ⚠️ **embedding 仍直連 OpenAI**（`openai_api_key` 永久保留 —— OpenRouter 不提供 embedding，
    換模型等於全庫重建索引）。
-   **模型清單在 `llm_models` 表**，管理頁 `/settings/models`（spechub 側，admin only）——
+   **模型清單在 `llm_models` 表**，管理頁 **`/settings/models`（本 app，admin only）**——
    Ask 的下拉選單也是讀它，不再寫死在 `MODEL_MAP`。
+   一度放在 spechub（只因為 surface enum 當時在那），造成 AI 設定散在兩個 app、
+   使用者找不到；已搬回本 app 與 API Keys / AI 用量並列。
+   **spechub 保留一支唯讀的 `/api/settings/models?surface=translate`** 給它的翻譯下拉用
+   —— 兩 app 共用同一個 DB，各自直讀，不跨 app 呼叫。
 4. **產品表唯讀約定**：spechub 改產品表 schema 前要確認本 app 的
    ingest-products/taxonomy 不受影響。migrations 一律放 `packages/db/supabase/migrations/`。
 

@@ -10,6 +10,14 @@
  */
 import type { Surface } from "./openrouter";
 
+/**
+ * Surfaces a model can be offered on. Lives here rather than in either
+ * app because both the admin editor (engenie) and the translate picker
+ * (spechub) validate against it.
+ */
+export const SUPPORTED_SURFACES = ["translate", "ask"] as const;
+export type ModelSurface = (typeof SUPPORTED_SURFACES)[number];
+
 export interface ModelRow {
   slug: string;
   label: string;

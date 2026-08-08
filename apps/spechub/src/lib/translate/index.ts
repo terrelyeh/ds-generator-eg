@@ -9,8 +9,7 @@ import { lineParityBudget } from "@/lib/datasheet/cover-layout";
 import { resolveModel } from "@eg/llm/models";
 import { createOpenRouterProvider } from "./providers/openrouter";
 
-export { SUPPORTED_SURFACES } from "./types";
-export type { TranslateModel, ModelSurface } from "./types";
+export type { TranslateModel } from "./types";
 
 // --- Model resolution ---
 

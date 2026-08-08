@@ -21,13 +21,6 @@ export interface TranslateProvider {
 }
 
 /**
- * Surfaces a model can be offered on. Lives here because both the catalog
- * API and the pickers validate against it.
- */
-export const SUPPORTED_SURFACES = ["translate", "ask"] as const;
-export type ModelSurface = (typeof SUPPORTED_SURFACES)[number];
-
-/**
  * A model as the picker sees it. The catalog is in the DB now
  * (llm_models, migration 00035) — AVAILABLE_PROVIDERS was a hardcoded
  * list whose ids had drifted from what they invoked, which is exactly
