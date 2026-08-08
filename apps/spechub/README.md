@@ -67,29 +67,37 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **Drive 自動建資料夾** — 第一次產 zh / ja PDF 時自動建立 `Cloud Camera_zh` / `Cloud Camera_ja` 等 sibling 資料夾（PM 不需要事先手動建）
 - **Drive 重複自動清** — Regenerate 時偵測同名舊檔自動覆蓋 + 移到垃圾桶清掉重複版本
 - **Toast 通知** — 生成中／完成／失敗都有即時 toast，完成後一鍵「Open PDF」開新分頁
-- **Draft 翻譯不能產官方 PDF** — 翻譯狀態還是 Draft 時 Regenerate 按鈕停用，強迫先 Save & Confirm 再產
+- **未核准的翻譯不能產官方 PDF** — 翻譯還沒通過審核時 Regenerate 按鈕停用；審核者按「退回修改」也會即時把 PDF 權限收回
 - **角色限制** — PM / Viewer 收到 preview 連結時看得到內容但**沒有 Regenerate 按鈕**，只有 Editor / Admin 可以產官方 PDF
 
 ### Layout Overflow Detection
 - **跑版預警** — Dashboard 和 Product Detail 自動偵測 overview/features/spec 會不會超過版面容納範圍，紅燈提示 PM 要精簡
-- **逐語言檢查** — 英/日/繁中各自用該語言的字級、行高、每行字數估算（CJK 字比較大，同樣內容更可能跑版）
+- **逐語言檢查** — 英/日/繁中/西各自用該語言的字級、行高、每行字數估算（CJK 字比較大，同樣內容更可能跑版）
 - **Mark as Reviewed OK** — PM 目視確認 PDF 沒問題後可以把紅燈壓綠，確認會和當下內容綁定；之後內容一改確認自動失效、紅燈回來
 - **Undo** — 隨時可以取消確認恢復紅燈
 
 ### Multi-Language Datasheet
-- **日文 / 繁體中文** 翻譯支援（可擴展更多語言）
+- **日文 / 繁體中文 / 西班牙文（拉美）** 翻譯支援（可擴展更多語言）
 - 選擇性啟用：每個型號獨立決定需不需要多語言版本
-- **兩種翻譯模式**：Light（標題+內容）/ Full（+規格表 label）
-- **AI 翻譯**：支援 Claude、GPT-4o、Gemini，翻譯同時改善原文品質
+- **AI 翻譯**：可選模型（Claude / GPT / Gemini 都經 OpenRouter），翻譯同時改善原文品質
+- **自動長度控制**：譯文比原文長是常態，系統會依原文行數算出每條 feature 的字數上限並要求 AI 遵守，避免譯文把 datasheet 封面擠爆
 - **翻譯筆記**：AI 翻譯後顯示做了哪些優化的中文說明
-- **翻譯詞庫**（Glossary）：公司級術語字典，AI 自動遵循
-- **Draft / Confirmed 流程**：Preview 隨時可預覽（自動存草稿），Save & Confirm 後才能生成 PDF。Draft 狀態下 Save 按鈕用 amber pulse 視覺強調 + Preview 跳 toast 提醒「請按 Save & Confirm」，避免使用者卡在 Draft 出不來
+- **翻譯詞庫**（Glossary）：公司級術語字典，AI 自動遵循；可分「全公司通用」與「單一產品線」兩層
+- **規格表 label 翻譯**：以產品線為單位翻一次，該線所有型號共用
 - 每個語言版本號獨立管理，Drive 獨立資料夾
 - CJK 排版優化：禁則處理、兩端對齊、per-locale 專用字型
 - 語言專屬 Hardware Image 支援（不同語言的標註圖）
 - Headline 支援 `**粗體**` 標記，可手動斷行
 - Subtitle 可按語言覆寫
 - QR Code 標籤和連結可按語言自訂
+
+### Translation Review（翻譯審核）
+- **指派審核者即啟用**：在 Users 頁把某人指定為某語言的審核者，該語言的翻譯從此需要審核才能產 PDF；沒有指派審核者的語言維持一鍵完成
+- **三種審核動作**：通過 / 退回修改（必須寫明要改什麼）/ 只留言（不改變狀態）
+- **意見可以指到位置**：Overview、第幾條 Feature、規格表、整體
+- **意見保留歷次紀錄**：來回修改時看得到前幾輪講過什麼
+- **一鍵譯成中文**：海外審核者用當地語言寫的意見，台灣同事可即時翻譯
+- **審核佇列**（`/translations/queue`）：審核者看待審件、編輯看被退回的（帶最新意見）
 
 ### Ask / Knowledge / Search API — 已移至 EnGenie
 

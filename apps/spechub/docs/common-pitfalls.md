@@ -137,3 +137,50 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
 
 53. **新產品線設定容易把 `drive_folder_id` 跟 `ds_images_folder_id` 填反** — drive_folder_id
     是「產品線」資料夾、ds_images_folder_id 是裡面的「DS Images」子資料夾。設定時跟 PM 確認層級。
+
+
+---
+
+## 66. `max-width`/`max-height` 只封頂、不放大（2026-08-03/05，已修）
+
+> 從 CLAUDE.md 移入 —— 三個受害者（Cloud 封面產品圖、hardware 圖、Cloud AP 天線圖）
+> 的程式都已修好，規則本身收錄在 `product-line-onboarding.md`。留全文是因為
+> 「留白在無意間當縮放控制」這個現象很難自己想到。
+
+**`max-width`/`max-height` 只封頂、不放大 —— 圖片尺寸會變成「PNG 像素數說了算」**
+    （2026-08-03 Cloud 封面產品圖事件）—— 封面本來寫 `max-width:290pt; max-height:100%`,
+    於是渲染尺寸 = 該檔的像素數 ×0.75,超過才被壓到 290pt。結果 ECW230 印出 **290×296pt**
+    （InDesign 原稿是 193×195）、ECW230S 290×312（原稿 183×184）;而 ECW260 看起來正常
+    **純粹是它的檔案剛好夠小**。引爆點是 **pitfall 裡那個為 SE110 加的 `sharp.trim()`**——
+    它對每條線每張 PNG 都生效,會同時改寫像素數**和長寬比**（ECW230S: 3800×2138 寬圖 →
+    1313×1413 高圖,渲染高度 163pt → 312pt）。**透明邊距一直在無意間當縮放控制**,裁掉後
+    就從「太小」盪到「太大」。修法:**框決定尺寸,不是檔案** —— 容器固定成參考稿量到的
+    `x 311-587, y 269-464`,img 改 `width/height:100% + object-fit:contain`。
+    ⚠️ 同一支還埋了**寫死的 4pt 重疊**:`.overview-section` 到 x306pt,舊容器卻從 x292pt 起,
+    只要圖寬到撞上限就一定壓到文字（五台實測都是精準 4.0pt）。**改共用版面 CSS 前先去量
+    InDesign 原稿**（`pymupdf` 抽 image bbox）,不要憑感覺調。
+    Transceiver 用 `width/height:auto` opt-out —— tx-cover 是另一種構圖,別讓它繼承填滿規則。
+    hardware 圖已於 `7edc4b7` 收編（`width:530pt` + `max-height` 只當保險）。
+
+    **（2026-08-05 補：Cloud AP 天線圖是第三個受害者,而且反過來踩）** —— 天線圖寫的是
+    `width:158pt; height:158pt`,框有決定尺寸,但**框開得太小又是正方形**:PM 的極座標圖
+    旁邊帶 legend,長寬比 1.00–1.42（中位數 1.37）,`object-fit:contain` 一 letterbox 就變
+    158×115,而欄寬其實有 **259pt**（`(612 − 2×35 padding − 24 gap) / 2`）。兩層一起,實際
+    印出來只有參考稿的三分之一面積。修法同源:`width:100%` 讓欄決定寬度、`height:auto`
+    讓來源比例決定高度、`max-height` 收尾。
+    ⚠️ **`max-height` 這裡不是純保險,是「不要太滿」的那個旋鈕**:頁高預算其實給到
+    2 排 262pt / 三排 160pt,但實際用 **207pt / 150pt**。原因是**方形來源**（ECW215、
+    ECW510L）填滿欄寬後高度就衝到 259pt,第二排的 pill 會直接貼在上一排的圖底下 ——
+    橫式來源自己只要 187–209pt,所以壓低只咬到那些偏方的圖,剛好就是看起來擠的那幾頁。
+    另外 row gap 30pt > column gap 24pt（換排的分隔感要大於換欄）、pill 到圖 14pt。
+    算式寫在該段註解裡,動 row gap / label / padding 就要重算。
+    另一半是資產面:同樣 850×620 的檔,內容填滿度從 **84% 到 100%** 都有 ——
+    **留白等於在偷偷當縮放控制**,所以「同一台機器兩張圖看起來一樣大」根本不成立。
+    `/api/upload-image` 的 radio_pattern 現在會 `trimPlotMargin()`（連白底 JPG 也裁,
+    和 sync 那支只裁 PNG 透明邊的 `trimTransparentEdges` 分開;Drive 仍存 PM 原檔,
+    Storage 存渲染用的裁切版）。既有 72 張已用
+    `scripts/trim-radio-pattern-margins.mjs` 補跑（原檔備份在 repo 外的
+    `~/dev/DS-system/radio-pattern-originals-2026-08-05/`）。
+    ⚠️ 覆蓋 Storage 後 **CDN 會續發舊 bytes 一段時間** —— 量測前記得
+    `page.setCacheEnabled(false)`,否則會以為 backfill 沒生效。
+

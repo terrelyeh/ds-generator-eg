@@ -1,13 +1,14 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-07-29。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-08-07。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
-> **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth`。RAG/Ask 的事去看
-> [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
-> 近期：**Broadband Outdoor ▸ EOC 上線**（鋼藍;一套組件同時出單機版與系列版）、
-> Orin Box 收斂到共用的 `ds_scope` 管線、**自訂版型補上多語言**（原本寫死英文,
-> pitfall #63）、**CJK 字型修復**（PDF 缺字印成空白,pitfall #64 —— 本機重現不了）。
+> **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
+> RAG/Ask 的事去看 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
+> **近期（2026-08-06~07）：西文 es-MX 上線 + 翻譯行數預算 + LLM 全面走 OpenRouter
+> + 花費帳本 + 翻譯審核流程。這四塊互相咬合，動之前先讀
+> [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)** ——
+> 裡面有三個「看起來多餘、其實不能拆」的設計，以及行數預算為何不能用字數比例。
 
 ## Project Overview
 
@@ -45,10 +46,12 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
    navbar**；要瀏覽整個知識庫請直接去 EnGenie 站。
 3. **LLM provider keys 管理 UI 在 EnGenie**（settings 首頁有連結卡）；本 app 的
    translate runtime 直接讀共用 `app_settings`（`@eg/db/settings` 的 `getApiKey`）。
-   **2026-08-06 起 chat completions 改走 OpenRouter**（`@eg/llm/openrouter`，
-   單一 `openrouter_api_key`）：translate 走 OpenRouter、**沒設 key 才 fallback 回
-   三家直連**；battlecard 兩支是 **OpenRouter only**（它們本來就因為沒有
-   `anthropic_api_key` 一直回 400，沒有可退的路）。Ask（engenie）還沒搬。
+   **2026-08-06~07：所有 chat completions 走 OpenRouter**（`@eg/llm`）——
+   translate、battlecard、engenie 的 Ask 都是；**三家直連的 client 已刪除**。
+   兩把 key：`openrouter_api_key`（SpecHub）與 `openrouter_api_key_ask`（Ask，
+   沒設會 fallback 回前者），也是花費帳本的兩個統計桶。
+   **模型清單在 `llm_models` 表**，管理頁在 **EnGenie `/settings/models`**；
+   本 app 只留唯讀的 `/api/settings/models?surface=translate` 給翻譯下拉。
    ⚠️ **`openai_api_key` 永久保留** —— RAG embedding（`text-embedding-3-small`,
    1536 維）不走 OpenRouter，換 embedding model 等於全量重建索引。
    查 model slug：`npx tsx scripts/list-openrouter-models.ts <關鍵字>`。
@@ -96,9 +99,10 @@ locale-aware 圖片雙向同步。另見 [`docs/sync-and-notifications.md`](docs
 ### Datasheet 渲染:PDF / 版面 / 多語言 → [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md)
 
 PDF 生成(Regenerate/New Version、Puppeteer 自我認證、Drive folder auto-create/dedupe、
-locale Draft 阻擋)、動態 cover 版面 + spec 2 欄分頁(`lib/datasheet/`,**locale-aware
-metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet(兩層翻譯、
-Draft/Confirmed、per-locale typography、5 層 AI 翻譯 prompt)。**改 PDF/版面/翻譯前先讀該檔。**
+locale 未核准阻擋)、動態 cover 版面 + spec 2 欄分頁(`lib/datasheet/`,**locale-aware
+metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet
+(en/ja/zh-TW/**es**、三態審核、per-locale typography 僅 CJK、**6 層 AI 翻譯 prompt**
+——第 6 層是從原文算出的行數預算,防止譯文變長把封面擠爆)。**改 PDF/版面/翻譯前先讀該檔。**
 
 ### Authentication & RBAC → [`docs/auth-rbac.md`](docs/auth-rbac.md)
 
@@ -206,31 +210,24 @@ auth.users → profiles ← email_whitelist.invited_by
 
 **Datasheet 系統**：
 5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
+   （`translate/prompts/product-lines/`,目前只有 Cloud Camera 有）
 6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
 7. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
    三張需再加一欄 + upload API 型別
-8. **Resync versions per-locale** — `/api/resync-versions` 目前只更新 EN
-9. ~~**新增第 4 個翻譯語言（如 es）**~~ — **es 已上（`feat/locale-es`, 2026-08-06）**，
-   墨西哥認證帶起來的需求，首波 ECS1528FP / ECS1552FP。實作與當初預估的差異:
-   ① **`cover-layout.ts` / `pagination.ts` 都不用加 entry** —— 拉丁語系走 `default`
-   本來就是對的，複製一份反而會漂移;② **不要加 `TYPOGRAPHY_DEFAULTS.es`**
-   （見 pitfall #68）;③ 多改了 `typography-editor` 與 typography API 的語言過濾。
-   QR 沿用英文 URL、label 在地化。
-   **(a) 行數預算已完成** —— 翻譯 prompt 多了 **Layer 6**（`buildLengthBudgetPrompt`），
-   從原文算出每條 feature 的字元預算（`lineParityBudget()` 在 `cover-layout.ts`，
-   刻意跟版面 metrics 放同一支，兩邊不可能不一致）。**對所有語系生效，不只 es**；
-   CJK 目標會把 char-slot 預算除以 2。驗證用
-   `scripts/check-translation-budget.ts <MODEL> <locale> [--dry-run]`
-   （`--dry-run` 不用 key、不花錢，直接印出注入的預算段）。
-   **剩 (b) 翻譯審核流程**（分公司審稿，見系統項 #10）。
-   ⚠️ 已量測:ECS1552FP 的英文內容直翻西文**封面會爆版**——features 需 325pt / 上限 320pt，
-   連帶把 overview 可用空間壓到 146pt（需 145pt，過不了 12pt 安全緩衝）。
-   肇因是第 8/9/10 條各多一個 wrap line。**要守的是「行數不超過原文」，不是字數比例**。
-
 **系統**：
-10. **Review Workflow** — PM approve content → MKT generate。需要 `products.review_approval`
-   JSONB + content-hash bound + `/api/generate-pdf` approval gate
-11. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
+8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
+
+**多語言（2026-08-07 現況）**：
+9. **日文規格標籤只翻了 Cloud AP** — `spec_label_translations` 是**產品線層級**;
+   Cloud Camera / L3 Switch / VPN Firewall / AI-NVS 有日文產品但標籤是英文,
+   Broadband EOC 連繁中都沒有（那條線從沒開過標籤編輯器）。
+   補法:`/translations/[line]` → Japanese → AI Translate Empty Fields,每條線約 $0.006。
+   **產 PDF 寫死 `mode=full`,所以沒翻就是印英文。**
+10. **`product_translations.translation_mode` 欄位沒有人讀** — 編輯器的 Light/Full
+   下拉已於 2026-08-07 移除（它什麼都沒改變）,存檔固定寫 `full`。欄位本身還在,
+   要清掉是另一個 migration。
+11. **審核流程已上線但要有人被指派才會生效** — `/settings/users` 點語言旗標。
+   ⚠️ 決定不做第五個角色（editor+review.approve）:分公司維持只審不改。
 
 **Battlecard**（MVP 已上線,功能詳見 README）：
 12. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
@@ -352,42 +349,14 @@ npm run lint
     附帶:`Return EXACTLY the same number of lines` 只寫在 prompt 裡,程式沒驗證 ——
     AI 翻譯那條路徑靠 `englishFeatures.map((_, i) => lines[i] ?? "")` 夾取才沒出事。
 
-66. **`max-width`/`max-height` 只封頂、不放大 —— 圖片尺寸會變成「PNG 像素數說了算」**
-    （2026-08-03 Cloud 封面產品圖事件）—— 封面本來寫 `max-width:290pt; max-height:100%`,
-    於是渲染尺寸 = 該檔的像素數 ×0.75,超過才被壓到 290pt。結果 ECW230 印出 **290×296pt**
-    （InDesign 原稿是 193×195）、ECW230S 290×312（原稿 183×184）;而 ECW260 看起來正常
-    **純粹是它的檔案剛好夠小**。引爆點是 **pitfall 裡那個為 SE110 加的 `sharp.trim()`**——
-    它對每條線每張 PNG 都生效,會同時改寫像素數**和長寬比**（ECW230S: 3800×2138 寬圖 →
-    1313×1413 高圖,渲染高度 163pt → 312pt）。**透明邊距一直在無意間當縮放控制**,裁掉後
-    就從「太小」盪到「太大」。修法:**框決定尺寸,不是檔案** —— 容器固定成參考稿量到的
-    `x 311-587, y 269-464`,img 改 `width/height:100% + object-fit:contain`。
-    ⚠️ 同一支還埋了**寫死的 4pt 重疊**:`.overview-section` 到 x306pt,舊容器卻從 x292pt 起,
-    只要圖寬到撞上限就一定壓到文字（五台實測都是精準 4.0pt）。**改共用版面 CSS 前先去量
-    InDesign 原稿**（`pymupdf` 抽 image bbox）,不要憑感覺調。
-    Transceiver 用 `width/height:auto` opt-out —— tx-cover 是另一種構圖,別讓它繼承填滿規則。
-    hardware 圖已於 `7edc4b7` 收編（`width:530pt` + `max-height` 只當保險）。
-
-    **（2026-08-05 補：Cloud AP 天線圖是第三個受害者,而且反過來踩）** —— 天線圖寫的是
-    `width:158pt; height:158pt`,框有決定尺寸,但**框開得太小又是正方形**:PM 的極座標圖
-    旁邊帶 legend,長寬比 1.00–1.42（中位數 1.37）,`object-fit:contain` 一 letterbox 就變
-    158×115,而欄寬其實有 **259pt**（`(612 − 2×35 padding − 24 gap) / 2`）。兩層一起,實際
-    印出來只有參考稿的三分之一面積。修法同源:`width:100%` 讓欄決定寬度、`height:auto`
-    讓來源比例決定高度、`max-height` 收尾。
-    ⚠️ **`max-height` 這裡不是純保險,是「不要太滿」的那個旋鈕**:頁高預算其實給到
-    2 排 262pt / 三排 160pt,但實際用 **207pt / 150pt**。原因是**方形來源**（ECW215、
-    ECW510L）填滿欄寬後高度就衝到 259pt,第二排的 pill 會直接貼在上一排的圖底下 ——
-    橫式來源自己只要 187–209pt,所以壓低只咬到那些偏方的圖,剛好就是看起來擠的那幾頁。
-    另外 row gap 30pt > column gap 24pt（換排的分隔感要大於換欄）、pill 到圖 14pt。
-    算式寫在該段註解裡,動 row gap / label / padding 就要重算。
-    另一半是資產面:同樣 850×620 的檔,內容填滿度從 **84% 到 100%** 都有 ——
-    **留白等於在偷偷當縮放控制**,所以「同一台機器兩張圖看起來一樣大」根本不成立。
-    `/api/upload-image` 的 radio_pattern 現在會 `trimPlotMargin()`（連白底 JPG 也裁,
-    和 sync 那支只裁 PNG 透明邊的 `trimTransparentEdges` 分開;Drive 仍存 PM 原檔,
-    Storage 存渲染用的裁切版）。既有 72 張已用
-    `scripts/trim-radio-pattern-margins.mjs` 補跑（原檔備份在 repo 外的
-    `~/dev/DS-system/radio-pattern-originals-2026-08-05/`）。
-    ⚠️ 覆蓋 Storage 後 **CDN 會續發舊 bytes 一段時間** —— 量測前記得
-    `page.setCacheEnabled(false)`,否則會以為 backfill 沒生效。
+66. **圖片尺寸要由「框」決定,不是由檔案的像素數決定** — `max-width`/`max-height`
+    只封頂不放大,所以渲染尺寸會變成「PNG 像素數說了算」。封面產品圖、hardware 圖、
+    Cloud AP 天線圖三處都中過,而且 `sharp.trim()` 裁掉透明邊後會同時改寫像素數**和長寬比**,
+    把「太小」盪成「太大」。**留白一直在無意間當縮放控制。**
+    修法一律是 `width/height:100% + object-fit:contain`,框用參考稿量到的尺寸。
+    **改共用版面 CSS 前先用 `pymupdf` 量 InDesign 原稿。**
+    全文（含三次事故的實測數字與 row/column gap 算式）見
+    [`docs/common-pitfalls.md`](docs/common-pitfalls.md#66)。
 
 64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
     兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,

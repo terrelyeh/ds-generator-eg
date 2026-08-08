@@ -9,7 +9,7 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 ### Ask — AI 知識問答（RAG）
 - **自然語言查詢** — 用中文 / 英文 / 日文問產品規格、比較、設定、推薦、法規，答案以公司自有知識庫為依據（不靠模型的泛用知識）
 - **向量語意搜尋** — pgvector + OpenAI Embedding，語意命中而非關鍵字匹配
-- **多 AI 模型即時切換** — Gemini（Pro / Flash / Lite）、GPT、Claude（Opus / Sonnet / Haiku）三大家族
+- **多 AI 模型即時切換** — Gemini、GPT、Claude 三大家族，全部經 OpenRouter；**提供哪些模型、預設哪一個，可在 Settings 自行維護，不用改程式**
 - **跨語言檢索** — 中文問題也能精準命中英文文件；偵測到型號（ECW536）或國家（台灣）時自動補查 + 重新排序
 - **三維度 Prompt** — 回答角度（Persona）、對話對象（User Profile）、產出格式（規劃中）
 - **快速回覆** — 首字約 2–3 秒（平行檢索 + 熱路徑快取 + Flash 免思考）；來源卡片在答案生成前就先出現，不用乾等
@@ -60,7 +60,9 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 - **Ask Personas**（`/settings/personas`）— 管理 AI 問答的 system prompt（角色）
 - **Ask Welcome**（`/settings/ask-welcome`）— 自訂內部 Ask 的歡迎語、說明、範例問題
 - **API Access**（`/settings/api-access`）— 核發 / 管理對外 Search API key + skill 安裝指引
-- **AI Provider API Keys**（`/settings/api-keys`）— Claude / GPT / Gemini 的 key（存共用 `app_settings`，供 Ask 回答、RAG embedding、SpecHub 翻譯共用）
+- **AI Provider API Keys**（`/settings/api-keys`）— OpenRouter key（Ask 與 SpecHub 各一把，方便分開看花費與單獨撤銷）+ OpenAI key（RAG embedding 專用，**不可移除**）
+- **AI Models**（`/settings/models`）— 翻譯與 Ask 的下拉選單提供哪些模型、預設哪一個、要不要關掉 reasoning。換模型是改一行設定
+- **AI 用量與餘額**（`/settings/ai-usage`）— OpenRouter 剩餘額度、近 7/30 天花費、各功能（SpecHub 翻譯 vs Ask）與各模型的花費分佈
 
 ### Access Control
 - **Google OAuth 登入** + Email 白名單 + 4 種角色（Admin / Editor / PM / Viewer），與 SpecHub 共用同一套 RBAC（`@eg/auth`）
@@ -82,7 +84,7 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 | UI | Tailwind CSS v4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + Storage)，與 SpecHub 共用 |
 | Vector Search | pgvector (HNSW) + OpenAI Embedding (`text-embedding-3-small`) |
-| LLM | Claude / GPT / Gemini（multi-provider，可即時切換） |
+| LLM | 經 **OpenRouter** 統一接入 Claude / GPT / Gemini；模型清單存 DB，可在 Settings 維護 |
 | Chat Rendering | react-markdown + remark-gfm + highlight.js |
 | Auth | Supabase Auth + Google OAuth + DB whitelist + 4-role RBAC（`@eg/auth`） |
 | Deployment | Vercel（專案 `engenie-eg`）+ Vercel Cron + GitHub Actions |
@@ -122,4 +124,7 @@ npm run dev -w engenie
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Google Docs 來源的 Drive API service account |
 | `FIRECRAWL_API_KEY` / `JINA_API_KEY` | `web` 來源的內容萃取（Firecrawl → Jina → fetch 層疊） |
 
-> **LLM keys（Claude / GPT / Gemini，含 OpenAI Embedding）不放 env** — 在 Settings ▸ AI Provider API Keys 設定（存共用 `app_settings`，與 SpecHub 共用）；env 可覆蓋但非必要。
+> **LLM keys 不放 env** — 在 Settings ▸ AI Provider API Keys 設定（存共用 `app_settings`，與 SpecHub 共用）；env 可覆蓋但非必要。
+> 現在是 **OpenRouter key ×2**（SpecHub / Ask）+ **OpenAI key**（只給 RAG embedding，
+> OpenRouter 不提供 embedding，換模型等於整個知識庫重建索引，所以這把必須留著）。
+> 讀取帳戶餘額另需 `OPENROUTER_MANAGEMENT_KEY` 環境變數（權限較高，刻意不放設定頁）。
