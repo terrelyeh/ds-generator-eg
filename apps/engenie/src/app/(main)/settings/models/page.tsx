@@ -6,7 +6,7 @@ export default async function ModelsPage() {
   // once, so it sits with whoever owns the credentials.
   await requirePagePermission("settings.edit_api_keys");
   return (
-    <div className="mx-auto max-w-[1100px] px-6 py-8">
+    <div className="mx-auto max-w-[1265px] px-6 py-8">
       <ModelsEditor />
     </div>
   );

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { SUPPORTED_SURFACES } from "@eg/llm/models";
@@ -138,47 +139,54 @@ export function ModelsEditor() {
     }
   }
 
-  if (loading) return <p className="py-12 text-center text-sm text-slate-400">讀取中…</p>;
+  if (loading) return <p className="py-12 text-center text-sm text-muted-foreground/70">讀取中…</p>;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#231f20]">AI 模型</h1>
-          <p className="mt-1 max-w-2xl text-sm text-slate-500">
-            決定翻譯和 Ask 的下拉選單提供哪些模型、預設是哪一個。slug 就是 OpenRouter
-            的 model id —— 換模型是改這裡的一行，不用改程式。
-          </p>
+      <div>
+        <nav className="mb-4 flex items-center gap-1.5 text-base">
+          <Link href="/settings" className="text-muted-foreground transition-colors hover:text-foreground">Settings</Link>
+          <span className="text-muted-foreground/40">/</span>
+          <span className="font-medium text-foreground">AI Models</span>
+        </nav>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[28px] font-bold tracking-tight">AI 模型</h1>
+            <p className="mt-1 text-base text-muted-foreground">
+              決定翻譯和 Ask 的下拉選單提供哪些模型、預設是哪一個。slug 就是 OpenRouter
+              的 model id —— 換模型是改這裡的一行，不用改程式。
+            </p>
+          </div>
+          <Button onClick={save} disabled={!dirty || saving} className="shrink-0">
+            {saving ? "儲存中…" : dirty ? "儲存變更" : "已儲存"}
+          </Button>
         </div>
-        <Button onClick={save} disabled={!dirty || saving} className="shrink-0">
-          {saving ? "儲存中…" : dirty ? "儲存變更" : "已儲存"}
-        </Button>
       </div>
 
-      <div className="space-y-2.5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-relaxed text-slate-600">
+      <div className="space-y-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-xs leading-relaxed text-muted-foreground">
         <p>
-          <span className="font-semibold text-slate-700">要換成別的模型？</span>{" "}
+          <span className="font-semibold text-foreground">要換成別的模型？</span>{" "}
           slug 不能就地改 —— 它是這一列的身分，workspace 和帳本都拿它當參照。
-          改法是<span className="font-semibold text-slate-700">新增一列、把預設移過去、再停用舊的</span>：
+          改法是<span className="font-semibold text-foreground">新增一列、把預設移過去、再停用舊的</span>：
           最下面填新 slug → 勾「出現在」→ 按「設為預設」→ 舊那列取消「啟用」→ 儲存。
         </p>
         <p>
           確定不再需要舊模型後，可以按最右邊的 ✕ 把它從清單刪掉（
-          <span className="font-semibold text-slate-700">帳本裡已經記錄的花費不受影響</span>
+          <span className="font-semibold text-foreground">帳本裡已經記錄的花費不受影響</span>
           ）。還被 Ask workspace 指定的模型會擋下來，不會讓你刪成空指向。
         </p>
-        <p className="text-slate-500">
+        <p className="text-muted-foreground">
           新增前先確認 slug 真的存在 —— 打錯字的 model 要到實際呼叫時才會失敗：
-          <code className="ml-1 rounded bg-slate-200/70 px-1 py-0.5 font-mono">
+          <code className="ml-1 rounded bg-muted px-1 py-0.5 font-mono">
             npx tsx apps/spechub/scripts/list-openrouter-models.ts claude
           </code>
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+      <div className="overflow-x-auto rounded-lg border border-border bg-card">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-200 text-xs text-slate-500">
+            <tr className="border-b border-border text-xs text-muted-foreground">
               <th className="px-3 py-2 text-left font-medium">顯示名稱 / slug</th>
               <th className="px-3 py-2 text-left font-medium">出現在</th>
               <th className="px-3 py-2 text-left font-medium">Reasoning</th>
@@ -189,14 +197,14 @@ export function ModelsEditor() {
           </thead>
           <tbody>
             {rows.map((r) => (
-              <tr key={r.slug} className="border-b border-slate-100 last:border-0">
+              <tr key={r.slug} className="border-b border-border/60 last:border-0">
                 <td className="px-3 py-2">
                   <input
                     value={r.label}
                     onChange={(e) => patch(r.slug, { label: e.target.value })}
-                    className="w-full rounded border border-slate-200 px-2 py-1 text-sm"
+                    className="w-full rounded border border-border px-2 py-1 text-sm"
                   />
-                  <code className="mt-0.5 block font-mono text-[11px] text-slate-400">{r.slug}</code>
+                  <code className="mt-0.5 block font-mono text-[11px] text-muted-foreground/70">{r.slug}</code>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex flex-col gap-1">
@@ -211,7 +219,7 @@ export function ModelsEditor() {
                             className={`rounded border px-1.5 py-0.5 text-[11px] transition ${
                               on
                                 ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                : "border-slate-200 text-slate-400 hover:border-slate-300"
+                                : "border-border text-muted-foreground/70 hover:border-foreground/20"
                             }`}
                           >
                             {SURFACE_LABEL[s] ?? s}
@@ -224,7 +232,7 @@ export function ModelsEditor() {
                               className={`text-[10px] ${
                                 isDefault
                                   ? "font-medium text-engenius-blue"
-                                  : "text-slate-400 underline hover:text-slate-600"
+                                  : "text-muted-foreground/70 underline hover:text-muted-foreground"
                               }`}
                             >
                               {isDefault ? "★ 預設" : "設為預設"}
@@ -239,7 +247,7 @@ export function ModelsEditor() {
                   <select
                     value={r.reasoning_effort ?? ""}
                     onChange={(e) => patch(r.slug, { reasoning_effort: e.target.value || null })}
-                    className="rounded border border-slate-200 px-2 py-1 text-xs"
+                    className="rounded border border-border px-2 py-1 text-xs"
                   >
                     <option value="">模型預設</option>
                     <option value="none">none（關閉）</option>
@@ -260,7 +268,7 @@ export function ModelsEditor() {
                     type="number"
                     value={r.sort_order}
                     onChange={(e) => patch(r.slug, { sort_order: Number(e.target.value) })}
-                    className="w-16 rounded border border-slate-200 px-2 py-1 text-right text-sm tabular-nums"
+                    className="w-16 rounded border border-border px-2 py-1 text-right text-sm tabular-nums"
                   />
                 </td>
                 <td className="px-3 py-2 text-right">
@@ -269,7 +277,7 @@ export function ModelsEditor() {
                     onClick={() => removeRow(r.slug)}
                     title={`從清單刪除 ${r.slug}`}
                     aria-label={`從清單刪除 ${r.slug}`}
-                    className="rounded px-1.5 py-0.5 text-sm text-slate-300 transition hover:bg-red-50 hover:text-red-600"
+                    className="rounded px-1.5 py-0.5 text-sm text-muted-foreground/50 transition hover:bg-red-50 hover:text-red-600"
                   >
                     ✕
                   </button>
@@ -286,18 +294,18 @@ export function ModelsEditor() {
           onChange={(e) => setNewSlug(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addRow()}
           placeholder="anthropic/claude-sonnet-5"
-          className="flex-1 rounded border border-slate-200 px-3 py-2 font-mono text-sm"
+          className="flex-1 rounded border border-border px-3 py-2 font-mono text-sm"
         />
         <Button variant="outline" onClick={addRow}>
           新增模型
         </Button>
       </div>
 
-      <p className="text-xs leading-relaxed text-slate-400">
+      <p className="text-xs leading-relaxed text-muted-foreground/70">
         關閉「啟用」只是把模型從下拉選單拿掉，那一列還留著（要真的清掉才按 ✕）。
         Reasoning 壓低是給 flash 類模型用的 —— 它們的思考發生在第一個 token 之前、
         結果又會被丟掉，開著等於白等 7–15 秒。
-        <span className="text-slate-500">
+        <span className="text-muted-foreground">
           {" "}但不是每個 flash 都吃 <code className="font-mono">none</code>：
           <code className="font-mono">gemini-3.5-flash</code> 設 none 會被 OpenRouter 直接擋掉
           （400 Reasoning is mandatory），所以它用 <code className="font-mono">low</code>。

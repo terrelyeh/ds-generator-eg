@@ -90,12 +90,12 @@ function Stat({
         ? "text-amber-600"
         : tone === "good"
           ? "text-emerald-600"
-          : "text-[#231f20]";
+          : "text-foreground";
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
+    <div className="rounded-lg border border-border bg-card px-4 py-3">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className={`mt-1 text-2xl font-semibold tabular-nums ${toneClass}`}>{value}</div>
-      {sub && <div className="mt-0.5 text-xs text-slate-400 tabular-nums">{sub}</div>}
+      {sub && <div className="mt-0.5 text-xs text-muted-foreground/70 tabular-nums">{sub}</div>}
     </div>
   );
 }
@@ -127,7 +127,7 @@ export function AiUsageDashboard() {
   }, [load]);
 
   if (loading && !data) {
-    return <div className="py-16 text-center text-sm text-slate-400">讀取中…</div>;
+    return <div className="py-16 text-center text-sm text-muted-foreground/70">讀取中…</div>;
   }
   if (!data) return null;
 
@@ -178,25 +178,32 @@ export function AiUsageDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-[#231f20]">AI 用量與餘額</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            OpenRouter 帳戶餘額、燒錢速率與各模型花費。
-            {data.fetchedAt && (
-              <span className="ml-1 tabular-nums text-slate-400">
-                資料時間 {new Date(data.fetchedAt).toLocaleString("zh-TW")}
-              </span>
-            )}
-          </p>
-        </div>
-        <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading}>
-            {loading ? "更新中…" : "重新整理"}
-          </Button>
-          <Link href="https://openrouter.ai/credits" target="_blank" rel="noopener noreferrer">
-            <Button size="sm">前往儲值</Button>
-          </Link>
+      <div>
+        <nav className="mb-4 flex items-center gap-1.5 text-base">
+          <Link href="/settings" className="text-muted-foreground transition-colors hover:text-foreground">Settings</Link>
+          <span className="text-muted-foreground/40">/</span>
+          <span className="font-medium text-foreground">AI Usage</span>
+        </nav>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-[28px] font-bold tracking-tight">AI 用量與餘額</h1>
+            <p className="mt-1 text-base text-muted-foreground">
+              OpenRouter 帳戶餘額、燒錢速率與各模型花費。
+              {data.fetchedAt && (
+                <span className="ml-1 tabular-nums text-muted-foreground/70">
+                  資料時間 {new Date(data.fetchedAt).toLocaleString("zh-TW")}
+                </span>
+              )}
+            </p>
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" onClick={() => load(true)} disabled={loading}>
+              {loading ? "更新中…" : "重新整理"}
+            </Button>
+            <Link href="https://openrouter.ai/credits" target="_blank" rel="noopener noreferrer">
+              <Button size="sm">前往儲值</Button>
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -237,7 +244,7 @@ export function AiUsageDashboard() {
       </div>
 
       {key && (
-        <p className="text-xs text-slate-400">
+        <p className="text-xs text-muted-foreground/70">
           用量數字來自 key「{key.label}」
           {key.limit !== null && <> · 上限 {usd(key.limit)}，剩餘 {usd(key.limit_remaining)}</>}
           {key.is_free_tier && <> · free tier</>}
@@ -250,7 +257,7 @@ export function AiUsageDashboard() {
         </CardHeader>
         <CardContent>
           {surfaces.length === 0 ? (
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground/70">
               還沒有記錄。這份帳本從我們自己的呼叫累積 —— OpenRouter 的公開 API
               無法依 key 拆分花費，所以每次呼叫的成本是我們自己記下來的。
             </p>
@@ -261,26 +268,26 @@ export function AiUsageDashboard() {
                 return (
                   <div key={surface}>
                     <div className="flex items-baseline justify-between gap-3 text-sm">
-                      <span className="font-medium text-[#231f20]">
+                      <span className="font-medium text-foreground">
                         {SURFACE_LABEL[surface] ?? surface}
                       </span>
-                      <span className="tabular-nums text-slate-500">
+                      <span className="tabular-nums text-muted-foreground">
                         {usd(v.cost)}
-                        <span className="ml-2 text-xs text-slate-400">
+                        <span className="ml-2 text-xs text-muted-foreground/70">
                           {compact(v.calls)} 次 · {v.models.size} 個模型
                         </span>
                       </span>
                     </div>
-                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-slate-100">
+                    <div className="mt-1 h-2 overflow-hidden rounded-full bg-muted">
                       <div
-                        className="h-full rounded-full bg-[#03a9f4]"
+                        className="h-full rounded-full bg-engenius-blue"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
                   </div>
                 );
               })}
-              <p className="pt-1 text-xs text-slate-400">
+              <p className="pt-1 text-xs text-muted-foreground/70">
                 不含 BYOK 呼叫（workspace 自帶 key 的花費不算公司成本）。
               </p>
             </div>
@@ -298,15 +305,15 @@ export function AiUsageDashboard() {
               <div className="flex min-w-[560px] items-end gap-1" style={{ height: 160 }}>
                 {days.map(([date, usage]) => (
                   <div key={date} className="group flex flex-1 flex-col items-center justify-end gap-1">
-                    <span className="text-[10px] tabular-nums text-slate-400 opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="text-[10px] tabular-nums text-muted-foreground/70 opacity-0 transition-opacity group-hover:opacity-100">
                       {usd(usage)}
                     </span>
                     <div
-                      className="w-full rounded-t bg-[#03a9f4] transition-colors group-hover:bg-[#0288d1]"
+                      className="w-full rounded-t bg-engenius-blue transition-colors group-hover:bg-engenius-blue-dark"
                       style={{ height: peak > 0 ? `${Math.max(2, (usage / peak) * 130)}px` : "2px" }}
                       title={`${date} — ${usd(usage)}`}
                     />
-                    <span className="text-[9px] tabular-nums text-slate-400">
+                    <span className="text-[9px] tabular-nums text-muted-foreground/70">
                       {date.slice(5)}
                     </span>
                   </div>
@@ -326,7 +333,7 @@ export function AiUsageDashboard() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-slate-200 text-xs text-slate-500">
+                  <tr className="border-b border-border text-xs text-muted-foreground">
                     <th className="py-2 text-left font-medium">模型</th>
                     <th className="py-2 text-left font-medium">Provider</th>
                     <th className="py-2 text-right font-medium">請求數</th>
@@ -339,27 +346,27 @@ export function AiUsageDashboard() {
                   {models.map(([model, m]) => {
                     const pct = totalModelSpend > 0 ? (m.usage / totalModelSpend) * 100 : 0;
                     return (
-                      <tr key={model} className="border-b border-slate-100 last:border-0">
-                        <td className="py-2 pr-3 font-mono text-xs text-[#231f20]">{model}</td>
-                        <td className="py-2 pr-3 text-xs text-slate-500">{m.provider}</td>
-                        <td className="py-2 text-right tabular-nums text-slate-600">
+                      <tr key={model} className="border-b border-border/60 last:border-0">
+                        <td className="py-2 pr-3 font-mono text-xs text-foreground">{model}</td>
+                        <td className="py-2 pr-3 text-xs text-muted-foreground">{m.provider}</td>
+                        <td className="py-2 text-right tabular-nums text-muted-foreground">
                           {compact(m.requests)}
                         </td>
-                        <td className="py-2 text-right tabular-nums text-slate-600">
+                        <td className="py-2 text-right tabular-nums text-muted-foreground">
                           {compact(m.tokens)}
                         </td>
-                        <td className="py-2 text-right tabular-nums font-medium text-[#231f20]">
+                        <td className="py-2 text-right tabular-nums font-medium text-foreground">
                           {usd(m.usage)}
                         </td>
                         <td className="py-2 pl-3 text-right">
                           <div className="flex items-center justify-end gap-2">
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted">
                               <div
-                                className="h-full rounded-full bg-[#03a9f4]"
+                                className="h-full rounded-full bg-engenius-blue"
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
-                            <span className="w-10 text-right tabular-nums text-xs text-slate-500">
+                            <span className="w-10 text-right tabular-nums text-xs text-muted-foreground">
                               {pct.toFixed(0)}%
                             </span>
                           </div>
