@@ -10,9 +10,13 @@ import { can } from "@eg/auth/permissions";
  * nothing ever said they were waiting. A reviewer should not have to be
  * handed a product URL to discover there is work.
  *
- * Reviewers see `draft` rows in the locales they are scoped to; MKT sees
- * `changes_requested` rows, which are theirs to fix. Both sides come from
- * one query and get filtered per role, so the two views can't drift.
+ * Reviewers see `pending_review` rows in the locales they are scoped to;
+ * MKT sees `changes_requested` rows, which are theirs to fix. Both sides
+ * come from one query and get filtered per role, so they can't drift.
+ *
+ * `draft` is deliberately absent: it means MKT has not submitted yet, and
+ * it is also the column default, so listing it put every row that merely
+ * came into existence (a Preview auto-save) in front of a reviewer.
  */
 export async function GET() {
   const user = await getCurrentUser();
@@ -28,7 +32,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from("product_translations")
     .select("product_id, locale, review_status, reviewed_at, translated_at")
-    .in("review_status", ["draft", "changes_requested"])
+    .in("review_status", ["pending_review", "changes_requested"])
     .order("translated_at", { ascending: true });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -48,7 +52,7 @@ export async function GET() {
   // Waiting on a reviewer — only the locales this person may actually act
   // on, so the queue is a to-do list rather than a status board.
   const toReview = isReviewer
-    ? rows.filter((r) => r.review_status === "draft" && inScope(r.locale))
+    ? rows.filter((r) => r.review_status === "pending_review" && inScope(r.locale))
     : [];
 
   // Sent back to MKT. Not locale-filtered: whoever edits fixes all of them.

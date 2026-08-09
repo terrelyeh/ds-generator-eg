@@ -239,3 +239,32 @@ export async function localeHasDesignatedReviewer(locale: string): Promise<boole
   reviewerLocaleCache.set(locale, { has, at: Date.now() });
   return has;
 }
+
+/**
+ * Every locale someone is explicitly scoped to review.
+ *
+ * The translation editor needs this before the first save: the button has
+ * to read "submit for review" rather than "Save & Confirm" on a locale the
+ * user cannot approve, and it can only know that up front by being told.
+ *
+ * Same rule as localeHasDesignatedReviewer — review_locales IS NULL is an
+ * unscoped reviewer, not a designation of every locale — so the two can't
+ * disagree about whether a locale is reviewed.
+ */
+export async function localesWithDesignatedReviewer(): Promise<string[]> {
+  try {
+    const { createAdminClient } = await import("@eg/db/admin");
+    const { data } = await createAdminClient()
+      .from("profiles")
+      .select("review_locales")
+      .not("review_locales", "is", null);
+
+    const rows = (data ?? []) as unknown as { review_locales: string[] | null }[];
+    return [...new Set(rows.flatMap((r) => r.review_locales ?? []))];
+  } catch {
+    // Fail open, like the singular version: an empty list means the editor
+    // shows the ordinary Save & Confirm, and the server still refuses to
+    // approve on a reviewed locale.
+    return [];
+  }
+}

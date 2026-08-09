@@ -100,6 +100,12 @@ interface ProductTranslationEditorProps {
   role?: Role;
   /** Locales this user may approve; null = all. */
   reviewLocales?: string[] | null;
+  /**
+   * Locales that have a designated reviewer, so a Save submits rather than
+   * approves. Needed up front — the button has to say what it will do
+   * before it is pressed, not explain itself afterwards in a toast.
+   */
+  reviewedLocales?: string[];
 }
 
 export function ProductTranslationEditor({
@@ -112,6 +118,7 @@ export function ProductTranslationEditor({
   existingTranslations,
   role,
   reviewLocales = null,
+  reviewedLocales = [],
 }: ProductTranslationEditorProps) {
   const router = useRouter();
   const localeOptions = SUPPORTED_LOCALES.filter((l) => l.value !== "en");
@@ -361,7 +368,7 @@ export function ProductTranslationEditor({
         // it. Claiming "confirmed" here would tell MKT the datasheet is
         // ready when a reviewer still has to sign off.
         if (data.awaiting_review) {
-          setReviewStatuses((prev) => ({ ...prev, [activeLocale]: "draft" }));
+          setReviewStatuses((prev) => ({ ...prev, [activeLocale]: "pending_review" }));
           setDirty(false);
           toast.success(
             data.awaiting_reason === "locale_reviewed"
@@ -432,13 +439,17 @@ export function ProductTranslationEditor({
         }),
       });
       setDirty(false);
-      // 防呆：Draft 狀態下開 Preview 提醒使用者要 Save & Confirm 才能生 PDF。
-      // 已 Confirmed 的 locale 不跳，避免雜訊。
-      if (wasDraft) {
+      // 防呆：還沒定案就開 Preview，提醒要按哪個鈕才能生 PDF。已 Confirmed
+      // 或已送審的 locale 不跳，避免雜訊 —— 那兩種情況都不需要再動作。
+      const previewStatus = reviewStatuses[activeLocale] ?? "draft";
+      if (wasDraft && previewStatus !== "pending_review") {
+        const needsReview = reviewedLocales.includes(activeLocale);
         toast.info(
           `${currentLocaleInfo?.label ?? activeLocale} 預覽已存為 Draft`,
           {
-            description: "正式生 PDF 前請按「Save & Confirm」。",
+            description: needsReview
+              ? "這個語系需要審核，正式生 PDF 前請按「儲存並送審」。"
+              : "正式生 PDF 前請按「Save & Confirm」。",
             duration: 7000,
           }
         );
@@ -594,16 +605,25 @@ export function ProductTranslationEditor({
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Draft / Confirmed badge */}
-          {confirmedLocales.has(activeLocale) ? (
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-700 border border-emerald-200">
-              Confirmed
-            </span>
-          ) : (
-            <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 border border-amber-200">
-              Draft
-            </span>
-          )}
+          {/* Status badge. Four states, because "not submitted yet" and
+              "submitted, waiting for the reviewer" have to look different —
+              when both read Draft there was no sign the button had worked. */}
+          {(() => {
+            const status = reviewStatuses[activeLocale] ?? "draft";
+            const meta =
+              status === "approved"
+                ? { label: "Confirmed", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+                : status === "pending_review"
+                  ? { label: "待審核", cls: "bg-sky-50 text-sky-700 border-sky-200" }
+                  : status === "changes_requested"
+                    ? { label: "已退回", cls: "bg-red-50 text-red-700 border-red-200" }
+                    : { label: "Draft", cls: "bg-amber-50 text-amber-700 border-amber-200" };
+            return (
+              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${meta.cls}`}>
+                {meta.label}
+              </span>
+            );
+          })()}
 
           <button
             onClick={handlePreview}
@@ -616,7 +636,7 @@ export function ProductTranslationEditor({
             </svg>
           </button>
           {(() => {
-            // (A) 拆掉 dirty gate：Draft 狀態下只要有翻譯內容就能 Save，
+            // (A) 拆掉 dirty gate：未定案時只要有翻譯內容就能 Save，
             // 已 Confirmed 的 locale 才需要 dirty 才能再 Save（避免重複按）。
             const hasContent = !!(
               headlineTrans.trim() ||
@@ -624,26 +644,54 @@ export function ProductTranslationEditor({
               overview.trim() ||
               features.some((f) => f.trim())
             );
-            const isDraft = !confirmedLocales.has(activeLocale);
-            const canSave = hasContent && (isDraft || dirty);
-            // (C) Draft + 可按時，按鈕用 amber 強調 + pulse 提示「這裡還沒 confirm」
-            const draftEmphasis =
-              isDraft && canSave && !saving
-                ? "bg-amber-500 text-white hover:bg-amber-500/90 ring-2 ring-amber-300 ring-offset-1 animate-pulse"
-                : "";
+            const status = reviewStatuses[activeLocale] ?? "draft";
+            const settled = status === "approved" || status === "pending_review";
+            const canSave = hasContent && (!settled || dirty);
+
+            // Whether this locale routes through a reviewer decides the whole
+            // vocabulary: on a reviewed locale the button submits, it does
+            // not confirm, and saying "Confirm" promised something the user
+            // has no permission to do.
+            const needsReview = reviewedLocales.includes(activeLocale);
+
+            const label = saving
+              ? "Saving..."
+              : needsReview
+                ? status === "pending_review"
+                  ? dirty ? "重新送審" : "已送審"
+                  : status === "changes_requested"
+                    ? "修改後重新送審"
+                    : "儲存並送審"
+                : "Save & Confirm";
+
+            // The amber pulse means "this still needs your action". Once it
+            // is submitted or approved it does not — leaving it pulsing was
+            // what made a successful submit look like nothing had happened.
+            const needsAction = !settled && canSave && !saving;
+            const draftEmphasis = needsAction
+              ? "bg-amber-500 text-white hover:bg-amber-500/90 ring-2 ring-amber-300 ring-offset-1 animate-pulse"
+              : "";
+
+            const title = !hasContent
+              ? undefined
+              : needsReview
+                ? status === "pending_review"
+                  ? "已送審，等待審核者處理。若又改了內容，按這裡重新送審"
+                  : "這個語系有指定審核者，按下會送出審核；審核通過後才能生成 PDF"
+                : status === "approved"
+                  ? undefined
+                  : "按下將正式 Confirm 並開放 PDF 生成";
+
             return (
               <Button
                 onClick={handleSave}
                 disabled={saving || !canSave}
                 size="sm"
+                variant={status === "pending_review" ? "outline" : "default"}
                 className={draftEmphasis}
-                title={
-                  isDraft && hasContent
-                    ? "目前是 Draft，按下將正式 Confirm 並開放 PDF 生成"
-                    : undefined
-                }
+                title={title}
               >
-                {saving ? "Saving..." : "Save & Confirm"}
+                {label}
               </Button>
             );
           })()}

@@ -87,6 +87,8 @@ interface ProductDetailProps {
   /** Locales this user may approve; null = all. Threaded to the review
    *  panel so the action buttons match what the API will actually allow. */
   reviewLocales?: string[] | null;
+  /** Locales someone is scoped to review — these route through a reviewer. */
+  reviewedLocales?: string[];
   /** Caller-supplied user role. Used to hide editor-only controls
    *  (Generate / Resync / Upload / Mark-as-Reviewed / Translation Editor). */
   role?: Role;
@@ -797,7 +799,7 @@ function QsgUrlCard({
   );
 }
 
-export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null }: ProductDetailProps) {
+export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [] }: ProductDetailProps) {
   // Role-derived flags. Prefixed `roleCan` to avoid collision with the
   // existing `canGenerate` that signals "all required fields are filled
   // (Product Image, Hardware Image, Overview, Features)".
@@ -1422,6 +1424,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           }))}
           role={role}
           reviewLocales={reviewLocales}
+          reviewedLocales={reviewedLocales}
         />
       )}
 

@@ -212,21 +212,24 @@ export async function POST(request: Request) {
   if (isLocalized) {
     const { data: ptRow } = await supabase
       .from("product_translations")
-      .select("confirmed")
+      .select("confirmed, review_status")
       .eq("product_id", product.model_name)
       .eq("locale", lang)
       .maybeSingle();
-    const confirmed = (ptRow as { confirmed?: boolean } | null)?.confirmed;
-    if (!confirmed) {
+    const row = ptRow as { confirmed?: boolean; review_status?: string } | null;
+    if (!row?.confirmed) {
       await releaseLock();
-      return NextResponse.json(
-        {
-          error:
-            `Cannot generate PDF: ${lang} translation is still a Draft. ` +
-            `Click "Save & Confirm" on the Translations tab first.`,
-        },
-        { status: 409 },
-      );
+      // Name the actual blocker. "Click Save & Confirm" is wrong advice
+      // once a locale routes through a reviewer — the editor has already
+      // done their part and is waiting on someone else.
+      const status = row?.review_status ?? "draft";
+      const reason =
+        status === "pending_review"
+          ? `${lang} translation is awaiting review. A designated reviewer has to approve it first.`
+          : status === "changes_requested"
+            ? `${lang} translation was sent back by its reviewer. Address the comments and re-submit.`
+            : `${lang} translation is still a Draft. Save it on the Translations tab first.`;
+      return NextResponse.json({ error: `Cannot generate PDF: ${reason}` }, { status: 409 });
     }
   }
 

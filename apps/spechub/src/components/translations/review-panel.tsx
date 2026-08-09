@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
-export type ReviewStatus = "draft" | "changes_requested" | "approved";
+export type ReviewStatus = "draft" | "pending_review" | "changes_requested" | "approved";
 
 interface Review {
   id: string;
@@ -16,8 +16,12 @@ interface Review {
   created_at: string;
 }
 
+// "尚未送審" and "待審核" used to be the same value, which meant the editor
+// could not show that pressing Save had done anything. They are separate
+// states as of 00037.
 const STATUS_META: Record<ReviewStatus, { label: string; cls: string }> = {
-  draft: { label: "待審核", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+  draft: { label: "尚未送審", cls: "bg-slate-100 text-slate-600 border-slate-200" },
+  pending_review: { label: "待審核", cls: "bg-sky-50 text-sky-700 border-sky-200" },
   changes_requested: { label: "已退回，待修改", cls: "bg-amber-50 text-amber-700 border-amber-200" },
   approved: { label: "已通過", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" },
 };

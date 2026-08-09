@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@eg/db/server";
-import { getCurrentUser } from "@eg/auth/session";
+import { getCurrentUser, localesWithDesignatedReviewer } from "@eg/auth/session";
 import { ProductDetail } from "@/components/product/product-detail";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import { filterRenderableSections } from "@/lib/datasheet/pagination";
@@ -61,6 +61,9 @@ export default async function ProductPage({
       .eq("product_id", model) as unknown as Promise<{ data: ProductTranslation[] | null }>,
   ]);
   const role = user?.role ?? "viewer";
+  // Which locales route through a reviewer. The editor needs this before
+  // the first save so its button can say what it will actually do.
+  const reviewedLocales = await localesWithDesignatedReviewer();
 
   const product = data as ProductQueryRow | null;
 
@@ -184,6 +187,7 @@ export default async function ProductPage({
         englishAcked={enAckValid && layoutReportRaw.status !== "ok"}
         role={role}
         reviewLocales={user?.reviewLocales ?? null}
+        reviewedLocales={reviewedLocales}
       />
     </div>
   );
