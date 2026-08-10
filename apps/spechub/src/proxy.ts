@@ -26,9 +26,24 @@ import { createServerClient } from "@supabase/ssr";
 const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/"];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
 const SERVICE_PATHS = ["/api/sync"];
+/**
+ * Individually published pages — world-readable, no account needed.
+ *
+ * Matched EXACTLY, not by prefix. The design reference is shared with
+ * outside designers who have no SpecHub login, but "/design/" as a prefix
+ * would mean anything later dropped in public/design/ is published the
+ * moment it lands. Adding a page here has to be a deliberate act.
+ *
+ * Anything listed is genuinely public: assume it will be found. The type
+ * spec carries product line names and model counts, which was accepted
+ * when it was published; it is served with <meta name="robots"
+ * content="noindex"> so it stays out of search results.
+ */
+const PUBLIC_EXACT_PATHS = ["/design/datasheet-type-spec.html"];
 
 function isPublic(pathname: string): boolean {
   if (PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))) return true;
+  if (PUBLIC_EXACT_PATHS.includes(pathname)) return true;
   if (
     SERVICE_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))
   ) {
