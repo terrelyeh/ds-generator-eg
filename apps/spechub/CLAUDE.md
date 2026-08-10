@@ -139,6 +139,11 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
 - Primary Blue: `#03a9f4` → `text-engenius-blue`, `bg-engenius-blue`
 - Dark Text: `#231f20`；Gray Text: `#6f6f6f`；NO pure black `#000000`
 - **Heading font**: Plus Jakarta Sans (`font-heading`)；**Body**: Geist Sans
+- **PDF 版型與字級規範**（四種版型的字型／字級／顏色／logo 對照，字級以真實 pt 排出）：
+  站內 `/design/datasheet-type-spec.html`，Settings 有卡片連過去。
+  **那份 HTML 是產生出來的，不要手改** —— 改 `scripts/design/type-spec.template.html`
+  或 `build-type-spec.py`，然後跑 `python3 apps/spechub/scripts/design/build-type-spec.py`
+  重新產生（會同時輸出站內版與 Artifact 版）。Roboto 字檔已存在 script 旁邊，建置不需要網路。
 
 ## Database Tables
 

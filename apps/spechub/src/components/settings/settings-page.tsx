@@ -16,7 +16,7 @@ interface SettingsSection {
   group: "translation" | "system";
   /** If set, only these roles see this card. Omitted = visible to everyone. */
   roles?: Role[];
-  /** External link (EnGenie app) — rendered with <a target="_blank">. */
+  /** Opens in a new tab — external apps, and the static design reference. */
   external?: boolean;
 }
 
@@ -45,6 +45,22 @@ const SETTINGS_SECTIONS: SettingsSection[] = [
     icon: (
       <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
         <path fillRule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
+      </svg>
+    ),
+  },
+  {
+    // Static page, rebuilt by scripts/design/build-type-spec.py. Sits beside
+    // Typography because it documents what that page controls — and what it
+    // doesn't (the other three layouts are code-only).
+    title: "版型與字級規範（設計參考）",
+    description:
+      "四種 datasheet 版型的字型、字級、顏色與 logo 尺寸對照，字級範例以真實 pt 排出。可直接給設計師看。",
+    href: "/design/datasheet-type-spec.html",
+    group: "translation",
+    external: true,
+    icon: (
+      <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+        <path d="M4 3a1 1 0 000 2h12a1 1 0 100-2H4zM3 8a1 1 0 011-1h5a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h5a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h9a1 1 0 110 2H4a1 1 0 01-1-1zm12-7a1 1 0 011 1v6a1 1 0 11-2 0v-6a1 1 0 011-1z" />
       </svg>
     ),
   },
