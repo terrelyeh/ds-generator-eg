@@ -36,6 +36,23 @@ export function isCjkLocale(locale: string | null | undefined): boolean {
 
 /** Google Fonts suitable for each locale */
 export const FONT_OPTIONS: Record<string, { value: string; label: string; import: string }[]> = {
+  // Latin faces. Roboto is what every datasheet has always been set in —
+  // the alternatives are here so the face is a choice rather than a code
+  // change, not because anything is expected to move off Roboto.
+  en: [
+    { value: "Roboto", label: "Roboto (default)", import: "Roboto" },
+    { value: "Inter", label: "Inter", import: "Inter" },
+    { value: "Open Sans", label: "Open Sans", import: "Open+Sans" },
+    { value: "Lato", label: "Lato", import: "Lato" },
+    { value: "Source Sans 3", label: "Source Sans 3", import: "Source+Sans+3" },
+  ],
+  es: [
+    { value: "Roboto", label: "Roboto (default)", import: "Roboto" },
+    { value: "Inter", label: "Inter", import: "Inter" },
+    { value: "Open Sans", label: "Open Sans", import: "Open+Sans" },
+    { value: "Lato", label: "Lato", import: "Lato" },
+    { value: "Source Sans 3", label: "Source Sans 3", import: "Source+Sans+3" },
+  ],
   ja: [
     { value: "Zen Kaku Gothic New", label: "Zen Kaku Gothic New", import: "Zen+Kaku+Gothic+New" },
     { value: "Noto Sans JP", label: "Noto Sans JP", import: "Noto+Sans+JP" },
@@ -53,7 +70,56 @@ export const FONT_OPTIONS: Record<string, { value: string; label: string; import
   ],
 };
 
+/**
+ * Per-locale type metrics for the standard (Cloud-skeleton) layout.
+ *
+ * en/es carry the values that used to be hardcoded in the layout's CSS, so
+ * adding them here changes no output — it only makes them editable. What is
+ * NOT here is leading, body colour and footer treatment: those differ by
+ * script family rather than by locale, and the renderer picks them from
+ * isCjkLocale(). Exposing them per locale would let someone give Spanish
+ * CJK leading, which is exactly how a cover overflows.
+ *
+ * Only this layout reads these. Data Center, Broadband and Edge AI set
+ * their own type in their own components.
+ */
 export const TYPOGRAPHY_DEFAULTS: Record<string, TypographySettings> = {
+  en: {
+    font_family: "Roboto",
+    headline_size: 24,
+    headline_weight: 500,
+    subtitle_size: 19,
+    overview_size: 11,
+    overview_weight: 400,
+    features_size: 11,
+    features_weight: 400,
+    spec_label_size: 7,
+    spec_label_weight: 500,
+    spec_value_weight: 300,
+    footer_size: 5.5,
+    section_title_size: 14,
+    letter_spacing: 0,
+    text_color: "#6f6f6f",
+  },
+  // Spanish renders in the English metrics deliberately: the cover budget is
+  // enforced by line parity in the translation prompt, not by shrinking type.
+  es: {
+    font_family: "Roboto",
+    headline_size: 24,
+    headline_weight: 500,
+    subtitle_size: 19,
+    overview_size: 11,
+    overview_weight: 400,
+    features_size: 11,
+    features_weight: 400,
+    spec_label_size: 7,
+    spec_label_weight: 500,
+    spec_value_weight: 300,
+    footer_size: 5.5,
+    section_title_size: 14,
+    letter_spacing: 0,
+    text_color: "#6f6f6f",
+  },
   ja: {
     font_family: "Zen Kaku Gothic New",
     headline_size: 24,

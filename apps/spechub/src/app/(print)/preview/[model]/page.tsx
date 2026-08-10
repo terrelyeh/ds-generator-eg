@@ -469,26 +469,53 @@ export default async function PreviewPage({
 
   const isCJK = isCjkLocale(lang);
 
-  // Load typography settings from DB (with defaults fallback)
-  let typo: TypographySettings | null = null;
-  if (isCJK) {
-    const defaults = TYPOGRAPHY_DEFAULTS[lang] ?? TYPOGRAPHY_DEFAULTS["ja"];
-    try {
-      const { data: typoData } = await supabase
-        .from("app_settings")
-        .select("value")
-        .eq("key", `typography_${lang}`)
-        .single() as { data: { value: string } | null };
+  // Load typography settings from DB (with defaults fallback).
+  //
+  // Every locale now, not just CJK. en/es defaults are the values that were
+  // hardcoded in this file's CSS, so the rendered output is unchanged — they
+  // are simply editable at Settings ▸ Typography instead of in code.
+  const typoDefaults = TYPOGRAPHY_DEFAULTS[lang] ?? TYPOGRAPHY_DEFAULTS["en"];
+  let typo: TypographySettings = typoDefaults;
+  try {
+    const { data: typoData } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", `typography_${lang}`)
+      .single() as { data: { value: string } | null };
 
-      if (typoData?.value) {
-        typo = { ...defaults, ...JSON.parse(typoData.value) };
-      } else {
-        typo = defaults;
-      }
-    } catch {
-      typo = defaults;
+    if (typoData?.value) {
+      typo = { ...typoDefaults, ...JSON.parse(typoData.value) };
     }
+  } catch {
+    // Keep the defaults — a settings lookup failure must not restyle a PDF.
   }
+
+  // Leading, body colour and footer treatment are properties of the SCRIPT,
+  // not of the locale, so they stay out of the editable settings: CJK needs
+  // taller lines and a darker body than Latin, and letting someone give
+  // Spanish CJK leading is how a cover overflows. Latin values here are the
+  // ones the CSS below used before en/es got a settings entry.
+  const script = isCJK
+    ? {
+        headlineLh: 1.25,
+        overviewLh: 1.5,
+        featuresLh: 1.4,
+        specLh: 1.5,
+        featuresColor: typo.text_color,
+        footerWeight: 400,
+        footerColor: "#555555",
+        footerLh: 1.5,
+      }
+    : {
+        headlineLh: 1.15,
+        overviewLh: 1.35,
+        featuresLh: 1.35,
+        specLh: 1.4,
+        featuresColor: "#4a4a4a",
+        footerWeight: 300,
+        footerColor: "#6d6e71",
+        footerLh: 1.45,
+      };
 
   // Font: from typography settings or defaults
   const chosenFont = typo?.font_family;
@@ -913,41 +940,43 @@ ${isCJK ? `
 }
 ` : ""}
 
-${typo ? `
-/* ===== Per-locale typography (from DB settings) ===== */
+/* ===== Per-locale typography (Settings ▸ Typography) =====
+   Sizes/weights come from the settings; leading and body colour come from
+   the script family. For en/es both resolve to the values that were written
+   directly in the CSS above, so this block restates them rather than
+   restyling anything. */
 .product-fullname-cloud,
 .product-fullname-standard {
-  font-weight: ${typo.headline_weight}; font-size: ${typo.headline_size}pt; line-height: 1.25;
+  font-weight: ${typo.headline_weight}; font-size: ${typo.headline_size}pt; line-height: ${script.headlineLh};
 }
 .product-subtitle-cloud,
 .product-subtitle-standard {
   font-size: ${typo.subtitle_size}pt;
 }
 .overview-text {
-  font-weight: ${typo.overview_weight}; font-size: ${typo.overview_size}pt; line-height: 1.5; color: ${typo.text_color};
+  font-weight: ${typo.overview_weight}; font-size: ${typo.overview_size}pt; line-height: ${script.overviewLh}; color: ${typo.text_color};
 }
 .section-title, .features-title {
   font-size: ${typo.section_title_size}pt;
 }
 .feature-item {
-  font-weight: ${typo.features_weight}; font-size: ${typo.features_size}pt; line-height: 1.4; color: ${typo.text_color};
+  font-weight: ${typo.features_weight}; font-size: ${typo.features_size}pt; line-height: ${script.featuresLh}; color: ${script.featuresColor};
 }
 .spec-label {
-  font-size: ${typo.spec_label_size}pt; font-weight: ${typo.spec_label_weight}; line-height: 1.5;
+  font-size: ${typo.spec_label_size}pt; font-weight: ${typo.spec_label_weight}; line-height: ${script.specLh};
 }
 .spec-value {
-  font-weight: ${typo.spec_value_weight}; line-height: 1.5;
+  font-weight: ${typo.spec_value_weight}; line-height: ${script.specLh};
 }
 .spec-category-header {
   letter-spacing: ${typo.letter_spacing}pt;
 }
 .footer-disclaimer {
-  font-size: ${typo.footer_size}pt; font-weight: 400; color: #555555; line-height: 1.5;
+  font-size: ${typo.footer_size}pt; font-weight: ${script.footerWeight}; color: ${script.footerColor}; line-height: ${script.footerLh};
 }
 .footer-version {
-  font-size: ${typo.footer_size}pt; font-weight: 400; color: #555555;
+  font-size: ${typo.footer_size}pt; font-weight: ${script.footerWeight}; color: ${script.footerColor};
 }
-` : ""}
 `,
         }}
       />
