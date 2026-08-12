@@ -61,7 +61,9 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 - **Ask Welcome**（`/settings/ask-welcome`）— 自訂內部 Ask 的歡迎語、說明、範例問題
 - **API Access**（`/settings/api-access`）— 核發 / 管理對外 Search API key + skill 安裝指引
 - **AI Provider API Keys**（`/settings/api-keys`）— OpenRouter key（Ask 與 SpecHub 各一把，方便分開看花費與單獨撤銷）+ OpenAI key（RAG embedding 專用，**不可移除**）
-- **AI Models**（`/settings/models`）— 翻譯與 Ask 的下拉選單提供哪些模型、預設哪一個、要不要關掉 reasoning。換模型是改一行設定
+- **AI Models**（`/settings/models`）— 翻譯與 Ask 的下拉選單提供哪些模型、預設哪一個、reasoning 檔位。
+  換模型 = 新增一列 slug → 設為預設 → 停用舊的（頁面上有寫步驟）；不再需要的列可以刪掉，
+  但還被某個 Ask workspace 指定的模型會擋下來並告訴你是哪幾個
 - **AI 用量與餘額**（`/settings/ai-usage`）— OpenRouter 剩餘額度、近 7/30 天花費、各功能（SpecHub 翻譯 vs Ask）與各模型的花費分佈
 
 ### Access Control

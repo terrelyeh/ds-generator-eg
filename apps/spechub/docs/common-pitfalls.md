@@ -184,3 +184,25 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     ⚠️ 覆蓋 Storage 後 **CDN 會續發舊 bytes 一段時間** —— 量測前記得
     `page.setCacheEnabled(false)`,否則會以為 backfill 沒生效。
 
+59. **locale 的「可否生成」與「版號」都不能掉回英文**（2026-07-23 ECW260 ja 事件）——
+    preview 渲染的是 locale 解析後的內容（`localeHardwareImage || EN`、翻譯後 overview/
+    features），但 `canGenerate` 當時檢查英文欄位，導致「日文版齊全但英文硬體圖缺」的
+    ECW260 永遠無法生成。**gate 一定要跟 render 讀同一組值**。同一支也踩到:
+    ① transceiver 本來就沒有 hardware image，gate 要比照 product-detail 豁免;
+    ② `version` 掉回 `product.current_version` 會讓沒產過的 ja 顯示「Regenerate v1.1」——
+    locale 版號互相獨立，沒有就是 `0.0`（toolbar 的 never-generated sentinel）。
+    另注意 **Model page 的 🌐 語言選單走另一條路徑（只 gate `confirmed`）**，所以會出現
+    「preview 擋、Model page 可生成」的不一致。
+
+65. **Drive 目標資料夾進了垃圾桶 → 系統會「成功」但檔案消失**（2026-07-30
+    Broadband EOC 事件）—— 垃圾桶裡的資料夾**API 仍可寫入**,所以 generate-pdf
+    照樣回報成功,兩份英文版 PDF 靜靜躺在垃圾桶。圖片那邊反而更陰:資料夾被
+    連帶刪除時裡面的圖也標記 trashed,`trashed = false` 查詢**回空清單而非報錯**,
+    呼叫端會把「列得到但空的」當成「PM 把圖刪了」→ 清空 DB 欄位。
+    現在兩條路徑都有防護:`assertFolderUsable`（drive-versions,直接 throw）與
+    `folderUnavailable`（drive-images,降級成「沒看到」不動 DB）。
+    ⚠️ **`drive_folder_id` / `ds_images_folder_id` 指向的資料夾會被 PM 手動刪掉**
+    —— EOC 與 Orin Box 都被 engenius.ad 刪過（新建的線他們不認識）。建線後要跟
+    PM 說一聲那個資料夾是系統在用的。
+
+（#59 / #65 於 2026-08-12 自 CLAUDE.md 歸檔：兩者的根因都已在程式裡防住——`canGenerate` 已改讀 locale 解析後的值，Drive 兩條路徑都有 `assertFolderUsable`／`folderUnavailable`。留存是因為「為什麼要這樣寫」不看紀錄推不出來。）

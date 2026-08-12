@@ -101,13 +101,17 @@ locale-aware 圖片雙向同步。另見 [`docs/sync-and-notifications.md`](docs
 PDF 生成(Regenerate/New Version、Puppeteer 自我認證、Drive folder auto-create/dedupe、
 locale 未核准阻擋)、動態 cover 版面 + spec 2 欄分頁(`lib/datasheet/`,**locale-aware
 metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet
-(en/ja/zh-TW/**es**、三態審核、per-locale typography 僅 CJK、**6 層 AI 翻譯 prompt**
+(en/ja/zh-TW/**es**、**四態審核**(`draft`→`pending_review`→`approved`/`changes_requested`,
+`draft` = 還沒送審、`pending_review` = 已送審待審,佇列只撈後者;`confirmed` 是
+`review_status='approved'` 的 generated column)、per-locale typography **四語系皆可調**、**6 層 AI 翻譯 prompt**
 ——第 6 層是從原文算出的行數預算,防止譯文變長把封面擠爆)。**改 PDF/版面/翻譯前先讀該檔。**
 
 ### Authentication & RBAC → [`docs/auth-rbac.md`](docs/auth-rbac.md)
 
-三層強制:`proxy.ts`(session refresh + auth gate;公開路由只剩 `/auth/`、service
-path `/api/sync`)→ `(main)/layout.tsx`(whitelist 檢查)→ per-route gates
+三層強制:`proxy.ts`(session refresh + auth gate;公開路由 = `/auth/` 前綴、service
+path `/api/sync`、以及 `PUBLIC_EXACT_PATHS` **精確比對**的單頁白名單——目前只有
+`/design/datasheet-type-spec.html`,**全站唯一免登入的頁面**,故意不用 `/design/` 前綴
+以免之後丟進那個資料夾的檔案自動變公開)→ `(main)/layout.tsx`(whitelist 檢查)→ per-route gates
 (`gate()`/`gateOrCron()`/`adminOnly()`/`requirePagePermission()` + client `can()`)。
 4 角色矩陣在 **`@eg/auth/permissions`**(packages/auth)。**改 auth/proxy/權限前先讀該檔。**
 
@@ -139,6 +143,9 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
 - Primary Blue: `#03a9f4` → `text-engenius-blue`, `bg-engenius-blue`
 - Dark Text: `#231f20`；Gray Text: `#6f6f6f`；NO pure black `#000000`
 - **Heading font**: Plus Jakarta Sans (`font-heading`)；**Body**: Geist Sans
+- **字級可調範圍**：`Settings ▸ Typography` 現在涵蓋 **en / es / ja / zh-TW 四個語系**
+  （2026-08-10 起拉丁語系也進來了,值就是原本寫死在 CSS 裡的那組,輸出零變化）。
+  **但只管得到版型 A** —— B/C/D 的字級寫死在各自元件裡,要改得動程式。
 - **PDF 版型與字級規範**（四種版型的字型／字級／顏色／logo 對照，字級以真實 pt 排出）：
   站內 `/design/datasheet-type-spec.html`，Settings 有卡片連過去。
   ⚠️ **這一頁是全站唯一免登入的頁面**（`proxy.ts` 的 `PUBLIC_EXACT_PATHS`，精確比對不是前綴），
@@ -189,8 +196,12 @@ auth.users → profiles ← email_whitelist.invited_by
 - **Solution sidebar**: 預設收合；展開 `w-64`。**有產品線的 solution 排在
   「soon」佔位之前**（在元件內依 `product_line_count` 推導,不是 `sort_order`——
   這樣新線一上就自動上移）
-- **Datasheet 佈景共 6 種變體**（Cloud 藍 / 灰 / Transceiver 綠 / DC navy /
-  Broadband 鋼藍 / Station navy + Edge AI teal series）→ 見
+- **Datasheet 版型 = 4 個結構元件 + 標準版型的 4 種配色**（不是「6 種變體」）：
+  A 標準 `preview/[model]/page.tsx`（Cloud 藍 / 灰 / Transceiver 綠 / Station 鋼藍,
+  只有 `getTheme()` 換色）、B `datacenter-preview.tsx`、C `broadband-preview.tsx`
+  （單機+系列共用）、D `edge-ai-series-preview.tsx`（**寫死 en,不支援多語系**）。
+  **每一種的字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
+  （站上免登入可看,字級以真實 pt 排出）。新增產品線見
   [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
 ## Current Status
@@ -200,21 +211,10 @@ auth.users → profiles ← email_whitelist.invited_by
 ### 🔜 Next Steps
 
 **產品線 / 版型**：
-1. **PM 待補圖** — **Cloud PDU 4 台全缺**（`_product` / `_hardware`;DS Images 空的）;
-   **Station AP 3 台全缺**（`_product` / `_hardware` + antenna:**三台都是
-   `_Port1/_Port2 × H/E-plane`**——Station 線不分頻段,ENS621EXT 雖是 dual-radio
-   也一樣走 port）;
-   **EOC 6 台全缺**（`_product` / `_hardware` ×2 / antenna ×4）;
-   **AI Server S21 / S11 全缺**（SE110 / SE210 / S41 已完整）;
-   **Orin Box 缺 7 張 `series_*`**。⚠️ 檔名**單底線**（S41 曾因 `S41__product.png`
-   雙底線靜默同步不到,改名後才進來）。
-2. **EOC 日文版待 PM 在翻譯頁 Confirm** — 6 台都已翻好但還是 Draft,Confirm 前
-   生不出正式 PDF。內容/架構圖/字型都已就緒。
-3. **EOC sheet 有筆錯誤待 PM 修** — EOC600/610/620 的第一條 feature 寫
-   "supports up to 16 devices in PtMP",但規格表 Max Subscribers = **4**
-   （那句是從 EOC655 複製的）。會印在 datasheet 第 2 頁。
-4. **Cloud AP 素材缺口** — 27 台裡 21 台在 Drive 沒有 datasheet 用圖 → 英文版 PDF 生不出來
-   （日/中文版不受影響,各語系有自己的 hardware image）。其他線各缺 1–3 台。
+1. **待補素材 / 待 PM 處理的項目**（缺圖、EOC 日文待 Confirm、EOC sheet 的
+   「16 devices」錯誤、Cloud AP 素材缺口）→ 見
+   [`docs/pending-assets.md`](docs/pending-assets.md)。
+   ⚠️ 圖檔名是**單底線**（`S41__product.png` 雙底線曾靜默同步不到）。
 
 **Datasheet 系統**：
 5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
@@ -234,7 +234,13 @@ auth.users → profiles ← email_whitelist.invited_by
 10. **`product_translations.translation_mode` 欄位沒有人讀** — 編輯器的 Light/Full
    下拉已於 2026-08-07 移除（它什麼都沒改變）,存檔固定寫 `full`。欄位本身還在,
    要清掉是另一個 migration。
-11. **審核流程已上線但要有人被指派才會生效** — `/settings/users` 點語言旗標。
+11. 🔴 **審核流程目前休眠（2026-08-12 Terrel 主動關掉,說是「先」移除）** —— 程式全在,
+   但**沒有任何語系被指定**,所以每個語系都是 MKT 一鍵 Confirm。
+   **看到 review 相關程式碼不要以為它在跑**;要重開就回 `/settings/users` 點語言旗標。
+   ⚠️ **`review_locales` 三種值語意不同**:`NULL` = 可審全部但不指定任何語系（admin 正確預設）;
+   `['es']` = 指定 es 需審核且此人只能審 es;`[]` = 不指定任何語系**且此人什麼都不能審**。
+   關流程時只清掉「被指定的語系」,**不要把 admin 也設成 `[]`** —— 曾因此讓 ECS1528FP/es
+   卡在 `pending_review` 而全公司沒人能核准。
    ⚠️ 決定不做第五個角色（editor+review.approve）:分公司維持只審不改。
 
 **Battlecard**（MVP 已上線,功能詳見 README）：
@@ -266,7 +272,7 @@ npm run lint
 
 ## Common Pitfalls
 
-> Pitfalls #1–#44, #46–#49, #51–#53 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> Pitfalls #1–#44, #46–#49, #51–#53, #59, #65 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 > #54–#58（RAG/聊天相關）搬到 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 45. **Supabase silent insert/update 是這個系統最久的雷** — supabase-js 的 write 不 throw on
@@ -278,17 +284,6 @@ npm run lint
     BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、CATEGORY_HEADER 22pt；
     **CJK row metrics 更大**（JA 24pt / zh-TW 25pt）。`splitIntoPages(sections, locale)` 必須傳
     locale。每改 preview CSS 必須同步檢查這些常數。
-
-
-59. **locale 的「可否生成」與「版號」都不能掉回英文**（2026-07-23 ECW260 ja 事件）——
-    preview 渲染的是 locale 解析後的內容（`localeHardwareImage || EN`、翻譯後 overview/
-    features），但 `canGenerate` 當時檢查英文欄位，導致「日文版齊全但英文硬體圖缺」的
-    ECW260 永遠無法生成。**gate 一定要跟 render 讀同一組值**。同一支也踩到:
-    ① transceiver 本來就沒有 hardware image，gate 要比照 product-detail 豁免;
-    ② `version` 掉回 `product.current_version` 會讓沒產過的 ja 顯示「Regenerate v1.1」——
-    locale 版號互相獨立，沒有就是 `0.0`（toolbar 的 never-generated sentinel）。
-    另注意 **Model page 的 🌐 語言選單走另一條路徑（只 gate `confirmed`）**，所以會出現
-    「preview 擋、Model page 可生成」的不一致。
 
 
 60. **`products.product_image` / `hardware_image` 是 `NOT NULL DEFAULT ''`** —— sync 的
@@ -330,19 +325,8 @@ npm run lint
     新增版型組件時**必收 `locale` + `translation` 兩個 prop**,並且:
     ① 標題走 `dict` 不要寫字串;② 硬體圖優先用該語系的（callout 印在圖裡）;
     ③ `PrintToolbar` 要收真 locale + `translationConfirmed`;④ `canGenerate`
-    讀「該語系實際渲染的值」(同 pitfall #59)。
+    讀「該語系實際渲染的值」(同 pitfall #59,已歸檔於 [`docs/common-pitfalls.md`](docs/common-pitfalls.md))。
 
-
-65. **Drive 目標資料夾進了垃圾桶 → 系統會「成功」但檔案消失**（2026-07-30
-    Broadband EOC 事件）—— 垃圾桶裡的資料夾**API 仍可寫入**,所以 generate-pdf
-    照樣回報成功,兩份英文版 PDF 靜靜躺在垃圾桶。圖片那邊反而更陰:資料夾被
-    連帶刪除時裡面的圖也標記 trashed,`trashed = false` 查詢**回空清單而非報錯**,
-    呼叫端會把「列得到但空的」當成「PM 把圖刪了」→ 清空 DB 欄位。
-    現在兩條路徑都有防護:`assertFolderUsable`（drive-versions,直接 throw）與
-    `folderUnavailable`（drive-images,降級成「沒看到」不動 DB）。
-    ⚠️ **`drive_folder_id` / `ds_images_folder_id` 指向的資料夾會被 PM 手動刪掉**
-    —— EOC 與 Orin Box 都被 engenius.ad 刪過（新建的線他們不認識）。建線後要跟
-    PM 說一聲那個資料夾是系統在用的。
 
 67. **翻譯的 feature 陣列不會跟著英文縮短 —— 多出來的尾巴 UI 看不見卻會印出來**
     （2026-08-03 ECP106 zh-TW 事件）—— PM 7/31 從 sheet 拿掉 2 條 feature（其實是把
@@ -388,16 +372,23 @@ npm run lint
     **同一類錯誤的第三次**（#61 用子字串比對 category、#63 版型寫死 locale）——
     現在改成明確的 `CJK_LOCALES` set + `isCjkLocale()`,`preview/[model]`、
     `typography-editor`、typography API 三處共用。
-    衍生規則:**per-locale typography 是 CJK 專屬功能**。拉丁語系（en / es）用 Roboto +
-    英文 metrics,不要有 defaults entry、不要出現在 typography 設定頁
-    （否則是一個按了 Save 卻不影響 datasheet 的面板）。
+    ⚠️ **原本的衍生規則已於 2026-08-10 作廢**。當時寫「拉丁語系不要有 defaults entry、
+    不要出現在設定頁」,現在 en / es **兩者都有了** —— 而且是安全的,正因為這條 pitfall
+    的修法（明確 set 而非推導)已經就位。真正的規則是:
+    **`TYPOGRAPHY_DEFAULTS` 有沒有某語系 ≠ 那個語系是不是 CJK**,兩件事各自判斷。
+    設定頁的語系清單現在從 `TYPOGRAPHY_DEFAULTS` 推導,所以「設定頁列出它」⇔
+    「算繪端真的會讀它」,不會再出現按了 Save 卻沒作用的面板。
+    **行高／內文色／頁尾樣式刻意不進設定頁** —— 那三項跟著文字系統走（拉丁 vs CJK）,
+    由 `preview/[model]` 依 `isCjkLocale()` 挑。開放成可依語系設定 = 有人能把西文
+    設成 CJK 行距 = 封面破版。
 
 ## 詳細文件
 
 - [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md) — 拆分藍圖（歸屬/階段/驗收/回滾）
 - [`docs/file-structure.md`](docs/file-structure.md) — 完整檔案地圖 + 放東西的規則
 - [`docs/schema.md`](docs/schema.md) — DB schema:關係圖、擁有權、各表欄位語意
-- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive #1–#25
+- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive（#1–#25 及後續歸檔的 #59 / #65）
+- [`docs/pending-assets.md`](docs/pending-assets.md) — 待補圖 / 待 PM 處理的庫存清單（某台產不出 PDF 先查這裡）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步
 - [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md) — PDF 生成、版面、多語言 + AI 翻譯

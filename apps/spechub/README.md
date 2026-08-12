@@ -93,6 +93,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 
 ### Translation Review（翻譯審核）
 - **指派審核者即啟用**：在 Users 頁把某人指定為某語言的審核者，該語言的翻譯從此需要審核才能產 PDF；沒有指派審核者的語言維持一鍵完成
+- **狀態看得出進度**：`Draft`（還沒送審）→ `待審核`（已送出，等審核者）→ `已通過` / `已退回`。
+  按下「儲存並送審」之後畫面會真的改變，按鈕變成「已送審」，不會讓人分不清送出去了沒
 - **三種審核動作**：通過 / 退回修改（必須寫明要改什麼）/ 只留言（不改變狀態）
 - **意見可以指到位置**：Overview、第幾條 Feature、規格表、整體
 - **意見保留歷次紀錄**：來回修改時看得到前幾輪講過什麼
@@ -106,8 +108,12 @@ SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base�
 → 功能全貌見 **[EnGenie README](../engenie/README.md)**；RAG / Ask / 知識庫的技術細節見 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 ### Settings
+- **版型與字級規範**（`/design/datasheet-type-spec.html`）— 四種 datasheet 版型的字型、
+  字級、顏色與 logo 尺寸對照，字級範例以真實 pt 排出。**這頁不需登入**，可以直接把連結
+  給外部設計師
 - **翻譯詞庫**（`/settings/glossary`）— 公司認可翻譯術語，分 Global 和產品線專屬
 - **Typography**（`/settings/typography`）— 每個語言獨立的字型、字級、字重設定
+  - 涵蓋 **English / Spanish / 日本語 / 繁體中文** 四個語言（適用標準版型的 datasheet）
   - Google Font 選擇器（預設 + 自定義 URL 添加）
   - Split layout：左設定、右即時 Datasheet Preview（可縮放）
 - **Users**（`/settings/users`）— 邀請 / 移除使用者、改 role（admin only）

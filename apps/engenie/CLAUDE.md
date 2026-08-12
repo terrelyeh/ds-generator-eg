@@ -94,6 +94,10 @@ src/
    使用者找不到；已搬回本 app 與 API Keys / AI 用量並列。
    **spechub 保留一支唯讀的 `/api/settings/models?surface=translate`** 給它的翻譯下拉用
    —— 兩 app 共用同一個 DB，各自直讀，不跨 app 呼叫。
+   **slug 不能就地改**（它是那列的身分，`ask_workspaces.provider` / `chat_sessions.provider` /
+   帳本 `llm_usage_events.model` 都拿它當參照）——換模型 = **新增一列 → 移預設 → 停用舊的**，
+   頁面上有寫。列可以刪（✕），但 **PUT 會擋掉還被 ask_workspace 指定的 slug 並點名是哪幾個**，
+   避免刪成空指向。
 4. **產品表唯讀約定**：spechub 改產品表 schema 前要確認本 app 的
    ingest-products/taxonomy 不受影響。migrations 一律放 `packages/db/supabase/migrations/`。
 
