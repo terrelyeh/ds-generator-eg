@@ -610,9 +610,17 @@ export function ProductTranslationEditor({
               when both read Draft there was no sign the button had worked. */}
           {(() => {
             const status = reviewStatuses[activeLocale] ?? "draft";
+            // "待審核" is only true while the locale actually has a reviewer.
+            // Once the assignment is removed, a row left in pending_review is
+            // waiting for nobody — saying otherwise sends someone looking for
+            // a reviewer who does not exist.
+            const stranded =
+              status === "pending_review" && !reviewedLocales.includes(activeLocale);
             const meta =
               status === "approved"
                 ? { label: "Confirmed", cls: "bg-emerald-50 text-emerald-700 border-emerald-200" }
+                : stranded
+                  ? { label: "待確認", cls: "bg-amber-50 text-amber-700 border-amber-200" }
                 : status === "pending_review"
                   ? { label: "待審核", cls: "bg-sky-50 text-sky-700 border-sky-200" }
                   : status === "changes_requested"
@@ -645,14 +653,20 @@ export function ProductTranslationEditor({
               features.some((f) => f.trim())
             );
             const status = reviewStatuses[activeLocale] ?? "draft";
-            const settled = status === "approved" || status === "pending_review";
-            const canSave = hasContent && (!settled || dirty);
-
             // Whether this locale routes through a reviewer decides the whole
             // vocabulary: on a reviewed locale the button submits, it does
             // not confirm, and saying "Confirm" promised something the user
             // has no permission to do.
             const needsReview = reviewedLocales.includes(activeLocale);
+
+            // "Settled" means there is nothing useful left to press. Waiting
+            // on a reviewer counts — but only while the locale still HAS one.
+            // Un-assign the reviewer and a pending_review row is stranded:
+            // no reviewer can approve it, and the dirty gate refused to let
+            // Save re-confirm it, so clearing it needed a throwaway edit.
+            const awaitingReviewer = needsReview && status === "pending_review";
+            const settled = status === "approved" || awaitingReviewer;
+            const canSave = hasContent && (!settled || dirty);
 
             const label = saving
               ? "Saving..."
@@ -662,7 +676,9 @@ export function ProductTranslationEditor({
                   : status === "changes_requested"
                     ? "修改後重新送審"
                     : "儲存並送審"
-                : "Save & Confirm";
+                : status === "pending_review"
+                  ? "改為 Confirmed"
+                  : "Save & Confirm";
 
             // The amber pulse means "this still needs your action". Once it
             // is submitted or approved it does not — leaving it pulsing was
@@ -680,14 +696,16 @@ export function ProductTranslationEditor({
                   : "這個語系有指定審核者，按下會送出審核；審核通過後才能生成 PDF"
                 : status === "approved"
                   ? undefined
-                  : "按下將正式 Confirm 並開放 PDF 生成";
+                  : status === "pending_review"
+                    ? "這個語系已經不需要審核了。按下會直接改為 Confirmed 並開放 PDF 生成"
+                    : "按下將正式 Confirm 並開放 PDF 生成";
 
             return (
               <Button
                 onClick={handleSave}
                 disabled={saving || !canSave}
                 size="sm"
-                variant={status === "pending_review" ? "outline" : "default"}
+                variant={awaitingReviewer ? "outline" : "default"}
                 className={draftEmphasis}
                 title={title}
               >
