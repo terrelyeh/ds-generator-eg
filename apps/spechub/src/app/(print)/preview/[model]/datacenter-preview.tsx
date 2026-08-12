@@ -96,7 +96,7 @@ function estLines(text: string, charsPerLine: number): number {
 const HERO_HEIGHT = 335;
 const HERO_PAD_TOP = 26;
 const HERO_PAD_BOTTOM = 20;
-const HEADLINE_SIZE = 24;
+const HEADLINE_SIZE = PT.cover;  // the cover step, not a private 24
 const HEADLINE_LINE_HEIGHT = 1.28;
 const HEADLINE_WIDTH = 520;
 const PRODUCT_COL = 268;     // right-hand render column
@@ -384,7 +384,7 @@ body {
    hierarchy still reads (all-bold would flatten the block). */
 .hero-headline {
   font-family: ${displayFont}; font-weight: ${WT.medium};
-  font-size: ${HEADLINE_SIZE}pt; line-height: ${HEADLINE_LINE_HEIGHT};
+  font-size: ${PT.cover}pt; line-height: ${HEADLINE_LINE_HEIGHT};
   color: white; max-width: ${HEADLINE_WIDTH}pt;
 }
 .hero-lower { display: flex; gap: 16pt; margin-top: ${LOWER_GAP}pt; }

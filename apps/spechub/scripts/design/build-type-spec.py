@@ -257,6 +257,29 @@ tbl_b = build("B", B)
 tbl_c = build("C", C)
 tbl_d = build("D", D)
 
+
+def typecell(layout, selector):
+    """`11 pt / w400` for one layout's role, read from its stylesheet.
+
+    A cell may instead be literal text, for the roles whose size is decided
+    at render time rather than in CSS — Broadband's headline switches on
+    copy length, so there is no static value to read and pretending
+    otherwise would be worse than saying what the mechanism is.
+    """
+    if selector is None:
+        return "—"
+    if not (selector.startswith(".") or selector == "body"):
+        return selector
+    size = px(layout, selector, "font-size")
+    weight = px(layout, selector, "font-weight", 400)
+    return f"{num(size)} pt / w{num(weight)}"
+
+
+def cmp_type(label, a, b, c, d):
+    """A comparison row whose four cells are read, not typed."""
+    return (label, typecell("A", a), typecell("B", b), typecell("C", c), typecell("D", d))
+
+
 # ── Cross-layout comparisons ────────────────────────────────────────────
 def cmp_table(rows):
     return "\n".join(
@@ -264,33 +287,37 @@ def cmp_table(rows):
     )
 
 cmp_title = cmp_table([
-    ("主標題",   "24 pt / w500", "24 pt / w500", "24 pt / w500<br>（>46 字降 17）", "24 pt / w500"),
+    cmp_type("主標題", ".product-fullname-cloud", ".hero-headline",
+             f'{num(BROADBAND_MAX)} → {num(PT["lead"])} pt 自動<br>（>46 字降階）', ".hero-title"),
     ("主標行高", "1.15",         "1.28",         "1.18",                          "1.18"),
     ("主標顏色", "#231f20",      "白字／深藍",     "白字／鋼藍",                     "白字"),
-    ("副標",     "17 pt / w500", "型號 14 pt / w600", "系列 14 pt / w400",         "17 pt / w400"),
-    ("區塊標題", "14 pt / w600", "17 pt / w600",  "14 pt / w600",                 "17 pt / w600"),
+    cmp_type("副標／型號", ".product-subtitle-cloud", ".hero-model", ".hero-series", ".hero-series"),
+    cmp_type("區塊標題", ".section-title", ".section-title", ".section-title", ".section-title"),
     ("標題字體", "Manrope",      "Manrope",       "Manrope",                      "Manrope"),
     ("內文字體", "Roboto",       "Roboto",        "Roboto",                       "Roboto"),
 ])
 
 cmp_body = cmp_table([
-    ("body 基準", "7 pt",  "8 pt",  "8 pt",  "7 pt"),
-    ("Overview",  "11 pt / w400", "11 → 9 pt 自動", "9 → 8 pt 自動", "10 pt / w400"),
+    cmp_type("body 基準", "body", "body", "body", "body"),
+    ("Overview",  typecell("A", ".overview-text"),
+                  " → ".join(num(v) for v in LADDERS["dcOverview"]) + " pt 自動",
+                  " → ".join(num(v) for v in LADDERS["broadbandOverview"]) + " pt 自動",
+                  typecell("D", ".overview-text")),
     ("Overview 行高", "1.35（CJK 1.5）", "1.55", "1.65", "1.55"),
-    ("Feature 標題", "14 pt / w600", "11 pt / w700", "10 pt / w500", "8 pt / w700"),
-    ("Feature 內文", "11 pt / w400", "9 pt / w400",  "9 pt / w400",  "8 pt / w400"),
+    cmp_type("Feature 標題", ".features-title", ".feature-title", ".block-title", ".feature-group-title"),
+    cmp_type("Feature 內文", ".feature-item", ".feature-text", ".benefit", ".feature-bullet"),
     ("內文色",    "#6f6f6f / #4a4a4a", "#525355", "#6f6f6f", "#6f6f6f"),
     ("條列圓點",  "0.5em CSS 圓",  "0.5em CSS 圓",  "0.5em CSS 圓",  "0.5em CSS 圓"),
 ])
 
 cmp_spec = cmp_table([
     ("版面",     "雙欄",          "全寬表格",      "全寬表格",      "全寬表格"),
-    ("分類列",   "8 pt / w500", "8 pt / w400", "8 pt / w500",  "8 pt / w400"),
+    cmp_type("分類列", ".spec-category-header", ".specs-band th", ".band-row th", ".specs-band th"),
     ("分類列底", "#6b7580",       "#0073bf",       "#1e6796",      "#86c9cf"),
-    ("標籤",     "7 pt / w500",   "8 pt / w400",   "7.5 pt / w500", "7 pt / w400"),
-    ("數值",     "7 pt / w400",   "8 pt / w400",   "7 pt / w400",  "7 pt / w400"),
+    cmp_type("標籤", ".spec-label", ".spec-row td", ".desc-row td", ".model-name-row td"),
+    cmp_type("數值", ".spec-value", ".spec-row td", ".spec-row td", ".spec-row td"),
     ("數值行高", "1.4（CJK 1.5）", "1.4",          "1.4",          "1.35"),
-    ("註腳",     "7 pt / w300", "5.5 pt / w300", "5.5 pt / w300", "5.5 pt / w300"),
+    cmp_type("註腳／頁尾", ".spec-footnote", ".footer-disclaimer", ".footer-disclaimer", ".footer-disclaimer"),
 ])
 
 # ── Assemble ────────────────────────────────────────────────────────────
