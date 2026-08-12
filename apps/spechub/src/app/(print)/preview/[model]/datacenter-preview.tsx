@@ -3,6 +3,7 @@ import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { cjkFontFor, displayFontStack } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
+import { PT, WT, LADDER } from "@/lib/datasheet/scale";
 import type {
   Product,
   ProductLine,
@@ -136,7 +137,7 @@ function estWrappedLines(text: string, size: number, columnWidth: number, widthF
  * rather than shrunk further.
  */
 function fitOverviewSize(overview: string, available: number): number {
-  const ladder = [10, 9.5, 9];
+  const ladder = LADDER.dcOverview;
   for (const size of ladder) {
     const height =
       estWrappedLines(overview, size, COPY_WIDTH, BODY_WIDTH_FACTOR) * size * OVERVIEW_LINE_HEIGHT;
@@ -334,16 +335,16 @@ body {
    300 is its lightest. */
 .page-number {
   position: absolute; right: 24pt; bottom: 16pt;
-  font-family: ${bodyFont}; font-weight: 300;
-  font-size: 7pt; color: #58595b;
+  font-family: ${bodyFont}; font-weight: ${WT.light};
+  font-size: ${PT.tableSm}pt; color: #58595b;
 }
 
 /* Page titles (EDCC / Technical Specifications / Hardware Overview).
    Weight 600 at 17pt reads as the same emphasis as the 24pt/500 cover
    headline — smaller type needs a touch more weight to match. */
 .section-title {
-  font-family: ${displayFont}; font-weight: 600;
-  font-size: 17pt; color: ${BLUE};
+  font-family: ${displayFont}; font-weight: ${WT.semi};
+  font-size: ${PT.lead}pt; color: ${BLUE};
 }
 
 .img-placeholder {
@@ -367,7 +368,7 @@ body {
 }
 .cover-header .solution-label {
   position: absolute; right: 36pt; top: 50%; transform: translateY(-50%);
-  font-family: ${displayFont}; font-weight: 200; font-size: 14pt; color: white;
+  font-family: ${displayFont}; font-weight: ${WT.medium}; font-size: ${PT.head}pt; color: white;
 }
 /* Reference structure: full-width headline across the top, then a row of
    copy (left) beside the product render (right). FLOW, not fixed offsets —
@@ -389,8 +390,8 @@ body {
 .hero-lower { display: flex; gap: 16pt; margin-top: ${LOWER_GAP}pt; }
 .hero-copy { flex: 1 1 auto; min-width: 0; max-width: ${COPY_WIDTH}pt; }
 .hero-model {
-  font-family: ${displayFont}; font-weight: 600;
-  font-size: 15pt; color: ${YELLOW}; margin-bottom: 8pt;
+  font-family: ${displayFont}; font-weight: ${WT.semi};
+  font-size: ${PT.head}pt; color: ${YELLOW}; margin-bottom: 8pt;
 }
 /* Body copy, so the body face — this was the one place a layout set
    running text in the display face. See BODY_WIDTH_FACTOR: the cover's
@@ -426,10 +427,10 @@ body {
   font-weight: 500; font-size: 8pt; padding: 1.5pt 7pt; margin-bottom: 4pt;
 }
 .feature-title {
-  font-weight: 700; font-size: 10.5pt; color: #3f4042; margin-bottom: 3pt;
+  font-weight: ${WT.bold}; font-size: ${PT.body}pt; color: #3f4042; margin-bottom: 3pt;
   line-height: 1.3;
 }
-.feature-text { font-weight: 400; font-size: 7.5pt; color: #525355; line-height: 1.5; }
+.feature-text { font-weight: ${WT.regular}; font-size: ${PT.bodySm}pt; color: #525355; line-height: 1.5; }
 .feature-text .fb { margin-bottom: 3pt; }
 /* flat fallback (no ds_features): plain bullet list, two columns */
 .cover-features-flat {
@@ -438,7 +439,7 @@ body {
 }
 .flat-bullet {
   display: flex; align-items: baseline; gap: 5pt; break-inside: avoid;
-  font-size: 8.5pt; color: #525355; line-height: 1.55; margin-bottom: 5pt;
+  font-size: ${PT.table}pt; color: #525355; line-height: 1.55; margin-bottom: 5pt;
 }
 ${bulletDotCss(".flat-bullet .dot", BLUE)}
 
@@ -459,7 +460,9 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
 .edcc-feature-title {
   font-size: 10pt; font-weight: 400; color: #231f20; margin-bottom: 3pt;
 }
-.edcc-feature-text { font-size: 7.5pt; line-height: 1.5; color: #525355; }
+/* One step below the cover grid: the EDCC page has six fixed blocks and
+   no auto-fit, and bodySm overruns the page by ~11pt. */
+.edcc-feature-text { font-size: ${PT.table}pt; line-height: 1.5; color: #525355; }
 
 /* ── Technical specifications ─────────────────────────────────────── */
 .specs-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; }
@@ -471,7 +474,7 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
   padding: 4.5pt 8pt; text-align: left;
 }
 .specs-band th {
-  background: ${BLUE}; color: white; font-weight: 400; font-size: 8.5pt;
+  background: ${BLUE}; color: white; font-weight: ${WT.regular}; font-size: ${PT.table}pt;
   text-align: center; padding: 5pt; border-color: ${BLUE};
 }
 .model-name-row td { background: #6d6e71; color: white; font-size: 8pt; }
@@ -485,7 +488,7 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
 /* ── Hardware overview ─────────────────────────────────────────────── */
 .hw-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; }
 .hw-title-row { padding: 22pt 0 4pt; }
-.hw-subtitle { font-size: 10.5pt; color: #231f20; font-weight: 400; margin-bottom: 10pt; }
+.hw-subtitle { font-size: ${PT.body}pt; color: #231f20; font-weight: ${WT.regular}; margin-bottom: 10pt; }
 /* Two renders share the page evenly (one per half) rather than stacking
    at the top; a single render centres in the whole area. */
 .hw-images {

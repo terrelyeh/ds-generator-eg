@@ -3,6 +3,7 @@ import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
+import { PT, WT } from "@/lib/datasheet/scale";
 import type { ProductLine } from "@eg/db/types";
 import type { SeriesFeatureGroup, SeriesSpecsData } from "@/lib/google/sheets-extra";
 import type { SeriesImages } from "@/lib/google/drive-images";
@@ -282,7 +283,7 @@ body {
   font-family: ${displayFontStack()};
 }
 .section-title {
-  font-weight: 500; font-size: 17pt; color: ${TEAL}; margin-bottom: 10pt;
+  font-weight: ${WT.semi}; font-size: ${PT.lead}pt; color: ${TEAL}; margin-bottom: 10pt;
 }
 
 /* Image placeholder (preview only — canGenerate blocks official PDFs
@@ -324,7 +325,7 @@ body {
 }
 .hero-series {
   position: absolute; left: 36pt; top: 161pt; z-index: 2;
-  font-weight: 400; font-size: 17.5pt; color: white;
+  font-weight: ${WT.regular}; font-size: ${PT.lead}pt; color: white;
 }
 .hero-product {
   position: absolute; right: 24pt; top: 130pt; z-index: 1;
@@ -354,7 +355,9 @@ body {
 }
 .feature-bullet {
   display: flex; align-items: baseline; gap: 5pt;
-  font-weight: 400; font-size: 8pt; color: #6f6f6f; line-height: 1.4;
+  /* Not bodySm: this box starts at 448pt and grows downward with no
+     budget, so one step up runs 17pt past the page edge. */
+  font-weight: ${WT.regular}; font-size: ${PT.table}pt; color: #6f6f6f; line-height: 1.4;
   margin-left: 6pt;
 }
 ${bulletDotCss(".feature-bullet .dot")}

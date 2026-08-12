@@ -11,6 +11,12 @@ about who owns the document shell:
   scripts/design/type-spec.artifact.html  — for publishing as an Artifact,
                                             which supplies its own shell
 
+⚠️ The values below are TRANSCRIBED from the layout components — this page
+does not read them. `lib/datasheet/scale.ts` is the source of truth for the
+type scale; if you change a size or weight there, update it here too and
+re-run this script, or the public reference starts lying to designers.
+Verify with `scale-audit` against the rendered pages, not by reading CSS.
+
 Everything is inlined: the Roboto (Apache-2.0) and Manrope (OFL-1.1) Latin
 subsets, checked in next to this script so the build needs no network, plus
 the three logo PNGs. The page has to show real type at real sizes in the
@@ -38,25 +44,16 @@ def spec(text, size, weight=400, color="#16202B", bg=None, lh=1.25, disp=False):
 
 # ── Ladder: every distinct size, isolated to size alone (uniform weight) ──
 LADDER = [
-    (24,   "Cloud Managed 24-Port Gigabit PoE+ Switch", "A 封面主標 · B 封面主標 · D 封面主標"),
-    (21,   "EnGenius EOC Outdoor Bridge Series",        "C 封面主標（標題 ≤ 46 字元）"),
-    (19,   "CloudSwitch L2Plus 24 Full PoE",            "A 封面副標"),
-    (17.5, "Powered by NVIDIA Jetson Orin",             "D 封面副標"),
-    (17,   "Key Features and Benefits",                 "B 區塊標題 · D 區塊標題 · A CJK 副標 · C 封面主標（> 46 字元）"),
-    (15,   "SE110 Edge Network Appliance",              "B 封面型號 · C 封面系列名"),
-    (14,   "Specifications",                            "A 區塊標題 · C 區塊標題 · B Solution 標籤 · 頁首分類"),
+    (24,   "Cloud Managed 24-Port Gigabit PoE+ Switch", "四種版型的封面主標"),
+    (17,   "EnGenius EOC Outdoor Bridge Series",        "A／D 封面副標 · B／D 區塊標題 · C 長主標"),
+    (14,   "Specifications",                            "四種版型的頁首分類 · A／C 區塊標題 · B 封面型號 · C 系列名"),
     (12,   "ECS1528FP",                                 "A 封面型號 · 頁首「Datasheet」"),
-    (11.5, "クラウド管理型スイッチ",                       "A CJK（ja）Overview"),
-    (11,   "802.3at/af PoE+ with a 410W total power budget",   "A Overview／Features · C 機種名 · D 硬體副標"),
-    (10.5, "Centralized Cloud Management",              "B Feature 標題 · B 硬體副標 · A CJK（ja）Features"),
-    (10,   "Deploy, monitor and troubleshoot from a single pane of glass.", "B 封面 Overview（上限）· D 內文 · C 區塊標題"),
-    (9.5,  "Deploy, monitor and troubleshoot from a single pane of glass.", "B 封面 Overview（中）"),
-    (9,    "Deploy, monitor and troubleshoot from a single pane of glass.", "B 封面 Overview（下限）"),
-    (8.5,  "Supports IEEE 802.3at/af PoE+ on all 24 downlink ports.",       "B Flat bullet · B 規格表頭 · C 機種 Overview（上限）"),
-    (8,    "Supports IEEE 802.3at/af PoE+ on all 24 downlink ports.",       "B／C／D 規格數值與表頭 · D Feature"),
-    (7.5,  "Hardware Specifications · 24 × 10/100/1000 Mbps RJ45 ports",    "A 規格分類列 · B Feature 內文 · C 機種 Overview（下限）"),
-    (7,    "Power over Ethernet — IEEE 802.3at/af, 410W total power budget", "A 規格標籤／數值 · C／D 規格 · 全版型頁碼"),
-    (6,    "EnGenius Technologies, Inc. 記載內容は予告なく変更する場合があります。", "A CJK 頁尾"),
+    (11,   "802.3at/af PoE+ with a 410W total power budget", "A Overview／Features · B Feature 標題與硬體副標 · B Overview 上限"),
+    (10,   "Deploy, monitor and troubleshoot from a single pane of glass.", "B 封面 Overview 階梯中間階"),
+    (9,    "Supports IEEE 802.3at/af PoE+ on all 24 downlink ports.", "B／C Feature 內文 · B Overview 下限 · C Overview 上限"),
+    (8.5,  "Supports IEEE 802.3at/af PoE+ on all 24 downlink ports.", "C 機種 Overview 階梯中間階"),
+    (8,    "Supports IEEE 802.3at/af PoE+ on all 24 downlink ports.", "規格表 · D Feature 內文 · B EDCC 內文 · C Overview 下限"),
+    (7,    "Power over Ethernet — IEEE 802.3at/af, 410W total power budget", "A／C／D 規格 · 全版型頁碼 · A 規格註腳"),
     (5.5,  "EnGenius Technologies, Inc. All rights reserved. Specifications subject to change without notice.", "全版型頁尾聲明"),
 ]
 
@@ -85,16 +82,16 @@ def sw(hexv):
 CLOUD = "#03a9f4"
 A = [
     ("封面主標",    "24",  "500", "1.15", "#231f20", spec("Cloud Managed 24-Port Gigabit PoE+ Switch", 24, 500, "#231f20", lh=1.15, disp=True)),
-    ("封面副標",    "19",  "500", "—",    CLOUD,     spec("CloudSwitch L2Plus 24 Full PoE", 19, 500, CLOUD, disp=True)),
+    ("封面副標",    "17",  "500", "—",    CLOUD,     spec("CloudSwitch L2Plus 24 Full PoE", 17, 500, CLOUD, disp=True)),
     ("封面型號",    "12",  "500", "—",    CLOUD,     spec("ECS1528FP", 12, 500, CLOUD, disp=True)),
-    ("區塊標題",    "14",  "500", "—",    CLOUD,     spec("Overview", 14, 500, CLOUD, disp=True)),
+    ("區塊標題",    "14",  "600", "—",    CLOUD,     spec("Overview", 14, 600, CLOUD, disp=True)),
     ("Overview 內文", "11", "400", "1.35", "#6f6f6f", spec("Designed for high-density deployments in offices and campuses.", 11, 400, "#6f6f6f", lh=1.35)),
-    ("Features 標題", "14", "500", "—",   CLOUD,     spec("Key Features", 14, 500, CLOUD, disp=True)),
+    ("Features 標題", "14", "600", "—",   CLOUD,     spec("Key Features", 14, 600, CLOUD, disp=True)),
     ("Feature 項目", "11",  "400", "1.35", "#4a4a4a", spec("802.3at/af PoE+ with a 410W total power budget", 11, 400, "#4a4a4a", lh=1.35)),
-    ("規格分類列",  "7.5", "500", "—",    "白字／底 #6b7580", spec("Hardware Specifications", 7.5, 500, "#ffffff", bg="#6b7580")),
+    ("規格分類列",  "8",   "500", "—",    "白字／底 #6b7580", spec("Hardware Specifications", 8, 500, "#ffffff", bg="#6b7580")),
     ("規格標籤",    "7",   "500", "1.4",  CLOUD,     spec("Power over Ethernet", 7, 500, CLOUD)),
-    ("規格數值",    "7",   "300", "1.4",  "#6f7073", spec("IEEE 802.3at/af, 410W total budget", 7, 300, "#6f7073")),
-    ("規格註腳",    "7.5", "300", "1.55", "#6f6f6f", spec("* Actual data throughput may vary by environment.", 7.5, 300, "#6f6f6f")),
+    ("規格數值",    "7",   "400", "1.4",  "#6f7073", spec("IEEE 802.3at/af, 410W total budget", 7, 400, "#6f7073")),
+    ("規格註腳",    "7",   "300", "1.55", "#6f6f6f", spec("* Actual data throughput may vary by environment.", 7, 300, "#6f6f6f")),
     ("頁首「Datasheet」", "12", "300", "—", "白字／底為主題色", spec("Datasheet", 12, 300, "#ffffff", bg=CLOUD, disp=True)),
     ("頁首分類",    "14",  "500", "—",    "白字／底為主題色", spec("Cloud Switch", 14, 500, "#ffffff", bg=CLOUD, disp=True)),
     ("頁碼",        "7",   "300", "—",    "#6f7073", spec("3", 7, 300, "#6f7073")),
@@ -127,21 +124,22 @@ tbl_cjk = "\n".join(
 # ── B · Data Center ─────────────────────────────────────────────────────
 DCN, DCB, DCY = "#16355c", "#0073bf", "#f4d768"
 B = [
-    ("Solution 標籤", "Manrope", "14",   "200", "白字／深藍底", spec("Data Center", 14, 200, "#ffffff", bg=DCN, disp=True)),
+    ("Solution 標籤", "Manrope", "14",   "500", "白字／深藍底", spec("Data Center", 14, 500, "#ffffff", bg=DCN, disp=True)),
     ("封面主標",     "Manrope", "24",   "500", "白字／深藍漸層底", spec("AI-Ready Edge Infrastructure", 24, 500, "#ffffff", bg=DCN, lh=1.28, disp=True)),
-    ("封面型號",     "Manrope", "15",   "600", DCY,      spec("SE110", 15, 600, DCY, bg=DCN, disp=True)),
-    ("封面 Overview", "Roboto", "10 → 9.5 → 9", "300", "白字 95%", spec("Purpose-built for distributed AI workloads at the network edge.", 10, 300, "#ffffff", bg=DCN, lh=1.55)),
+    ("封面型號",     "Manrope", "14",   "600", DCY,      spec("SE110", 14, 600, DCY, bg=DCN, disp=True)),
+    ("封面 Overview", "Roboto", "11 → 10 → 9", "300", "白字 95%", spec("Purpose-built for distributed AI workloads at the network edge.", 11, 300, "#ffffff", bg=DCN, lh=1.55)),
     ("區塊標題",     "Manrope", "17",   "600", DCB,      spec("Key Features", 17, 600, DCB, disp=True)),
     ("Feature 標籤", "Roboto",  "8",    "500", "白字／藍底", spec("EDCC", 8, 500, "#ffffff", bg=DCB)),
-    ("Feature 標題", "Roboto",  "10.5", "700", "#3f4042", spec("Centralized Cloud Management", 10.5, 700, "#3f4042", lh=1.3)),
-    ("Feature 內文", "Roboto",  "7.5",  "400", "#525355", spec("Monitor every node from a single dashboard.", 7.5, 400, "#525355", lh=1.5)),
-    ("條列（無 chip）", "Roboto", "8.5", "400", "#525355", spec("Supports redundant power and hot-swap drives.", 8.5, 400, "#525355", lh=1.55)),
+    ("Feature 標題", "Roboto",  "11",   "700", "#3f4042", spec("Centralized Cloud Management", 11, 700, "#3f4042", lh=1.3)),
+    ("Feature 內文", "Roboto",  "9",    "400", "#525355", spec("Monitor every node from a single dashboard.", 9, 400, "#525355", lh=1.5)),
+    ("條列（無 chip）", "Roboto", "8",   "400", "#525355", spec("Supports redundant power and hot-swap drives.", 8, 400, "#525355", lh=1.55)),
     ("EDCC 小標",    "Roboto",  "10",   "400", "#231f20", spec("Node View", 10, 400, "#231f20")),
-    ("規格表頭",     "Roboto",  "8.5",  "400", "白字／藍底", spec("Specifications", 8.5, 400, "#ffffff", bg=DCB)),
+    ("EDCC 內文",    "Roboto",  "8",    "400", "#525355", spec("Manage servers even when the OS is unresponsive.", 8, 400, "#525355", lh=1.5)),
+    ("規格表頭",     "Roboto",  "8",    "400", "白字／藍底", spec("Specifications", 8, 400, "#ffffff", bg=DCB)),
     ("機種名列",     "Roboto",  "8",    "400", "白字／底 #6d6e71", spec("SE110", 8, 400, "#ffffff", bg="#6d6e71")),
     ("料號列",       "Roboto",  "8",    "400", "白字／底 #939598", spec("SE110-01", 8, 400, "#ffffff", bg="#939598")),
     ("規格數值",     "Roboto",  "8",    "400", "#525355", spec("Intel Atom x6425E, 4 cores", 8, 400, "#525355", lh=1.4)),
-    ("硬體副標",     "Roboto",  "10.5", "400", "#231f20", spec("Front Panel", 10.5, 400, "#231f20")),
+    ("硬體副標",     "Roboto",  "11",   "400", "#231f20", spec("Front Panel", 11, 400, "#231f20")),
     ("頁碼",         "Roboto",  "7",    "300", "#58595b", spec("4", 7, 300, "#58595b")),
     ("頁尾聲明",     "Roboto",  "5.5",  "300", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
 ]
@@ -156,16 +154,16 @@ ST = "#1e6796"
 C = [
     ("頁首「Datasheet」", "12",  "300", "—",   "白字／鋼藍底", spec("Datasheet", 12, 300, "#ffffff", bg=ST, disp=True)),
     ("頁首分類",     "14",  "500", "—",    "白字／鋼藍底", spec("Broadband", 14, 500, "#ffffff", bg=ST, disp=True)),
-    ("封面主標",     "21 → 17", "700", "1.18", "白字／鋼藍底", spec("Long-Range Outdoor Ethernet over Coax", 21, 700, "#ffffff", bg=ST, lh=1.18, disp=True)),
-    ("封面系列名",   "15",  "400", "—",    "白字／鋼藍底", spec("EOC620", 15, 400, "#ffffff", bg=ST, disp=True)),
-    ("區塊標題",     "14",  "700", "—",    ST,        spec("Benefits", 14, 700, ST, disp=True)),
+    ("封面主標",     "24 → 17", "500", "1.18", "白字／鋼藍底", spec("Long-Range Outdoor Ethernet over Coax", 24, 500, "#ffffff", bg=ST, lh=1.18, disp=True)),
+    ("封面系列名",   "14",  "400", "—",    "白字／鋼藍底", spec("EOC620", 14, 400, "#ffffff", bg=ST, disp=True)),
+    ("區塊標題",     "14",  "600", "—",    ST,        spec("Benefits", 14, 600, ST, disp=True)),
     ("小節標題",     "10",  "500", "—",    ST,        spec("Deployment", 10, 500, ST, disp=True)),
     ("小節內文",     "8",   "400", "1.55", "#6f6f6f", spec("Reuses existing coaxial cabling, no new trenching required.", 8, 400, "#6f6f6f", lh=1.55)),
-    ("機種 Overview", "8.5 → 8 → 7.5", "400", "1.65", "#6f6f6f", spec("Delivers gigabit throughput over legacy coax runs up to 1 km.", 8.5, 400, "#6f6f6f", lh=1.65)),
-    ("Benefits 內文", "7.5", "400", "1.5", "#6f6f6f", spec("Cuts installation time on brownfield sites.", 7.5, 400, "#6f6f6f", lh=1.5)),
+    ("機種 Overview", "9 → 8.5 → 8", "400", "1.65", "#6f6f6f", spec("Delivers gigabit throughput over legacy coax runs up to 1 km.", 9, 400, "#6f6f6f", lh=1.65)),
+    ("Benefits 內文", "9",   "400", "1.5", "#6f6f6f", spec("Cuts installation time on brownfield sites.", 9, 400, "#6f6f6f", lh=1.5)),
     ("附註",         "7",   "300", "—",    "#a7a9ac", spec("Measured in a controlled environment.", 7, 300, "#a7a9ac")),
     ("規格表頭",     "8",   "500", "—",    "白字／鋼藍底", spec("Specifications", 8, 500, "#ffffff", bg=ST)),
-    ("規格分帶（深）", "7.5", "500", "—",  "白字／底 #6c6d71", spec("Interface", 7.5, 500, "#ffffff", bg="#6c6d71")),
+    ("規格分帶（深）", "8",   "500", "—",  "白字／底 #6c6d71", spec("Interface", 8, 500, "#ffffff", bg="#6c6d71")),
     ("規格分帶（淺）", "7",  "400", "—",   "白字／底 #888b8d", spec("EOC620", 7, 400, "#ffffff", bg="#888b8d")),
     ("規格數值",     "7",   "400", "1.4",  "#6f7073", spec("1 × 10/100/1000 Mbps RJ45", 7, 400, "#6f7073", lh=1.4)),
     ("機種名（圖說）", "11", "400", "—",   "#4a4a4a", spec("EOC620", 11, 400, "#4a4a4a")),
@@ -184,8 +182,8 @@ D = [
     ("頁首「Datasheet」", "12", "300", "—",  "白字／teal 底", spec("Datasheet", 12, 300, "#ffffff", bg="#5aa8b0", disp=True)),
     ("頁首分類",     "14",  "500", "—",    "白字／teal 底", spec("Edge AI Box", 14, 500, "#ffffff", bg="#5aa8b0", disp=True)),
     ("封面主標",     "24",  "500", "1.18", "白字",     spec("Powered by NVIDIA Jetson Orin", 24, 500, "#ffffff", bg="#5aa8b0", lh=1.18, disp=True)),
-    ("封面副標",     "17.5", "400", "—",   "白字",     spec("Orin Box Series", 17.5, 400, "#ffffff", bg="#5aa8b0", disp=True)),
-    ("區塊標題",     "17",  "500", "—",    TL,        spec("Software Architecture", 17, 500, "#5aa8b0", disp=True)),
+    ("封面副標",     "17",  "400", "—",    "白字",     spec("Orin Box Series", 17, 400, "#ffffff", bg="#5aa8b0", disp=True)),
+    ("區塊標題",     "17",  "600", "—",    TL,        spec("Software Architecture", 17, 600, "#5aa8b0", disp=True)),
     ("內文",         "10",  "400", "1.55", "#6f6f6f", spec("Runs the full NVIDIA JetPack stack out of the box.", 10, 400, "#6f6f6f", lh=1.55)),
     ("Feature 標題", "8",   "700", "—",    "#6f6f6f", spec("Ruggedized Chassis", 8, 700, "#6f6f6f")),
     ("Feature 內文", "8",   "400", "1.4",  "#6f6f6f", spec("Fanless, −20 to 60°C operating range.", 8, 400, "#6f6f6f", lh=1.4)),
@@ -210,33 +208,33 @@ def cmp_table(rows):
     )
 
 cmp_title = cmp_table([
-    ("主標題",   "24 pt / w500", "24 pt / w500", "21 pt / w700<br>（>46 字降 17）", "24 pt / w500"),
+    ("主標題",   "24 pt / w500", "24 pt / w500", "24 pt / w500<br>（>46 字降 17）", "24 pt / w500"),
     ("主標行高", "1.15",         "1.28",         "1.18",                          "1.18"),
     ("主標顏色", "#231f20",      "白字／深藍",     "白字／鋼藍",                     "白字"),
-    ("副標",     "19 pt / w500", "型號 15 pt / w600", "系列 15 pt / w400",         "17.5 pt / w400"),
-    ("區塊標題", "14 pt / w500", "17 pt / w600",  "14 pt / w700",                 "17 pt / w500"),
+    ("副標",     "17 pt / w500", "型號 14 pt / w600", "系列 14 pt / w400",         "17 pt / w400"),
+    ("區塊標題", "14 pt / w600", "17 pt / w600",  "14 pt / w600",                 "17 pt / w600"),
     ("標題字體", "Manrope",      "Manrope",       "Manrope",                      "Manrope"),
     ("內文字體", "Roboto",       "Roboto",        "Roboto",                       "Roboto"),
 ])
 
 cmp_body = cmp_table([
     ("body 基準", "7 pt",  "8 pt",  "8 pt",  "7 pt"),
-    ("Overview",  "11 pt / w400", "10 → 9 pt 自動", "8.5 → 7.5 pt 自動", "10 pt / w400"),
+    ("Overview",  "11 pt / w400", "11 → 9 pt 自動", "9 → 8 pt 自動", "10 pt / w400"),
     ("Overview 行高", "1.35（CJK 1.5）", "1.55", "1.65", "1.55"),
-    ("Feature 標題", "14 pt / w500", "10.5 pt / w700", "10 pt / w500", "8 pt / w700"),
-    ("Feature 內文", "11 pt / w400", "7.5 pt / w400",  "8 pt / w400",  "8 pt / w400"),
+    ("Feature 標題", "14 pt / w600", "11 pt / w700", "10 pt / w500", "8 pt / w700"),
+    ("Feature 內文", "11 pt / w400", "9 pt / w400",  "9 pt / w400",  "8 pt / w400"),
     ("內文色",    "#6f6f6f / #4a4a4a", "#525355", "#6f6f6f", "#6f6f6f"),
     ("條列圓點",  "0.5em CSS 圓",  "0.5em CSS 圓",  "0.5em CSS 圓",  "0.5em CSS 圓"),
 ])
 
 cmp_spec = cmp_table([
     ("版面",     "雙欄",          "全寬表格",      "全寬表格",      "全寬表格"),
-    ("分類列",   "7.5 pt / w500", "8.5 pt / w400", "8 pt / w500",  "8 pt / w400"),
+    ("分類列",   "8 pt / w500", "8 pt / w400", "8 pt / w500",  "8 pt / w400"),
     ("分類列底", "#6b7580",       "#0073bf",       "#1e6796",      "#86c9cf"),
     ("標籤",     "7 pt / w500",   "8 pt / w400",   "7.5 pt / w500", "7 pt / w400"),
-    ("數值",     "7 pt / w300",   "8 pt / w400",   "7 pt / w400",  "7 pt / w400"),
+    ("數值",     "7 pt / w400",   "8 pt / w400",   "7 pt / w400",  "7 pt / w400"),
     ("數值行高", "1.4（CJK 1.5）", "1.4",          "1.4",          "1.35"),
-    ("註腳",     "7.5 pt / w300", "5.5 pt / w300", "5.5 pt / w300", "5.5 pt / w300"),
+    ("註腳",     "7 pt / w300", "5.5 pt / w300", "5.5 pt / w300", "5.5 pt / w300"),
 ])
 
 # ── Assemble ────────────────────────────────────────────────────────────

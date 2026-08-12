@@ -4,6 +4,7 @@ import { getDict } from "@/lib/datasheet/locales";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
 import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
+import { PT, WT, LADDER, BROADBAND_HEADLINE } from "@/lib/datasheet/scale";
 import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@eg/db/types";
 
 /**
@@ -169,10 +170,10 @@ export function BroadbandPreview({
   const OV_SLOT_HEIGHT = 222;
   const OV_WIDTH_FACTOR = 0.514;
   const overviewFontPt =
-    [8.5, 8, 7.5].find((pt) => {
+    LADDER.broadbandOverview.find((pt) => {
       const perLine = OV_COL_WIDTH / (OV_WIDTH_FACTOR * pt);
       return Math.ceil(modelOverview.length / perLine) * pt * 1.65 <= OV_SLOT_HEIGHT;
-    }) ?? 7.5;
+    }) ?? LADDER.broadbandOverview[LADDER.broadbandOverview.length - 1];
 
   // Roboto has no CJK glyphs — a ja sheet rendered as tofu boxes. Put the
   // locale's face in front of it so Latin still sets in Roboto.
@@ -405,7 +406,7 @@ body {
   font-family: ${displayFont};
 }
 .section-title {
-  font-weight: 700; font-size: 14pt; color: ${STEEL};
+  font-weight: ${WT.semi}; font-size: ${PT.head}pt; color: ${STEEL};
 }
 .img-ph {
   border: 1pt dashed #b9bfc4; background: #f8f9fa; color: #9aa3ab;
@@ -439,8 +440,8 @@ body {
   position: absolute; top: 104pt; left: 0; right: 0; bottom: 0;
   width: 100%; height: 255pt; object-fit: cover;
 }
-.hero-title { font-weight: 700; color: white; line-height: 1.18; }
-.hero-series { font-weight: 400; font-size: 15pt; color: white; margin-top: 4pt; }
+.hero-title { font-weight: ${WT.medium}; color: white; line-height: 1.18; }
+.hero-series { font-weight: ${WT.regular}; font-size: ${PT.head}pt; color: white; margin-top: 4pt; }
 .cover-blocks {
   position: absolute; top: 470pt; left: 36pt; right: 36pt; bottom: 46pt;
   display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 24pt;
@@ -481,7 +482,7 @@ body {
 }
 .benefit {
   display: flex; align-items: baseline; gap: 6pt; break-inside: avoid;
-  font-size: 7.5pt; line-height: 1.5; color: #6f6f6f; margin-bottom: 8pt;
+  font-size: ${PT.bodySm}pt; line-height: 1.5; color: #6f6f6f; margin-bottom: 8pt;
 }
 ${bulletDotCss(".benefit .dot")}
 .benefit b { font-weight: 700; color: #4a4a4a; }
@@ -514,7 +515,7 @@ ${bulletDotCss(".benefit .dot")}
   text-align: center; border-color: ${STEEL}; padding: 5pt;
 }
 .model-row td {
-  background: ${BAND_DARK}; color: white; font-weight: 500; font-size: 7.5pt; text-align: center;
+  background: ${BAND_DARK}; color: white; font-weight: ${WT.medium}; font-size: ${PT.table}pt; text-align: center;
 }
 .model-row td:first-child { text-align: left; }
 .desc-row td {
@@ -593,7 +594,8 @@ ${bulletDotCss(".benefit .dot")}
           <div className="hero-titles">
             <div
               className="hero-title"
-              style={{ fontSize: `${coverHeadline.length > 46 ? 17 : 21}pt` }}
+              style={{ fontSize: `${coverHeadline.length > BROADBAND_HEADLINE.threshold
+                  ? BROADBAND_HEADLINE.long : BROADBAND_HEADLINE.max}pt` }}
             >
               {coverHeadline}
             </div>

@@ -12,6 +12,7 @@ import {
 } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
+import { PT, WT } from "@/lib/datasheet/scale";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { DataCenterPreview } from "./datacenter-preview";
 import { BroadbandPreview } from "./broadband-preview";
@@ -649,12 +650,18 @@ body {
 .product-fullname-cloud,
 .product-subtitle-standard,
 .product-fullname-standard,
+/* Every section heading is one role, so it carries one set of type values.
+   They used to be restated in five places, which is how a role drifts. Only
+   the surrounding spacing differs per page, below. */
 .section-title,
 .features-title,
 .spec-page-title,
 .hardware-title,
 .antennas-title {
   font-family: ${displayFont};
+  font-weight: ${WT.semi};
+  font-size: ${PT.head}pt;
+  color: ${theme.sectionTitle};
 }
 
 .top-bar-full .title-prefix {
@@ -722,9 +729,7 @@ body {
   width: 100%; height: 100%; object-fit: contain;
 }
 
-.section-title {
-  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle}; margin-bottom: 8pt;
-}
+.section-title { margin-bottom: 8pt; }
 .overview-section {
   position: absolute; left: 36pt; top: 270pt; width: 270pt;
   /* 'bottom' is set inline from coverLayout.overviewBottom so overview
@@ -764,9 +769,7 @@ body {
   max-height: ${FEATURES_MAX_HEIGHT}pt;
   overflow: hidden;
 }
-.features-title {
-  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle}; margin-bottom: 10pt;
-}
+.features-title { margin-bottom: 10pt; }
 .features-box { background: ${theme.featuresBox}; padding: 18pt 28pt; }
 .features-columns { display: table; width: 100%; table-layout: fixed; }
 .features-col { display: table-cell; width: 50%; vertical-align: top; }
@@ -782,18 +785,15 @@ ${bulletDotCss(".feature-bullet")}
 
 /* Spec pages */
 .spec-page { padding: 0 35pt; }
-.spec-page-title {
-  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
-  padding-top: 27pt; margin-bottom: 18pt;
-}
+.spec-page-title { padding-top: 27pt; margin-bottom: 18pt; }
 .spec-columns { display: table; width: 100%; table-layout: fixed; }
 .spec-col { display: table-cell; width: 50%; vertical-align: top; }
 .spec-col:first-child { padding-right: 15pt; }
 .spec-col:last-child { padding-left: 15pt; }
 
 .spec-category-header {
-  background: #6b7580; color: white; font-weight: 500;
-  font-size: 7.5pt; padding: 2.5pt 6pt; margin-top: 6pt; margin-bottom: 2pt;
+  background: #6b7580; color: white; font-weight: ${WT.medium};
+  font-size: ${PT.table}pt; padding: 2.5pt 6pt; margin-top: 6pt; margin-bottom: 2pt;
 }
 .spec-category-header:first-child { margin-top: 0; }
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
@@ -806,8 +806,8 @@ ${bulletDotCss(".feature-bullet")}
    visually disconnected from the spec content above. */
 .spec-footnote {
   margin-top: 16pt;
-  font-size: 7.5pt;
-  font-weight: 300;
+  font-size: ${PT.tableSm}pt;
+  font-weight: ${WT.light};
   line-height: 1.55;
   color: #6f7073;
   text-align: left;
@@ -815,10 +815,7 @@ ${bulletDotCss(".feature-bullet")}
 
 /* Hardware overview */
 .hardware-page { padding: 0 35pt; }
-.hardware-title {
-  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
-  padding-top: 31pt; margin-bottom: 16pt;
-}
+.hardware-title { padding-top: 31pt; margin-bottom: 16pt; }
 .hardware-image-container { text-align: center; margin: 10pt auto; }
 /* Same fix as the cover: width is set, not capped, so the box decides the
    scale instead of the PNG's pixel count. 49 of the 50 Cloud-template
