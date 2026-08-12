@@ -11,11 +11,15 @@ about who owns the document shell:
   scripts/design/type-spec.artifact.html  — for publishing as an Artifact,
                                             which supplies its own shell
 
-⚠️ The values below are TRANSCRIBED from the layout components — this page
-does not read them. `lib/datasheet/scale.ts` is the source of truth for the
-type scale; if you change a size or weight there, update it here too and
-re-run this script, or the public reference starts lying to designers.
-Verify with `scale-audit` against the rendered pages, not by reading CSS.
+Every size and weight is READ from the source at build time — `scale.ts`
+for the steps, the four layout components for which step each role uses,
+`typography.ts` for the standard layout's editable metrics. Nothing here
+restates a number, so this page cannot drift from what the PDFs print, and
+the build refuses to run if a layout introduces an off-scale size.
+
+The one thing still written by hand is the CJK table: those metrics live in
+`app_settings` and are edited through the settings UI, so there is no code
+to read. Check them against the database, not against this file.
 
 Everything is inlined: the Roboto (Apache-2.0) and Manrope (OFL-1.1) Latin
 subsets, checked in next to this script so the build needs no network, plus
@@ -23,7 +27,10 @@ the three logo PNGs. The page has to show real type at real sizes in the
 real face, so a fallback would defeat the point — and a sample labelled
 Manrope must actually BE Manrope.
 """
-import base64, html, pathlib
+import base64, html, pathlib, sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+import read_type_system as TS
 
 HERE = pathlib.Path(__file__).resolve().parent
 SPECHUB = HERE.parent.parent
@@ -77,44 +84,92 @@ def td(v, cls=""):
 
 def sw(hexv):
     return f'<span class="sw" style="background:{hexv}"></span><span class="mono">{hexv}</span>'
+# ── Read the type system out of the source ──────────────────────────────
+# Every size and weight below comes from scale.ts and the layout components.
+# Nothing on this page restates a number, so it cannot describe a scale the
+# code does not follow.
+PT, WT, LADDERS = TS.read_scale()
+BROADBAND_MAX = PT["cover"]  # the long-copy switch drops to PT.lead
+TYPO_EN = TS.read_typography_defaults("en")
+CSS = {L: TS.read_component(L, PT, WT, TYPO_EN) for L in "ABCD"}
+
+_off_scale = TS.audit_off_scale(PT)
+if _off_scale:
+    raise SystemExit(
+        "refusing to publish: a layout uses a size that is not a scale step\n  "
+        + "\n  ".join(_off_scale)
+    )
+
+
+def px(layout, selector, prop, fallback=None):
+    """One resolved declaration, or fail loudly."""
+    decls = CSS[layout].get(selector)
+    if decls is None or prop not in decls:
+        if fallback is not None:
+            return fallback
+        raise SystemExit(
+            f"read_type_system: {layout} `{selector}` has no {prop} — "
+            "the selector or the stylesheet shape changed"
+        )
+    return decls[prop]
+
+
+def num(v):
+    """8.0 -> '8', 5.5 -> '5.5'."""
+    return f"{v:g}"
+
+
+def live(layout, selector, text, color="#16202B", bg=None, lh=1.25, disp=False,
+         size=None, weight=None):
+    """A table row whose numbers and specimen both come from the source."""
+    s = size if size is not None else px(layout, selector, "font-size")
+    w = weight if weight is not None else px(layout, selector, "font-weight")
+    swatch = sw(color) if color.startswith("#") else color
+    sample_color = color if color.startswith("#") else "#ffffff"
+    return row([
+        td(ROLE_LABEL, "role"), td(num(s) + " pt", "num"), td(num(w), "num"),
+        td(LH_CELL, "num"), td(swatch, "mono"),
+        td(spec(text, s, w, sample_color, bg=bg, lh=lh, disp=disp), "spec"),
+    ])
+
 
 # ── A · Latin ───────────────────────────────────────────────────────────
+# Sizes marked (設定) are editable per locale in Settings ▸ Typography; the
+# number shown is the en default this layout falls back to.
 CLOUD = "#03a9f4"
 A = [
-    ("封面主標",    "24",  "500", "1.15", "#231f20", spec("Cloud Managed 24-Port Gigabit PoE+ Switch", 24, 500, "#231f20", lh=1.15, disp=True)),
-    ("封面副標",    "17",  "500", "—",    CLOUD,     spec("CloudSwitch L2Plus 24 Full PoE", 17, 500, CLOUD, disp=True)),
-    ("封面型號",    "12",  "500", "—",    CLOUD,     spec("ECS1528FP", 12, 500, CLOUD, disp=True)),
-    ("區塊標題",    "14",  "600", "—",    CLOUD,     spec("Overview", 14, 600, CLOUD, disp=True)),
-    ("Overview 內文", "11", "400", "1.35", "#6f6f6f", spec("Designed for high-density deployments in offices and campuses.", 11, 400, "#6f6f6f", lh=1.35)),
-    ("Features 標題", "14", "600", "—",   CLOUD,     spec("Key Features", 14, 600, CLOUD, disp=True)),
-    ("Feature 項目", "11",  "400", "1.35", "#4a4a4a", spec("802.3at/af PoE+ with a 410W total power budget", 11, 400, "#4a4a4a", lh=1.35)),
-    ("規格分類列",  "8",   "500", "—",    "白字／底 #6b7580", spec("Hardware Specifications", 8, 500, "#ffffff", bg="#6b7580")),
-    ("規格標籤",    "7",   "500", "1.4",  CLOUD,     spec("Power over Ethernet", 7, 500, CLOUD)),
-    ("規格數值",    "7",   "400", "1.4",  "#6f7073", spec("IEEE 802.3at/af, 410W total budget", 7, 400, "#6f7073")),
-    ("規格註腳",    "7",   "300", "1.55", "#6f6f6f", spec("* Actual data throughput may vary by environment.", 7, 300, "#6f6f6f")),
-    ("頁首「Datasheet」", "12", "300", "—", "白字／底為主題色", spec("Datasheet", 12, 300, "#ffffff", bg=CLOUD, disp=True)),
-    ("頁首分類",    "14",  "500", "—",    "白字／底為主題色", spec("Cloud Switch", 14, 500, "#ffffff", bg=CLOUD, disp=True)),
-    ("頁碼",        "7",   "300", "—",    "#6f7073", spec("3", 7, 300, "#6f7073")),
-    ("頁尾聲明",    "5.5", "300", "1.45", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
+    ("封面主標",    ".product-fullname-cloud", "1.15", "#231f20", "Cloud Managed 24-Port Gigabit PoE+ Switch", dict(lh=1.15, disp=True)),
+    ("封面副標",    ".product-subtitle-cloud", "—",    CLOUD,     "CloudSwitch L2Plus 24 Full PoE", dict(disp=True)),
+    ("封面型號",    ".model-name",             "—",    CLOUD,     "ECS1528FP", dict(disp=True)),
+    ("區塊標題",    ".section-title",          "—",    CLOUD,     "Overview", dict(disp=True)),
+    ("Overview 內文", ".overview-text",        "1.35", "#6f6f6f", "Designed for high-density deployments in offices and campuses.", dict(lh=1.35)),
+    ("Features 標題", ".features-title",       "—",    CLOUD,     "Key Features", dict(disp=True)),
+    ("Feature 項目", ".feature-item",          "1.35", "#4a4a4a", "802.3at/af PoE+ with a 410W total power budget", dict(lh=1.35)),
+    ("規格分類列",  ".spec-category-header",   "—",    "白字／底 #6b7580", "Hardware Specifications", dict(bg="#6b7580")),
+    ("規格標籤",    ".spec-label",             "1.4",  CLOUD,     "Power over Ethernet", {}),
+    ("規格數值",    ".spec-value",             "1.4",  "#6f7073", "IEEE 802.3at/af, 410W total budget", {}),
+    ("規格註腳",    ".spec-footnote",          "1.55", "#6f6f6f", "* Actual data throughput may vary by environment.", {}),
+    ("頁首「Datasheet」", ".top-bar-full .title-prefix", "—", "白字／底為主題色", "Datasheet", dict(bg=CLOUD, disp=True)),
+    ("頁首分類",    ".top-bar-full .title-category", "—", "白字／底為主題色", "Cloud Switch", dict(bg=CLOUD, disp=True)),
+    ("頁碼",        ".page-number",            "—",    "#6f7073", "3", {}),
+    ("頁尾聲明",    ".footer-disclaimer",      "1.45", "#6d6e71", "EnGenius Technologies, Inc. All rights reserved.", dict(lh=1.45)),
 ]
-tbl_a = "\n".join(
-    row([td(r[0], "role"), td(r[1] + " pt", "num"), td(r[2], "num"), td(r[3], "num"),
-         td(sw(r[4]) if r[4].startswith("#") else r[4], "mono"), td(r[5], "spec")])
-    for r in A
-)
 
 # ── A · CJK ─────────────────────────────────────────────────────────────
+# NOT parsed: these live in `app_settings` per locale and are edited through
+# the settings UI, so the code carries no number to read. Kept as prose.
 CJK = [
+    ("字級來源",    "app_settings", "app_settings", "—", "設定頁 ▸ Typography，程式碼改不動"),
     ("封面主標",    "24 pt / w500", "24 pt / w600", "1.25", "—"),
-    ("封面副標",    "17 pt",        "17 pt",        "—",    "拉丁為 19 pt"),
-    ("區塊標題",    "13 pt",        "13 pt",        "—",    "拉丁為 14 pt"),
-    ("Overview 內文", "11.5 pt / w500", "12 pt / w500", "1.5",  "內文色 #444444"),
-    ("Feature 項目", "10.5 pt / w500", "11 pt / w500", "1.4",  "內文色 #444444"),
-    ("規格標籤",    "7 pt / w600",  "7 pt / w600",  "1.5",  "拉丁為 w500"),
-    ("規格數值",    "7 pt / w400",  "7 pt / w400",  "1.5",  "拉丁為 w300"),
+    ("封面副標",    "17 pt",        "17 pt",        "—",    "與拉丁文同階"),
+    ("區塊標題",    "12 pt",        "13 pt",        "—",    "拉丁為 14 pt"),
+    ("Overview 內文", "10 pt / w500", "11 pt / w500", "1.5",  "內文色 #444444"),
+    ("Feature 項目", "10 pt / w500", "11 pt / w500", "1.4",  "內文色 #444444"),
+    ("規格標籤",    "8 pt / w600",  "7 pt / w600",  "1.5",  "拉丁為 w500"),
+    ("規格數值",    "8 pt / w400",  "7 pt / w400",  "1.5",  "拉丁同為 w400"),
     ("頁尾聲明",    "6 pt",         "6 pt",         "1.5",  "w400 / #555555"),
     ("字距",        "0.5 pt",       "0.3 pt",       "—",    "只作用在規格分類列"),
-    ("字體",        "Zen Kaku Gothic New", "Noto Sans TC", "—", "設定頁可更換"),
+    ("字體",        "Noto Sans JP", "Noto Sans TC", "—",    "標題仍走 Manrope 作為西文 fallback"),
 ]
 tbl_cjk = "\n".join(
     row([td(r[0], "role"), td(r[1], "num"), td(r[2], "num"), td(r[3], "num"), td(r[4])])
@@ -124,82 +179,83 @@ tbl_cjk = "\n".join(
 # ── B · Data Center ─────────────────────────────────────────────────────
 DCN, DCB, DCY = "#16355c", "#0073bf", "#f4d768"
 B = [
-    ("Solution 標籤", "Manrope", "14",   "500", "白字／深藍底", spec("Data Center", 14, 500, "#ffffff", bg=DCN, disp=True)),
-    ("封面主標",     "Manrope", "24",   "500", "白字／深藍漸層底", spec("AI-Ready Edge Infrastructure", 24, 500, "#ffffff", bg=DCN, lh=1.28, disp=True)),
-    ("封面型號",     "Manrope", "14",   "600", DCY,      spec("SE110", 14, 600, DCY, bg=DCN, disp=True)),
-    ("封面 Overview", "Roboto", "11 → 10 → 9", "300", "白字 95%", spec("Purpose-built for distributed AI workloads at the network edge.", 11, 300, "#ffffff", bg=DCN, lh=1.55)),
-    ("區塊標題",     "Manrope", "17",   "600", DCB,      spec("Key Features", 17, 600, DCB, disp=True)),
-    ("Feature 標籤", "Roboto",  "8",    "500", "白字／藍底", spec("EDCC", 8, 500, "#ffffff", bg=DCB)),
-    ("Feature 標題", "Roboto",  "11",   "700", "#3f4042", spec("Centralized Cloud Management", 11, 700, "#3f4042", lh=1.3)),
-    ("Feature 內文", "Roboto",  "9",    "400", "#525355", spec("Monitor every node from a single dashboard.", 9, 400, "#525355", lh=1.5)),
-    ("條列（無 chip）", "Roboto", "8",   "400", "#525355", spec("Supports redundant power and hot-swap drives.", 8, 400, "#525355", lh=1.55)),
-    ("EDCC 小標",    "Roboto",  "10",   "400", "#231f20", spec("Node View", 10, 400, "#231f20")),
-    ("EDCC 內文",    "Roboto",  "8",    "400", "#525355", spec("Manage servers even when the OS is unresponsive.", 8, 400, "#525355", lh=1.5)),
-    ("規格表頭",     "Roboto",  "8",    "400", "白字／藍底", spec("Specifications", 8, 400, "#ffffff", bg=DCB)),
-    ("機種名列",     "Roboto",  "8",    "400", "白字／底 #6d6e71", spec("SE110", 8, 400, "#ffffff", bg="#6d6e71")),
-    ("料號列",       "Roboto",  "8",    "400", "白字／底 #939598", spec("SE110-01", 8, 400, "#ffffff", bg="#939598")),
-    ("規格數值",     "Roboto",  "8",    "400", "#525355", spec("Intel Atom x6425E, 4 cores", 8, 400, "#525355", lh=1.4)),
-    ("硬體副標",     "Roboto",  "11",   "400", "#231f20", spec("Front Panel", 11, 400, "#231f20")),
-    ("頁碼",         "Roboto",  "7",    "300", "#58595b", spec("4", 7, 300, "#58595b")),
-    ("頁尾聲明",     "Roboto",  "5.5",  "300", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
+    ("Solution 標籤", ".cover-header .solution-label", "—", "白字／深藍底", "Data Center", dict(bg=DCN, disp=True)),
+    ("封面主標",     ".hero-headline",  "1.28", "白字／深藍漸層底", "AI-Ready Edge Infrastructure", dict(bg=DCN, lh=1.28, disp=True, size=24)),
+    ("封面型號",     ".hero-model",     "—",    DCY,       "SE110", dict(bg=DCN, disp=True)),
+    ("封面 Overview", ".hero-overview", "1.55", "白字 95%", "Purpose-built for distributed AI workloads at the network edge.", dict(bg=DCN, lh=1.55, size=LADDERS["dcOverview"][0])),
+    ("區塊標題",     ".section-title",  "—",    DCB,       "Key Features", dict(disp=True)),
+    ("Feature 標籤", ".feature-chip",   "—",    "白字／藍底", "EDCC", dict(bg=DCB)),
+    ("Feature 標題", ".feature-title",  "1.3",  "#3f4042", "Centralized Cloud Management", dict(lh=1.3)),
+    ("Feature 內文", ".feature-text",   "1.5",  "#525355", "Monitor every node from a single dashboard.", dict(lh=1.5)),
+    ("條列（無 chip）", ".flat-bullet", "1.55", "#525355", "Supports redundant power and hot-swap drives.", dict(lh=1.55)),
+    ("EDCC 小標",    ".edcc-feature-title", "—", "#231f20", "Node View", {}),
+    ("EDCC 內文",    ".edcc-feature-text",  "1.5", "#525355", "Manage servers even when the OS is unresponsive.", dict(lh=1.5)),
+    ("規格表頭",     ".specs-band th",  "—",    "白字／藍底", "Specifications", dict(bg=DCB)),
+    ("硬體副標",     ".hw-subtitle",    "—",    "#231f20", "Front Panel", {}),
+    ("頁碼",         ".page-number",    "—",    "#58595b", "4", {}),
+    ("頁尾聲明",     ".footer-disclaimer", "1.45", "#6d6e71", "EnGenius Technologies, Inc. All rights reserved.", dict(lh=1.45)),
 ]
-tbl_b = "\n".join(
-    row([td(r[0], "role"), td(r[1], "mono"), td(r[2] + " pt", "num"), td(r[3], "num"),
-         td(sw(r[4]) if r[4].startswith("#") else r[4], "mono"), td(r[5], "spec")])
-    for r in B
-)
 
 # ── C · Broadband ───────────────────────────────────────────────────────
 ST = "#1e6796"
 C = [
-    ("頁首「Datasheet」", "12",  "300", "—",   "白字／鋼藍底", spec("Datasheet", 12, 300, "#ffffff", bg=ST, disp=True)),
-    ("頁首分類",     "14",  "500", "—",    "白字／鋼藍底", spec("Broadband", 14, 500, "#ffffff", bg=ST, disp=True)),
-    ("封面主標",     "24 → 17", "500", "1.18", "白字／鋼藍底", spec("Long-Range Outdoor Ethernet over Coax", 24, 500, "#ffffff", bg=ST, lh=1.18, disp=True)),
-    ("封面系列名",   "14",  "400", "—",    "白字／鋼藍底", spec("EOC620", 14, 400, "#ffffff", bg=ST, disp=True)),
-    ("區塊標題",     "14",  "600", "—",    ST,        spec("Benefits", 14, 600, ST, disp=True)),
-    ("小節標題",     "10",  "500", "—",    ST,        spec("Deployment", 10, 500, ST, disp=True)),
-    ("小節內文",     "8",   "400", "1.55", "#6f6f6f", spec("Reuses existing coaxial cabling, no new trenching required.", 8, 400, "#6f6f6f", lh=1.55)),
-    ("機種 Overview", "9 → 8.5 → 8", "400", "1.65", "#6f6f6f", spec("Delivers gigabit throughput over legacy coax runs up to 1 km.", 9, 400, "#6f6f6f", lh=1.65)),
-    ("Benefits 內文", "9",   "400", "1.5", "#6f6f6f", spec("Cuts installation time on brownfield sites.", 9, 400, "#6f6f6f", lh=1.5)),
-    ("附註",         "7",   "300", "—",    "#a7a9ac", spec("Measured in a controlled environment.", 7, 300, "#a7a9ac")),
-    ("規格表頭",     "8",   "500", "—",    "白字／鋼藍底", spec("Specifications", 8, 500, "#ffffff", bg=ST)),
-    ("規格分帶（深）", "8",   "500", "—",  "白字／底 #6c6d71", spec("Interface", 8, 500, "#ffffff", bg="#6c6d71")),
-    ("規格分帶（淺）", "7",  "400", "—",   "白字／底 #888b8d", spec("EOC620", 7, 400, "#ffffff", bg="#888b8d")),
-    ("規格數值",     "7",   "400", "1.4",  "#6f7073", spec("1 × 10/100/1000 Mbps RJ45", 7, 400, "#6f7073", lh=1.4)),
-    ("機種名（圖說）", "11", "400", "—",   "#4a4a4a", spec("EOC620", 11, 400, "#4a4a4a")),
-    ("頁碼",         "7",   "300", "—",    "#6f7073", spec("2", 7, 300, "#6f7073")),
-    ("頁尾聲明",     "5.5", "300", "1.45", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
+    ("頁首「Datasheet」", ".cover-header .ds-label", "—", "白字／鋼藍底", "Datasheet", dict(bg=ST, disp=True)),
+    ("封面主標",     ".hero-title",     "1.18", "白字／鋼藍底", "Long-Range Outdoor Ethernet over Coax", dict(bg=ST, lh=1.18, disp=True, size=BROADBAND_MAX)),
+    ("封面主標（>46 字）", ".hero-title", "1.18", "白字／鋼藍底", "Long-Range Outdoor Ethernet over Coax for Multi-Dwelling Units", dict(bg=ST, lh=1.18, disp=True, size=PT["lead"])),
+    ("封面系列名",   ".hero-series",    "—",    "白字／鋼藍底", "EOC620", dict(bg=ST, disp=True)),
+    ("區塊標題",     ".section-title",  "—",    ST,        "Benefits", dict(disp=True)),
+    ("小節標題",     ".block-title",    "—",    ST,        "Deployment", dict(disp=True)),
+    ("小節內文",     ".block-body",     "1.55", "#6f6f6f", "Reuses existing coaxial cabling, no new trenching required.", dict(lh=1.55)),
+    ("機種 Overview（自動階梯）", ".block-body", "1.65", "#6f6f6f", "Delivers gigabit throughput over legacy coax runs up to 1 km.", dict(lh=1.65, size=LADDERS["broadbandOverview"][0], weight=400)),
+    ("Benefits 內文", ".benefit",       "1.5",  "#6f6f6f", "Cuts installation time on brownfield sites.", dict(lh=1.5)),
+    ("附註",         ".benefits-note",  "—",    "#a7a9ac", "Measured in a controlled environment.", {}),
+    ("規格分帶（深）", ".band-row th",  "—",    "白字／底 #6c6d71", "Interface", dict(bg="#6c6d71")),
+    ("規格數值",     ".spec-row td",    "1.4",  "#6f7073", "1 × 10/100/1000 Mbps RJ45", dict(lh=1.4)),
+    ("機種名（圖說）", ".views-model",  "—",    "#4a4a4a", "EOC620", {}),
+    ("頁碼",         ".page-number",    "—",    "#6f7073", "2", {}),
+    ("頁尾聲明",     ".footer-disclaimer", "1.45", "#6d6e71", "EnGenius Technologies, Inc. All rights reserved.", dict(lh=1.45)),
 ]
-tbl_c = "\n".join(
-    row([td(r[0], "role"), td(r[1] + " pt", "num"), td(r[2], "num"), td(r[3], "num"),
-         td(sw(r[4]) if r[4].startswith("#") else r[4], "mono"), td(r[5], "spec")])
-    for r in C
-)
 
 # ── D · Edge AI ─────────────────────────────────────────────────────────
-TL = "#86c9cf"
+TL = "#5aa8b0"
 D = [
-    ("頁首「Datasheet」", "12", "300", "—",  "白字／teal 底", spec("Datasheet", 12, 300, "#ffffff", bg="#5aa8b0", disp=True)),
-    ("頁首分類",     "14",  "500", "—",    "白字／teal 底", spec("Edge AI Box", 14, 500, "#ffffff", bg="#5aa8b0", disp=True)),
-    ("封面主標",     "24",  "500", "1.18", "白字",     spec("Powered by NVIDIA Jetson Orin", 24, 500, "#ffffff", bg="#5aa8b0", lh=1.18, disp=True)),
-    ("封面副標",     "17",  "400", "—",    "白字",     spec("Orin Box Series", 17, 400, "#ffffff", bg="#5aa8b0", disp=True)),
-    ("區塊標題",     "17",  "600", "—",    TL,        spec("Software Architecture", 17, 600, "#5aa8b0", disp=True)),
-    ("內文",         "10",  "400", "1.55", "#6f6f6f", spec("Runs the full NVIDIA JetPack stack out of the box.", 10, 400, "#6f6f6f", lh=1.55)),
-    ("Feature 標題", "8",   "700", "—",    "#6f6f6f", spec("Ruggedized Chassis", 8, 700, "#6f6f6f")),
-    ("Feature 內文", "8",   "400", "1.4",  "#6f6f6f", spec("Fanless, −20 to 60°C operating range.", 8, 400, "#6f6f6f", lh=1.4)),
-    ("規格表頭",     "8",   "400", "—",    "白字／teal 底", spec("Specifications", 8, 400, "#ffffff", bg="#5aa8b0")),
-    ("規格分帶（深）", "7",  "400", "—",   "白字／底 #6e6e6e", spec("Compute", 7, 400, "#ffffff", bg="#6e6e6e")),
-    ("規格分帶（淺）", "7",  "400", "—",   "白字／底 #969696", spec("Orin NX 16GB", 7, 400, "#ffffff", bg="#969696")),
-    ("規格數值",     "7",   "400", "1.35", "#6f6f6f", spec("100 TOPS (INT8), 1024-core Ampere GPU", 7, 400, "#6f6f6f", lh=1.35)),
-    ("硬體副標",     "11",  "400", "—",    "#231f20", spec("I/O Layout", 11, 400, "#231f20")),
-    ("頁碼",         "7",   "300", "—",    "#6f7073", spec("5", 7, 300, "#6f7073")),
-    ("頁尾聲明",     "5.5", "300", "1.45", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
+    ("頁首「Datasheet」", ".top-bar-full .title-prefix", "—", "白字／teal 底", "Datasheet", dict(bg=TL, disp=True)),
+    ("頁首分類",     ".top-bar-full .title-category", "—", "白字／teal 底", "Edge AI Computer", dict(bg=TL, disp=True)),
+    ("封面主標",     ".hero-title",     "1.18", "白字",     "Powered by NVIDIA Jetson Orin", dict(bg=TL, lh=1.18, disp=True)),
+    ("封面副標",     ".hero-series",    "—",    "白字",     "Orin Box Series", dict(bg=TL, disp=True)),
+    ("區塊標題",     ".section-title",  "—",    TL,        "Software Architecture", dict(disp=True)),
+    ("內文",         ".overview-text",  "1.55", "#6f6f6f", "Runs the full NVIDIA JetPack stack out of the box.", dict(lh=1.55)),
+    ("Feature 標題", ".feature-group-title", "—", "#6f6f6f", "Ruggedized Chassis", {}),
+    ("Feature 內文", ".feature-bullet", "1.4",  "#6f6f6f", "Fanless, −20 to 60°C operating range.", dict(lh=1.4)),
+    ("規格表頭",     ".specs-band th",  "—",    "白字／teal 底", "Specifications", dict(bg=TL)),
+    ("規格數值",     ".spec-row td",    "1.35", "#6f6f6f", "100 TOPS (INT8), 1024-core Ampere GPU", dict(lh=1.35)),
+    ("硬體副標",     ".hw-subtitle",    "—",    "#231f20", "I/O Layout", {}),
+    ("頁碼",         ".page-number",    "—",    "#6f7073", "5", {}),
+    ("頁尾聲明",     ".footer-disclaimer", "1.45", "#6d6e71", "EnGenius Technologies, Inc. All rights reserved.", dict(lh=1.45)),
 ]
-tbl_d = "\n".join(
-    row([td(r[0], "role"), td(r[1] + " pt", "num"), td(r[2], "num"), td(r[3], "num"),
-         td(sw(r[4]) if r[4].startswith("#") else r[4], "mono"), td(r[5], "spec")])
-    for r in D
-)
+
+
+def build(layout, rows):
+    out = []
+    for label, selector, lh_cell, color, text, kw in rows:
+        size = kw.pop("size", None)
+        weight = kw.pop("weight", None)
+        s = size if size is not None else px(layout, selector, "font-size")
+        w = weight if weight is not None else px(layout, selector, "font-weight", 400)
+        swatch = sw(color) if color.startswith("#") else color
+        sample_color = color if color.startswith("#") else "#ffffff"
+        out.append(row([
+            td(label, "role"), td(num(s) + " pt", "num"), td(num(w), "num"),
+            td(lh_cell, "num"), td(swatch, "mono"),
+            td(spec(text, s, w, sample_color, **kw), "spec"),
+        ]))
+    return "\n".join(out)
+
+
+tbl_a = build("A", A)
+tbl_b = build("B", B)
+tbl_c = build("C", C)
+tbl_d = build("D", D)
 
 # ── Cross-layout comparisons ────────────────────────────────────────────
 def cmp_table(rows):

@@ -375,7 +375,7 @@ ${cjk ? `@import url('${cjk.importUrl}');` : ""}
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 body {
-  font-family: ${bodyFont}; color: #6f6f6f; font-size: 8pt;
+  font-family: ${bodyFont}; color: #6f6f6f; font-size: ${PT.table}pt;
   line-height: 1.4; background: #e0e0e0;
   padding-top: ${showToolbar ? "48px" : "0"};
 }
@@ -393,7 +393,7 @@ body {
 .top-bar { background: ${STEEL}; height: 21pt; width: 100%; }
 .page-number {
   position: absolute; right: 27pt; bottom: 18pt;
-  font-weight: 300; font-size: 7pt; color: #6f7073;
+  font-weight: ${WT.light}; font-size: ${PT.tableSm}pt; color: #6f7073;
 }
 /* Display type: running-header title area, cover lockup, section headings.
    Everything else — body copy, spec tables, footers, page numbers — stays
@@ -410,7 +410,7 @@ body {
 }
 .img-ph {
   border: 1pt dashed #b9bfc4; background: #f8f9fa; color: #9aa3ab;
-  display: flex; align-items: center; justify-content: center; font-size: 8pt;
+  display: flex; align-items: center; justify-content: center; font-size: ${PT.table}pt;
 }
 
 /* ── cover ─────────────────────────────────────────────────────────── */
@@ -422,9 +422,9 @@ body {
 }
 .cover-header .ds-label {
   position: absolute; right: 36pt; top: 50%; transform: translateY(-50%);
-  font-size: 12pt; font-weight: 300; color: white;
+  font-size: ${PT.label}pt; font-weight: ${WT.light}; color: white;
 }
-.cover-header .ds-label strong { font-weight: 500; font-size: 14pt; }
+.cover-header .ds-label strong { font-weight: ${WT.medium}; font-size: ${PT.head}pt; }
 /* The reference hero art is cropped BELOW its baked-in headline, so the
    live title sits in its own band above the photo (same steel blue, so it
    reads as one block). */
@@ -448,9 +448,9 @@ body {
   align-content: start;
 }
 .block-title {
-  font-weight: 500; font-size: 10pt; color: ${STEEL}; margin-bottom: 5pt;
+  font-weight: ${WT.medium}; font-size: ${PT.bodyMd}pt; color: ${STEEL}; margin-bottom: 5pt;
 }
-.block-body { font-size: 8pt; line-height: 1.55; color: #6f6f6f; }
+.block-body { font-size: ${PT.table}pt; line-height: 1.55; color: #6f6f6f; }
 /* per-model cover: the model's own overview beside its own photo.
    (Key Features live on page 2 in full — splitting the list across two
    pages under two different headings read as a mistake.) */
@@ -467,7 +467,7 @@ body {
 .mc-shot-ph { width: 100%; height: 200pt; }
 .cover-note {
   position: absolute; left: 316pt; bottom: 30pt;
-  font-size: 7pt; font-weight: 300; color: #a7a9ac;
+  font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; color: #a7a9ac;
 }
 
 /* ── benefits page ─────────────────────────────────────────────────── */
@@ -485,8 +485,8 @@ body {
   font-size: ${PT.bodySm}pt; line-height: 1.5; color: #6f6f6f; margin-bottom: 8pt;
 }
 ${bulletDotCss(".benefit .dot")}
-.benefit b { font-weight: 700; color: #4a4a4a; }
-.benefits-note { font-size: 7pt; font-weight: 300; color: #a7a9ac; margin-top: 8pt; }
+.benefit b { font-weight: ${WT.bold}; color: #4a4a4a; }
+.benefits-note { font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; color: #a7a9ac; margin-top: 8pt; }
 .deploy { margin-top: 16pt; display: flex; justify-content: center; }
 .deploy img { max-width: 100%; max-height: 320pt; object-fit: contain; }
 /* per-model p2 shares the page with the full feature list; the diagram
@@ -511,7 +511,7 @@ ${bulletDotCss(".benefit .dot")}
   border: 0.5pt solid #d9d9d9; padding: 3.5pt 6pt; vertical-align: top; text-align: left;
 }
 .band-row th {
-  background: ${STEEL}; color: white; font-weight: 500; font-size: 8pt;
+  background: ${STEEL}; color: white; font-weight: ${WT.medium}; font-size: ${PT.table}pt;
   text-align: center; border-color: ${STEEL}; padding: 5pt;
 }
 .model-row td {
@@ -519,11 +519,11 @@ ${bulletDotCss(".benefit .dot")}
 }
 .model-row td:first-child { text-align: left; }
 .desc-row td {
-  background: ${BAND_LIGHT}; color: white; font-weight: 400; font-size: 7pt; text-align: center;
+  background: ${BAND_LIGHT}; color: white; font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt; text-align: center;
 }
 .desc-row td:first-child { text-align: left; }
 .spec-row td {
-  font-size: 7pt; line-height: 1.4; color: #6f7073; white-space: pre-line;
+  font-size: ${PT.tableSm}pt; line-height: 1.4; color: #6f7073; white-space: pre-line;
   /* series columns get narrow — break long unbroken tokens like
      "station(BSU)/subscriber(SU)" instead of letting them bleed out */
   overflow-wrap: anywhere; word-break: break-word;
@@ -534,7 +534,7 @@ ${bulletDotCss(".benefit .dot")}
 /* ── product views ─────────────────────────────────────────────────── */
 .views-page { position: absolute; top: 21pt; left: 36pt; right: 36pt; }
 .views-title { padding: 22pt 0 2pt; }
-.views-model { font-size: 11pt; color: #4a4a4a; margin-bottom: 14pt; }
+.views-model { font-size: ${PT.body}pt; color: #4a4a4a; margin-bottom: 14pt; }
 .views-grid {
   display: flex; flex-direction: column; align-items: center;
   height: 600pt; justify-content: space-around;
@@ -547,13 +547,13 @@ ${bulletDotCss(".benefit .dot")}
 /* ── antenna patterns ──────────────────────────────────────────────── */
 .ant-page { position: absolute; top: 21pt; left: 36pt; right: 36pt; }
 .ant-title { padding: 22pt 0 2pt; }
-.ant-model { font-size: 11pt; color: #4a4a4a; margin-bottom: 16pt; }
+.ant-model { font-size: ${PT.body}pt; color: #4a4a4a; margin-bottom: 16pt; }
 .ant-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20pt 24pt; }
 .ant-cell { }
 .ant-tags { display: flex; flex-direction: column; gap: 2pt; margin-bottom: 4pt; }
 .ant-group, .ant-plane {
   align-self: flex-start; background: ${BAND_DARK}; color: white;
-  font-size: 7pt; padding: 1.5pt 6pt;
+  font-size: ${PT.tableSm}pt; padding: 1.5pt 6pt;
 }
 .ant-plane { background: ${BAND_LIGHT}; }
 .ant-plot {
@@ -561,7 +561,7 @@ ${bulletDotCss(".benefit .dot")}
   justify-content: center; height: 200pt;
 }
 .ant-plot img { max-width: 100%; max-height: 190pt; object-fit: contain; }
-.ant-ph { width: 100%; height: 100%; border: none; background: transparent; font-size: 7pt; }
+.ant-ph { width: 100%; height: 100%; border: none; background: transparent; font-size: ${PT.tableSm}pt; }
 
 /* ── footer ────────────────────────────────────────────────────────── */
 .footer {
@@ -572,11 +572,11 @@ ${bulletDotCss(".benefit .dot")}
 .footer-left { display: table-cell; vertical-align: top; padding-right: 30pt; }
 .footer-right { display: table-cell; vertical-align: bottom; width: 75pt; text-align: center; }
 .footer-logo img { height: 17pt; margin-bottom: 6pt; }
-.footer-disclaimer { font-weight: 300; font-size: 5.5pt; color: #6d6e71; line-height: 1.45; }
-.footer-version { font-weight: 300; font-size: 5.5pt; color: #6d6e71; margin-top: 4pt; }
+.footer-disclaimer { font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; line-height: 1.45; }
+.footer-version { font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; margin-top: 4pt; }
 .footer-qr { background: white; padding: 2pt 2pt 5pt 2pt; display: inline-block; }
 .footer-qr img { width: 41pt; height: 41pt; display: block; }
-.footer-qr-label { font-size: 7pt; color: #6b7580; margin-top: 2pt; }
+.footer-qr-label { font-size: ${PT.tableSm}pt; color: #6b7580; margin-top: 2pt; }
 `,
         }}
       />

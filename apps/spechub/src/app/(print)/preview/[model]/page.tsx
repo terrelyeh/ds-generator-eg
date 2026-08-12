@@ -593,7 +593,7 @@ html, body {
 body {
   font-family: ${fontFamily};
   color: #6f6f6f;
-  font-size: 7pt;
+  font-size: ${PT.tableSm}pt;
   line-height: 1.4;
   background: #e0e0e0;
   padding-top: ${showToolbar ? "48px" : "0"};
@@ -665,15 +665,15 @@ body {
 }
 
 .top-bar-full .title-prefix {
-  font-weight: 300; font-size: 12pt; color: white;
+  font-weight: ${WT.light}; font-size: ${PT.label}pt; color: white;
 }
 .top-bar-full .title-category {
-  font-weight: 500; font-size: 14pt; color: white;
+  font-weight: ${WT.medium}; font-size: ${PT.head}pt; color: white;
 }
 
 .page-number {
   position: absolute; right: 23pt; bottom: 18pt;
-  font-weight: 300; font-size: 7pt; color: #6f7073;
+  font-weight: ${WT.light}; font-size: ${PT.tableSm}pt; color: #6f7073;
 }
 
 /* Cover */
@@ -682,27 +682,27 @@ body {
 }
 .model-name {
   position: absolute; right: 27pt; top: 104pt;
-  font-weight: 500; font-size: 12pt; color: ${theme.modelColor};
+  font-weight: ${WT.medium}; font-size: ${PT.label}pt; color: ${theme.modelColor};
 }
 
 /* Cloud cover: subtitle next to cloud icon */
 .product-subtitle-cloud {
   position: absolute; left: 134pt; top: 138pt;
-  font-weight: 500; font-size: 19pt; color: ${theme.subtitleColor};
+  font-weight: ${WT.medium}; font-size: ${PT.lead}pt; color: ${theme.subtitleColor};
 }
 .product-fullname-cloud {
   position: absolute; left: 134pt; top: 160pt; right: 36pt;
-  font-weight: 500; font-size: 24pt; color: #231f20; line-height: 1.15;
+  font-weight: ${WT.medium}; font-size: ${PT.cover}pt; color: #231f20; line-height: 1.15;
 }
 
 /* Non-cloud cover: subtitle aligned left (no cloud icon) */
 .product-subtitle-standard {
   position: absolute; left: 36pt; top: 130pt;
-  font-weight: 500; font-size: 19pt; color: ${theme.subtitleColor};
+  font-weight: ${WT.medium}; font-size: ${PT.lead}pt; color: ${theme.subtitleColor};
 }
 .product-fullname-standard {
   position: absolute; left: 36pt; top: 155pt; right: 36pt;
-  font-weight: 500; font-size: 24pt; color: #231f20; line-height: 1.15;
+  font-weight: ${WT.medium}; font-size: ${PT.cover}pt; color: #231f20; line-height: 1.15;
 }
 
 /* Geometry traced off the InDesign originals (DS_Cloud_ECW230 v1.2 /
@@ -739,7 +739,7 @@ body {
   overflow: hidden;
 }
 .overview-text {
-  font-weight: 400; font-size: 11pt; color: #6f6f6f; line-height: 1.35;
+  font-weight: ${WT.regular}; font-size: ${PT.body}pt; color: #6f6f6f; line-height: 1.35;
 }
 
 /* Transceiver cover: product image centered directly below the title, with the
@@ -777,7 +777,7 @@ body {
 .features-col:last-child { padding-left: 14pt; }
 .feature-item {
   display: flex; align-items: baseline; gap: 6pt;
-  font-weight: 400; font-size: 11pt; color: #4a4a4a;
+  font-weight: ${WT.regular}; font-size: ${PT.body}pt; color: #4a4a4a;
   margin-bottom: 8pt; line-height: 1.35;
 }
 ${bulletDotCss(".feature-bullet")}
@@ -797,8 +797,8 @@ ${bulletDotCss(".feature-bullet")}
 }
 .spec-category-header:first-child { margin-top: 0; }
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
-.spec-label { font-weight: 500; font-size: 7pt; color: ${theme.specLabel}; }
-.spec-value { font-weight: 300; font-size: 7pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
+.spec-label { font-weight: ${WT.medium}; font-size: ${PT.tableSm}pt; color: ${theme.specLabel}; }
+.spec-value { font-weight: ${WT.light}; font-size: ${PT.tableSm}pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
 
 /* Footnote shown once at the bottom of the last spec page (per-product-line,
    nullable in DB). Sits in normal flow below .spec-columns, spans full width
@@ -839,10 +839,7 @@ ${bulletDotCss(".feature-bullet")}
    plane badge on the left, polar plot on the right. Images are
    user-uploaded polar plots stored in Supabase Storage. */
 .antennas-page { padding: 0 35pt; }
-.antennas-title {
-  font-weight: 500; font-size: 14pt; color: ${theme.sectionTitle};
-  padding-top: 31pt; margin-bottom: 14pt;
-}
+.antennas-title { padding-top: 31pt; margin-bottom: 14pt; }
 /* Row gap is 30pt, not the column's 24pt: a row break has to read as a
    bigger separation than a column one, or the plot above lands almost on
    top of the next row's band pill. */
@@ -859,14 +856,14 @@ ${bulletDotCss(".feature-bullet")}
   margin-bottom: 4pt;
 }
 .antenna-band {
-  font-weight: 600; font-size: 9pt; color: white;
+  font-weight: ${WT.semi}; font-size: ${PT.bodySm}pt; color: white;
   background: ${theme.sectionTitle};
   padding: 2pt 10pt;
   min-width: 46pt;
   text-align: center;
 }
 .antenna-plane {
-  font-weight: 500; font-size: 9pt; color: ${theme.sectionTitle};
+  font-weight: ${WT.medium}; font-size: ${PT.bodySm}pt; color: ${theme.sectionTitle};
   background: ${theme.antennaPlaneBg};
   padding: 2pt 10pt;
   min-width: 56pt;
@@ -921,16 +918,16 @@ ${bulletDotCss(".feature-bullet")}
 .footer-logo { margin-bottom: 6pt; }
 .footer-logo img { height: 17pt; }
 .footer-disclaimer {
-  font-weight: 300; font-size: 5.5pt; color: #6d6e71; line-height: 1.45;
+  font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; line-height: 1.45;
 }
 .footer-version {
-  font-weight: 300; font-size: 5.5pt; color: #6d6e71; margin-top: 4pt;
+  font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; margin-top: 4pt;
 }
 .footer-qr {
   background: white; padding: 2pt 2pt 5pt 2pt; display: inline-block;
 }
 .footer-qr img { width: 41pt; height: 41pt; display: block; }
-.footer-qr-label { font-weight: 400; font-size: 7pt; color: #6b7580; margin-top: 2pt; }
+.footer-qr-label { font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt; color: #6b7580; margin-top: 2pt; }
 
 ${isCJK ? `
 /* ===== CJK Shared — 禁則處理 + line breaking ===== */
@@ -954,7 +951,7 @@ ${isCJK ? `
 }
 .product-fullname-cloud strong,
 .product-fullname-standard strong {
-  font-weight: 700;
+  font-weight: ${WT.bold};
 }
 
 .feature-text {

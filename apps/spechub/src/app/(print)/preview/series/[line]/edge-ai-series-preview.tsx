@@ -234,7 +234,7 @@ html, body {
 body {
   font-family: 'Roboto', sans-serif;
   color: #6f6f6f;
-  font-size: 7pt;
+  font-size: ${PT.tableSm}pt;
   line-height: 1.4;
   background: #e0e0e0;
   padding-top: ${showToolbar ? "48px" : "0"};
@@ -275,12 +275,12 @@ body {
   position: absolute; left: 36pt; top: 50%; transform: translateY(-50%); height: 27pt;
 }
 .top-bar-full .title-area { position: absolute; right: 27pt; top: 44pt; }
-.top-bar-full .title-prefix { font-weight: 300; font-size: 12pt; color: white; }
-.top-bar-full .title-category { font-weight: 500; font-size: 14pt; color: white; }
+.top-bar-full .title-prefix { font-weight: ${WT.light}; font-size: ${PT.label}pt; color: white; }
+.top-bar-full .title-category { font-weight: ${WT.medium}; font-size: ${PT.head}pt; color: white; }
 
 .page-number {
   position: absolute; right: 23pt; bottom: 18pt;
-  font-weight: 300; font-size: 7pt; color: #6f7073;
+  font-weight: ${WT.light}; font-size: ${PT.tableSm}pt; color: #6f7073;
 }
 
 /* Display type: running-header title area, cover lockup, section headings.
@@ -302,7 +302,7 @@ body {
 .img-placeholder {
   border: 1pt dashed #b9bfc4; background: #f8f9fa; color: #9aa3ab;
   display: flex; align-items: center; justify-content: center;
-  font-size: 8pt; font-weight: 400;
+  font-size: ${PT.table}pt; font-weight: ${WT.regular};
 }
 
 /* ── Page 1: cover ─────────────────────────────────────────────────── */
@@ -331,7 +331,7 @@ body {
    "Powered by NVIDIA® Jetson Orin™" stays on ONE line at 24pt */
 .hero-title {
   position: absolute; left: 36pt; top: 76pt; width: 410pt; z-index: 2;
-  font-weight: 500; font-size: 24pt; line-height: 1.18; color: white;
+  font-weight: ${WT.medium}; font-size: ${PT.cover}pt; line-height: 1.18; color: white;
   white-space: pre-line;
 }
 .hero-series {
@@ -353,7 +353,7 @@ body {
   position: absolute; left: 36pt; top: ${COVER_COLS_TOP}pt; width: 262pt;
 }
 .overview-text {
-  font-weight: 400; font-size: 10pt; color: #6f6f6f; line-height: 1.55;
+  font-weight: ${WT.regular}; font-size: ${PT.bodyMd}pt; color: #6f6f6f; line-height: 1.55;
   white-space: pre-line;
 }
 .cover-features {
@@ -365,7 +365,7 @@ body {
 .feature-group { margin-bottom: 6pt; }
 .feature-group:last-child { margin-bottom: 0; }
 .feature-group-title {
-  font-weight: 700; font-size: 8pt; color: #6f6f6f; margin-bottom: 2pt;
+  font-weight: ${WT.bold}; font-size: ${PT.table}pt; color: #6f6f6f; margin-bottom: 2pt;
 }
 .feature-bullet {
   display: flex; align-items: baseline; gap: 5pt;
@@ -377,7 +377,7 @@ ${bulletDotCss(".feature-bullet .dot")}
 /* ── Page 2: software architecture ─────────────────────────────────── */
 .arch-page { position: absolute; left: 36pt; right: 36pt; top: 56pt; bottom: 40pt; }
 .arch-text {
-  font-weight: 400; font-size: 10pt; color: #6f6f6f; line-height: 1.55;
+  font-weight: ${WT.regular}; font-size: ${PT.bodyMd}pt; color: #6f6f6f; line-height: 1.55;
   white-space: pre-line; margin-bottom: 20pt;
 }
 .arch-image-container {
@@ -398,26 +398,26 @@ ${bulletDotCss(".feature-bullet .dot")}
   padding: 3pt 5pt;
 }
 .specs-band th {
-  background: ${TEAL}; color: white; font-weight: 400; font-size: 8pt;
+  background: ${TEAL}; color: white; font-weight: ${WT.regular}; font-size: ${PT.table}pt;
   padding: 4.5pt 5pt; border-color: ${TEAL};
 }
 .specs-photo-row td { border-bottom: none; padding: 6pt 4pt 2pt; height: 64pt; }
 .specs-photo-row img { max-height: 56pt; max-width: 100%; object-fit: contain; }
 .specs-photo-ph { height: 52pt; margin: 0 auto; width: 80%; }
 .model-name-row td {
-  background: #6e6e6e; color: white; font-weight: 400; font-size: 7pt;
+  background: #6e6e6e; color: white; font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt;
 }
 .model-number-row td {
-  background: #969696; color: white; font-weight: 400; font-size: 7pt;
+  background: #969696; color: white; font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt;
 }
-.spec-row td { font-weight: 400; font-size: 7pt; color: #6f6f6f; line-height: 1.35; }
+.spec-row td { font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt; color: #6f6f6f; line-height: 1.35; }
 .spec-row td.spec-label { color: #231f20; }
 .spec-row:nth-child(even) td { background: #f7f7f7; }
 
 /* ── Hardware overview pages ───────────────────────────────────────── */
 .hw-page { position: absolute; left: 36pt; right: 36pt; top: 56pt; }
 .hw-subtitle {
-  font-weight: 400; font-size: 11pt; color: #231f20; margin-bottom: 8pt;
+  font-weight: ${WT.regular}; font-size: ${PT.body}pt; color: #231f20; margin-bottom: 8pt;
 }
 .hw-images {
   display: flex; flex-direction: column; align-items: center; gap: 22pt;
@@ -438,11 +438,11 @@ ${bulletDotCss(".feature-bullet .dot")}
 .footer-right { display: table-cell; vertical-align: bottom; width: 75pt; text-align: center; }
 .footer-logo { margin-bottom: 6pt; }
 .footer-logo img { height: 17pt; }
-.footer-disclaimer { font-weight: 300; font-size: 5.5pt; color: #6d6e71; line-height: 1.45; }
-.footer-version { font-weight: 300; font-size: 5.5pt; color: #6d6e71; margin-top: 4pt; }
+.footer-disclaimer { font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; line-height: 1.45; }
+.footer-version { font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; margin-top: 4pt; }
 .footer-qr { background: white; padding: 2pt 2pt 5pt 2pt; display: inline-block; }
 .footer-qr img { width: 41pt; height: 41pt; display: block; }
-.footer-qr-label { font-weight: 400; font-size: 7pt; color: #6b7580; margin-top: 2pt; }
+.footer-qr-label { font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt; color: #6b7580; margin-top: 2pt; }
 `,
         }}
       />

@@ -307,7 +307,7 @@ html, body {
 body {
   font-family: ${bodyFont};
   color: #525355;
-  font-size: 8pt;
+  font-size: ${PT.table}pt;
   line-height: 1.4;
   background: #e0e0e0;
   padding-top: ${showToolbar ? "48px" : "0"};
@@ -350,7 +350,7 @@ body {
 .img-placeholder {
   border: 1pt dashed #b9bfc4; background: #f8f9fa; color: #9aa3ab;
   display: flex; align-items: center; justify-content: center;
-  font-size: 8pt;
+  font-size: ${PT.table}pt;
 }
 
 /* ── Cover ─────────────────────────────────────────────────────────────
@@ -383,7 +383,7 @@ body {
 /* Headline + model carry weight; the overview stays light so the
    hierarchy still reads (all-bold would flatten the block). */
 .hero-headline {
-  font-family: ${displayFont}; font-weight: 500;
+  font-family: ${displayFont}; font-weight: ${WT.medium};
   font-size: ${HEADLINE_SIZE}pt; line-height: ${HEADLINE_LINE_HEIGHT};
   color: white; max-width: ${HEADLINE_WIDTH}pt;
 }
@@ -397,7 +397,7 @@ body {
    running text in the display face. See BODY_WIDTH_FACTOR: the cover's
    line estimate is face-specific and was re-measured for Roboto. */
 .hero-overview {
-  font-family: ${bodyFont}; font-weight: 300;
+  font-family: ${bodyFont}; font-weight: ${WT.light};
   line-height: ${OVERVIEW_LINE_HEIGHT}; color: rgba(255,255,255,0.95);
 }
 /* Wide render column; flat 1U units fill the width, taller chassis the
@@ -424,7 +424,7 @@ body {
 }
 .feature-chip {
   display: inline-block; background: ${BLUE}; color: white;
-  font-weight: 500; font-size: 8pt; padding: 1.5pt 7pt; margin-bottom: 4pt;
+  font-weight: ${WT.medium}; font-size: ${PT.table}pt; padding: 1.5pt 7pt; margin-bottom: 4pt;
 }
 .feature-title {
   font-weight: ${WT.bold}; font-size: ${PT.body}pt; color: #3f4042; margin-bottom: 3pt;
@@ -448,7 +448,7 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
    screenshots + their callouts come from the reference PDF as images. */
 .edcc-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; padding-top: 22pt; }
 .edcc-intro {
-  font-size: 8pt; line-height: 1.6; color: #525355; margin: 8pt 0 14pt;
+  font-size: ${PT.table}pt; line-height: 1.6; color: #525355; margin: 8pt 0 14pt;
 }
 .edcc-visual { display: flex; justify-content: center; }
 .edcc-visual img { width: 492pt; object-fit: contain; }
@@ -458,7 +458,7 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
 }
 .edcc-feature { border-left: 2pt solid ${BLUE}; padding-left: 8pt; }
 .edcc-feature-title {
-  font-size: 10pt; font-weight: 400; color: #231f20; margin-bottom: 3pt;
+  font-size: ${PT.bodyMd}pt; font-weight: ${WT.regular}; color: #231f20; margin-bottom: 3pt;
 }
 /* One step below the cover grid: the EDCC page has six fixed blocks and
    no auto-fit, and bodySm overruns the page by ~11pt. */
@@ -477,11 +477,11 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
   background: ${BLUE}; color: white; font-weight: ${WT.regular}; font-size: ${PT.table}pt;
   text-align: center; padding: 5pt; border-color: ${BLUE};
 }
-.model-name-row td { background: #6d6e71; color: white; font-size: 8pt; }
-.model-number-row td { background: #939598; color: white; font-size: 8pt; }
+.model-name-row td { background: #6d6e71; color: white; font-size: ${PT.table}pt; }
+.model-number-row td { background: #939598; color: white; font-size: ${PT.table}pt; }
 .model-name-row td:first-child, .model-number-row td:first-child { text-align: left; }
-.spec-row td { font-size: 8pt; line-height: 1.4; }
-.spec-row td.spec-label { color: #231f20; font-weight: 400; }
+.spec-row td { font-size: ${PT.table}pt; line-height: 1.4; }
+.spec-row td.spec-label { color: #231f20; font-weight: ${WT.regular}; }
 .spec-row td.spec-value { color: #525355; white-space: pre-line; }
 .spec-row:nth-child(even) td { background: #eff0f0; }
 
@@ -510,11 +510,11 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
 .footer-right { display: table-cell; vertical-align: bottom; width: 75pt; text-align: center; }
 .footer-logo { margin-bottom: 6pt; }
 .footer-logo img { height: 17pt; }
-.footer-disclaimer { font-weight: 300; font-size: 5.5pt; color: #6d6e71; line-height: 1.45; }
-.footer-version { font-weight: 300; font-size: 5.5pt; color: #6d6e71; margin-top: 4pt; }
+.footer-disclaimer { font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; line-height: 1.45; }
+.footer-version { font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; margin-top: 4pt; }
 .footer-qr { background: white; padding: 2pt 2pt 5pt 2pt; display: inline-block; }
 .footer-qr img { width: 41pt; height: 41pt; display: block; }
-.footer-qr-label { font-weight: 400; font-size: 7pt; color: #6b7580; margin-top: 2pt; }
+.footer-qr-label { font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt; color: #6b7580; margin-top: 2pt; }
 `,
         }}
       />

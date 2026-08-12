@@ -18,7 +18,11 @@
  * here, that is a conversation about the scale, not a local edit.
  */
 
-/** Type steps, in points. */
+/**
+ * Type steps, in points. The public type-spec page PARSES this file, so a
+ * change here reaches the designer-facing reference on the next build —
+ * these numbers are not transcribed anywhere.
+ */
 export const PT = {
   /** Cover headline. */
   cover: 24,
@@ -30,6 +34,14 @@ export const PT = {
   label: 12,
   /** Primary running copy — the standard layout's overview and features. */
   body: 11,
+  /**
+   * Between `body` and `bodySm`. Not a fudge: three components genuinely
+   * want it (Edge AI's cover overview, Broadband's block titles, the EDCC
+   * feature titles) and Data Center's overview ladder steps through it.
+   * It was previously undeclared, which made the scale look one step
+   * tidier than the layouts actually were.
+   */
+  bodyMd: 10,
   /** Secondary running copy — dense feature grids, compact overviews. */
   bodySm: 9,
   /** Spec tables, category bands. */
@@ -64,7 +76,7 @@ export const WT = {
  */
 export const LADDER = {
   /** Data Center cover overview. */
-  dcOverview: [PT.body, 10, PT.bodySm] as number[],
+  dcOverview: [PT.body, PT.bodyMd, PT.bodySm] as number[],
   /** Broadband per-model cover overview. */
   broadbandOverview: [PT.bodySm, 8.5, PT.table] as number[],
 } as const;
