@@ -3,8 +3,15 @@ import { createClient } from "@eg/db/server";
 import { splitIntoPages, filterRenderableSections } from "@/lib/datasheet/pagination";
 import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
-import { TYPOGRAPHY_DEFAULTS, FONT_OPTIONS, isCjkLocale } from "@/lib/datasheet/typography";
+import {
+  TYPOGRAPHY_DEFAULTS,
+  FONT_OPTIONS,
+  isCjkLocale,
+  displayFontStack,
+  MANROPE_IMPORT_URL,
+} from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
+import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { DataCenterPreview } from "./datacenter-preview";
 import { BroadbandPreview } from "./broadband-preview";
@@ -526,6 +533,7 @@ export default async function PreviewPage({
 
   const fontImports = [
     "https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap",
+    MANROPE_IMPORT_URL,
     ...(fontImportSlug
       ? [`https://fonts.googleapis.com/css2?family=${fontImportSlug}:wght@300;400;500;600;700&display=swap`]
       : []),
@@ -534,6 +542,12 @@ export default async function PreviewPage({
   const fontFamily = chosenFont
     ? `'${chosenFont}', 'Roboto', sans-serif`
     : "'Roboto', sans-serif";
+
+  // Headings are Manrope in every layout. On a CJK locale `chosenFont` is
+  // that locale's face and has to lead the stack (pitfall #64) — on a Latin
+  // one it is the body face and must NOT, or picking Inter for body copy
+  // would silently take the headings with it.
+  const displayFont = displayFontStack(isCJK ? chosenFont : null);
 
   return (
     <>
@@ -625,6 +639,24 @@ body {
 .top-bar-full .title-area {
   position: absolute; right: 27pt; top: 44pt;
 }
+/* Display type: the running-header title area, the cover lockup and every
+   section heading are Manrope; body copy, spec tables, footers and page
+   numbers stay in the body face. */
+.top-bar-full .title-prefix,
+.top-bar-full .title-category,
+.model-name,
+.product-subtitle-cloud,
+.product-fullname-cloud,
+.product-subtitle-standard,
+.product-fullname-standard,
+.section-title,
+.features-title,
+.spec-page-title,
+.hardware-title,
+.antennas-title {
+  font-family: ${displayFont};
+}
+
 .top-bar-full .title-prefix {
   font-weight: 300; font-size: 12pt; color: white;
 }
@@ -745,10 +777,7 @@ body {
   font-weight: 400; font-size: 11pt; color: #4a4a4a;
   margin-bottom: 8pt; line-height: 1.35;
 }
-.feature-bullet {
-  flex-shrink: 0; color: #4a4a4a; font-size: 6pt; line-height: 1;
-  margin-top: 4pt;
-}
+${bulletDotCss(".feature-bullet")}
 .feature-text { flex: 1; }
 
 /* Spec pages */
@@ -1043,7 +1072,7 @@ ${isCJK ? `
                 <div className="features-col">
                   {leftFeatures.map((f, i) => (
                     <div key={i} className="feature-item">
-                      <span className="feature-bullet">{dict.bullet}</span>
+                      <span className="feature-bullet" />
                       <span className="feature-text">{f}</span>
                     </div>
                   ))}
@@ -1051,7 +1080,7 @@ ${isCJK ? `
                 <div className="features-col">
                   {rightFeatures.map((f, i) => (
                     <div key={i} className="feature-item">
-                      <span className="feature-bullet">{dict.bullet}</span>
+                      <span className="feature-bullet" />
                       <span className="feature-text">{f}</span>
                     </div>
                   ))}

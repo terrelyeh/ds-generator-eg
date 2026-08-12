@@ -36,5 +36,4 @@ export const es: DatasheetDict = {
     "Es probable que el funcionamiento de este equipo en una zona residencial cause interferencias perjudiciales, en cuyo caso el usuario deberá corregir la interferencia por su propia cuenta. " +
     "Antes de instalar cualquier equipo de videovigilancia, es su responsabilidad asegurarse de que la instalación cumpla con las leyes locales, estatales y federales en materia de videovigilancia, grabación de audio y privacidad.",
   dateLocale: "es-MX",
-  bullet: "●",
 };

@@ -146,6 +146,9 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
 - **字級可調範圍**：`Settings ▸ Typography` 現在涵蓋 **en / es / ja / zh-TW 四個語系**
   （2026-08-10 起拉丁語系也進來了,值就是原本寫死在 CSS 裡的那組,輸出零變化）。
   **但只管得到版型 A** —— B/C/D 的字級寫死在各自元件裡,要改得動程式。
+  ⚠️ **`font_family` 是「內文字體」,不是全部** —— 四種版型的標題（封面主標/副標/型號、
+  頁首分類、所有段落標）一律 **Manrope**,寫死在元件裡（`displayFontStack()`）;
+  設定頁改的是內文 Roboto。CJK 語系兩條 stack 都會把語系字型放最前面（pitfall #64）。
 - **PDF 版型與字級規範**（四種版型的字型／字級／顏色／logo 對照，字級以真實 pt 排出）：
   站內 `/design/datasheet-type-spec.html`，Settings 有卡片連過去。
   ⚠️ **這一頁是全站唯一免登入的頁面**（`proxy.ts` 的 `PUBLIC_EXACT_PATHS`，精確比對不是前綴），

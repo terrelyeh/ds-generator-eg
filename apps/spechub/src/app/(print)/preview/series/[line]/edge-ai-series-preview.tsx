@@ -1,6 +1,8 @@
 import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
+import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
+import { bulletDotCss } from "@/lib/datasheet/bullet";
 import type { ProductLine } from "@eg/db/types";
 import type { SeriesFeatureGroup, SeriesSpecsData } from "@/lib/google/sheets-extra";
 import type { SeriesImages } from "@/lib/google/drive-images";
@@ -205,6 +207,7 @@ export function EdgeAiSeriesPreview({
         dangerouslySetInnerHTML={{
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
+@import url('${MANROPE_IMPORT_URL}');
 
 @page { size: letter; margin: 0; }
 
@@ -268,6 +271,13 @@ body {
   font-weight: 300; font-size: 7pt; color: #6f7073;
 }
 
+/* Display type: cover lockup + section headings. Everything else — body
+   copy, spec tables, footers, page numbers — stays in the body face.
+   This layout is en-only, so the stack needs no CJK face in front. */
+.hero-title,
+.section-title {
+  font-family: ${displayFontStack()};
+}
 .section-title {
   font-weight: 500; font-size: 17pt; color: ${TEAL}; margin-bottom: 10pt;
 }
@@ -340,11 +350,11 @@ body {
   font-weight: 700; font-size: 8pt; color: #6f6f6f; margin-bottom: 2pt;
 }
 .feature-bullet {
-  display: flex; gap: 5pt;
+  display: flex; align-items: baseline; gap: 5pt;
   font-weight: 400; font-size: 8pt; color: #6f6f6f; line-height: 1.4;
   margin-left: 6pt;
 }
-.feature-bullet .dot { flex: none; }
+${bulletDotCss(".feature-bullet .dot")}
 
 /* ── Page 2: software architecture ─────────────────────────────────── */
 .arch-page { position: absolute; left: 36pt; right: 36pt; top: 56pt; bottom: 40pt; }
@@ -464,7 +474,7 @@ body {
                     {g.title && <div className="feature-group-title">{g.title}:</div>}
                     {g.bullets.map((b, bi) => (
                       <div key={bi} className="feature-bullet">
-                        <span className="dot">•</span>
+                        <span className="dot" />
                         <span>{b}</span>
                       </div>
                     ))}
@@ -476,7 +486,7 @@ body {
                   const m = f.match(/^([^:]{2,60}):\s*(.*)$/);
                   return (
                     <div key={fi} className="feature-bullet">
-                      <span className="dot">•</span>
+                      <span className="dot" />
                       <span>
                         {m ? (
                           <>

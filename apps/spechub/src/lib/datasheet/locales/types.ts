@@ -19,8 +19,6 @@ export interface DatasheetDict {
   disclaimer: string;
   /** Date locale for toLocaleDateString (e.g. "en-US", "ja-JP") */
   dateLocale: string;
-  /** Bullet character for feature lists */
-  bullet: string;
 }
 
 export type SupportedLocale = "en" | "ja" | "zh-TW" | "es";

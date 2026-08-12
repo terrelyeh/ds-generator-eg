@@ -126,7 +126,7 @@ B = [
     ("Solution 標籤", "Manrope", "14",   "200", "白字／深藍底", spec("Data Center", 14, 200, "#ffffff", bg=DCN)),
     ("封面主標",     "Manrope", "24",   "500", "白字／深藍漸層底", spec("AI-Ready Edge Infrastructure", 24, 500, "#ffffff", bg=DCN, lh=1.28)),
     ("封面型號",     "Manrope", "15",   "600", DCY,      spec("SE110", 15, 600, DCY, bg=DCN)),
-    ("封面 Overview", "Manrope", "10 → 9.5 → 9", "300", "白字 95%", spec("Purpose-built for distributed AI workloads at the network edge.", 10, 300, "#ffffff", bg=DCN, lh=1.55)),
+    ("封面 Overview", "Roboto", "10 → 9.5 → 9", "300", "白字 95%", spec("Purpose-built for distributed AI workloads at the network edge.", 10, 300, "#ffffff", bg=DCN, lh=1.55)),
     ("區塊標題",     "Manrope", "17",   "600", DCB,      spec("Key Features", 17, 600, DCB)),
     ("Feature 標籤", "Roboto",  "8",    "500", "白字／藍底", spec("EDCC", 8, 500, "#ffffff", bg=DCB)),
     ("Feature 標題", "Roboto",  "10.5", "700", "#3f4042", spec("Centralized Cloud Management", 10.5, 700, "#3f4042", lh=1.3)),
@@ -138,7 +138,7 @@ B = [
     ("料號列",       "Roboto",  "8",    "400", "白字／底 #939598", spec("SE110-01", 8, 400, "#ffffff", bg="#939598")),
     ("規格數值",     "Roboto",  "8",    "400", "#525355", spec("Intel Atom x6425E, 4 cores", 8, 400, "#525355", lh=1.4)),
     ("硬體副標",     "Roboto",  "10.5", "400", "#231f20", spec("Front Panel", 10.5, 400, "#231f20")),
-    ("頁碼",         "Manrope", "7",    "200", "#58595b", spec("4", 7, 200, "#58595b")),
+    ("頁碼",         "Roboto",  "7",    "300", "#58595b", spec("4", 7, 300, "#58595b")),
     ("頁尾聲明",     "Roboto",  "5.5",  "300", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
 ]
 tbl_b = "\n".join(
@@ -211,7 +211,8 @@ cmp_title = cmp_table([
     ("主標顏色", "#231f20",      "白字／深藍",     "白字／鋼藍",                     "白字"),
     ("副標",     "19 pt / w500", "型號 15 pt / w600", "系列 15 pt / w400",         "17.5 pt / w400"),
     ("區塊標題", "14 pt / w500", "17 pt / w600",  "14 pt / w700",                 "17 pt / w500"),
-    ("標題字體", "Roboto",       "Manrope",       "Roboto",                       "Roboto"),
+    ("標題字體", "Manrope",      "Manrope",       "Manrope",                      "Manrope"),
+    ("內文字體", "Roboto",       "Roboto",        "Roboto",                       "Roboto"),
 ])
 
 cmp_body = cmp_table([
@@ -221,6 +222,7 @@ cmp_body = cmp_table([
     ("Feature 標題", "14 pt / w500", "10.5 pt / w700", "10 pt / w500", "8 pt / w700"),
     ("Feature 內文", "11 pt / w400", "7.5 pt / w400",  "8 pt / w400",  "8 pt / w400"),
     ("內文色",    "#6f6f6f / #4a4a4a", "#525355", "#6f6f6f", "#6f6f6f"),
+    ("條列圓點",  "0.5em CSS 圓",  "0.5em CSS 圓",  "0.5em CSS 圓",  "0.5em CSS 圓"),
 ])
 
 cmp_spec = cmp_table([

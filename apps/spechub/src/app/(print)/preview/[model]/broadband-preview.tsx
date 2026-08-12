@@ -2,7 +2,8 @@ import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
-import { cjkFontFor } from "@/lib/datasheet/typography";
+import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
+import { bulletDotCss } from "@/lib/datasheet/bullet";
 import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@eg/db/types";
 
 /**
@@ -177,6 +178,7 @@ export function BroadbandPreview({
   // locale's face in front of it so Latin still sets in Roboto.
   const cjk = cjkFontFor(locale);
   const bodyFont = cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif";
+  const displayFont = displayFontStack(cjk?.family);
 
   const seriesName = lineContent?.series_name || line.label;
   const categoryLabel = lineContent?.category_label || line.label;
@@ -366,6 +368,7 @@ export function BroadbandPreview({
         dangerouslySetInnerHTML={{
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
+@import url('${MANROPE_IMPORT_URL}');
 ${cjk ? `@import url('${cjk.importUrl}');` : ""}
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -390,6 +393,14 @@ body {
 .page-number {
   position: absolute; right: 27pt; bottom: 18pt;
   font-weight: 300; font-size: 7pt; color: #6f7073;
+}
+/* Display type: cover lockup + section headings. Everything else — body
+   copy, spec tables, footers, page numbers — stays in the body face. */
+.hero-title,
+.hero-series,
+.block-title,
+.section-title {
+  font-family: ${displayFont};
 }
 .section-title {
   font-weight: 700; font-size: 14pt; color: ${STEEL};
@@ -467,10 +478,10 @@ body {
   background: #f7f8f8; padding: 14pt 16pt;
 }
 .benefit {
-  display: flex; gap: 6pt; break-inside: avoid;
+  display: flex; align-items: baseline; gap: 6pt; break-inside: avoid;
   font-size: 7.5pt; line-height: 1.5; color: #6f6f6f; margin-bottom: 8pt;
 }
-.benefit .dot { flex: none; color: #6f6f6f; }
+${bulletDotCss(".benefit .dot")}
 .benefit b { font-weight: 700; color: #4a4a4a; }
 .benefits-note { font-size: 7pt; font-weight: 300; color: #a7a9ac; margin-top: 8pt; }
 .deploy { margin-top: 16pt; display: flex; justify-content: center; }
@@ -638,7 +649,7 @@ body {
               const m = b.match(/^([^:]{2,60}):\s*(.*)$/);
               return (
                 <div key={i} className="benefit">
-                  <span className="dot">•</span>
+                  <span className="dot" />
                   <span>
                     {m ? (
                       <>

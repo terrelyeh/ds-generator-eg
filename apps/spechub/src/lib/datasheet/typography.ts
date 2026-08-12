@@ -239,3 +239,22 @@ export function cjkFontFor(
     family,
   };
 }
+
+/** Google Fonts URL for the display face; every layout must @import it. */
+export const MANROPE_IMPORT_URL =
+  "https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&display=swap";
+
+/**
+ * The display stack — cover lockup and section headings.
+ *
+ * Manrope is a brand rule rather than a choice, so it is not exposed in
+ * Settings ▸ Typography: `font_family` there picks the BODY face only.
+ * Headings stay Manrope even if someone moves the body copy to Inter.
+ *
+ * `cjkFamily` (from cjkFontFor) goes in FRONT — pitfall #64: Manrope has no
+ * CJK glyphs, and Vercel's chromium has no system font to fall back on, so
+ * a heading without the locale's face prints blank rather than tofu.
+ */
+export function displayFontStack(cjkFamily?: string | null): string {
+  return cjkFamily ? `'${cjkFamily}', 'Manrope', sans-serif` : "'Manrope', sans-serif";
+}

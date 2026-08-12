@@ -1,7 +1,8 @@
 import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
-import { cjkFontFor } from "@/lib/datasheet/typography";
+import { cjkFontFor, displayFontStack } from "@/lib/datasheet/typography";
+import { bulletDotCss } from "@/lib/datasheet/bullet";
 import type {
   Product,
   ProductLine,
@@ -104,12 +105,19 @@ const LOWER_GAP = 14;        // .hero-lower margin-top
 const OVERVIEW_LINE_HEIGHT = 1.55;
 /**
  * Average glyph advance as a fraction of font size. CALIBRATED against
- * rendered PDFs (five models, observed lines vs character counts) — an
- * earlier guess of 0.586 over-counted lines by ~10% and pushed the copy
- * two steps down the ladder for no reason. Manrope Medium (headline) runs
- * wider than the Light body copy.
+ * rendered output (all five models × the whole size ladder, observed lines
+ * vs character counts) — an earlier guess of 0.586 over-counted lines by
+ * ~10% and pushed the copy two steps down the ladder for no reason.
+ *
+ * ⚠️ The body factor is per-FACE. It was 0.531 while .hero-overview was set
+ * in Manrope Light; the overview is Roboto Light now (headings own the
+ * display face, body copy does not), and Roboto Light is slightly narrower
+ * — re-measuring in a real 272pt column gives 0.478. Leaving the old value
+ * behind would have over-counted by a line on nearly every model and
+ * silently shrunk covers that fit. Re-measure this whenever the body face
+ * moves; the headline factor tracks Manrope Medium and is unaffected.
  */
-const BODY_WIDTH_FACTOR = 0.531;
+const BODY_WIDTH_FACTOR = 0.478;
 const HEADLINE_WIDTH_FACTOR = 0.6;
 
 /** Estimated wrapped line count for `text` in a column of `columnWidth`. */
@@ -200,7 +208,7 @@ export function DataCenterPreview({
   // Neither Roboto nor Manrope carries CJK glyphs (pitfall #64).
   const cjk = cjkFontFor(locale);
   const bodyFont = cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif";
-  const displayFont = cjk ? `'${cjk.family}', 'Manrope', sans-serif` : "'Manrope', sans-serif";
+  const displayFont = displayFontStack(cjk?.family);
   const headline = (isTranslated ? translation?.headline : null) || product.headline;
   const overview = (isTranslated ? translation?.overview : null) ?? product.overview;
   const features = (isTranslated ? translation?.features : null) ?? product.features;
@@ -321,9 +329,12 @@ body {
 /* slim navy strip on continuation pages */
 .top-bar { background: ${NAVY}; height: 21.4pt; width: 100%; }
 
+/* Body face, not display — a folio is not a heading, and this layout was
+   the only one setting one in Manrope. Weight 200 doesn't exist in Roboto;
+   300 is its lightest. */
 .page-number {
   position: absolute; right: 24pt; bottom: 16pt;
-  font-family: ${displayFont}; font-weight: 200;
+  font-family: ${bodyFont}; font-weight: 300;
   font-size: 7pt; color: #58595b;
 }
 
@@ -381,8 +392,11 @@ body {
   font-family: ${displayFont}; font-weight: 600;
   font-size: 15pt; color: ${YELLOW}; margin-bottom: 8pt;
 }
+/* Body copy, so the body face — this was the one place a layout set
+   running text in the display face. See BODY_WIDTH_FACTOR: the cover's
+   line estimate is face-specific and was re-measured for Roboto. */
 .hero-overview {
-  font-family: ${displayFont}; font-weight: 300;
+  font-family: ${bodyFont}; font-weight: 300;
   line-height: ${OVERVIEW_LINE_HEIGHT}; color: rgba(255,255,255,0.95);
 }
 /* Wide render column; flat 1U units fill the width, taller chassis the
@@ -423,10 +437,10 @@ body {
   column-count: 2; column-gap: 28pt;
 }
 .flat-bullet {
-  display: flex; gap: 5pt; break-inside: avoid;
+  display: flex; align-items: baseline; gap: 5pt; break-inside: avoid;
   font-size: 8.5pt; color: #525355; line-height: 1.55; margin-bottom: 5pt;
 }
-.flat-bullet .dot { color: ${BLUE}; flex: none; }
+${bulletDotCss(".flat-bullet .dot", BLUE)}
 
 /* ── EDCC shared page ──────────────────────────────────────────────── */
 /* Copy is LIVE TEXT (crisp at any zoom, editable); only the product
@@ -551,7 +565,7 @@ body {
           <div className="cover-features-flat">
             {(features ?? []).map((f, fi) => (
               <div key={fi} className="flat-bullet">
-                <span className="dot">●</span>
+                <span className="dot" />
                 <span>{f}</span>
               </div>
             ))}
