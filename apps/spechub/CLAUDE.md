@@ -83,7 +83,8 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
 - **`(main)/`** = 受白名單 gate 的頁面（dashboard / product / compare / settings…），
   **headless 驗不了**（pitfall #62）；**`(print)/preview/*`** 帶 bypass header 可以直接抓
-- **`lib/datasheet/`** 放版面計算與「依 category 而異」的規則
+- **`lib/datasheet/`** 放版面計算與「依 category 而異」的規則。
+  **`scale.ts` 是四種版型共用的字級/字重刻度（唯一來源）**,`bullet.ts` 是 CSS 畫的條列圓點
   （`qr.ts`、`radio-patterns.ts` —— 不要在元件內就地判斷 category）
 - **`lib/google/`** 是所有 Sheets / Drive 存取的入口
 - 共用碼在 repo root 的 `packages/`：`@eg/db`（含 **migrations 唯一來源**）、`@eg/auth`
@@ -145,7 +146,10 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
 - **Heading font**: Plus Jakarta Sans (`font-heading`)；**Body**: Geist Sans
 - **字級可調範圍**：`Settings ▸ Typography` 現在涵蓋 **en / es / ja / zh-TW 四個語系**
   （2026-08-10 起拉丁語系也進來了,值就是原本寫死在 CSS 裡的那組,輸出零變化）。
-  **但只管得到版型 A** —— B/C/D 的字級寫死在各自元件裡,要改得動程式。
+  **但只管得到版型 A** —— B/C/D 沒有 DB 覆寫,要改得動程式。
+  ⚠️ **但它們也不再各寫各的**:2026-08-12 起四種版型的字級/字重都引用
+  `lib/datasheet/scale.ts` 的 `PT` / `WT`(10 階 / 5 種字重)。元件裡不該再出現
+  `font-size: 9pt` 這種字面值 —— 產生器會擋下不在刻度上的值(見下)。
   ⚠️ **`font_family` 是「內文字體」,不是全部** —— 四種版型的標題（封面主標/副標/型號、
   頁首分類、所有段落標）一律 **Manrope**,寫死在元件裡（`displayFontStack()`）;
   設定頁改的是內文 Roboto。CJK 語系兩條 stack 都會把語系字型放最前面（pitfall #64）。
@@ -156,7 +160,17 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
   已加 `noindex` 不進搜尋引擎。往 `public/design/` 丟新檔案**不會**自動變公開，要另外加進白名單。
   **那份 HTML 是產生出來的，不要手改** —— 改 `scripts/design/type-spec.template.html`
   或 `build-type-spec.py`，然後跑 `python3 apps/spechub/scripts/design/build-type-spec.py`
-  重新產生（會同時輸出站內版與 Artifact 版）。Roboto 字檔已存在 script 旁邊，建置不需要網路。
+  重新產生（會同時輸出站內版與 Artifact 版）。Roboto／Manrope 字檔已存在 script 旁邊，
+  建置不需要網路。
+  ⚠️ **頁面上的字級/字重不是手打的,是 build 時解析出來的**（`read_type_system.py`）:
+  `scale.ts` 給刻度、四個版型元件給「哪個角色用哪一階」、`typography.ts` 給版型 A 的
+  en 預設。**元件用了刻度外的字級,產生器會拒絕產出並指名是誰。**
+  改完刻度只要重跑產生器,不用去改任何數字。
+  ⚠️ **唯一的例外是 CJK 那張表** —— ja/zh-TW 的值在 `app_settings`,由設定頁編輯,
+  程式碼裡沒有東西可讀。作法是「簽入快照 + 漂移偵測」:
+  `python3 apps/spechub/scripts/design/check-cjk-typography.py`(比對快照與線上 DB,
+  不一致 exit 1),`--update` 重抓快照後要再跑一次產生器。
+  **設定頁改值不會經過任何發版,所以這張表是全頁最容易悄悄過期的地方。**
 
 ## Database Tables
 
@@ -203,6 +217,9 @@ auth.users → profiles ← email_whitelist.invited_by
   A 標準 `preview/[model]/page.tsx`（Cloud 藍 / 灰 / Transceiver 綠 / Station 鋼藍,
   只有 `getTheme()` 換色）、B `datacenter-preview.tsx`、C `broadband-preview.tsx`
   （單機+系列共用）、D `edge-ai-series-preview.tsx`（**寫死 en,不支援多語系**）。
+  **四種版型共用一套字級刻度**(`lib/datasheet/scale.ts`)與一條字體規則:
+  標題 Manrope、內文 Roboto、條列圓點是 CSS 畫的 `0.5em` 圓(不是字元 —— 打字元會讓
+  圓點大小變成「字型的屬性」而不是設計的屬性,英文曾經只有中日文的 48%)。
   **每一種的字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
   （站上免登入可看,字級以真實 pt 排出）。新增產品線見
   [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
@@ -330,6 +347,17 @@ npm run lint
     ③ `PrintToolbar` 要收真 locale + `translationConfirmed`;④ `canGenerate`
     讀「該語系實際渲染的值」(同 pitfall #59,已歸檔於 [`docs/common-pitfalls.md`](docs/common-pitfalls.md))。
 
+
+69. **版面驗證最容易「假綠」—— 檢查器要先證明自己看得到東西**（2026-08-12 型級收斂時
+    連踩兩次）。兩個獨立的成因,都讓 109 份文件回報「0 溢版」而其實什麼都沒驗到:
+    ① **`.page` 是 `overflow: hidden`,所以 `scrollHeight` 永遠等於 `clientHeight`** ——
+    用它判斷溢版永遠回 false。要比對子元素的 `getBoundingClientRect().bottom` 有沒有
+    超過 page 的 bottom。
+    ② **`rm -rf .next` 之後 dev server 被「reused」會吐出 0 頁的空白頁面** ——
+    而「0 頁」當然不會溢版,檢查器一片綠。跑批次驗證前先確認伺服器真的在吐頁面
+    （`curl ... | grep -c 'class="page"'`）,並且把「after 頁數 = 0」本身當成失敗條件。
+    **通則:任何「沒發現問題」的檢查,要先能證明它在有問題時會叫。** 今天兩支
+    guard（off-scale、CJK 漂移）都是先故意種一個錯、看它報錯,才算數。
 
 67. **翻譯的 feature 陣列不會跟著英文縮短 —— 多出來的尾巴 UI 看不見卻會印出來**
     （2026-08-03 ECP106 zh-TW 事件）—— PM 7/31 從 sheet 拿掉 2 條 feature（其實是把

@@ -109,7 +109,8 @@ SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base�
 
 ### Settings
 - **版型與字級規範**（`/design/datasheet-type-spec.html`）— 四種 datasheet 版型的字型、
-  字級、顏色與 logo 尺寸對照，字級範例以真實 pt 排出。**這頁不需登入**，可以直接把連結
+  字級、顏色與 logo 尺寸對照，字級範例以真實 pt 排出。頁上的數字是 build 時從程式碼
+  解析出來的（不是人工維護），所以不會跟實際 PDF 說不一樣。**這頁不需登入**，可以直接把連結
   給外部設計師
 - **翻譯詞庫**（`/settings/glossary`）— 公司認可翻譯術語，分 Global 和產品線專屬
 - **Typography**（`/settings/typography`）— 每個語言獨立的字型、字級、字重設定
