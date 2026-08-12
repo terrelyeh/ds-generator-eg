@@ -1,0 +1,40 @@
+{
+  "captured": "2026-08-12",
+  "locales": {
+    "ja": {
+      "features_size": 10,
+      "features_weight": 500,
+      "font_family": "Noto Sans JP",
+      "footer_size": 6,
+      "headline_size": 24,
+      "headline_weight": 500,
+      "letter_spacing": 0.5,
+      "overview_size": 10,
+      "overview_weight": 500,
+      "section_title_size": 12,
+      "spec_label_size": 8,
+      "spec_label_weight": 600,
+      "spec_value_weight": 400,
+      "subtitle_size": 17,
+      "text_color": "#444444"
+    },
+    "zh-TW": {
+      "features_size": 11,
+      "features_weight": 500,
+      "font_family": "Noto Sans TC",
+      "footer_size": 6,
+      "headline_size": 24,
+      "headline_weight": 600,
+      "letter_spacing": 0.3,
+      "overview_size": 11,
+      "overview_weight": 400,
+      "section_title_size": 13,
+      "spec_label_size": 7,
+      "spec_label_weight": 600,
+      "spec_value_weight": 400,
+      "subtitle_size": 17,
+      "text_color": "#444444"
+    }
+  },
+  "source": "app_settings.typography_<locale> (Settings ▸ Typography)"
+}

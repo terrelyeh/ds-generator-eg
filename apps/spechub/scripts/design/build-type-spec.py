@@ -31,6 +31,7 @@ import base64, html, pathlib, sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 import read_type_system as TS
+import cjk_typography as CJKT
 
 HERE = pathlib.Path(__file__).resolve().parent
 SPECHUB = HERE.parent.parent
@@ -119,19 +120,6 @@ def num(v):
     return f"{v:g}"
 
 
-def live(layout, selector, text, color="#16202B", bg=None, lh=1.25, disp=False,
-         size=None, weight=None):
-    """A table row whose numbers and specimen both come from the source."""
-    s = size if size is not None else px(layout, selector, "font-size")
-    w = weight if weight is not None else px(layout, selector, "font-weight")
-    swatch = sw(color) if color.startswith("#") else color
-    sample_color = color if color.startswith("#") else "#ffffff"
-    return row([
-        td(ROLE_LABEL, "role"), td(num(s) + " pt", "num"), td(num(w), "num"),
-        td(LH_CELL, "num"), td(swatch, "mono"),
-        td(spec(text, s, w, sample_color, bg=bg, lh=lh, disp=disp), "spec"),
-    ])
-
 
 # ── A · Latin ───────────────────────────────────────────────────────────
 # Sizes marked (設定) are editable per locale in Settings ▸ Typography; the
@@ -156,25 +144,15 @@ A = [
 ]
 
 # ── A · CJK ─────────────────────────────────────────────────────────────
-# NOT parsed: these live in `app_settings` per locale and are edited through
-# the settings UI, so the code carries no number to read. Kept as prose.
-CJK = [
-    ("字級來源",    "app_settings", "app_settings", "—", "設定頁 ▸ Typography，程式碼改不動"),
-    ("封面主標",    "24 pt / w500", "24 pt / w600", "1.25", "—"),
-    ("封面副標",    "17 pt",        "17 pt",        "—",    "與拉丁文同階"),
-    ("區塊標題",    "12 pt",        "13 pt",        "—",    "拉丁為 14 pt"),
-    ("Overview 內文", "10 pt / w500", "11 pt / w500", "1.5",  "內文色 #444444"),
-    ("Feature 項目", "10 pt / w500", "11 pt / w500", "1.4",  "內文色 #444444"),
-    ("規格標籤",    "8 pt / w600",  "7 pt / w600",  "1.5",  "拉丁為 w500"),
-    ("規格數值",    "8 pt / w400",  "7 pt / w400",  "1.5",  "拉丁同為 w400"),
-    ("頁尾聲明",    "6 pt",         "6 pt",         "1.5",  "w400 / #555555"),
-    ("字距",        "0.5 pt",       "0.3 pt",       "—",    "只作用在規格分類列"),
-    ("字體",        "Noto Sans JP", "Noto Sans TC", "—",    "標題仍走 Manrope 作為西文 fallback"),
-]
+# Composed from a checked-in snapshot of `app_settings`, so the page build
+# stays offline. `check-cjk-typography.py` is what catches the snapshot
+# going stale — the settings UI changes these without any commit.
+CJK_SNAP = CJKT.load()
 tbl_cjk = "\n".join(
     row([td(r[0], "role"), td(r[1], "num"), td(r[2], "num"), td(r[3], "num"), td(r[4])])
-    for r in CJK
+    for r in CJKT.rows(CJK_SNAP)
 )
+CJK_CAPTURED = CJKT.captured_on(CJK_SNAP)
 
 # ── B · Data Center ─────────────────────────────────────────────────────
 DCN, DCB, DCY = "#16355c", "#0073bf", "#f4d768"
@@ -331,6 +309,7 @@ out = (src
     .replace("__LADDER__",     ladder)
     .replace("__TBL_A__",      tbl_a)
     .replace("__TBL_CJK__",    tbl_cjk)
+    .replace("__CJK_CAPTURED__", CJK_CAPTURED)
     .replace("__TBL_B__",      tbl_b)
     .replace("__TBL_C__",      tbl_c)
     .replace("__TBL_D__",      tbl_d)
@@ -339,7 +318,7 @@ out = (src
     .replace("__CMP_SPEC__",   cmp_spec)
 )
 
-leftover = [t for t in ["__ROBOTO__","__MANROPE__","__LOGO_WHITE__","__LOGO_GRAY__","__CLOUD_ICON__","__LADDER__",
+leftover = [t for t in ["__ROBOTO__","__MANROPE__","__CJK_CAPTURED__","__LOGO_WHITE__","__LOGO_GRAY__","__CLOUD_ICON__","__LADDER__",
                         "__TBL_A__","__TBL_CJK__","__TBL_B__","__TBL_C__","__TBL_D__",
                         "__CMP_TITLE__","__CMP_BODY__","__CMP_SPEC__"] if t in out]
 if leftover:
