@@ -271,10 +271,13 @@ body {
   font-weight: 300; font-size: 7pt; color: #6f7073;
 }
 
-/* Display type: cover lockup + section headings. Everything else — body
-   copy, spec tables, footers, page numbers — stays in the body face.
-   This layout is en-only, so the stack needs no CJK face in front. */
+/* Display type: running-header title area, cover lockup, section headings.
+   Everything else — body copy, spec tables, footers, page numbers — stays
+   in the body face. This layout is en-only, so no CJK face in front. */
+.top-bar-full .title-prefix,
+.top-bar-full .title-category,
 .hero-title,
+.hero-series,
 .section-title {
   font-family: ${displayFontStack()};
 }

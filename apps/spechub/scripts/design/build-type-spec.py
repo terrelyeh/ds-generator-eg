@@ -11,10 +11,11 @@ about who owns the document shell:
   scripts/design/type-spec.artifact.html  — for publishing as an Artifact,
                                             which supplies its own shell
 
-Everything is inlined: the Roboto Latin subset (Apache-2.0, checked in next
-to this script so the build needs no network) and the three logo PNGs. The
-page has to show real type at real sizes, so a fallback face would defeat
-the point.
+Everything is inlined: the Roboto (Apache-2.0) and Manrope (OFL-1.1) Latin
+subsets, checked in next to this script so the build needs no network, plus
+the three logo PNGs. The page has to show real type at real sizes in the
+real face, so a fallback would defeat the point — and a sample labelled
+Manrope must actually BE Manrope.
 """
 import base64, html, pathlib
 
@@ -26,11 +27,14 @@ PUB = SPECHUB / "public" / "logo"
 def datauri(path, mime):
     return f"data:{mime};base64," + base64.b64encode(path.read_bytes()).decode()
 
-def spec(text, size, weight=400, color="#16202B", bg=None, lh=1.25):
+def spec(text, size, weight=400, color="#16202B", bg=None, lh=1.25, disp=False):
+    """One live specimen. `disp=True` marks display type, which every layout
+    sets in Manrope; everything else is body copy and stays Roboto."""
     style = f"font-size:{size}pt;font-weight:{weight};color:{color};line-height:{lh}"
     if bg:
         style += f";background:{bg};padding:2pt 6pt;display:inline-block"
-    return f'<span class="spec-in" style="{style}">{html.escape(text)}</span>'
+    cls = "spec-in disp" if disp else "spec-in"
+    return f'<span class="{cls}" style="{style}">{html.escape(text)}</span>'
 
 # ── Ladder: every distinct size, isolated to size alone (uniform weight) ──
 LADDER = [
@@ -80,19 +84,19 @@ def sw(hexv):
 # ── A · Latin ───────────────────────────────────────────────────────────
 CLOUD = "#03a9f4"
 A = [
-    ("封面主標",    "24",  "500", "1.15", "#231f20", spec("Cloud Managed 24-Port Gigabit PoE+ Switch", 24, 500, "#231f20", lh=1.15)),
-    ("封面副標",    "19",  "500", "—",    CLOUD,     spec("CloudSwitch L2Plus 24 Full PoE", 19, 500, CLOUD)),
-    ("封面型號",    "12",  "500", "—",    CLOUD,     spec("ECS1528FP", 12, 500, CLOUD)),
-    ("區塊標題",    "14",  "500", "—",    CLOUD,     spec("Overview", 14, 500, CLOUD)),
+    ("封面主標",    "24",  "500", "1.15", "#231f20", spec("Cloud Managed 24-Port Gigabit PoE+ Switch", 24, 500, "#231f20", lh=1.15, disp=True)),
+    ("封面副標",    "19",  "500", "—",    CLOUD,     spec("CloudSwitch L2Plus 24 Full PoE", 19, 500, CLOUD, disp=True)),
+    ("封面型號",    "12",  "500", "—",    CLOUD,     spec("ECS1528FP", 12, 500, CLOUD, disp=True)),
+    ("區塊標題",    "14",  "500", "—",    CLOUD,     spec("Overview", 14, 500, CLOUD, disp=True)),
     ("Overview 內文", "11", "400", "1.35", "#6f6f6f", spec("Designed for high-density deployments in offices and campuses.", 11, 400, "#6f6f6f", lh=1.35)),
-    ("Features 標題", "14", "500", "—",   CLOUD,     spec("Key Features", 14, 500, CLOUD)),
+    ("Features 標題", "14", "500", "—",   CLOUD,     spec("Key Features", 14, 500, CLOUD, disp=True)),
     ("Feature 項目", "11",  "400", "1.35", "#4a4a4a", spec("802.3at/af PoE+ with a 410W total power budget", 11, 400, "#4a4a4a", lh=1.35)),
     ("規格分類列",  "7.5", "500", "—",    "白字／底 #6b7580", spec("Hardware Specifications", 7.5, 500, "#ffffff", bg="#6b7580")),
     ("規格標籤",    "7",   "500", "1.4",  CLOUD,     spec("Power over Ethernet", 7, 500, CLOUD)),
     ("規格數值",    "7",   "300", "1.4",  "#6f7073", spec("IEEE 802.3at/af, 410W total budget", 7, 300, "#6f7073")),
     ("規格註腳",    "7.5", "300", "1.55", "#6f6f6f", spec("* Actual data throughput may vary by environment.", 7.5, 300, "#6f6f6f")),
-    ("頁首「Datasheet」", "12", "300", "—", "白字／底為主題色", spec("Datasheet", 12, 300, "#ffffff", bg=CLOUD)),
-    ("頁首分類",    "14",  "500", "—",    "白字／底為主題色", spec("Cloud Switch", 14, 500, "#ffffff", bg=CLOUD)),
+    ("頁首「Datasheet」", "12", "300", "—", "白字／底為主題色", spec("Datasheet", 12, 300, "#ffffff", bg=CLOUD, disp=True)),
+    ("頁首分類",    "14",  "500", "—",    "白字／底為主題色", spec("Cloud Switch", 14, 500, "#ffffff", bg=CLOUD, disp=True)),
     ("頁碼",        "7",   "300", "—",    "#6f7073", spec("3", 7, 300, "#6f7073")),
     ("頁尾聲明",    "5.5", "300", "1.45", "#6d6e71", spec("EnGenius Technologies, Inc. All rights reserved.", 5.5, 300, "#6d6e71", lh=1.45)),
 ]
@@ -123,11 +127,11 @@ tbl_cjk = "\n".join(
 # ── B · Data Center ─────────────────────────────────────────────────────
 DCN, DCB, DCY = "#16355c", "#0073bf", "#f4d768"
 B = [
-    ("Solution 標籤", "Manrope", "14",   "200", "白字／深藍底", spec("Data Center", 14, 200, "#ffffff", bg=DCN)),
-    ("封面主標",     "Manrope", "24",   "500", "白字／深藍漸層底", spec("AI-Ready Edge Infrastructure", 24, 500, "#ffffff", bg=DCN, lh=1.28)),
-    ("封面型號",     "Manrope", "15",   "600", DCY,      spec("SE110", 15, 600, DCY, bg=DCN)),
+    ("Solution 標籤", "Manrope", "14",   "200", "白字／深藍底", spec("Data Center", 14, 200, "#ffffff", bg=DCN, disp=True)),
+    ("封面主標",     "Manrope", "24",   "500", "白字／深藍漸層底", spec("AI-Ready Edge Infrastructure", 24, 500, "#ffffff", bg=DCN, lh=1.28, disp=True)),
+    ("封面型號",     "Manrope", "15",   "600", DCY,      spec("SE110", 15, 600, DCY, bg=DCN, disp=True)),
     ("封面 Overview", "Roboto", "10 → 9.5 → 9", "300", "白字 95%", spec("Purpose-built for distributed AI workloads at the network edge.", 10, 300, "#ffffff", bg=DCN, lh=1.55)),
-    ("區塊標題",     "Manrope", "17",   "600", DCB,      spec("Key Features", 17, 600, DCB)),
+    ("區塊標題",     "Manrope", "17",   "600", DCB,      spec("Key Features", 17, 600, DCB, disp=True)),
     ("Feature 標籤", "Roboto",  "8",    "500", "白字／藍底", spec("EDCC", 8, 500, "#ffffff", bg=DCB)),
     ("Feature 標題", "Roboto",  "10.5", "700", "#3f4042", spec("Centralized Cloud Management", 10.5, 700, "#3f4042", lh=1.3)),
     ("Feature 內文", "Roboto",  "7.5",  "400", "#525355", spec("Monitor every node from a single dashboard.", 7.5, 400, "#525355", lh=1.5)),
@@ -150,12 +154,12 @@ tbl_b = "\n".join(
 # ── C · Broadband ───────────────────────────────────────────────────────
 ST = "#1e6796"
 C = [
-    ("頁首「Datasheet」", "12",  "300", "—",   "白字／鋼藍底", spec("Datasheet", 12, 300, "#ffffff", bg=ST)),
-    ("頁首分類",     "14",  "500", "—",    "白字／鋼藍底", spec("Broadband", 14, 500, "#ffffff", bg=ST)),
-    ("封面主標",     "21 → 17", "700", "1.18", "白字／鋼藍底", spec("Long-Range Outdoor Ethernet over Coax", 21, 700, "#ffffff", bg=ST, lh=1.18)),
-    ("封面系列名",   "15",  "400", "—",    "白字／鋼藍底", spec("EOC620", 15, 400, "#ffffff", bg=ST)),
-    ("區塊標題",     "14",  "700", "—",    ST,        spec("Benefits", 14, 700, ST)),
-    ("小節標題",     "10",  "500", "—",    ST,        spec("Deployment", 10, 500, ST)),
+    ("頁首「Datasheet」", "12",  "300", "—",   "白字／鋼藍底", spec("Datasheet", 12, 300, "#ffffff", bg=ST, disp=True)),
+    ("頁首分類",     "14",  "500", "—",    "白字／鋼藍底", spec("Broadband", 14, 500, "#ffffff", bg=ST, disp=True)),
+    ("封面主標",     "21 → 17", "700", "1.18", "白字／鋼藍底", spec("Long-Range Outdoor Ethernet over Coax", 21, 700, "#ffffff", bg=ST, lh=1.18, disp=True)),
+    ("封面系列名",   "15",  "400", "—",    "白字／鋼藍底", spec("EOC620", 15, 400, "#ffffff", bg=ST, disp=True)),
+    ("區塊標題",     "14",  "700", "—",    ST,        spec("Benefits", 14, 700, ST, disp=True)),
+    ("小節標題",     "10",  "500", "—",    ST,        spec("Deployment", 10, 500, ST, disp=True)),
     ("小節內文",     "8",   "400", "1.55", "#6f6f6f", spec("Reuses existing coaxial cabling, no new trenching required.", 8, 400, "#6f6f6f", lh=1.55)),
     ("機種 Overview", "8.5 → 8 → 7.5", "400", "1.65", "#6f6f6f", spec("Delivers gigabit throughput over legacy coax runs up to 1 km.", 8.5, 400, "#6f6f6f", lh=1.65)),
     ("Benefits 內文", "7.5", "400", "1.5", "#6f6f6f", spec("Cuts installation time on brownfield sites.", 7.5, 400, "#6f6f6f", lh=1.5)),
@@ -177,11 +181,11 @@ tbl_c = "\n".join(
 # ── D · Edge AI ─────────────────────────────────────────────────────────
 TL = "#86c9cf"
 D = [
-    ("頁首「Datasheet」", "12", "300", "—",  "白字／teal 底", spec("Datasheet", 12, 300, "#ffffff", bg="#5aa8b0")),
-    ("頁首分類",     "14",  "500", "—",    "白字／teal 底", spec("Edge AI Box", 14, 500, "#ffffff", bg="#5aa8b0")),
-    ("封面主標",     "24",  "500", "1.18", "白字",     spec("Powered by NVIDIA Jetson Orin", 24, 500, "#ffffff", bg="#5aa8b0", lh=1.18)),
-    ("封面副標",     "17.5", "400", "—",   "白字",     spec("Orin Box Series", 17.5, 400, "#ffffff", bg="#5aa8b0")),
-    ("區塊標題",     "17",  "500", "—",    TL,        spec("Software Architecture", 17, 500, "#5aa8b0")),
+    ("頁首「Datasheet」", "12", "300", "—",  "白字／teal 底", spec("Datasheet", 12, 300, "#ffffff", bg="#5aa8b0", disp=True)),
+    ("頁首分類",     "14",  "500", "—",    "白字／teal 底", spec("Edge AI Box", 14, 500, "#ffffff", bg="#5aa8b0", disp=True)),
+    ("封面主標",     "24",  "500", "1.18", "白字",     spec("Powered by NVIDIA Jetson Orin", 24, 500, "#ffffff", bg="#5aa8b0", lh=1.18, disp=True)),
+    ("封面副標",     "17.5", "400", "—",   "白字",     spec("Orin Box Series", 17.5, 400, "#ffffff", bg="#5aa8b0", disp=True)),
+    ("區塊標題",     "17",  "500", "—",    TL,        spec("Software Architecture", 17, 500, "#5aa8b0", disp=True)),
     ("內文",         "10",  "400", "1.55", "#6f6f6f", spec("Runs the full NVIDIA JetPack stack out of the box.", 10, 400, "#6f6f6f", lh=1.55)),
     ("Feature 標題", "8",   "700", "—",    "#6f6f6f", spec("Ruggedized Chassis", 8, 700, "#6f6f6f")),
     ("Feature 內文", "8",   "400", "1.4",  "#6f6f6f", spec("Fanless, −20 to 60°C operating range.", 8, 400, "#6f6f6f", lh=1.4)),
@@ -239,6 +243,7 @@ cmp_spec = cmp_table([
 src = (HERE / "type-spec.template.html").read_text()
 out = (src
     .replace("__ROBOTO__",     datauri(SP / "roboto-latin.woff2", "font/woff2"))
+    .replace("__MANROPE__",    datauri(SP / "manrope-latin.woff2", "font/woff2"))
     .replace("__LOGO_WHITE__", datauri(PUB / "EnGenius-Logo-white.png", "image/png"))
     .replace("__LOGO_GRAY__",  datauri(PUB / "EnGenius-Logo-gray.png", "image/png"))
     .replace("__CLOUD_ICON__", datauri(PUB / "engenius_cloud_icon.png", "image/png"))
@@ -253,7 +258,7 @@ out = (src
     .replace("__CMP_SPEC__",   cmp_spec)
 )
 
-leftover = [t for t in ["__ROBOTO__","__LOGO_WHITE__","__LOGO_GRAY__","__CLOUD_ICON__","__LADDER__",
+leftover = [t for t in ["__ROBOTO__","__MANROPE__","__LOGO_WHITE__","__LOGO_GRAY__","__CLOUD_ICON__","__LADDER__",
                         "__TBL_A__","__TBL_CJK__","__TBL_B__","__TBL_C__","__TBL_D__",
                         "__CMP_TITLE__","__CMP_BODY__","__CMP_SPEC__"] if t in out]
 if leftover:

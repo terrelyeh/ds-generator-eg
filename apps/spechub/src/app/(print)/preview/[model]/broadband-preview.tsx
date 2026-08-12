@@ -394,8 +394,10 @@ body {
   position: absolute; right: 27pt; bottom: 18pt;
   font-weight: 300; font-size: 7pt; color: #6f7073;
 }
-/* Display type: cover lockup + section headings. Everything else — body
-   copy, spec tables, footers, page numbers — stays in the body face. */
+/* Display type: running-header title area, cover lockup, section headings.
+   Everything else — body copy, spec tables, footers, page numbers — stays
+   in the body face. */
+.cover-header .ds-label,
 .hero-title,
 .hero-series,
 .block-title,
