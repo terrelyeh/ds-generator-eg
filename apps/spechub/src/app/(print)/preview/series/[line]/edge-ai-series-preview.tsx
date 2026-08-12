@@ -27,6 +27,17 @@ import type { SeriesImages } from "@/lib/google/drive-images";
 
 const TEAL = "#86c9cf";
 
+/**
+ * Where the cover's two lower columns start.
+ *
+ * The hero ends at 399.5pt and this used to be 448 — 48.5pt of white that
+ * was the whole page's slack. The feature box below grows downward with no
+ * height budget (unlike Data Center's fixed band), so that gap is what pays
+ * for body copy at the shared secondary step instead of a size below it.
+ * Only the SERIES cover is tight; a per-model cover uses ~140pt here.
+ */
+const COVER_COLS_TOP = 424;
+
 export interface OrinSeriesContent {
   headline: string | null;
   series_name: string | null;
@@ -335,29 +346,30 @@ body {
   position: absolute; right: 24pt; top: 130pt; width: 240pt; height: 150pt;
 }
 
+/* Both columns start together. 424pt rather than 448: the 48.5pt gap under
+   the hero was the page's only slack, and this box grows downward with no
+   budget — see .feature-bullet. 24.5pt still separates them clearly. */
 .cover-overview {
-  position: absolute; left: 36pt; top: 448pt; width: 262pt;
+  position: absolute; left: 36pt; top: ${COVER_COLS_TOP}pt; width: 262pt;
 }
 .overview-text {
   font-weight: 400; font-size: 10pt; color: #6f6f6f; line-height: 1.55;
   white-space: pre-line;
 }
 .cover-features {
-  position: absolute; left: 322pt; right: 36pt; top: 448pt;
+  position: absolute; left: 322pt; right: 36pt; top: ${COVER_COLS_TOP}pt;
 }
 .features-box {
-  background: #f1f1f1; padding: 12pt 14pt; margin-top: 2pt;
+  background: #f1f1f1; padding: 10pt 14pt; margin-top: 2pt;
 }
-.feature-group { margin-bottom: 9pt; }
+.feature-group { margin-bottom: 6pt; }
 .feature-group:last-child { margin-bottom: 0; }
 .feature-group-title {
   font-weight: 700; font-size: 8pt; color: #6f6f6f; margin-bottom: 2pt;
 }
 .feature-bullet {
   display: flex; align-items: baseline; gap: 5pt;
-  /* Not bodySm: this box starts at 448pt and grows downward with no
-     budget, so one step up runs 17pt past the page edge. */
-  font-weight: ${WT.regular}; font-size: ${PT.table}pt; color: #6f6f6f; line-height: 1.4;
+  font-weight: ${WT.regular}; font-size: ${PT.bodySm}pt; color: #6f6f6f; line-height: 1.4;
   margin-left: 6pt;
 }
 ${bulletDotCss(".feature-bullet .dot")}
