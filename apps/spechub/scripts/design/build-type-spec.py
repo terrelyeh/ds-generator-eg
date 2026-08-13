@@ -345,3 +345,22 @@ page.write_text(standalone, encoding="utf-8")
 
 print(f"artifact   {artifact.relative_to(SPECHUB)}  {len(out.encode())/1024:.1f} KB")
 print(f"standalone {page.relative_to(SPECHUB)}  {len(standalone.encode())/1024:.1f} KB")
+
+# The CJK table is the one part of the page composed from a snapshot rather
+# than read from source, so it is the one part that can silently go stale
+# when someone edits Settings ▸ Typography. Remind the person regenerating —
+# they are the one who can act on it — but never block the build on the
+# database being reachable: that offline guarantee is why the snapshot
+# exists. A skip is fine; drift is loud.
+_cjk_status, _cjk_details = CJKT.check_drift()
+if _cjk_status == "drift":
+    print("\n⚠ CJK table is STALE — Settings ▸ Typography has changed since the "
+          f"snapshot ({CJK_CAPTURED}):")
+    print("\n".join(_cjk_details))
+    print("  Recapture: python3 check-cjk-typography.py --update && "
+          "python3 build-type-spec.py")
+elif _cjk_status == "skipped":
+    print(f"·  CJK drift check skipped ({_cjk_details[0]}) — snapshot "
+          f"({CJK_CAPTURED}) used as-is")
+else:
+    print(f"✓  CJK table in sync with Settings ▸ Typography (snapshot {CJK_CAPTURED})")
