@@ -805,6 +805,12 @@ ${bulletDotCss(".feature-bullet")}
    Keep CATEGORY_HEADER_HEIGHT in pagination.ts in step with this. */
 .spec-col > div + div { margin-top: 12pt; }
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
+/* The rule separates one row from the NEXT one, so the last row of a section
+   has nothing to separate from — with 12pt of air below it the line just
+   hangs. Scoped to the section wrapper, whose last child is always the last
+   row (the category band is its first), so unlike the :first-child rule this
+   replaced it cannot reach further than intended. */
+.spec-row:last-child { border-bottom: none; }
 .spec-label { font-weight: ${WT.medium}; font-size: ${PT.tableSm}pt; color: ${theme.specLabel}; }
 .spec-value { font-weight: ${WT.light}; font-size: ${PT.tableSm}pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
 
