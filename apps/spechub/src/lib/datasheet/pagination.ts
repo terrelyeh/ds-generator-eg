@@ -42,14 +42,33 @@ export const BOTTOM_MARGIN = 72;
 export const AVAILABLE_HEIGHT =
   PAGE_HEIGHT - TOP_BAR_HEIGHT - SPEC_TITLE_HEIGHT - BOTTOM_MARGIN;
 
-// Real CSS:
-//   .spec-category-header { font-size: 7.5pt (~9pt line); padding 2.5+2.5pt;
-//                           margin-top 6pt + margin-bottom 2pt } = ~22pt
-//   (first one has margin-top:0 → ~16pt, but the over-estimate on the first
-//   is fine and offsets row-level drift.)
-// Was 18pt — under-estimated by 4pt per header. For ESG320 with 7 sections
-// that's ~28pt cumulative drift past BOTTOM_MARGIN.
-export const CATEGORY_HEADER_HEIGHT = 22;
+// Real CSS, measured rather than derived:
+//   .spec-category-header { font-size 8pt (~9.6pt line) + padding 2.5+2.5
+//                           + margin-bottom 2 } = 18.2pt
+//   .spec-col > div + div { margin-top: 12pt }  <- BETWEEN sections only
+// These are two different things and must not be folded into one number: the
+// gap does not apply to the first section in a column, so bundling it into
+// the band over-states every column by 12pt. That was enough to make columns
+// that fit look like they overflowed, spilling 22 datasheets onto an extra
+// page when the overflow guard was first added.
+export const CATEGORY_HEADER_HEIGHT = 18;
+export const SECTION_GAP = 12;
+
+/**
+ * Where the overflow guard draws the line — deliberately NOT AVAILABLE_HEIGHT.
+ *
+ * BOTTOM_MARGIN is an inch of designed breathing room and the row estimates
+ * round up on purpose, so a column measuring over the packing budget usually
+ * still prints fine; it just sits lower than the design intends. Spilling on
+ * that threshold pushed 20+ datasheets onto an extra page to rescue two that
+ * were genuinely broken.
+ *
+ * This is the point where content would run off the paper instead: the same
+ * budget with most of the bottom margin handed back, keeping 30pt clear for
+ * the page number. Cosmetic tightness is left alone; only real overflow
+ * spills.
+ */
+export const HARD_COLUMN_LIMIT = AVAILABLE_HEIGHT + BOTTOM_MARGIN - 30;
 
 /**
  * Is a spec value effectively "no meaningful data" and therefore not
@@ -415,6 +434,13 @@ function fitSection(
   return { fitted, remaining };
 }
 
+
+/** Estimated height of a whole column. */
+function columnHeight(col: Section[], locale?: string): number {
+  const sections = col.reduce((h, s) => h + estimateSectionHeight(s, locale), 0);
+  return sections + Math.max(0, col.length - 1) * SECTION_GAP;
+}
+
 export function splitIntoPages(sections: Section[], locale?: string): SpecPage[] {
   if (!sections.length) return [{ left: [], right: [] }];
 
@@ -436,7 +462,9 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
     while (queue.length > 0) {
       const remaining = AVAILABLE_HEIGHT - leftH;
       const nextSection = queue[0];
-      const sectionH = estimateSectionHeight(nextSection, locale);
+      // Opening a column costs no gap; every section after it does.
+      const gap = left.length === 0 ? 0 : SECTION_GAP;
+      const sectionH = estimateSectionHeight(nextSection, locale) + gap;
 
       if (sectionH <= remaining) {
         // Whole section fits
@@ -450,7 +478,7 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
         const { fitted, remaining: cont } = fitSection(nextSection, remaining, true, locale);
         if (fitted) {
           left.push(fitted);
-          leftH += estimateSectionHeight(fitted, locale);
+          leftH += estimateSectionHeight(fitted, locale) + gap;
         }
         queue.shift();
         if (cont) {
@@ -461,10 +489,10 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
         // Column has content + won't fit next section → try partial split.
         // DON'T force-fit here — we'd rather break and send the item to
         // the next column than overshoot this one and orphan later items.
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false, locale);
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining - gap, false, locale);
         if (fitted && fitted.items.length > 0) {
           left.push(fitted);
-          leftH += estimateSectionHeight(fitted, locale);
+          leftH += estimateSectionHeight(fitted, locale) + gap;
           queue.shift();
           if (cont) {
             queue.unshift(cont);
@@ -485,7 +513,9 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
     while (queue.length > 0) {
       const remaining = AVAILABLE_HEIGHT - rightH;
       const nextSection = queue[0];
-      const sectionH = estimateSectionHeight(nextSection, locale);
+      // Opening a column costs no gap; every section after it does.
+      const gap = right.length === 0 ? 0 : SECTION_GAP;
+      const sectionH = estimateSectionHeight(nextSection, locale) + gap;
 
       if (sectionH <= remaining) {
         right.push(nextSection);
@@ -497,7 +527,7 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
         const { fitted, remaining: cont } = fitSection(nextSection, remaining, true, locale);
         if (fitted) {
           right.push(fitted);
-          rightH += estimateSectionHeight(fitted, locale);
+          rightH += estimateSectionHeight(fitted, locale) + gap;
         }
         queue.shift();
         if (cont) {
@@ -506,10 +536,10 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
         }
       } else {
         // Has content → no force-fit; let the rest flow to next page.
-        const { fitted, remaining: cont } = fitSection(nextSection, remaining, false, locale);
+        const { fitted, remaining: cont } = fitSection(nextSection, remaining - gap, false, locale);
         if (fitted && fitted.items.length > 0) {
           right.push(fitted);
-          rightH += estimateSectionHeight(fitted, locale);
+          rightH += estimateSectionHeight(fitted, locale) + gap;
           queue.shift();
           if (cont) {
             queue.unshift(cont);
@@ -519,6 +549,32 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
           break;
         }
       }
+    }
+
+    // Safety net for the force-fit branches above. Those deliberately plant
+    // an oversized section in an empty column rather than loop forever, so a
+    // column CAN still end up over budget — and when it does the content
+    // prints past the trim edge with nothing to catch it. Spill the trailing
+    // sections back onto the queue instead: an extra page always beats a page
+    // that runs off the paper.
+    //
+    // Order matters. The reading order is the whole left column, then the
+    // whole right one, so anything spilled from the left has to take the
+    // right column with it or the specs come back in the wrong sequence.
+    const spill: Section[] = [];
+    while (right.length > 1 && columnHeight(right, locale) > HARD_COLUMN_LIMIT) {
+      spill.unshift(right.pop()!);
+    }
+    if (left.length > 1 && columnHeight(left, locale) > HARD_COLUMN_LIMIT) {
+      while (right.length > 0) spill.unshift(right.pop()!);
+      while (left.length > 1 && columnHeight(left, locale) > HARD_COLUMN_LIMIT) {
+        spill.unshift(left.pop()!);
+      }
+    }
+    if (spill.length > 0) {
+      queue.unshift(...spill);
+      // Keeps balanceColumns off a layout it would happily undo.
+      splitOccurred = true;
     }
 
     pages.push({ left, right });

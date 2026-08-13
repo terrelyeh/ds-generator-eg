@@ -793,9 +793,17 @@ ${bulletDotCss(".feature-bullet")}
 
 .spec-category-header {
   background: #6b7580; color: white; font-weight: ${WT.medium};
-  font-size: ${PT.table}pt; padding: 2.5pt 6pt; margin-top: 6pt; margin-bottom: 2pt;
+  font-size: ${PT.table}pt; padding: 2.5pt 6pt; margin-bottom: 2pt;
 }
-.spec-category-header:first-child { margin-top: 0; }
+/* Space between spec SECTIONS, not on the band itself.
+   Each section is its own wrapper div, so every band was a :first-child and
+   a margin-top on the band was zeroed for ALL of them — the gap the CSS
+   claimed to set had never rendered once, which is why the grey band sat
+   flush against the previous section's last row. On the wrapper, "not
+   before the first one" falls out of the adjacent-sibling selector instead
+   of needing a :first-child rule that then over-matches.
+   Keep CATEGORY_HEADER_HEIGHT in pagination.ts in step with this. */
+.spec-col > div + div { margin-top: 12pt; }
 .spec-row { border-bottom: 0.5pt solid #bcbec0; padding: 2pt 0; }
 .spec-label { font-weight: ${WT.medium}; font-size: ${PT.tableSm}pt; color: ${theme.specLabel}; }
 .spec-value { font-weight: ${WT.light}; font-size: ${PT.tableSm}pt; color: #6f7073; margin-top: 1pt; white-space: pre-line; }
