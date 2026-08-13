@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-08-07。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-08-13。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
 > **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
@@ -9,6 +9,9 @@
 > + 花費帳本 + 翻譯審核流程。這四塊互相咬合，動之前先讀
 > [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)** ——
 > 裡面有三個「看起來多餘、其實不能拆」的設計，以及行數預算為何不能用字數比例。
+> **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
+> 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
+> 細節在下方 Brand & Visual System 與 pitfall #50。
 
 ## Project Overview
 
@@ -171,6 +174,13 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
   `python3 apps/spechub/scripts/design/check-cjk-typography.py`(比對快照與線上 DB,
   不一致 exit 1),`--update` 重抓快照後要再跑一次產生器。
   **設定頁改值不會經過任何發版,所以這張表是全頁最容易悄悄過期的地方。**
+  （產生器本身在重生時也會非阻斷地跑這個比對,漂移就印警告、連不到 DB 就跳過。）
+- **Datasheet logo**（2026-08-13 換新 ®）：`public/logo/` 的 `EnGenius-Logo-white.png`（封面）
+  與 `-gray.png`（頁尾,現為近黑 #363333）是從 checked-in 的來源 SVG（`-white`/`-black`/`-blue.svg`）
+  **高解析轉出**的。**不要手改 PNG，要改 logo 就改 SVG 再轉**。
+  ⚠️ Chrome 會擋 `file://` 的 `<img src>`（轉出來會是破圖 icon）——轉檔要把 SVG markup **內嵌**進頁面,
+  不能走 `<img src=file://…>`。這兩個 PNG 被四種版型的封面+頁尾、兩個 app 標頭、規範頁共用,
+  **換檔即全站生效**。
 
 ## Database Tables
 
@@ -242,6 +252,9 @@ auth.users → profiles ← email_whitelist.invited_by
 6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
 7. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
    三張需再加一欄 + upload API 型別
+7b. **渲染端改動需重產 PDF 才生效** — 2026-08-12~13 的字型/字級/分區間距/logo 全是渲染端,
+   已產出的 ~90 份 PDF 仍是舊版,挑產品線 Regenerate 才會套用。**CJK 字級收斂尚未做**
+   （`scale.ts` 只涵蓋 en/es;ja/zh-TW 在 `app_settings`、刻意較大,要不要一起收斂是獨立決定）。
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
@@ -292,7 +305,7 @@ npm run lint
 
 ## Common Pitfalls
 
-> Pitfalls #1–#44, #46–#49, #51–#53, #59, #65 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> Pitfalls #1–#44, #46–#49, #51–#53, #59, #64, #65, #66, #67 archived to [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 > #54–#58（RAG/聊天相關）搬到 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 45. **Supabase silent insert/update 是這個系統最久的雷** — supabase-js 的 write 不 throw on
@@ -301,9 +314,19 @@ npm run lint
 
 
 50. **Pagination 常數一定要對齊實際 CSS** — `AVAILABLE_HEIGHT = 792 - TOP_BAR - SPEC_TITLE -
-    BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、CATEGORY_HEADER 22pt；
+    BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、
+    **CATEGORY_HEADER_HEIGHT 18pt + SECTION_GAP 12pt**（2026-08-13 拆開:分類條高度與「分區之間」
+    的間距是兩回事,SECTION_GAP 不套用在每欄第一個分區,合成一個數字會每欄高估 12pt）；
     **CJK row metrics 更大**（JA 24pt / zh-TW 25pt）。`splitIntoPages(sections, locale)` 必須傳
     locale。每改 preview CSS 必須同步檢查這些常數。
+    ⚠️ **規格頁分區間距放在 `.spec-col > div + div`,不是分類條上**（2026-08-13）—— 每個分區是自己的
+    wrapper div,所以灰色分類條全都是 `:first-child`,`.spec-category-header:first-child{margin-top:0}`
+    會把**所有**分區的上緣間距清成 0（原本 CSS 寫的 6pt 從沒生效過,分類條一直貼著上一區最後一列）。
+    最後一列另用 `.spec-row:last-child{border:none}` 去掉懸空的底線。
+    ⚠️ **`splitIntoPages` 的 force-fit 分支會塞爆欄位** —— 欄位空但 section 過高時硬塞（防無限迴圈）,
+    塞完原本沒人檢查 → 內容印出紙外。已加 `HARD_COLUMN_LIMIT`（= AVAILABLE + 大部分 BOTTOM_MARGIN,
+    留 30pt 給頁碼）事後把超出的 section 擠到下一頁;順序要注意:**左欄溢出得連右欄一起擠**,否則規格
+    會亂序。`balanceColumns` 的防溢版只在「沒有 section 被切開」時跑,擋不到 force-fit 這條路徑。
 
 
 60. **`products.product_image` / `hardware_image` 是 `NOT NULL DEFAULT ''`** —— sync 的
@@ -359,18 +382,10 @@ npm run lint
     **通則:任何「沒發現問題」的檢查,要先能證明它在有問題時會叫。** 今天兩支
     guard（off-scale、CJK 漂移）都是先故意種一個錯、看它報錯,才算數。
 
-67. **翻譯的 feature 陣列不會跟著英文縮短 —— 多出來的尾巴 UI 看不見卻會印出來**
-    （2026-08-03 ECP106 zh-TW 事件）—— PM 7/31 從 sheet 拿掉 2 條 feature（其實是把
-    `Safety`/`Integration` 的項目符號拔掉,那兩行本來就是小標題,sync 正確地不再匯入）,
-    英文 12 → 10。但 `product_translations.features` 還是 12 條:編輯器的 state 直接
-    `existing?.features` 照抄,而畫面是 `englishFeatures.map(...)` 只畫 10 列 →
-    **第 11、12 條在 UI 完全看不到,存檔時卻原封不動送回去,datasheet 就印出來**。
-    使用者看到的「重複」是巧合:刪掉第 6、10 條後,新的第 9、10 條剛好就是舊第 11、12 條
-    的來源句。已在**兩層**對齊（編輯器 `alignToSource()` + `/api/translations/product`
-    伺服端截齊,不依賴呼叫端）。**新增「陣列跟著另一個陣列長度走」的欄位時,務必在讀取端
-    和寫入端都對齊**;spec_labels 也是同款契約。
-    附帶:`Return EXACTLY the same number of lines` 只寫在 prompt 裡,程式沒驗證 ——
-    AI 翻譯那條路徑靠 `englishFeatures.map((_, i) => lines[i] ?? "")` 夾取才沒出事。
+67. **翻譯陣列（features / spec_labels）不會跟著英文縮短,尾巴 UI 看不見卻會印進 PDF** —
+    新增「陣列長度跟著另一個陣列走」的欄位時,**讀取端和寫入端都要對齊來源長度**
+    （編輯器 `alignToSource()` + `/api/translations/product` 伺服端截齊,不依賴呼叫端）。
+    全文（ECP106 zh-TW 事件）見 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 
 66. **圖片尺寸要由「框」決定,不是由檔案的像素數決定** — `max-width`/`max-height`
     只封頂不放大,所以渲染尺寸會變成「PNG 像素數說了算」。封面產品圖、hardware 圖、
@@ -379,21 +394,14 @@ npm run lint
     修法一律是 `width/height:100% + object-fit:contain`,框用參考稿量到的尺寸。
     **改共用版面 CSS 前先用 `pymupdf` 量 InDesign 原稿。**
     全文（含三次事故的實測數字與 row/column gap 算式）見
-    [`docs/common-pitfalls.md`](docs/common-pitfalls.md#66)。
+    [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 
-64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
-    兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,
-    兩者都沒有 CJK 字符;② `/api/generate-pdf` 只等 `networkidle0`。
-    **本機 macOS 有 PingFang TC 會自動 fallback,所以這個 bug 在本地永遠重現不了**
-    （CDP `CSS.getPlatformFontsForNode` 一問就知道:本機連 Cloud 版型也是走系統字型,
-    webfont 從沒真的上場）。Vercel 的 chromium 沒有日文字型 → 缺字直接印成空白
-    （PDF 裡是 `\x00`,同事在 Windows 開就是豆腐）。
-    **`document.fonts.ready` 不夠** —— 實測 ready 之後 loaded 分片是 **0**;
-    Google Fonts 的 CJK 是數百個 unicode-range 分片、排版時才 lazy 抓。
-    現在 route 用 `waitForFonts(page)`:蒐集頁面所有 font-family × weight,
-    對 `document.body.innerText` 呼叫 `document.fonts.load()` 逼出所有需要的分片,
-    再等一次 ready。**新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**
-    （`lib/datasheet/typography.ts` 的 `cjkFontFor`）。
+64. **CJK 字型要在 CSS 指名、產 PDF 前主動載入** — `font-family` 只寫 Roboto/Manrope
+    沒有 CJK 字符,而 `document.fonts.ready` 不夠（Google Fonts CJK 是數百個 lazy
+    unicode-range 分片）。route 用 `waitForFonts(page)` 對 `body.innerText` 逼出分片。
+    **新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**（`cjkFontFor`）。
+    ⚠️ **本機有 PingFang TC 會 fallback,這 bug 本地永遠重現不了** —— Vercel 缺字印成
+    `\x00`。全文（EOC610 ja 事件）見 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 
 68. **「是不是 CJK」不要用「有沒有 TYPOGRAPHY_DEFAULTS」來推導**（2026-08-06 加 es 時發現）——
     `cjkFontFor()` 原本寫 `const defaults = TYPOGRAPHY_DEFAULTS[locale]; if (!defaults) return null;`。
@@ -418,7 +426,7 @@ npm run lint
 - [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md) — 拆分藍圖（歸屬/階段/驗收/回滾）
 - [`docs/file-structure.md`](docs/file-structure.md) — 完整檔案地圖 + 放東西的規則
 - [`docs/schema.md`](docs/schema.md) — DB schema:關係圖、擁有權、各表欄位語意
-- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive（#1–#25 及後續歸檔的 #59 / #65）
+- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls archive（#1–#42 及後續歸檔的 #59 / #64 / #65 / #66 / #67）
 - [`docs/pending-assets.md`](docs/pending-assets.md) — 待補圖 / 待 PM 處理的庫存清單（某台產不出 PDF 先查這裡）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步

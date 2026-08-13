@@ -206,3 +206,36 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     PM 說一聲那個資料夾是系統在用的。
 
 （#59 / #65 於 2026-08-12 自 CLAUDE.md 歸檔：兩者的根因都已在程式裡防住——`canGenerate` 已改讀 locale 解析後的值，Drive 兩條路徑都有 `assertFolderUsable`／`folderUnavailable`。留存是因為「為什麼要這樣寫」不看紀錄推不出來。）
+
+---
+
+> 64 / 67 於 2026-08-13 自 CLAUDE.md 歸檔：根因都已在程式裡防住（`waitForFonts`、
+> 讀寫兩端 `alignToSource`），CLAUDE.md 只留可操作的摘要。留全文是因為症狀（本地重現不了、
+> UI 看不見的尾巴）不看紀錄推不出來。
+
+64. **CJK 字型：CSS 要指名，產 PDF 前要主動載入**（2026-07-29 EOC610 ja 亂碼）——
+    兩件事一起才成立:① Broadband/DC 版型的 `font-family` 只寫 Roboto/Manrope,
+    兩者都沒有 CJK 字符;② `/api/generate-pdf` 只等 `networkidle0`。
+    **本機 macOS 有 PingFang TC 會自動 fallback,所以這個 bug 在本地永遠重現不了**
+    （CDP `CSS.getPlatformFontsForNode` 一問就知道:本機連 Cloud 版型也是走系統字型,
+    webfont 從沒真的上場）。Vercel 的 chromium 沒有日文字型 → 缺字直接印成空白
+    （PDF 裡是 `\x00`,同事在 Windows 開就是豆腐）。
+    **`document.fonts.ready` 不夠** —— 實測 ready 之後 loaded 分片是 **0**;
+    Google Fonts 的 CJK 是數百個 unicode-range 分片、排版時才 lazy 抓。
+    現在 route 用 `waitForFonts(page)`:蒐集頁面所有 font-family × weight,
+    對 `document.body.innerText` 呼叫 `document.fonts.load()` 逼出所有需要的分片,
+    再等一次 ready。**新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**
+    （`lib/datasheet/typography.ts` 的 `cjkFontFor`）。
+
+67. **翻譯的 feature 陣列不會跟著英文縮短 —— 多出來的尾巴 UI 看不見卻會印出來**
+    （2026-08-03 ECP106 zh-TW 事件）—— PM 7/31 從 sheet 拿掉 2 條 feature（其實是把
+    `Safety`/`Integration` 的項目符號拔掉,那兩行本來就是小標題,sync 正確地不再匯入）,
+    英文 12 → 10。但 `product_translations.features` 還是 12 條:編輯器的 state 直接
+    `existing?.features` 照抄,而畫面是 `englishFeatures.map(...)` 只畫 10 列 →
+    **第 11、12 條在 UI 完全看不到,存檔時卻原封不動送回去,datasheet 就印出來**。
+    使用者看到的「重複」是巧合:刪掉第 6、10 條後,新的第 9、10 條剛好就是舊第 11、12 條
+    的來源句。已在**兩層**對齊（編輯器 `alignToSource()` + `/api/translations/product`
+    伺服端截齊,不依賴呼叫端）。**新增「陣列跟著另一個陣列長度走」的欄位時,務必在讀取端
+    和寫入端都對齊**;spec_labels 也是同款契約。
+    附帶:`Return EXACTLY the same number of lines` 只寫在 prompt 裡,程式沒驗證 ——
+    AI 翻譯那條路徑靠 `englishFeatures.map((_, i) => lines[i] ?? "")` 夾取才沒出事。
