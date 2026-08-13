@@ -685,13 +685,22 @@ body {
   font-weight: ${WT.medium}; font-size: ${PT.label}pt; color: ${theme.modelColor};
 }
 
-/* Cloud cover: subtitle next to cloud icon */
+/* Cloud cover: subtitle + headline as one block, vertically centred on the
+   cloud icon. The old fixed tops (subtitle 138 / headline 160) were tuned for
+   a 2-line headline — a 1-line one then sat ~15pt high and a 3-line one ~13pt
+   low. Anchoring the block's centre to the icon's centre makes it consistent
+   at any line count, and CJK follows for free since the block sizes to its
+   own content.
+   177.8pt = .cloud-icon top (142) + its rendered height (85pt wide → 71.6pt) / 2.
+   ⚠️ Magic number tied to engenius_cloud_icon.png — re-measure if its aspect changes. */
+.cloud-title {
+  position: absolute; left: 134pt; right: 36pt;
+  top: 177.8pt; transform: translateY(-50%);
+}
 .product-subtitle-cloud {
-  position: absolute; left: 134pt; top: 138pt;
   font-weight: ${WT.medium}; font-size: ${PT.lead}pt; color: ${theme.subtitleColor};
 }
 .product-fullname-cloud {
-  position: absolute; left: 134pt; top: 160pt; right: 36pt;
   font-weight: ${WT.medium}; font-size: ${PT.cover}pt; color: #231f20; line-height: 1.15;
 }
 
@@ -1043,9 +1052,11 @@ ${isCJK ? `
               src="/logo/engenius_cloud_icon.png"
               alt=""
             />
-            <div className="product-subtitle-cloud">{subtitle}</div>
-            <div className="product-fullname-cloud">
-              {parseHeadlineMarkup(headline)}
+            <div className="cloud-title">
+              <div className="product-subtitle-cloud">{subtitle}</div>
+              <div className="product-fullname-cloud">
+                {parseHeadlineMarkup(headline)}
+              </div>
             </div>
           </>
         ) : (
