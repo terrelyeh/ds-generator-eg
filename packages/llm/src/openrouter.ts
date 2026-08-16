@@ -14,6 +14,7 @@
  * `openai_api_key` therefore stays configured even after this migration.
  */
 import { getApiKey } from "@eg/db/settings";
+import { featureTag, type Feature } from "./features";
 
 export const OPENROUTER_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
 
@@ -84,6 +85,11 @@ export interface ChatOptions {
   json?: boolean;
   /** Which key pays, and which bucket the spend lands in. Default "spechub". */
   surface?: Surface;
+  /**
+   * Which feature is spending, one level finer than the key. Required, so a
+   * new call site can't silently land in `unmapped` — see ./features.
+   */
+  feature: Feature;
   /** Free-form attribution: product model, workspace slug, line name… */
   ref?: string;
   /** BYOK override — used instead of the stored key, never persisted. */
@@ -129,6 +135,10 @@ export async function chatComplete(opts: ChatOptions): Promise<string> {
     body: JSON.stringify({
       model: opts.model,
       messages,
+      // OpenRouter's `user` is an attribution label, NOT the user message —
+      // that one is in `messages` above (ChatOptions.user is the prompt).
+      // Wiring opts.user in here would ship prompt text to usage analytics.
+      user: featureTag(opts.feature),
       ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.json ? { response_format: { type: "json_object" } } : {}),
@@ -252,6 +262,8 @@ export async function streamComplete(
       model: opts.model,
       messages,
       stream: true,
+      // Attribution label, not the user message — see the note in chatComplete.
+      user: featureTag(opts.feature),
       ...(opts.maxTokens ? { max_tokens: opts.maxTokens } : {}),
       ...(opts.temperature !== undefined ? { temperature: opts.temperature } : {}),
       ...(opts.reasoningEffort ? { reasoning: { effort: opts.reasoningEffort } } : {}),

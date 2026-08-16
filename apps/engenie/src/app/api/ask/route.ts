@@ -516,6 +516,7 @@ IMPORTANT formatting rules:
           // excludes it from company totals.
           apiKey: llmKey,
           surface: "ask",
+          feature: "ask",
           ref: ws?.slug ?? "internal",
           onChunk: (text) =>
             sendEvent(JSON.stringify({ type: "chunk", content: text })),

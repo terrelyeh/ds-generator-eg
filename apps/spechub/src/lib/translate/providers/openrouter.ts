@@ -1,4 +1,5 @@
 import { chatComplete } from "@eg/llm/openrouter";
+import type { Feature } from "@eg/llm/features";
 import type { TranslateProvider } from "../types";
 
 /**
@@ -17,14 +18,22 @@ import type { TranslateProvider } from "../types";
  * 400 rather than a graceful degrade. The prompt already demands bare
  * JSON and the salvage path handles the rest.
  */
-export function createOpenRouterProvider(
-  id: string,
-  name: string,
-  model: string,
+export function createOpenRouterProvider(opts: {
+  id: string;
+  name: string;
+  model: string;
+  /**
+   * Which feature is spending. Forwarded from whoever called translate(),
+   * because the same prompt pipeline serves the editors (production
+   * translation) and the budget-check script (a trial run) — see
+   * @eg/llm/features.
+   */
+  feature: Feature;
   /** Product model being translated — tags the spend so "which datasheet
    *  was expensive" is answerable. Falls back to the product line. */
-  ref?: string
-): TranslateProvider {
+  ref?: string;
+}): TranslateProvider {
+  const { id, name, model, feature, ref } = opts;
   return {
     id,
     name,
@@ -36,6 +45,7 @@ export function createOpenRouterProvider(
         maxTokens: 8192,
         temperature: 0.3,
         surface: "spechub",
+        feature,
         ref,
       });
     },

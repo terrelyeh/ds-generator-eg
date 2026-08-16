@@ -7,6 +7,7 @@ import { cloudCameraPrompt } from "./prompts/product-lines/cloud-camera";
 import { contentTypePrompts } from "./prompts/content-types";
 import { lineParityBudget } from "@/lib/datasheet/cover-layout";
 import { resolveModel } from "@eg/llm/models";
+import type { Feature } from "@eg/llm/features";
 import { createOpenRouterProvider } from "./providers/openrouter";
 
 export type { TranslateModel } from "./types";
@@ -32,13 +33,23 @@ export interface ResolvedProvider {
  * default rather than erroring: the picker's options can change between
  * a page load and a submit.
  */
-async function resolveProvider(slug?: string, ref?: string): Promise<ResolvedProvider> {
+async function resolveProvider(
+  feature: Feature,
+  slug?: string,
+  ref?: string,
+): Promise<ResolvedProvider> {
   const model = await resolveModel(slug, "translate");
   if (!model) {
     throw new Error("No translation model is configured. Add one in Settings → AI Models.");
   }
   return {
-    provider: createOpenRouterProvider(model.slug, model.label, model.slug, ref),
+    provider: createOpenRouterProvider({
+      id: model.slug,
+      name: model.label,
+      model: model.slug,
+      feature,
+      ref,
+    }),
     model: model.slug,
   };
 }
@@ -229,6 +240,13 @@ export async function translate(opts: {
   productLine?: string;
   /** OpenRouter slug. Omit to use the catalog's translate default. */
   providerId?: string;
+  /**
+   * Which feature is spending (OpenRouter usage tag). Required rather than
+   * defaulted to "translate": this pipeline also serves the budget-check
+   * script, and a default would let a future caller inherit the wrong tag
+   * silently. See @eg/llm/features.
+   */
+  feature: Feature;
   /** Product model, for spend attribution. Falls back to the product line. */
   ref?: string;
 }): Promise<{
@@ -244,10 +262,11 @@ export async function translate(opts: {
     contentType,
     productLine,
     providerId,
+    feature,
     ref,
   } = opts;
 
-  const { provider, model } = await resolveProvider(providerId, ref ?? productLine);
+  const { provider, model } = await resolveProvider(feature, providerId, ref ?? productLine);
   const systemPrompt = await buildSystemPrompt(
     targetLocale,
     productLine,

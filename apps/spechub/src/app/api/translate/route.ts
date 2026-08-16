@@ -62,6 +62,9 @@ export async function POST(request: Request) {
       contentType: content_type,
       productLine: product_line,
       providerId: provider,
+      // Every translation button in the app arrives here — cover copy, spec
+      // labels and review comments alike — so they share one usage tag.
+      feature: "translate",
       ref,
     });
 

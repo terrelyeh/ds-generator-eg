@@ -95,6 +95,9 @@ async function main() {
       contentType: "features",
       productLine,
       providerId: provider,
+      // Trial runs, not production translation — tagged apart so they don't
+      // inflate what translation costs on the OpenRouter dashboard.
+      feature: "budget-check",
       // Match what the editor records, so script runs and real usage tag
       // the ledger at the same granularity instead of product-line vs model.
       ref: p.model_name,
@@ -105,6 +108,9 @@ async function main() {
       contentType: "overview",
       productLine,
       providerId: provider,
+      // Trial runs, not production translation — tagged apart so they don't
+      // inflate what translation costs on the OpenRouter dashboard.
+      feature: "budget-check",
       // Match what the editor records, so script runs and real usage tag
       // the ledger at the same granularity instead of product-line vs model.
       ref: p.model_name,

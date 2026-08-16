@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "npm run dev -w spechub",
     "build": "npm run build -w spechub",
-    "lint": "npm run lint -w spechub"
+    "lint": "npm run lint -w spechub",
+    "check:feature-tags": "node scripts/check-feature-tags.mjs"
   }
 }

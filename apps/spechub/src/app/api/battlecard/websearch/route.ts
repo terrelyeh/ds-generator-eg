@@ -72,6 +72,7 @@ async function extract(
     user,
     maxTokens: 4096,
     surface: "spechub",
+    feature: "battlecard",
     ref: label,
   });
 

@@ -56,6 +56,7 @@ async function extractSpecs(
     user,
     maxTokens: 4096,
     surface: "spechub",
+    feature: "battlecard",
     ref: competitorLabel,
   });
 
