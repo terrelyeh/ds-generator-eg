@@ -61,7 +61,7 @@ const TRACKED = [
 const ENTRY_NAMES = new Set(TRACKED.flatMap((t) => t.names));
 
 /** Second and third segment shape, as documented in features.ts. */
-const TAG_RE = /^engenius-spechub\.(engenie|dsgen)\.[a-z0-9]+(-[a-z0-9]+)*$/;
+const TAG_RE = /^engenius-spechub\.(engenie|spechub)\.[a-z0-9]+(-[a-z0-9]+)*$/;
 const UNMAPPED_RE = /^engenius-spechub\.unmapped$/;
 
 const problems = [];

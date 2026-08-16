@@ -7,7 +7,7 @@
  *
  *   engenius-spechub   fixed prefix, so our rows can never collide with
  *                      another project's on the same account
- *   engenie | dsgen    which key paid — one segment per OpenRouter key,
+ *   engenie | spechub  which key paid — one segment per OpenRouter key,
  *                      mirroring `Surface` in ./openrouter
  *   <feature>          what the spend bought
  *
@@ -48,20 +48,20 @@ export const FEATURE_TAGS: Record<Feature, string> = {
    * Datasheet translation — headline, overview, features, spec labels and
    * review comments. One API serving six buttons, so one bucket.
    */
-  translate: "engenius-spechub.dsgen.translate",
+  translate: "engenius-spechub.spechub.translate",
 
   /**
    * Competitor battlecard spec extraction — both the ↻ datasheet re-sync
    * and the 🔍 web search fill.
    */
-  battlecard: "engenius-spechub.dsgen.battlecard",
+  battlecard: "engenius-spechub.spechub.battlecard",
 
   /**
    * scripts/check-translation-budget.ts — a real translation, run by hand
    * against the production key. Kept out of `translate` so trial runs don't
    * inflate what translation actually costs in production.
    */
-  "budget-check": "engenius-spechub.dsgen.budget-check",
+  "budget-check": "engenius-spechub.spechub.budget-check",
 };
 
 /**
