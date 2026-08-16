@@ -16,6 +16,7 @@
 │   ├── db/             # @eg/db — supabase server/client/admin + settings accessor + DB types + supabase/migrations（唯一來源）
 │   ├── auth/           # @eg/auth — session.ts(gate/RBAC) + permissions.ts + page-guards.ts
 │   └── llm/            # @eg/llm — OpenRouter chat client（chat completions 統一入口；**embedding 不走這裡**）
+│                       #   + features.ts = 花費歸戶的功能標籤對照表（OpenRouter `user` 欄位）
 └── package.json        # npm workspaces：apps/*, packages/*
 ```
 
@@ -23,6 +24,12 @@
 產品表唯讀約定）詳見兩個 app 的 CLAUDE.md「Monorepo 接點 / 跨 app 接點」章節。
 
 - packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|types`、`@eg/auth/session|permissions|page-guards`
+- **新增任何 OpenRouter 呼叫點時必須帶 `feature`**（`chatComplete`/`streamComplete` 的必填選項，
+  查 `packages/llm/src/features.ts` 的對照表 → 送進 OpenRouter 的 `user` 欄位做花費歸戶）。
+  漏標不會有任何症狀——畫面正常、測試全過，花費只是靜靜落進 `unmapped`。
+  所以有一支雙向檢查：`npm run check:feature-tags`（每個呼叫點都有標、每個標籤都有人用、
+  **串流那支也送 `user`**、沒有人繞過共用函式自己打 endpoint）。標籤字串是對外契約，
+  **改名不會改到舊資料**，儀表板上會裂成兩列。
 - migrations 在 `packages/db/supabase/migrations/`（supabase CLI 的 link 狀態 `.temp` 也在旁邊，`supabase db push` 從 `packages/db` 跑）
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）
