@@ -96,12 +96,24 @@ export function RequirementsIntake({
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-[#231f20]">
-            業務需求
+            ① 貼上業務需求
           </h2>
           <p className="mt-1 max-w-[640px] text-xs text-muted-foreground">
-            把業務給的那段話原封不動貼進來。能變成規則的會列成建議，
-            答不出來的會變成待問的問題。<strong>解析完不會自動套用</strong>，
-            要你勾選才會動到文件。
+            把業務給的那段話<strong>原封不動</strong>貼進來，按「解析」。系統會把它拆成兩堆：
+          </p>
+          <ul className="mt-1.5 max-w-[640px] space-y-0.5 text-xs text-muted-foreground">
+            <li>
+              · <strong>能直接變成規則的</strong> —— 「不要放 chipset」→ 藏掉那幾列；
+              「IP67」→ 加一列規格
+            </li>
+            <li>
+              · <strong>只有人能回答的</strong> —— 「圖片是 EnGenius model」→
+              哪一張？變成下面 ② 的待辦問題
+            </li>
+          </ul>
+          <p className="mt-1.5 max-w-[640px] text-xs text-muted-foreground">
+            前者列成建議給你勾，每一項都會標明<strong>依據是原文的哪一句</strong>。
+            <strong>勾了按套用才會動到文件</strong>，解析本身不改任何東西。
           </p>
         </div>
         {!open && !proposal && (

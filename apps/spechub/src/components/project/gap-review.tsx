@@ -20,9 +20,16 @@ interface ReviewFinding {
   answer: string | null;
 }
 
+export interface ReviewCounts {
+  open: number;
+  blocking: number;
+  advisory: number;
+  answered: number;
+}
+
 interface ReviewPayload {
   findings: ReviewFinding[];
-  counts: { open: number; blocking: number; advisory: number; answered: number };
+  counts: ReviewCounts;
   brief: string;
 }
 
@@ -41,7 +48,16 @@ const ASKED_LABEL: Record<AskedOf, string> = {
  * needs next is more useful than what it currently says — the fields are
  * where you act on the answers, this is where you find out what to ask.
  */
-export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () => void }) {
+export function GapReview({
+  docId,
+  onChanged,
+  onCounts,
+}: {
+  docId: string;
+  onChanged?: () => void;
+  /** Lets the page header show the badge and work out the next step. */
+  onCounts?: (counts: ReviewCounts) => void;
+}) {
   const [data, setData] = useState<ReviewPayload | null>(null);
   const [loading, setLoading] = useState(true);
   const [showBrief, setShowBrief] = useState(false);
@@ -64,11 +80,15 @@ export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () 
       if (!res.ok) throw new Error(json.error ?? "Scan failed");
       setData(json);
       setBrief(json.brief);
+      onCounts?.(json.counts);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Scan failed");
+      toast.error(e instanceof Error ? e.message : "檢查失敗");
     } finally {
       setLoading(false);
     }
+    // `onCounts` is a parent setState and stable enough in practice; including
+    // it would re-run the scan on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docId]);
 
   useEffect(() => {
@@ -159,20 +179,27 @@ export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-[#231f20]">
-            還缺什麼
+            ② 還缺什麼 · 要問誰
           </h2>
           <p className="mt-1 max-w-[640px] text-xs text-muted-foreground">
             {blocking.length > 0 ? (
               <>
                 <strong className="text-amber-700">{blocking.length} 項</strong>{" "}
                 在確認前不建議送出，另有 {advisory.length} 項可以之後補。
-                資料不齊是正常的——擋住的只有「會讓文件寫錯」的部分。
+                <strong>資料不齊是正常的</strong>——擋住的只有「會讓文件寫錯」的部分
+                （我們自己編的數字、自相矛盾的規格、說要拿掉卻還在的字）。
               </>
             ) : open.length > 0 ? (
               <>沒有會出錯的項目，剩下 {open.length} 項是待補的資料，不影響先送一版。</>
             ) : (
               <>沒有待釐清的項目。</>
             )}
+          </p>
+          <p className="mt-1.5 max-w-[640px] text-xs text-muted-foreground">
+            <strong>怎麼用：</strong>按「產生澄清訊息」→ 複製 → 貼給 RD／ODM／業務。
+            他們回了之後回來按該項的「記錄答覆」，把原話貼上——
+            系統會讀一遍，<strong>告訴你規格表要不要跟著改</strong>，改什麼由你勾。
+            只是確認（「對，就是 IP67」）就不會有任何改動，只留下紀錄。
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
