@@ -79,6 +79,31 @@ ingress_protection = IP67   覆寫；來源沒這列也會憑空長出來
 還有一個對稱的：**圖片註記**（`image_note`）。專案 datasheet 常常放一張「像的那台」
 的照片，標案文件放一張不是本人的照片而不說明，是誤導風險。有圖就有註記。
 
+### 圖片：第二個 bucket，而且是 public
+
+`project-datasheets`（00038）是**私有**的，裝的是**證據**——規格從哪份 ODM PDF 來的。
+產品照片是相反性質的東西：它會**印在交給客戶的文件上**，而 renderer 是用一個普通的
+`<img src>` 去拿——列印時從作者的瀏覽器、之後做 server-side PDF 時從 headless Chrome。
+
+- **signed URL 會過期**，幾個月後把一份已經寄出的 datasheet 變成一排破圖
+- **走驗證過的 proxy route** 在瀏覽器可以，在 Puppeteer 不行（它沒有 session）
+
+所以：**圖片 public、來源 private**（`project-images`，migration 00043）。
+跟目錄那邊同一個切法——`datasheets` bucket 本來就是 public 在放產品圖。
+
+⚠️ public = 拿到網址的人都讀得到。對 EnGenius 硬體 render 沒問題，對別的東西就不對了，
+所以上傳端**只收圖片格式**。
+
+⚠️ **`images` 不在 Save 的送出欄位裡。** 上傳當下就寫進去了，
+Save 如果順手把表單掛載時的那份副本送上去，會把之後所有上傳蓋掉。
+
+### 封面高度是彈性的，不是寫死的
+
+戶外機的 render 又高又窄，寫死 `max-height` 會錯兩次：對這種比例太小
+（高度先撞到上限，寬度還有一大截沒用到，封面空掉三分之一），
+而某人寫了四段 overview 的時候又太大。所以 `.cover-body` 是一個
+從 header 底下到 PRELIMINARY 條上方的固定框，圖片吃掉文案沒用完的部分。
+
 ## 版型是選的，不是推導的
 
 目錄版型看產品是什麼（`getTheme()` 依 category 切）——Cloud AP 就是藍的，沒人要選。

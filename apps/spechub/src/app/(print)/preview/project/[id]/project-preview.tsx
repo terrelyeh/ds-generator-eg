@@ -321,7 +321,16 @@ body {
   color: #fff; font-size: ${PT.label}pt; font-weight: ${WT.medium};
   letter-spacing: .04em; text-transform: uppercase;
 }
-.cover-body { padding: 124pt 44pt 0; }
+/* Fixed box from under the header band to just above the PRELIMINARY strip,
+   so the product shots can take whatever the copy doesn't. A fixed image
+   height instead would be a guess that is wrong twice: too small for the
+   tall, narrow outdoor units (where the height cap binds long before the
+   width does, leaving a third of the cover empty) and too large the moment
+   someone writes a four-paragraph overview. */
+.cover-body {
+  position: absolute; top: 96pt; left: 44pt; right: 44pt; bottom: 104pt;
+  display: flex; flex-direction: column; padding-top: 28pt;
+}
 .hero-title {
   font-size: ${PT.cover}pt; font-weight: ${WT.bold}; color: ${INK};
   line-height: 1.18; margin-bottom: 4pt;
@@ -335,11 +344,14 @@ body {
   white-space: pre-line; max-width: 470pt;
 }
 .cover-shots {
-  display: flex; gap: 24pt; justify-content: center; align-items: flex-end;
-  margin-top: 22pt; min-height: 250pt;
+  display: flex; gap: 24pt; justify-content: center; align-items: stretch;
+  margin-top: 22pt; flex: 1; min-height: 0;
 }
-.cover-shot { flex: 1; text-align: center; max-width: 240pt; }
-.cover-shot img { max-width: 100%; max-height: 230pt; object-fit: contain; }
+.cover-shot {
+  flex: 1; max-width: 250pt; min-height: 0;
+  display: flex; flex-direction: column; justify-content: flex-end; text-align: center;
+}
+.cover-shot img { flex: 1; min-height: 0; width: 100%; object-fit: contain; }
 .cover-shot .cs-name {
   font-family: ${displayFont}; font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi};
   color: ${INK}; margin-top: 8pt;

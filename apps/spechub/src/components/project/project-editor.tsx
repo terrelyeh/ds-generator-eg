@@ -13,14 +13,17 @@ import { GapReview } from "@/components/project/gap-review";
 import { RequirementsIntake } from "@/components/project/requirements-intake";
 import { SourceExtract } from "@/components/project/source-extract";
 import { AddModelMenu } from "@/components/project/add-model-menu";
+import {
+  ImageManager,
+  MODEL_SLOTS,
+  DOC_SLOTS,
+} from "@/components/project/image-manager";
 import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
-  parseImages,
   parseRules,
   parseSpecRows,
   serializeFeatureBlocks,
-  serializeImages,
   serializeRules,
   serializeSpecRows,
 } from "@/lib/project-datasheet/text-format";
@@ -41,7 +44,6 @@ interface ModelDraft {
   id: string;
   model_name: string;
   display_name: string;
-  images: string;
   raw: string;
   rules: string;
 }
@@ -75,9 +77,6 @@ export function ProjectEditor({
         : [],
     ),
   );
-  const [docImages, setDocImages] = useState(() =>
-    serializeImages(parseImagesJson(doc.images)),
-  );
   const [disclaimer, setDisclaimer] = useState(doc.disclaimer);
   const [imageNote, setImageNote] = useState(doc.image_note ?? "");
   const [blankPolicy, setBlankPolicy] = useState(doc.blank_policy);
@@ -101,7 +100,6 @@ export function ProjectEditor({
       id: m.id,
       model_name: m.model_name,
       display_name: m.display_name ?? "",
-      images: serializeImages(parseImagesJson(m.images)),
       raw: serializeSpecRows(asRawDoc(m.raw_doc)),
       rules: serializeRules(asRules(m.rules)),
     })),
@@ -149,12 +147,14 @@ export function ProjectEditor({
           overview: overview || null,
           footnote: footnote || null,
           features: parseFeatureBlocks(features),
-          images: parseImages(docImages),
           disclaimer,
           image_note: imageNote || null,
           blank_policy: blankPolicy,
           doc_rules: parseRules(docRules),
           sections,
+          // `images` is deliberately absent from both payloads: the uploader
+          // writes them the moment a file lands, so including a copy captured
+          // when the form mounted would wipe every upload made since.
           notes: notes || null,
           branch: branch || null,
           sales_owner: salesOwner || null,
@@ -175,7 +175,6 @@ export function ProjectEditor({
             id: d.id,
             model_name: d.model_name,
             display_name: d.display_name || null,
-            images: parseImages(d.images),
             raw_doc: parseSpecRows(d.raw),
             rules: parseRules(d.rules),
           }),
@@ -373,12 +372,14 @@ export function ProjectEditor({
         <Field label="Footnote">
           <Input value={footnote} onChange={(e) => setFootnote(e.target.value)} />
         </Field>
-        <Field
-          label="Document images"
-          hint="one per line: `slot url`. Slot `diagram` renders on the deployment page."
-        >
-          <Textarea rows={3} value={docImages} onChange={(e) => setDocImages(e.target.value)} />
-        </Field>
+        <ImageManager
+          docId={doc.id}
+          modelId={null}
+          initial={parseImagesJson(doc.images)}
+          slots={DOC_SLOTS}
+          label="文件層圖片"
+          hint="部署示意圖等不屬於單一型號的圖。要印出來還需要把「Sections」裡的部署示意圖打開。"
+        />
       </Panel>
 
       <Panel
@@ -495,17 +496,14 @@ export function ProjectEditor({
                   />
                 </Field>
               </Grid>
-              <Field
-                label="Images"
-                hint="one per line: `slot url`. Slot `product` is the cover shot; anything else goes on the hardware page."
-              >
-                <Textarea
-                  rows={3}
-                  value={d.images}
-                  onChange={(e) => setDraft(d.id, { images: e.target.value })}
-                  className="font-mono text-xs"
-                />
-              </Field>
+              <ImageManager
+                docId={doc.id}
+                modelId={d.id}
+                initial={parseImagesJson(models.find((m) => m.id === d.id)?.images)}
+                slots={MODEL_SLOTS}
+                label="產品圖"
+                hint="封面主圖一張（再傳會換掉舊的），硬體外觀可以多張，會照上傳順序排在 Hardware Overview 頁。圖片下方會自動帶「僅供參考」的註記。"
+              />
               <div className="space-y-2">
                 <SourceExtract
                   docId={doc.id}
