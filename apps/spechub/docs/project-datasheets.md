@@ -57,6 +57,10 @@ ingress_protection = IP67   覆寫；來源沒這列也會憑空長出來
 ## software                 之後的列歸到 Software Features 表
 ```
 
+列的順序是**合併**各欄、不是串接：每一欄保持自己的相對順序，只有某一欄有的列會插在
+它在那一欄的鄰居旁邊。這不是美觀問題——串接會把所有 5G 專屬的列丟到 Weight 底下，
+讓「區分這兩台的那個規格」讀起來像附註。
+
 `key` 是 label 正規化後的字串（`normalizeKey`）。重抽之後 label 改名或消失，
 規則就變成**孤兒**——編輯器會列出來，不會默默吃掉。**一個悄悄失效的 override
 就是 chipset 重新出現在標案文件上的方式。**
@@ -141,4 +145,7 @@ PRELIMINARY + 圖片註記、版型 registry。
   ⚠️ 一定要**掃全文**（overview + features + 所有值），不只掃 label——
   EOR 這個案子的殘留有 5 處，其中 2 處在 overview 裡（"based on the new SDX62 platform"）
 - **M4** — Duplicate（複製給下一個客戶）、封存
-- 排序（`add.after` 目前是唯一的位置控制手段）、圖片上傳（現在只吃 URL）
+- **自由排序** — 目前的順序是「合併各欄、各欄保持自己的相對順序」＋ `add.after`
+  指定新列位置。這個組合對 EOR 這種案子已經對了（5G NR 排到最上面跟其他射頻規格一起、
+  Antenna gain 落在 Dimensions 旁邊、PoE 落在 Interface 後面），但沒有「把這列拖到那裡」
+- 圖片上傳（現在只吃 URL）

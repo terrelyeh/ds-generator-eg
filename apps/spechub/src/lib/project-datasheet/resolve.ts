@@ -14,6 +14,7 @@
  */
 
 import type {
+  AddedRow,
   BlankMode,
   DocRules,
   RawSpecRow,
@@ -135,11 +136,15 @@ function resolveColumn(raw: RawSpecRow[], rules: SpecRules): Column {
     });
   }
 
+  // Honour `add.after`. Added rows are appended above so an override written
+  // against an added key still finds it; placing them is a separate pass.
+  const positioned = placeAdds(out, rules.add ?? []);
+
   // A row whose value resolved to nothing is blank, not empty.
-  for (const [key, cell] of out) {
+  for (const [key, cell] of positioned) {
     if (cell.value.trim()) continue;
     const mode = rules.blank?.[key];
-    out.set(key, {
+    positioned.set(key, {
       ...cell,
       value: mode ? BLANK_TEXT[mode] : "",
       origin: "blank",
@@ -147,7 +152,32 @@ function resolveColumn(raw: RawSpecRow[], rules: SpecRules): Column {
     });
   }
 
-  return out;
+  return positioned;
+}
+
+/**
+ * Move each added row to sit just after the row it names. Map iteration is
+ * insertion-ordered, so "position" here means rebuilding the map.
+ *
+ * An `after` naming a row that isn't there (hidden, or never in the source)
+ * leaves the addition where it landed rather than dropping it — losing a row
+ * because its neighbour was hidden would be a surprising way to lose content.
+ */
+function placeAdds(out: Column, adds: AddedRow[]): Column {
+  if (adds.length === 0) return out;
+  const entries = [...out.entries()];
+  for (const add of adds) {
+    if (!add.after) continue;
+    const key = add.key || normalizeKey(add.label);
+    const from = entries.findIndex(([k]) => k === key);
+    if (from === -1) continue;
+    const [entry] = entries.splice(from, 1);
+    const afterKey = normalizeKey(add.after ?? "");
+    const anchor = entries.findIndex(([k]) => k === afterKey);
+    if (anchor === -1) entries.splice(from, 0, entry);
+    else entries.splice(anchor + 1, 0, entry);
+  }
+  return new Map(entries);
 }
 
 /** `poe_input` → `Poe Input`. Only used when a rule invents a row. */
@@ -168,10 +198,15 @@ export interface ResolveInput {
 /**
  * Build the printable matrix: one row per surviving spec, one cell per model.
  *
- * Row order is the union in column order — every row the first model carries,
- * then anything only later models have. It's deterministic and reads
- * naturally, and `add.after` gives positional control where it matters.
- * Free reordering is an editor feature, not a resolver one.
+ * Row order MERGES the columns rather than concatenating them: each column's
+ * rows keep their relative order, and a row only one column has is inserted
+ * beside its neighbours from that column instead of being appended.
+ *
+ * The difference is not cosmetic. Concatenating puts every 5G-only row at the
+ * bottom of a 4G/5G comparison, under Weight — so the spec that distinguishes
+ * the two products reads as an afterthought. Merging puts 5G NR at the top
+ * with the other radio specs and Antenna gain next to Dimensions, which is
+ * where a reader looks for them.
  */
 export function resolveMatrix({ models, docRules, blankPolicy }: ResolveInput): ResolvedRow[] {
   const columns = models.map((m) =>
@@ -182,10 +217,19 @@ export function resolveMatrix({ models, docRules, blankPolicy }: ResolveInput): 
   const labels = new Map<string, string>();
   const groups = new Map<string, string>();
   for (const col of columns) {
+    // Where this column's last-placed row sits in the merged order; new rows
+    // go directly after it (-1 → the very top).
+    let anchor = -1;
     for (const [key, cell] of col) {
+      const at = order.indexOf(key);
+      if (at !== -1) {
+        anchor = at;
+      } else {
+        order.splice(anchor + 1, 0, key);
+        anchor += 1;
+      }
       if (!labels.has(key)) {
         labels.set(key, cell.label);
-        order.push(key);
       }
       // A row is only 'spec' if no column claims it for a real group —
       // when one source documents a software table and the other doesn't,
