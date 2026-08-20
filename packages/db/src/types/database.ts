@@ -515,6 +515,32 @@ export interface Database {
           Partial<Pick<Database["public"]["Tables"]["project_datasheet_sources"]["Row"], "id" | "created_at" | "filename" | "storage_path" | "extracted_text" | "extraction" | "extraction_model" | "extracted_at">>;
         Update: Partial<Database["public"]["Tables"]["project_datasheet_sources"]["Insert"]>;
       };
+      project_datasheet_questions: {
+        Row: {
+          id: string;
+          project_datasheet_id: string;
+          /** finding identity from gap-scan.ts, with model_id + row_key */
+          code: string;
+          model_id: string | null;
+          row_key: string | null;
+          state: string; // 'open' | 'answered' | 'dismissed' | 'resolved'
+          answer: string | null;
+          answered_by: string | null;
+          answered_at: string | null;
+          /** snapshot of the finding as last seen */
+          title: string;
+          detail: string;
+          asked_of: string; // 'sales' | 'rd' | 'odm' | 'internal'
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["project_datasheet_questions"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["project_datasheet_questions"]["Row"], "id" | "created_at" | "updated_at" | "model_id" | "row_key" | "state" | "answer" | "answered_by" | "answered_at" | "title" | "detail" | "asked_of">>;
+        Update: Partial<Database["public"]["Tables"]["project_datasheet_questions"]["Insert"]>;
+      };
       project_datasheet_models: {
         Row: {
           id: string;
@@ -576,6 +602,8 @@ export type ProjectDatasheetSource =
   Database["public"]["Tables"]["project_datasheet_sources"]["Row"];
 export type ProjectDatasheetModel =
   Database["public"]["Tables"]["project_datasheet_models"]["Row"];
+export type ProjectDatasheetQuestion =
+  Database["public"]["Tables"]["project_datasheet_questions"]["Row"];
 
 // Composite types for API responses
 export type ProductWithSpecs = Product & {

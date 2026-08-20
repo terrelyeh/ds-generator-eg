@@ -101,6 +101,54 @@ EOC datasheet。這裡分岔很便宜，耦合出事很貴。
 [type-spec 頁](https://…/design/datasheet-type-spec.html)。**不要加進去**——那頁是
 免登入的，上面有產品線名稱與機種數量，標案版型不該在那裡。
 
+## Gap review — 引導層
+
+這個模組不是「一次把 datasheet 生對」的轉換器。業務手上的資訊永遠不完整，
+假裝完整只是把缺的東西從「不知道」變成「悄悄假設了」。工具的工作是**一直問到補齊**。
+
+`lib/project-datasheet/gap-scan.ts` 讀現況，產出三類 finding：
+
+| 類 | 意思 | 例子 |
+|---|---|---|
+| **缺** missing | 還沒拿到 | TBD 格、沒圖、沒 overview |
+| **疑** doubt | 跟來源不一致 | 覆寫改了數值、值不是來源給的、兩台該一致卻不一致 |
+| **險** risk | 會出錯 | af 餵不動 24 W、藏了 chipset 但文字裡還有型號 |
+
+**掃描是 deterministic 的，沒有 LLM。** 同一份文件永遠得到同一組 finding，
+finding 才能跨次掃描追蹤，也才不會有人懷疑「沒警告是真的沒事，還是模型沒看到」。
+LLM 屬於 intake（把業務的一段話變成規則＋問題），不屬於這裡。
+
+### blocking vs advisory 的分界不是「缺多少」
+
+```
+advisory = 文件還不完整   ← preliminary 本來就這樣，TBD 是誠實
+blocking = 文件會寫錯     ← 自己填的數字、自我矛盾的規格、說要拿掉卻還在的字
+```
+
+所以「14 格 TBD」不擋，「IP67 沒有來源」擋。`status` 要切到 `ready`
+**會被 API 擋下來**（409 + 列出擋住的項目）——不然引導只是建議，而對一份已經寄出去的
+文件提建議毫無意義。
+
+### finding 是算出來的，questions 表只存「人做了什麼」
+
+跟 `raw_doc ⊕ rules` 同一個道理。表以 `(code, model_id, row_key)` 為身分，
+每次掃描**對帳**而不是重建：新的插進來、消失的標 `resolved`（不刪，因為
+「當初問了什麼、怎麼定案」就是日後守住規格承諾的依據）、又出現的重新打開。
+**severity 不存**——存了就會有規則改嚴之後，舊資料還帶著舊 severity 的鬼問題。
+
+### 澄清訊息才是產出
+
+能回答這些問題的人**都不在 SpecHub 裡**：業務在通訊軟體上、RD 在會議室、
+ODM 在另一個時區的 email。一個只有作者看得到的漂亮清單補不了任何洞。
+
+所以 `brief.ts` 產生一段**可以直接貼出去的 zh-TW 文字**，按「誰能回答」分組
+（RD / ODM / 業務 / 我方）。是**模板不是 LLM**：問供應商的問題每次都該長一樣，
+沒有人想 diff 兩個 LLM 版本的「幾根天線」。同一個 check 重複太多次會摺成一條
+（一邊七個「沒有值」摺成一則，可以一次回完）。
+
+**記錄答覆不會自動改規格表。** 把答案變成規則是另一個刻意的動作——
+一個會偷偷改寫規格表的答案欄，會是整個模組裡最難稽核的東西。
+
 ## PDF 怎麼出
 
 **瀏覽器列印**（`ProjectPrintToolbar`），不是 `/api/generate-pdf`。
@@ -135,15 +183,20 @@ scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
 
 ## 現況（2026-08-20）
 
-**M1 完成**：資料層、手動建案、規則解析、渲染、出 PDF、區塊開關、TBD 佔位、
-PRELIMINARY + 圖片註記、版型 registry。
+**M1 完成**：資料層、手動建案、規則解析、渲染、出 PDF（含標準 footer + Contact Us QR）、
+區塊開關、TBD 佔位、PRELIMINARY + 圖片註記、版型 registry。
+
+**M2 完成**：gap review（缺／疑／險三類掃描）、questions 表對帳、澄清訊息、
+readiness gate。跑 EOR 這份的結果是 22 項（7 blocking）。
 
 **還沒做**：
-- **M2 抽取** — PDF（Vercel 上沒有 poppler，要用 JS 的 `unpdf`/`pdf-parse`，這是第一個要驗的技術點）、
-  XLSX（sheetjs）、貼上文字；LLM 只做結構化不做改寫，逐格帶 `source_page` + `confidence`
-- **M3 lint** — 殘留掃描（藏了 X 但全文還提到 X）、覆寫與來源衝突、物理矛盾（af 餵不動 24 W）。
-  ⚠️ 一定要**掃全文**（overview + features + 所有值），不只掃 label——
-  EOR 這個案子的殘留有 5 處，其中 2 處在 overview 裡（"based on the new SDX62 platform"）
+- **M2.5 intake** — 業務給的一段需求（「不要放 WiFi / poe 是 802.3af/at / IP67」）
+  → 拆成「可執行的規則」+「答不出來的問題」。這是引導迴圈的前門，也是唯一該用 LLM 的地方
+- **答案 → 規則** — 現在記錄答覆只留文字，套用還是手動改欄位
+- **M3 抽取** — PDF（Vercel 上沒有 poppler，要用 JS 的 `unpdf`/`pdf-parse`，這是第一個要驗的技術點）、
+  XLSX（sheetjs）、貼上文字；LLM 只做結構化不做改寫，逐格帶 `source_page` + `confidence`。
+  抽進來之後**來源全文也要進殘留掃描**——現在只掃得到規格列，
+  掃不到 overview 原文裡的 "based on the new SDX62 platform"
 - **M4** — Duplicate（複製給下一個客戶）、封存
 - **自由排序** — 目前的順序是「合併各欄、各欄保持自己的相對順序」＋ `add.after`
   指定新列位置。這個組合對 EOR 這種案子已經對了（5G NR 排到最上面跟其他射頻規格一起、

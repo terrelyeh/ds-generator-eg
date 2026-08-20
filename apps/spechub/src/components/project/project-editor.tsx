@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { layoutOptions } from "@/lib/project-datasheet/themes";
+import { GapReview } from "@/components/project/gap-review";
 import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
@@ -51,6 +52,8 @@ export function ProjectEditor({
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
+  // Bumped after a save so the review re-runs against what was just written.
+  const [reviewKey, setReviewKey] = useState(0);
 
   // Document fields
   const [name, setName] = useState(doc.name);
@@ -163,6 +166,7 @@ export function ProjectEditor({
       }
 
       toast.success("Saved");
+      setReviewKey((k) => k + 1);
       router.refresh();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Save failed");
@@ -220,6 +224,10 @@ export function ProjectEditor({
           </Button>
         </div>
       </div>
+
+      {/* Above the fields on purpose: what the document still needs is more
+          actionable than what it currently says. */}
+      <GapReview docId={doc.id} key={reviewKey} />
 
       <Panel title="Document">
         <Grid>

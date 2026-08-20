@@ -2,6 +2,14 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { PROJECT_LAYOUTS } from "@/lib/project-datasheet/themes";
+import { resolveMatrix } from "@/lib/project-datasheet/resolve";
+import { scanDocument, storedFindingId } from "@/lib/project-datasheet/gap-scan";
+import type { BlankMode, DocRules } from "@/lib/project-datasheet/types";
+import type {
+  ProjectDatasheet,
+  ProjectDatasheetModel,
+  ProjectDatasheetQuestion,
+} from "@eg/db/types";
 
 /** Document fields the editor may write. Anything else is ignored. */
 const DOC_FIELDS = [
@@ -68,9 +76,75 @@ export async function PATCH(
   patch.updated_at = new Date().toISOString();
 
   const supabase = createAdminClient();
+
+  // "Ready to send" has to be earned. Without this the gap review is advice,
+  // and advice about a document that is already out the door is worth
+  // nothing. Incompleteness never blocks — TBD is honest in a preliminary
+  // sheet — so what stands in the way is only the set of things that would
+  // make the document WRONG: a number nobody sourced, a spec that
+  // contradicts itself, a term we said we had removed.
+  if (patch.status === "ready") {
+    const blockers = await openBlockers(supabase, id);
+    if (blockers.length > 0) {
+      return NextResponse.json(
+        {
+          error:
+            `還有 ${blockers.length} 項未確認的問題會讓這份文件出錯，先處理完才能標成 Ready：\n` +
+            blockers.slice(0, 5).map((b) => `· ${b}`).join("\n") +
+            (blockers.length > 5 ? `\n· …還有 ${blockers.length - 5} 項` : ""),
+        },
+        { status: 409 },
+      );
+    }
+  }
   const { error } = await supabase.from("project_datasheets").update(patch).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * Titles of the blocking findings still open on this document.
+ *
+ * Rescans rather than trusting stored rows: severity lives in the scanner, so
+ * a question answered against an older version of a rule should not keep a
+ * document unblocked after the rule tightened.
+ */
+async function openBlockers(
+  supabase: ReturnType<typeof createAdminClient>,
+  id: string,
+): Promise<string[]> {
+  const [{ data: docRow }, { data: modelRows }, { data: questionRows }] = await Promise.all([
+    supabase.from("project_datasheets").select("*").eq("id", id).maybeSingle(),
+    supabase
+      .from("project_datasheet_models")
+      .select("*")
+      .eq("project_datasheet_id", id)
+      .order("position"),
+    supabase.from("project_datasheet_questions").select("*").eq("project_datasheet_id", id),
+  ]);
+
+  const doc = docRow as ProjectDatasheet | null;
+  if (!doc) return [];
+  const models = (modelRows ?? []) as ProjectDatasheetModel[];
+
+  const rows = resolveMatrix({
+    models,
+    docRules: (doc.doc_rules ?? {}) as DocRules,
+    blankPolicy: (doc.blank_policy as BlankMode) ?? "tbd",
+  });
+
+  // Anything a human has answered or dismissed is settled, whatever the
+  // scanner still says about it — the point of answering is to move on.
+  const settled = new Set(
+    ((questionRows ?? []) as ProjectDatasheetQuestion[])
+      .filter((q) => q.state === "answered" || q.state === "dismissed")
+      .map(storedFindingId),
+  );
+
+  return scanDocument({ doc, models, rows })
+    .filter((f) => f.severity === "blocking")
+    .filter((f) => !settled.has(`${f.code}|${f.modelId ?? ""}|${f.rowKey ?? ""}`))
+    .map((f) => f.title);
 }
 
 /** DELETE /api/projects/[id] — models and sources cascade. */

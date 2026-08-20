@@ -1053,6 +1053,65 @@ export type Database = {
           },
         ]
       }
+      project_datasheet_questions: {
+        Row: {
+          answer: string | null
+          answered_at: string | null
+          answered_by: string | null
+          asked_of: string
+          code: string
+          created_at: string
+          detail: string
+          id: string
+          model_id: string | null
+          project_datasheet_id: string
+          row_key: string | null
+          state: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_of?: string
+          code: string
+          created_at?: string
+          detail?: string
+          id?: string
+          model_id?: string | null
+          project_datasheet_id: string
+          row_key?: string | null
+          state?: string
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          answer?: string | null
+          answered_at?: string | null
+          answered_by?: string | null
+          asked_of?: string
+          code?: string
+          created_at?: string
+          detail?: string
+          id?: string
+          model_id?: string | null
+          project_datasheet_id?: string
+          row_key?: string | null
+          state?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_datasheet_questions_project_datasheet_id_fkey"
+            columns: ["project_datasheet_id"]
+            isOneToOne: false
+            referencedRelation: "project_datasheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       project_datasheet_sources: {
         Row: {
           created_at: string

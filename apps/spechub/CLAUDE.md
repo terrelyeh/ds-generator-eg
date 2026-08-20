@@ -141,7 +141,11 @@ EnGenie 就會開始跟人說我們有賣它;
 ④ **`project-preview.tsx` 是獨立元件**,不是 broadband-preview 加參數;配色是**抄的不是共用的**,
 否則一次性標案的調色會回頭改到出貨中的 EOC datasheet;
 ⑤ 出 PDF 走**瀏覽器列印**不走 `/api/generate-pdf`（後者會寫 version、進 datasheets bucket、開 Drive 資料夾）;
-⑥ 這支元件**不在** type-spec 產生器的 COMPONENTS 清單裡,**不要加**——那頁是免登入的。
+⑥ 這支元件**不在** type-spec 產生器的 COMPONENTS 清單裡,**不要加**——那頁是免登入的;
+⑦ **gap review 是這個模組的核心不是打磨**（`gap-scan.ts`,缺／疑／險三類,**deterministic 無 LLM**）——
+blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 14 格 TBD 不擋、一個沒來源的 IP67 擋;
+finding 是算出來的,`project_datasheet_questions` 只存人做了什麼,**severity 不存**;
+真正的產出是**可以貼給業務/RD/ODM 的澄清訊息**（`brief.ts`,模板不是 LLM）——能回答的人都不在站內。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 

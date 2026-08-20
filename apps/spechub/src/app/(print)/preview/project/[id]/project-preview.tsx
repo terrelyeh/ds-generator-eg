@@ -3,6 +3,7 @@ import { ProjectPrintToolbar } from "@/components/preview/project-print-toolbar"
 import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT } from "@/lib/datasheet/scale";
+import { CONTACT_US_URL } from "@/lib/datasheet/qr";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
 import { getProjectTheme } from "@/lib/project-datasheet/themes";
 import { DEFAULT_SECTIONS } from "@/lib/project-datasheet/types";
@@ -168,6 +169,18 @@ export function ProjectPreview({
   let pageNo = 0;
   const nextPage = () => ++pageNo;
 
+  // The footer QR always points at Contact Us. A project datasheet has no
+  // Quick Start Guide to link to — the product doesn't exist yet — and the
+  // whole point of the document is to start a conversation.
+  const qrCodeUrl =
+    "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" +
+    encodeURIComponent(CONTACT_US_URL);
+  const today = new Date().toLocaleDateString("en-US", {
+    month: "2-digit",
+    day: "2-digit",
+    year: "numeric",
+  });
+
   const showSoftware = sections.software && softwareRows.length > 0 && softwareCols.length > 0;
   const showPackage = sections.package && packageRows.length > 0 && packageCols.length > 0;
   const showHardware = sections.hardware && hardwareShots.some((h) => h.shots.length > 0);
@@ -189,11 +202,26 @@ export function ProjectPreview({
 
   const Footer = () => (
     <div className="footer">
-      <div className="footer-logo">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo/EnGenius-Logo-gray.png" alt="EnGenius" />
+      <div className="footer-content">
+        <div className="footer-left">
+          <div className="footer-logo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo/EnGenius-Logo-gray.png" alt="EnGenius" />
+          </div>
+          <div className="footer-disclaimer">{doc.disclaimer}</div>
+          <div className="footer-version">
+            {doc.customer ? `${doc.customer} · ` : ""}
+            {today}
+          </div>
+        </div>
+        <div className="footer-right">
+          <div className="footer-qr">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={qrCodeUrl} alt="QR Code" />
+          </div>
+          <div className="footer-qr-label">Contact Us</div>
+        </div>
       </div>
-      <div className="footer-note">{doc.disclaimer}</div>
     </div>
   );
 
@@ -389,13 +417,28 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 .diagram img { max-width: 100%; max-height: 420pt; object-fit: contain; }
 .diagram { text-align: center; }
 
-/* ── footer ────────────────────────────────────────────────────────── */
+/* ── footer ─────────────────────────────────────────────────────────
+   The catalogue footer, unchanged: grey band, logo + disclaimer on the
+   left, Contact Us QR on the right. A tender sheet that ends differently
+   from every other EnGenius datasheet reads as a different company's
+   document, which is the opposite of what it is for. */
 .footer {
-  position: absolute; left: 44pt; right: 44pt; bottom: 36pt;
-  border-top: .5pt solid #d5d8da; padding-top: 8pt;
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: #eff0f2; padding: 14pt 36pt 20pt 36pt;
 }
-.footer-logo img { height: 15pt; margin-bottom: 5pt; }
-.footer-note { font-size: ${PT.footer}pt; line-height: 1.5; color: ${MUTED}; }
+.footer-content { display: table; width: 100%; }
+.footer-left { display: table-cell; vertical-align: top; padding-right: 30pt; }
+.footer-right { display: table-cell; vertical-align: bottom; width: 75pt; text-align: center; }
+.footer-logo img { height: 17pt; margin-bottom: 6pt; }
+.footer-disclaimer {
+  font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; line-height: 1.45;
+}
+.footer-version {
+  font-weight: ${WT.light}; font-size: ${PT.footer}pt; color: #6d6e71; margin-top: 4pt;
+}
+.footer-qr { background: white; padding: 2pt 2pt 5pt 2pt; display: inline-block; }
+.footer-qr img { width: 41pt; height: 41pt; display: block; }
+.footer-qr-label { font-size: ${PT.tableSm}pt; color: #6b7580; margin-top: 2pt; }
 `,
         }}
       />
@@ -426,7 +469,11 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
             ))}
           </div>
         </div>
-        <div className="prelim">{doc.disclaimer}</div>
+        {/* Clears the footer band on the rare single-page document where
+            the cover is also the last page. */}
+        <div className="prelim" style={lastSection === "cover" ? { bottom: "104pt" } : undefined}>
+          {doc.disclaimer}
+        </div>
         {lastSection === "cover" && <Footer />}
         <div className="page-number">{nextPage()}</div>
       </div>
