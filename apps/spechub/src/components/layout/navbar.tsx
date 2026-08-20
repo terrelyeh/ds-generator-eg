@@ -23,6 +23,9 @@ interface NavbarProps {
 export function Navbar({ user }: NavbarProps) {
   const role = user?.role;
   const showSettings = can(role, "settings.view");
+  // Datasheet on Demand is admin/editor only — sales and PM shouldn't be
+  // one click from a half-finished quote that looks like a real datasheet.
+  const showProjects = can(role, "project_datasheet.view");
 
   return (
     <header className="sticky top-0 z-50 bg-engenius-blue text-white shadow-md">
@@ -40,6 +43,17 @@ export function Navbar({ user }: NavbarProps) {
           Product SpecHub
         </span>
         <div className="ml-auto flex items-center gap-1">
+          {showProjects && (
+            <Link
+              href="/projects"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V7a2 2 0 00-2-2h-6l-1.5-2H4z" />
+              </svg>
+              On Demand
+            </Link>
+          )}
           {showSettings && (
             <Link
               href="/settings"

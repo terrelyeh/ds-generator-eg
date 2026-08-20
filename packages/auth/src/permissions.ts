@@ -67,7 +67,10 @@ export type Permission =
   | "knowledge.edit"
   // competitor battlecard (internal-only)
   | "battlecard.view"
-  | "battlecard.edit";
+  | "battlecard.edit"
+  // datasheet on demand — project / tender datasheets
+  | "project_datasheet.view"
+  | "project_datasheet.edit";
 
 const PERMISSIONS: Record<Permission, Role[]> = {
   // Everyone can view product / dashboard / preview
@@ -118,6 +121,16 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   // viewer (sales/field) excluded for now — easy to widen later.
   "battlecard.view": ["admin", "editor", "pm"],
   "battlecard.edit": ["admin", "editor", "pm"],
+
+  // Datasheet on Demand. Narrower than battlecard on purpose: every project
+  // datasheet is a one-off shaped by one conversation with one customer, so
+  // it's authored by whoever is having that conversation (MKT) rather than
+  // reviewed into existence. PM is out because there is no review workflow to
+  // be part of, and viewer (sales/field) is out because a half-finished tender
+  // draft that looks like a datasheet is exactly the file you don't want
+  // circulating — the finished PDF is what gets handed over.
+  "project_datasheet.view": ["admin", "editor"],
+  "project_datasheet.edit": ["admin", "editor"],
 };
 
 /** Check if a role can perform an action. */

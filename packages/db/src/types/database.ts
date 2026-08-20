@@ -456,6 +456,91 @@ export interface Database {
           Partial<Pick<Database["public"]["Tables"]["battlecard_values"]["Row"], "id" | "updated_at" | "anchor_model_name" | "competitor_product_id" | "value" | "confirmed" | "source_url" | "captured_at" | "extraction_method" | "confirmed_by" | "confirmed_at">>;
         Update: Partial<Database["public"]["Tables"]["battlecard_values"]["Insert"]>;
       };
+
+      // ── Datasheet on Demand (project / tender datasheets) ──────────────
+      // A parallel island to products/spec_items on purpose — see
+      // migration 00038 for why there is no promotion path between them.
+      project_datasheets: {
+        Row: {
+          id: string;
+          name: string;
+          customer: string | null;
+          status: string; // 'draft' | 'ready' | 'archived'
+          /** key into PROJECT_LAYOUTS (lib/project-datasheet/themes.ts) */
+          layout: string;
+          headline: string | null;
+          series_name: string | null;
+          category_label: string | null;
+          overview: string | null;
+          features: Json;
+          footnote: string | null;
+          /** document-level artwork (diagram etc.) — [{slot,url,caption}] */
+          images: Json;
+          /** PRELIMINARY notice — wording editable, existence is not */
+          disclaimer: string;
+          image_note: string | null;
+          sections: Json;
+          blank_policy: string; // 'tbd' | 'na' | 'blank'
+          /** document-wide spec rules; per-model rules layer on top */
+          doc_rules: Json;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["project_datasheets"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "created_by">>;
+        Update: Partial<Database["public"]["Tables"]["project_datasheets"]["Insert"]>;
+      };
+      project_datasheet_sources: {
+        Row: {
+          id: string;
+          project_datasheet_id: string;
+          kind: string; // 'pdf' | 'xlsx' | 'text'
+          filename: string | null;
+          storage_path: string | null;
+          extracted_text: string | null;
+          extraction: Json | null;
+          extraction_model: string | null;
+          extracted_at: string | null;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["project_datasheet_sources"]["Row"],
+          "id" | "created_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["project_datasheet_sources"]["Row"], "id" | "created_at" | "filename" | "storage_path" | "extracted_text" | "extraction" | "extraction_model" | "extracted_at">>;
+        Update: Partial<Database["public"]["Tables"]["project_datasheet_sources"]["Insert"]>;
+      };
+      project_datasheet_models: {
+        Row: {
+          id: string;
+          project_datasheet_id: string;
+          source_id: string | null;
+          position: number;
+          model_name: string;
+          display_name: string | null;
+          subtitle: string | null;
+          overview: string | null;
+          features: Json;
+          images: Json;
+          /** extraction output, replaced wholesale on re-extract */
+          raw_doc: Json;
+          /** every human edit; survives re-extraction */
+          rules: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["project_datasheet_models"]["Row"],
+          "id" | "created_at" | "updated_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["project_datasheet_models"]["Row"], "id" | "created_at" | "updated_at" | "source_id" | "position" | "display_name" | "subtitle" | "overview" | "features" | "images" | "raw_doc" | "rules">>;
+        Update: Partial<Database["public"]["Tables"]["project_datasheet_models"]["Insert"]>;
+      };
     };
     Enums: {
       image_type: ImageType;
@@ -486,6 +571,11 @@ export type CompetitorProduct = Database["public"]["Tables"]["competitor_product
 export type CompetitorMatchup = Database["public"]["Tables"]["competitor_matchups"]["Row"];
 export type BattlecardDimension = Database["public"]["Tables"]["battlecard_dimensions"]["Row"];
 export type BattlecardValue = Database["public"]["Tables"]["battlecard_values"]["Row"];
+export type ProjectDatasheet = Database["public"]["Tables"]["project_datasheets"]["Row"];
+export type ProjectDatasheetSource =
+  Database["public"]["Tables"]["project_datasheet_sources"]["Row"];
+export type ProjectDatasheetModel =
+  Database["public"]["Tables"]["project_datasheet_models"]["Row"];
 
 // Composite types for API responses
 export type ProductWithSpecs = Product & {

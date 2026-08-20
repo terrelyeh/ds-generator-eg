@@ -907,6 +907,199 @@ export type Database = {
           },
         ]
       }
+      project_datasheets: {
+        Row: {
+          blank_policy: string
+          category_label: string | null
+          created_at: string
+          created_by: string | null
+          customer: string | null
+          disclaimer: string
+          doc_rules: Json
+          features: Json
+          footnote: string | null
+          headline: string | null
+          id: string
+          image_note: string | null
+          images: Json
+          layout: string
+          name: string
+          notes: string | null
+          overview: string | null
+          sections: Json
+          series_name: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          blank_policy?: string
+          category_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer?: string | null
+          disclaimer: string
+          doc_rules?: Json
+          features?: Json
+          footnote?: string | null
+          headline?: string | null
+          id?: string
+          image_note?: string | null
+          images?: Json
+          layout?: string
+          name: string
+          notes?: string | null
+          overview?: string | null
+          sections?: Json
+          series_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          blank_policy?: string
+          category_label?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer?: string | null
+          disclaimer?: string
+          doc_rules?: Json
+          features?: Json
+          footnote?: string | null
+          headline?: string | null
+          id?: string
+          image_note?: string | null
+          images?: Json
+          layout?: string
+          name?: string
+          notes?: string | null
+          overview?: string | null
+          sections?: Json
+          series_name?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_datasheets_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_datasheet_models: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          features: Json
+          id: string
+          images: Json
+          model_name: string
+          overview: string | null
+          position: number
+          project_datasheet_id: string
+          raw_doc: Json
+          rules: Json
+          source_id: string | null
+          subtitle: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          features?: Json
+          id?: string
+          images?: Json
+          model_name: string
+          overview?: string | null
+          position?: number
+          project_datasheet_id: string
+          raw_doc?: Json
+          rules?: Json
+          source_id?: string | null
+          subtitle?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          features?: Json
+          id?: string
+          images?: Json
+          model_name?: string
+          overview?: string | null
+          position?: number
+          project_datasheet_id?: string
+          raw_doc?: Json
+          rules?: Json
+          source_id?: string | null
+          subtitle?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_datasheet_models_project_datasheet_id_fkey"
+            columns: ["project_datasheet_id"]
+            isOneToOne: false
+            referencedRelation: "project_datasheets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "project_datasheet_models_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "project_datasheet_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      project_datasheet_sources: {
+        Row: {
+          created_at: string
+          extracted_at: string | null
+          extracted_text: string | null
+          extraction: Json | null
+          extraction_model: string | null
+          filename: string | null
+          id: string
+          kind: string
+          project_datasheet_id: string
+          storage_path: string | null
+        }
+        Insert: {
+          created_at?: string
+          extracted_at?: string | null
+          extracted_text?: string | null
+          extraction?: Json | null
+          extraction_model?: string | null
+          filename?: string | null
+          id?: string
+          kind: string
+          project_datasheet_id: string
+          storage_path?: string | null
+        }
+        Update: {
+          created_at?: string
+          extracted_at?: string | null
+          extracted_text?: string | null
+          extraction?: Json | null
+          extraction_model?: string | null
+          filename?: string | null
+          id?: string
+          kind?: string
+          project_datasheet_id?: string
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_datasheet_sources_project_datasheet_id_fkey"
+            columns: ["project_datasheet_id"]
+            isOneToOne: false
+            referencedRelation: "project_datasheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
