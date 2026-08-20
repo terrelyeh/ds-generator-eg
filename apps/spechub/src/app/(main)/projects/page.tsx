@@ -7,7 +7,7 @@ import type { ProjectDatasheet } from "@eg/db/types";
 export const dynamic = "force-dynamic";
 
 /**
- * Datasheet on Demand — the list of project / tender datasheets.
+ * Project Datasheet Builder — the list of on-demand project datasheets.
  *
  * Separate from /dashboard on purpose. The dashboard is the catalogue; these
  * are quotes for hardware that may never exist, and mixing them into the same
@@ -31,7 +31,7 @@ export default async function ProjectsPage() {
       <div className="mb-2 flex items-start justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-[#231f20]">
-            Datasheet on Demand
+            Project Datasheet Builder
           </h1>
           <p className="mt-1 max-w-[620px] text-sm text-muted-foreground">
             Preliminary datasheets for project business — retarget a supplier

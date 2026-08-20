@@ -457,7 +457,7 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["battlecard_values"]["Insert"]>;
       };
 
-      // ── Datasheet on Demand (project / tender datasheets) ──────────────
+      // ── Project Datasheet Builder (on-demand project datasheets) ───────
       // A parallel island to products/spec_items on purpose — see
       // migration 00038 for why there is no promotion path between them.
       project_datasheets: {

@@ -68,7 +68,7 @@ export type Permission =
   // competitor battlecard (internal-only)
   | "battlecard.view"
   | "battlecard.edit"
-  // datasheet on demand — project / tender datasheets
+  // project datasheet builder — on-demand project/tender datasheets
   | "project_datasheet.view"
   | "project_datasheet.edit";
 
@@ -122,7 +122,7 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   "battlecard.view": ["admin", "editor", "pm"],
   "battlecard.edit": ["admin", "editor", "pm"],
 
-  // Datasheet on Demand. Narrower than battlecard on purpose: every project
+  // Project Datasheet Builder. Narrower than battlecard on purpose: every project
   // datasheet is a one-off shaped by one conversation with one customer, so
   // it's authored by whoever is having that conversation (MKT) rather than
   // reviewed into existence. PM is out because there is no review workflow to

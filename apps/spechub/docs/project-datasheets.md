@@ -1,4 +1,4 @@
-# Datasheet on Demand — 專案／標案 datasheet
+# Project Datasheet Builder — 專案／標案 datasheet（on-demand）
 
 > **必讀時機**：要動 `/projects`、`/preview/project/*`、`project_datasheet*` 表，
 > 或想把 project datasheet 的東西接進目錄（products / sync / RAG）之前。

@@ -12,7 +12,7 @@
 > **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
 > 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
 > 細節在下方 Brand & Visual System 與 pitfall #50。
-> **2026-08-20：新模組 Datasheet on Demand**（專案／標案用的暫時性 datasheet,
+> **2026-08-20：新模組 Project Datasheet Builder**（專案／標案用的暫時性 datasheet,
 > `/projects`;M1 = 資料層 + 手動建案 + 出 PDF）——**它是刻意跟目錄平行的孤島**,
 > 動之前先讀 [`docs/project-datasheets.md`](docs/project-datasheets.md)。
 > **2026-08-20：規格頁的「值續段」不再重複印規格名稱**（原本掛 `「原標籤 (cont.)」`）——
@@ -24,7 +24,7 @@
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
-另含 **Datasheet on Demand**（`/projects`;專案／標案用的暫時性 datasheet,
+另含 **Project Datasheet Builder**（`/projects`;專案／標案用的暫時性 datasheet,
 與產品目錄平行、永不進 sync/RAG）。
 
 **6 個 solution 上線**：**Cloud**（9 條線,含 **Cloud PDU**——ECP 四台,預設藍、
@@ -127,7 +127,7 @@ path `/api/sync`、以及 `PUBLIC_EXACT_PATHS` **精確比對**的單頁白名�
 (`gate()`/`gateOrCron()`/`adminOnly()`/`requirePagePermission()` + client `can()`)。
 4 角色矩陣在 **`@eg/auth/permissions`**(packages/auth)。**改 auth/proxy/權限前先讀該檔。**
 
-### Datasheet on Demand（專案／標案 datasheet）→ [`docs/project-datasheets.md`](docs/project-datasheets.md)
+### Project Datasheet Builder（專案／標案 datasheet, on-demand）→ [`docs/project-datasheets.md`](docs/project-datasheets.md)
 
 Project business 用的暫時性 datasheet：拿 ODM／他牌規格表 → 換 EnGenius 命名/照片/版型
 → 出一份談 tender 的 PDF。`/projects`（gate `project_datasheet.*`，**只有 admin/editor**）、

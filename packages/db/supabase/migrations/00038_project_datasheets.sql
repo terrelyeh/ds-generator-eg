@@ -1,4 +1,4 @@
--- Datasheet on Demand — the PROJECT / TENDER datasheet module.
+-- Project Datasheet Builder — on-demand datasheets for project business.
 --
 -- Project business means a customer wants custom or not-yet-existing hardware.
 -- We get an ODM/other-brand spec sheet, retarget it onto EnGenius naming,

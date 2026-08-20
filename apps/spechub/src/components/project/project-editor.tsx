@@ -201,7 +201,7 @@ export function ProjectEditor({
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <Link href="/projects" className="text-sm text-muted-foreground hover:underline">
-            ← Datasheet on Demand
+            ← Project Datasheets
           </Link>
           <h1 className="mt-1 truncate font-heading text-2xl font-semibold text-[#231f20]">
             {doc.name}
