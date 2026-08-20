@@ -14,6 +14,7 @@ import { RequirementsIntake } from "@/components/project/requirements-intake";
 import { SourceExtract } from "@/components/project/source-extract";
 import { AddModelMenu } from "@/components/project/add-model-menu";
 import { ImageManager, MODEL_SLOTS, DOC_SLOTS } from "@/components/project/image-manager";
+import type { ModelImage } from "@/lib/project-datasheet/types";
 import { SpecFormatHelp } from "@/components/project/spec-format-help";
 import { LayoutPicker } from "@/components/project/layout-picker";
 import { SpecPreview, toggleHideLine } from "@/components/project/spec-preview";
@@ -920,13 +921,27 @@ export function ProjectEditor({
   );
 }
 
-function parseImagesJson(value: unknown): { slot: string; url: string }[] {
+/**
+ * Everything the manager can edit, not just what it needs to draw a
+ * thumbnail. Narrowing this to {slot, url} meant the caption and labels an
+ * author had written were absent from the component's state, so the next
+ * upload wrote the whole array back without them.
+ */
+function parseImagesJson(value: unknown): ModelImage[] {
   if (!Array.isArray(value)) return [];
-  return value.flatMap((i) =>
-    i && typeof i === "object" && typeof (i as { url?: string }).url === "string"
-      ? [{ slot: (i as { slot?: string }).slot ?? "product", url: (i as { url: string }).url }]
-      : [],
-  );
+  return value.flatMap((i) => {
+    if (!i || typeof i !== "object") return [];
+    const img = i as Partial<ModelImage>;
+    if (typeof img.url !== "string" || !img.url) return [];
+    return [
+      {
+        slot: img.slot ?? "product",
+        url: img.url,
+        caption: img.caption ?? null,
+        labels: Array.isArray(img.labels) ? img.labels : [],
+      },
+    ];
+  });
 }
 
 function Panel({

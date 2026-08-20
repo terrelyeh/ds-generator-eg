@@ -1,9 +1,10 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import type { ModelImage } from "@/lib/project-datasheet/types";
+import type { ImageLabel, ModelImage } from "@/lib/project-datasheet/types";
 
 /**
  * Upload and arrange the images a project datasheet prints.
@@ -36,7 +37,34 @@ export function ImageManager({
   const [images, setImages] = useState<ModelImage[]>(initial);
   const [slot, setSlot] = useState(slots[0].value);
   const [busy, setBusy] = useState(false);
+  /** url of the image whose caption and labels are open for editing */
+  const [editing, setEditing] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  /**
+   * Caption and labels save on their own request rather than with the
+   * document's form. The uploader already writes `images` immediately, so a
+   * form save posts whatever it loaded on mount — which is how an image
+   * uploaded mid-edit used to vanish on the next Save.
+   */
+  async function saveMeta(url: string, patch: { caption?: string | null; labels?: ImageLabel[] }) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${docId}/images`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url, modelId, ...patch }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "儲存失敗");
+      setImages(json.images);
+      toast.success("已儲存");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "儲存失敗");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function upload(files: FileList) {
     setBusy(true);
@@ -105,6 +133,13 @@ export function ImageManager({
               </span>
               <button
                 type="button"
+                onClick={() => setEditing(editing === img.url ? null : img.url)}
+                className="mt-1 w-full rounded border px-1 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
+              >
+                {editing === img.url ? "收合" : "圖說／標註"}
+              </button>
+              <button
+                type="button"
                 disabled={busy}
                 onClick={() => void remove(img.url)}
                 className="absolute -right-1.5 -top-1.5 h-5 w-5 rounded-full border bg-background text-xs leading-none text-muted-foreground hover:text-destructive"
@@ -115,6 +150,15 @@ export function ImageManager({
             </li>
           ))}
         </ul>
+      )}
+
+      {editing && images.some((i) => i.url === editing) && (
+        <LabelEditor
+          key={editing}
+          image={images.find((i) => i.url === editing)!}
+          busy={busy}
+          onSave={(patch) => void saveMeta(editing, patch)}
+        />
       )}
 
       <div className="flex flex-wrap items-center gap-2">
@@ -152,6 +196,142 @@ export function ImageManager({
           PNG / JPEG / WebP / SVG，單張 12 MB 內，可一次選多張
         </span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Caption and on-image labels for one illustration.
+ *
+ * Labels are placed by clicking the picture, not by typing coordinates —
+ * "62.4% across, 41% down" is not a thing anyone can judge from a number, and
+ * the whole point is putting the word next to the right object. Dragging a
+ * placed label moves it.
+ *
+ * The preview positions labels as a percentage of the image box, so the
+ * editor can show the picture at any width and the placement still holds on
+ * a Letter page.
+ */
+function LabelEditor({
+  image,
+  busy,
+  onSave,
+}: {
+  image: ModelImage;
+  busy: boolean;
+  onSave: (patch: { caption: string | null; labels: ImageLabel[] }) => void;
+}) {
+  const [caption, setCaption] = useState(image.caption ?? "");
+  const [labels, setLabels] = useState<ImageLabel[]>(image.labels ?? []);
+  const [drag, setDrag] = useState<number | null>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  function pointToPercent(e: { clientX: number; clientY: number }) {
+    const box = boxRef.current?.getBoundingClientRect();
+    if (!box || !box.width || !box.height) return null;
+    const pct = (n: number) => Math.min(100, Math.max(0, Math.round(n * 10) / 10));
+    return {
+      x: pct(((e.clientX - box.left) / box.width) * 100),
+      y: pct(((e.clientY - box.top) / box.height) * 100),
+    };
+  }
+
+  return (
+    <div className="space-y-3 rounded-lg border bg-muted/30 p-3">
+      <div
+        ref={boxRef}
+        className="relative mx-auto w-fit max-w-full cursor-crosshair select-none bg-white"
+        onPointerMove={(e) => {
+          if (drag === null) return;
+          const at = pointToPercent(e);
+          if (at) setLabels((ls) => ls.map((l, i) => (i === drag ? { ...l, ...at } : l)));
+        }}
+        onPointerUp={() => setDrag(null)}
+        onPointerLeave={() => setDrag(null)}
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={image.url}
+          alt=""
+          draggable={false}
+          className="block max-h-[420px] w-auto max-w-full"
+          onClick={(e) => {
+            const at = pointToPercent(e);
+            if (at) setLabels((ls) => [...ls, { ...at, text: "" }]);
+          }}
+        />
+        {labels.map((l, i) => (
+          <span
+            key={i}
+            onPointerDown={(e) => {
+              e.preventDefault();
+              setDrag(i);
+            }}
+            style={{ left: `${l.x}%`, top: `${l.y}%` }}
+            className="absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-nowrap rounded border border-[#d8dfe6] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#1b3a5c] shadow-sm"
+          >
+            {l.text || `標籤 ${i + 1}`}
+          </span>
+        ))}
+      </div>
+      <p className="text-center text-xs text-muted-foreground">
+        點圖片任一處新增標籤，拖曳可移動。文字在下方輸入。
+      </p>
+
+      <div className="space-y-2">
+        {labels.map((l, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <Input
+              value={l.text}
+              maxLength={60}
+              placeholder="例：EOR200"
+              onChange={(e) =>
+                setLabels((ls) => ls.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))
+              }
+              className="h-8 text-xs"
+            />
+            <span className="w-20 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
+              {l.x} / {l.y}
+            </span>
+            <button
+              type="button"
+              onClick={() => setLabels((ls) => ls.filter((_, j) => j !== i))}
+              className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+              aria-label="移除標籤"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-[#231f20]">圖說</label>
+        <Input
+          value={caption}
+          placeholder="場景名稱 — 一句說明"
+          onChange={(e) => setCaption(e.target.value)}
+          className="mt-1 h-8 text-xs"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          破折號（—）前面的字會印成粗體小標，後面是說明。沒有破折號就整句照印。
+        </p>
+      </div>
+
+      <Button
+        size="sm"
+        disabled={busy}
+        onClick={() =>
+          onSave({
+            caption: caption.trim() || null,
+            // A label with no text prints as an empty white box. Dropping it
+            // here is what the author meant by leaving it blank.
+            labels: labels.filter((l) => l.text.trim()),
+          })
+        }
+      >
+        {busy ? "儲存中…" : "儲存圖說與標註"}
+      </Button>
     </div>
   );
 }
