@@ -27,7 +27,7 @@ import type {
  *   customer, notes,  RESET — every one of these belongs to the deal that is
  *   internal fields,  ending, and a stale salesperson or a tender date from
  *   status            another bid is worse than a blank field
- *   disclaimer        REGENERATED for the new customer — it names them
+ *   disclaimer        RESET to the neutral default
  *   sources           COPIED — the source sheet is the BASELINE the rules are
  *                     a delta against, and the review degrades silently
  *                     without it (see below)
@@ -87,7 +87,7 @@ export async function POST(
       features: source.features as never,
       footnote: source.footnote,
       images: source.images as never,
-      disclaimer: defaultDisclaimer(customer),
+      disclaimer: defaultDisclaimer(),
       image_note: source.image_note,
       sections: source.sections as never,
       blank_policy: source.blank_policy,

@@ -3,6 +3,7 @@ import { ProjectPrintToolbar } from "@/components/preview/project-print-toolbar"
 import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT } from "@/lib/datasheet/scale";
+import { getDict } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL } from "@/lib/datasheet/qr";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
 import { getProjectTheme } from "@/lib/project-datasheet/themes";
@@ -43,9 +44,27 @@ import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 const INK = "#231f20";
 const MUTED = "#6f7073";
 
-/** ~chars per line in a value column of `width` pt at 7pt. */
+/**
+ * The spec table's type step, and the pagination maths derived from it.
+ *
+ * A step above the catalogue layouts on purpose. `scale.ts` fixes the ladder
+ * but lets each layout choose its rung, and a tender sheet is read on a
+ * meeting table in print far more often than a product datasheet is —
+ * `tableSm` survives a screen and loses an argument on paper.
+ *
+ * Derived rather than written twice: the previous version hard-coded 7pt in
+ * the char-width estimate and 9.6pt of leading in the row height, so changing
+ * the font size would have silently left pagination measuring the old one and
+ * packed rows past the bottom margin.
+ */
+const SPEC_PT = PT.table;
+const SPEC_LINE = SPEC_PT * 1.4;
+/** Roughly the average glyph width as a fraction of the em, at this size. */
+const SPEC_CHAR_W = SPEC_PT * 0.5;
+
+/** ~chars per line in a value column of `width` pt at the spec size. */
 function estRows(text: string, width: number): number {
-  const perLine = Math.max(8, Math.floor(width / (0.5 * 7)));
+  const perLine = Math.max(8, Math.floor(width / SPEC_CHAR_W));
   return text
     .split("\n")
     .reduce((n, seg) => n + Math.max(1, Math.ceil(seg.trim().length / perLine)), 0);
@@ -71,7 +90,7 @@ function paginate(
       estRows(r.label, 110),
       ...r.cells.map((c) => estRows(c.value, valueWidth)),
     );
-    const h = lines * 9.6 + 8;
+    const h = lines * SPEC_LINE + 8;
     if (used + h > budget && cur.length) {
       pages.push(cur);
       cur = [];
@@ -124,6 +143,10 @@ export function ProjectPreview({
   showToolbar: boolean;
 }) {
   const theme = getProjectTheme(doc.layout);
+  // The footer carries the same neutral boilerplate every EnGenius datasheet
+  // carries. The PRELIMINARY notice lives on the cover, where it is the point;
+  // repeating it down here made the footer read like a different document's.
+  const dict = getDict("en");
   const sections = asSections(doc.sections);
   const displayFont = displayFontStack("en");
   const docImages = asImages(doc.images);
@@ -185,10 +208,18 @@ export function ProjectPreview({
   const showPackage = sections.package && packageRows.length > 0 && packageCols.length > 0;
   const showHardware = sections.hardware && hardwareShots.some((h) => h.shots.length > 0);
   const showDiagram = sections.diagram && !!diagram;
+  /**
+   * The deployment diagram rides under Features & Benefits when that page
+   * exists. A page containing one picture reads as a gap in the document,
+   * and the diagram is doing the same job as the benefits — showing what the
+   * product is FOR — so it belongs in the same breath. It only gets a page of
+   * its own when there is no benefits page to sit under.
+   */
+  const diagramWithFeatures = showDiagram && sections.features && featureBlocks.length > 0;
 
   // The footer rides the LAST page whichever section that turns out to be,
   // so toggling a section off can never orphan the disclaimer.
-  const lastSection: string = showDiagram
+  const lastSection: string = showDiagram && !diagramWithFeatures
     ? "diagram"
     : showPackage
       ? "package"
@@ -208,11 +239,11 @@ export function ProjectPreview({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo/EnGenius-Logo-gray.png" alt="EnGenius" />
           </div>
-          <div className="footer-disclaimer">{doc.disclaimer}</div>
-          <div className="footer-version">
-            {doc.customer ? `${doc.customer} · ` : ""}
-            {today}
-          </div>
+          <div className="footer-disclaimer">{dict.disclaimer}</div>
+          {/* No customer name: one sourced product is approached to several
+              projects, and a sheet reaching the wrong reader with another
+              buyer's name on it says who else we are quoting. */}
+          <div className="footer-version">{today}</div>
         </div>
         <div className="footer-right">
           <div className="footer-qr">
@@ -340,7 +371,7 @@ body {
   margin-bottom: 16pt;
 }
 .cover-overview {
-  font-size: ${PT.bodySm}pt; line-height: 1.6; color: ${MUTED};
+  font-size: ${PT.bodyMd}pt; line-height: 1.6; color: ${MUTED};
   white-space: pre-line; max-width: 470pt;
 }
 .cover-shots {
@@ -356,7 +387,7 @@ body {
   font-family: ${displayFont}; font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi};
   color: ${INK}; margin-top: 8pt;
 }
-.cover-shot .cs-desc { font-size: ${PT.tableSm}pt; color: ${MUTED}; margin-top: 2pt; }
+.cover-shot .cs-desc { font-size: ${PT.table}pt; color: ${MUTED}; margin-top: 2pt; }
 
 /* PRELIMINARY strip. On the cover, not only the footer — this document's
    whole risk is that it looks exactly like a real datasheet, and the cover
@@ -364,21 +395,32 @@ body {
 .prelim {
   position: absolute; left: 44pt; right: 44pt; bottom: 44pt;
   border-left: 3pt solid ${theme.primary}; background: ${theme.featuresBox};
-  padding: 8pt 12pt; font-size: ${PT.tableSm}pt; line-height: 1.5; color: ${INK};
+  padding: 8pt 12pt; font-size: ${PT.table}pt; line-height: 1.5; color: ${INK};
 }
 
 /* ── features & benefits ───────────────────────────────────────────── */
-.body-page { padding: 30pt 44pt 0; height: calc(792pt - 21pt); }
+.body-page {
+  padding: 30pt 44pt 0; height: calc(792pt - 21pt);
+  display: flex; flex-direction: column;
+}
 .page-title { margin-bottom: 18pt; }
 .blocks { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 24pt; }
+/* Give the diagram the rest of the page rather than a fixed height — the
+   benefits list is written per deal and its length is not predictable. */
+.blocks.with-diagram { flex: none; }
+.deploy {
+  flex: 1; min-height: 0; margin-top: 18pt; padding-bottom: 46pt;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.deploy img { max-width: 100%; flex: 1; min-height: 0; object-fit: contain; }
 .block {
   background: ${theme.featuresBox}; border-radius: 3pt; padding: 12pt 14pt;
 }
 .block-title {
-  font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi}; color: ${theme.primary};
+  font-size: ${PT.body}pt; font-weight: ${WT.semi}; color: ${theme.primary};
   margin-bottom: 5pt;
 }
-.block-body { font-size: ${PT.bodySm}pt; line-height: 1.55; color: ${MUTED}; }
+.block-body { font-size: ${PT.bodyMd}pt; line-height: 1.55; color: ${MUTED}; }
 .block-body li {
   list-style: none; display: flex; gap: 6pt; align-items: baseline; margin-bottom: 3pt;
 }
@@ -390,14 +432,14 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 .band-row th {
   background: ${theme.bandDark}; color: #fff; text-align: left;
   font-family: ${displayFont}; font-weight: ${WT.semi};
-  font-size: ${PT.table}pt; padding: 5pt 8pt; letter-spacing: .02em;
+  font-size: ${PT.bodySm}pt; padding: 5pt 8pt; letter-spacing: .02em;
 }
 .model-row td {
   background: ${theme.bandLight}; color: #fff; font-weight: ${WT.semi};
-  font-size: ${PT.table}pt; padding: 4pt 8pt; border-right: 1pt solid #fff;
+  font-size: ${PT.bodySm}pt; padding: 4pt 8pt; border-right: 1pt solid #fff;
 }
 .spec-row td {
-  font-size: ${PT.tableSm}pt; line-height: 1.4; padding: 4pt 8pt;
+  font-size: ${SPEC_PT}pt; line-height: 1.4; padding: 4pt 8pt;
   vertical-align: top; white-space: pre-line; border-bottom: .5pt solid #dcdedf;
   /* Cellular band lists are slash-separated with no spaces
      ("n1/2/3/5/7/8/12/…"), so a fixed-layout table has nowhere to wrap them
@@ -424,7 +466,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
   color: ${INK}; margin: 14pt 0 6pt;
 }
 .image-note {
-  font-size: ${PT.tableSm}pt; font-style: italic; color: ${MUTED}; margin-top: 10pt;
+  font-size: ${PT.table}pt; font-style: italic; color: ${MUTED}; margin-top: 10pt;
 }
 .diagram img { max-width: 100%; max-height: 420pt; object-fit: contain; }
 .diagram { text-align: center; }
@@ -498,7 +540,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
             <div className="page-title">
               <span className="section-title">Features &amp; Benefits</span>
             </div>
-            <div className="blocks">
+            <div className={`blocks${diagramWithFeatures ? " with-diagram" : ""}`}>
               {featureBlocks.map((b, i) => (
                 <div className="block" key={i}>
                   <div className="block-title">{b.title}</div>
@@ -513,6 +555,15 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
                 </div>
               ))}
             </div>
+            {/* No image note under the diagram: that note says the product
+                PHOTO is a stand-in, and a schematic is not a photo of
+                anything. It belongs under the hardware renders, where it is. */}
+            {diagramWithFeatures && diagram && (
+              <div className="deploy">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={diagram.url} alt="Deployment" />
+              </div>
+            )}
           </div>
           <div className="page-number">{nextPage()}</div>
         </div>
@@ -597,7 +648,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
       )}
 
       {/* ═══ APPLICATION DIAGRAM ═══ */}
-      {showDiagram && diagram && (
+      {showDiagram && !diagramWithFeatures && diagram && (
         <div className="page">
           <div className="top-bar" />
           <div className="body-page">
@@ -608,7 +659,6 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={diagram.url} alt="Deployment diagram" />
             </div>
-            {doc.image_note && <div className="image-note">{doc.image_note}</div>}
           </div>
           {lastSection === "diagram" && <Footer />}
           <div className="page-number">{nextPage()}</div>
