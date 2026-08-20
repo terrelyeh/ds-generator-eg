@@ -47,6 +47,18 @@ type IntakeItemBase =
       because: string;
     }
   | { type: "model_override"; modelName: string; key: string; value: string; because: string }
+  | {
+      /**
+       * "This model doesn't have that." Distinct from an empty value: TBD
+       * means an answer is still coming, — means there is nothing to come.
+       * Only an answer can tell those apart, which is why this type exists.
+       */
+      type: "model_blank";
+      modelName: string;
+      key: string;
+      mode: "na" | "tbd";
+      because: string;
+    }
   | { type: "doc_field"; field: DocField; value: string; because: string }
   | { type: "question"; askedOf: AskedOf; title: string; detail: string; because: string };
 
@@ -84,6 +96,7 @@ Item types:
   {"type":"doc_override","key":"<spec key>","label":"<label>","value":"<value>","because":"..."}
   {"type":"model_add","modelName":"<model>","key":"<key>","label":"<label>","value":"<value>","after":"<key or null>","because":"..."}
   {"type":"model_override","modelName":"<model>","key":"<key>","value":"<value>","because":"..."}
+  {"type":"model_blank","modelName":"<model>","key":"<key>","mode":"na|tbd","because":"..."}
   {"type":"doc_field","field":"headline|series_name|category_label|overview|footnote","value":"...","because":"..."}
   {"type":"question","askedOf":"sales|rd|odm|internal","title":"<short, zh-TW>","detail":"<what to ask, zh-TW>","because":"..."}
 
@@ -145,10 +158,27 @@ export function parseProposal(raw: string, modelNames: string[]): IntakeProposal
   const json = extractJson(raw);
   if (!json) return { items: [], ignored: [] };
 
+  const ignored = (Array.isArray(json.ignored) ? json.ignored : [])
+    .map((v) => str(v))
+    .filter(Boolean);
+
+  return { items: sanitizeItems(json.items, modelNames), ignored };
+}
+
+/**
+ * Validate a list of proposed items, dropping anything malformed.
+ *
+ * Also the gate for items that come back from the browser, where a proposal
+ * is reviewed before it is applied. Not a privilege boundary — whoever is
+ * ticking these can already write rules directly — but a shape boundary: a
+ * half-formed item that reached the merge would corrupt `rules` in a way
+ * nothing downstream is written to survive.
+ */
+export function sanitizeItems(rawItems: unknown, modelNames: string[]): IntakeItem[] {
   const known = new Set(modelNames);
   const items: IntakeItem[] = [];
 
-  for (const entry of Array.isArray(json.items) ? json.items : []) {
+  for (const entry of Array.isArray(rawItems) ? rawItems : []) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
     const because = str(e.because);
@@ -192,6 +222,16 @@ export function parseProposal(raw: string, modelNames: string[]): IntakeProposal
             because,
           });
         break;
+      case "model_blank":
+        if (key && known.has(str(e.modelName)) && (e.mode === "na" || e.mode === "tbd"))
+          items.push({
+            type: "model_blank",
+            modelName: str(e.modelName),
+            key,
+            mode: e.mode,
+            because,
+          });
+        break;
       case "doc_field":
         if (DOC_FIELDS.includes(e.field as DocField) && str(e.value))
           items.push({
@@ -214,11 +254,7 @@ export function parseProposal(raw: string, modelNames: string[]): IntakeProposal
     }
   }
 
-  const ignored = (Array.isArray(json.ignored) ? json.ignored : [])
-    .map((v) => str(v))
-    .filter(Boolean);
-
-  return { items, ignored };
+  return items;
 }
 
 /** One-line summary for the review list. */
@@ -232,6 +268,10 @@ export function describeItem(item: IntakeItem): string {
       return `${item.modelName} 新增「${item.label}」= ${item.value}`;
     case "model_override":
       return `${item.modelName} 的「${item.key}」改為「${item.value}」`;
+    case "model_blank":
+      return item.mode === "na"
+        ? `${item.modelName} 的「${item.key}」標成不適用（印 —）`
+        : `${item.modelName} 的「${item.key}」標成待補（印 TBD）`;
     case "doc_field":
       return `${item.field} 設為「${truncate(item.value)}」`;
     case "question":

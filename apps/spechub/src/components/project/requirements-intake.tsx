@@ -4,21 +4,13 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { describeItem, type IntakeItem } from "@/lib/project-datasheet/intake";
+import type { IntakeItem } from "@/lib/project-datasheet/intake";
+import { ProposalList, defaultAccepted } from "@/components/project/proposal-list";
 
 interface Proposal {
   items: IntakeItem[];
   ignored: string[];
 }
-
-const TYPE_LABEL: Record<IntakeItem["type"], string> = {
-  doc_hide: "隱藏",
-  doc_override: "覆寫",
-  model_add: "新增",
-  model_override: "覆寫",
-  doc_field: "文案",
-  question: "待問",
-};
 
 /**
  * Requirements intake.
@@ -57,16 +49,7 @@ export function RequirementsIntake({
       if (!res.ok) throw new Error(json.error ?? "解析失敗");
       setSourceId(json.sourceId);
       setProposal(json.proposal);
-      // Everything ticked EXCEPT items that would overwrite an existing
-      // value. Those are the ones with a real cost when the model guessed
-      // wrong, so they start unticked and have to be chosen deliberately.
-      setAccepted(
-        new Set(
-          (json.proposal.items as IntakeItem[])
-            .map((item, i) => (item.replaces ? -1 : i))
-            .filter((i) => i >= 0),
-        ),
-      );
+      setAccepted(defaultAccepted(json.proposal.items as IntakeItem[]));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "解析失敗");
     } finally {
@@ -159,70 +142,14 @@ export function RequirementsIntake({
             </p>
           ) : (
             <>
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs text-muted-foreground">
-                  {proposal.items.length} 項建議，已勾選 {accepted.size} 項。
-                </p>
-                <button
-                  type="button"
-                  className="text-xs text-engenius-blue hover:underline"
-                  onClick={() =>
-                    setAccepted(
-                      accepted.size === proposal.items.length
-                        ? new Set()
-                        : new Set(proposal.items.map((_, i) => i)),
-                    )
-                  }
-                >
-                  {accepted.size === proposal.items.length ? "全部取消" : "全部勾選"}
-                </button>
-              </div>
-
-              <ul className="divide-y rounded-md border">
-                {proposal.items.map((item, i) => (
-                  <li key={i} className="flex items-start gap-2.5 px-3 py-2.5">
-                    <input
-                      type="checkbox"
-                      checked={accepted.has(i)}
-                      onChange={() => toggle(i)}
-                      className="mt-1"
-                    />
-                    <span
-                      className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${
-                        item.type === "question"
-                          ? "bg-amber-100 text-amber-900"
-                          : "bg-muted text-muted-foreground"
-                      }`}
-                    >
-                      {TYPE_LABEL[item.type]}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="text-sm text-[#231f20]">{describeItem(item)}</div>
-                      {item.type === "question" && item.detail && (
-                        <div className="mt-0.5 text-xs text-muted-foreground">{item.detail}</div>
-                      )}
-                      {/* What this would destroy. An override that lands on
-                          the wrong row reads as a perfectly sensible proposal
-                          until you see the value it replaces — so that value
-                          gets the loudest treatment on the card, not a
-                          footnote. */}
-                      {item.replaces && (
-                        <div className="mt-1 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
-                          <strong>會蓋掉現有的值：</strong>
-                          <span className="whitespace-pre-line">{item.replaces}</span>
-                        </div>
-                      )}
-                      {/* The line of the note it came from. Without it you
-                          cannot tell a faithful reading from a hallucination. */}
-                      {item.because && (
-                        <div className="mt-1 text-[11px] text-muted-foreground">
-                          依據：「{item.because}」
-                        </div>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <ProposalList
+                items={proposal.items}
+                accepted={accepted}
+                onToggle={toggle}
+                onSelectAll={(all) =>
+                  setAccepted(all ? new Set(proposal.items.map((_, i) => i)) : new Set())
+                }
+              />
 
               <div className="flex gap-2">
                 <Button

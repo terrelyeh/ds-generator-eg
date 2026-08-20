@@ -178,8 +178,26 @@ ODM 在另一個時區的 email。一個只有作者看得到的漂亮清單補�
 沒有人想 diff 兩個 LLM 版本的「幾根天線」。同一個 check 重複太多次會摺成一條
 （一邊七個「沒有值」摺成一則，可以一次回完）。
 
-**記錄答覆不會自動改規格表。** 把答案變成規則是另一個刻意的動作——
-一個會偷偷改寫規格表的答案欄，會是整個模組裡最難稽核的東西。
+### 答案 → 規則
+
+記錄答覆時會**先讀一遍答案，提出規格要怎麼跟著改**，走的是跟 intake **完全同一條管線**：
+建議 → 顯示會蓋掉什麼 → 勾選 → 套用。一種提案格式、一條 apply 路徑（`apply-items.ts`）、
+一個 review 元件（`proposal-list.tsx`）。**答案不會因為晚到就比較可信**，
+兩份清單如果長得不一樣，遲早會變成兩種審查標準。
+
+最難的情況是**「不用改」**：doubt 類的答覆多半是確認（「殼體確實照 IP67 做的」），
+正確輸出是**什麼都不產出**——問題關掉、值不動。一個覺得自己非得產出編輯的模型，
+會把正確的規格改寫成答覆的轉述，那就是 `IP67` 變成 `IP67 (confirmed by RD)`
+印在客戶的 datasheet 上的方式。
+
+兩個實測調出來的行為：
+- **保留答案給的每個數字與修飾**——「4 根 5 dBi 全向天線」要變成
+  `4 × 5 dBi omnidirectional`，掉了「4 根」就是掉了規格
+- **一個答覆可以結掉一整族的列**——「EOR100 是 4G 機種，這幾項不適用」
+  一次處理掉四個 5G 列（每一項仍然分開勾選）。不然同一句話要打四次
+
+`model_blank` 這個型別存在的理由：**TBD 和 — 是兩件事**，
+「還沒回」跟「本來就沒有」只有答案分得出來。
 
 ## PDF 怎麼出
 
@@ -222,7 +240,9 @@ src/lib/project-datasheet/
   text-format.ts  純文字 ⇄ jsonb（編輯器用的貼上格式）
   gap-scan.ts     缺／疑／險掃描（deterministic、無 LLM）
   brief.ts        澄清訊息（模板、zh-TW、按誰能回答分組）
-  intake.ts       業務需求 → 建議規則 + 待問問題（唯一用 LLM 的地方）
+  intake.ts       業務需求 → 建議規則 + 待問問題
+  answer.ts       答覆 → 規格改動建議（跟 intake 共用提案格式）
+  apply-items.ts  套用提案（intake 與 answer 共用的唯一寫入點）
 src/app/(main)/projects/                列表 + 編輯器
 src/app/(print)/preview/project/[id]/   渲染
 src/app/api/projects/                   CRUD（admin client 寫，gate() 授權）
@@ -238,12 +258,13 @@ scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
 **M2 完成**：gap review（缺／疑／險三類掃描）、questions 表對帳、澄清訊息、
 readiness gate。跑 EOR 這份的結果是 22 項（7 blocking）。
 
+**答案→規則 完成**：記錄答覆會提出規格改動建議，共用 intake 的提案／審查／套用管線。
+
 **M2.5 完成**：requirements intake（LLM 解析 → 建議 → 勾選套用）、
 覆寫預警（會蓋掉什麼、預設不勾）、內部資訊欄位（分公司／業務／案號／數量／期限／案子進度，
 **都不會印在 PDF 上**）、編輯區放大 15%。
 
 **還沒做**：
-- **答案 → 規則** — 現在記錄答覆只留文字，套用還是手動改欄位
 - **M3 抽取** — PDF（Vercel 上沒有 poppler，要用 JS 的 `unpdf`/`pdf-parse`，這是第一個要驗的技術點）、
   XLSX（sheetjs）、貼上文字；LLM 只做結構化不做改寫，逐格帶 `source_page` + `confidence`。
   抽進來之後**來源全文也要進殘留掃描**——現在只掃得到規格列，

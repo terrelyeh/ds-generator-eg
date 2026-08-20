@@ -3,7 +3,8 @@ import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
 import { PROJECT_INTAKE_MODEL } from "@/lib/llm/models";
-import { asRawDoc, asRules, normalizeKey } from "@/lib/project-datasheet/resolve";
+import { asRawDoc } from "@/lib/project-datasheet/resolve";
+import { applyItems } from "@/lib/project-datasheet/apply-items";
 import {
   INTAKE_SYSTEM,
   buildIntakePrompt,
@@ -11,7 +12,6 @@ import {
   type IntakeItem,
   type IntakeProposal,
 } from "@/lib/project-datasheet/intake";
-import type { SpecRules } from "@/lib/project-datasheet/types";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 
 /**
@@ -141,101 +141,14 @@ async function apply(
     return NextResponse.json({ error: "selection matched no items" }, { status: 400 });
   }
 
-  // Merge, never replace. Intake is one of several ways rules get written —
-  // an apply that clobbered `doc_rules` would silently undo hand edits made
-  // between the parse and the click.
-  const docRules = asRules(doc.doc_rules) as SpecRules;
-  const hide = new Set(docRules.hide ?? []);
-  const override = { ...(docRules.override ?? {}) };
-  const docPatch: Record<string, unknown> = {};
+  const result = await applyItems(supabase, id, doc, models, chosen);
 
-  const modelPatches = new Map<string, SpecRules>();
-  const rulesFor = (name: string): SpecRules | null => {
-    const model = models.find((m) => m.model_name === name);
-    if (!model) return null;
-    if (!modelPatches.has(model.id)) {
-      modelPatches.set(model.id, asRules(model.rules) as SpecRules);
-    }
-    return modelPatches.get(model.id)!;
-  };
+  await supabase
+    .from("project_datasheet_sources")
+    .update({ extraction: { ...stored, applied: accept } as never })
+    .eq("id", body.sourceId);
 
-  const questions: Record<string, unknown>[] = [];
-
-  for (const item of chosen) {
-    switch (item.type) {
-      case "doc_hide":
-        hide.add(item.key);
-        break;
-      case "doc_override":
-        override[item.key] = item.value;
-        break;
-      case "doc_field":
-        docPatch[item.field] = item.value;
-        break;
-      case "model_override": {
-        const r = rulesFor(item.modelName);
-        if (r) r.override = { ...(r.override ?? {}), [item.key]: item.value };
-        break;
-      }
-      case "model_add": {
-        const r = rulesFor(item.modelName);
-        if (!r) break;
-        r.add = [
-          ...(r.add ?? []).filter((a) => (a.key || normalizeKey(a.label)) !== item.key),
-          { key: item.key, label: item.label, value: item.value, after: item.after ?? null },
-        ];
-        break;
-      }
-      case "question":
-        questions.push({
-          project_datasheet_id: id,
-          // Namespaced so the gap scanner never resolves it away — a question
-          // sales raised is not a finding the scanner can decide is fixed.
-          code: `intake:${normalizeKey(item.title).slice(0, 60)}`,
-          model_id: null,
-          row_key: null,
-          title: item.title,
-          detail: item.detail || item.because,
-          asked_of: item.askedOf,
-        });
-        break;
-    }
-  }
-
-  docPatch.doc_rules = { ...docRules, hide: [...hide], override };
-  docPatch.updated_at = new Date().toISOString();
-
-  const writes: PromiseLike<unknown>[] = [
-    supabase.from("project_datasheets").update(docPatch as never).eq("id", id),
-    ...[...modelPatches].map(([modelId, rules]) =>
-      supabase
-        .from("project_datasheet_models")
-        .update({ rules: rules as never, updated_at: new Date().toISOString() })
-        .eq("id", modelId),
-    ),
-    supabase
-      .from("project_datasheet_sources")
-      .update({ extraction: { ...stored, applied: accept } as never })
-      .eq("id", body.sourceId),
-  ];
-  if (questions.length) {
-    // Re-running intake on a revised note must not duplicate a question that
-    // is already there. Filtered by hand rather than upserted: the identity
-    // index is an EXPRESSION index (it coalesces the nullable columns), so
-    // PostgREST's `onConflict` — which takes a column list — cannot name it.
-    const { data: existing } = await supabase
-      .from("project_datasheet_questions")
-      .select("code")
-      .eq("project_datasheet_id", id);
-    const seen = new Set(((existing ?? []) as { code: string }[]).map((q) => q.code));
-    const fresh = questions.filter((q) => !seen.has(q.code as string));
-    if (fresh.length) {
-      writes.push(supabase.from("project_datasheet_questions").insert(fresh as never));
-    }
-  }
-  await Promise.all(writes);
-
-  return NextResponse.json({ applied: chosen.length, questions: questions.length });
+  return NextResponse.json(result);
 }
 
 /**

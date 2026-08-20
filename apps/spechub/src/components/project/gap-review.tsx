@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { AskedOf, FindingKind, Severity } from "@/lib/project-datasheet/gap-scan";
+import type { IntakeItem } from "@/lib/project-datasheet/intake";
+import { ProposalList, defaultAccepted } from "@/components/project/proposal-list";
 
 interface ReviewFinding {
   id: string;
@@ -46,6 +48,12 @@ export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () 
   const [brief, setBrief] = useState("");
   const [answering, setAnswering] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState("");
+  // The rules an answer implies, waiting to be ticked. Never applied on the
+  // way in: an answer arrives as one line of chat and is no more trustworthy
+  // than the note that raised the question.
+  const [proposed, setProposed] = useState<IntakeItem[] | null>(null);
+  const [accepted, setAccepted] = useState<Set<number>>(new Set());
+  const [busy, setBusy] = useState(false);
   const [showSettled, setShowSettled] = useState(false);
 
   const load = useCallback(async () => {
@@ -66,6 +74,53 @@ export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () 
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** Ask what the answer implies. No writes yet. */
+  async function propose(questionId: string) {
+    if (!answerText.trim()) return;
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${docId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "propose", questionId, answer: answerText }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "解析失敗");
+      const items = (json.items ?? []) as IntakeItem[];
+      // Nothing to change is the COMMON case, not a failure — most answers to
+      // a doubt confirm what the document already says. File it and move on
+      // rather than making the user dismiss an empty list.
+      if (items.length === 0) {
+        await commit(questionId, []);
+        toast.success("已記錄答覆（規格沒有需要改的地方）");
+        return;
+      }
+      setProposed(items);
+      setAccepted(defaultAccepted(items));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "解析失敗");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** File the answer and apply whatever was ticked. */
+  async function commit(questionId: string, items: IntakeItem[]) {
+    const res = await fetch(`/api/projects/${docId}/questions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "apply", questionId, answer: answerText, items }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error ?? "套用失敗");
+    setAnswering(null);
+    setAnswerText("");
+    setProposed(null);
+    await load();
+    onChanged?.();
+    return json as { applied: number };
+  }
 
   async function setState(
     questionId: string,
@@ -187,22 +242,90 @@ export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () 
                     value={answerText}
                     onChange={(e) => setAnswerText(e.target.value)}
                     placeholder="他們怎麼回的？照抄就好。"
+                    disabled={!!proposed}
                   />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      disabled={!answerText.trim()}
-                      onClick={() => void setState(f.id, "answered", answerText)}
-                    >
-                      記錄答覆
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setAnswering(null)}>
-                      取消
-                    </Button>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground">
-                    記錄答覆不會自動改規格表——要改值請到下面的欄位改，這裡只留下當初怎麼講的。
-                  </p>
+                  {proposed ? (
+                    <div className="space-y-2">
+                      <ProposalList
+                        items={proposed}
+                        accepted={accepted}
+                        onToggle={(i) =>
+                          setAccepted((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(i)) next.delete(i);
+                            else next.add(i);
+                            return next;
+                          })
+                        }
+                        onSelectAll={(all) =>
+                          setAccepted(all ? new Set(proposed.map((_, i) => i)) : new Set())
+                        }
+                      />
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          disabled={busy}
+                          onClick={async () => {
+                            setBusy(true);
+                            try {
+                              const r = await commit(
+                                f.id,
+                                [...accepted].map((i) => proposed[i]),
+                              );
+                              toast.success(
+                                r.applied
+                                  ? `已記錄答覆，套用 ${r.applied} 項規格變更`
+                                  : "已記錄答覆",
+                              );
+                            } catch (e) {
+                              toast.error(e instanceof Error ? e.message : "套用失敗");
+                            } finally {
+                              setBusy(false);
+                            }
+                          }}
+                        >
+                          {accepted.size
+                            ? `記錄答覆並套用 ${accepted.size} 項`
+                            : "只記錄答覆，不改規格"}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setProposed(null);
+                            setAccepted(new Set());
+                          }}
+                        >
+                          回上一步
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        disabled={!answerText.trim() || busy}
+                        onClick={() => void propose(f.id)}
+                      >
+                        {busy ? "看看要改什麼…" : "記錄答覆"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setAnswering(null);
+                          setProposed(null);
+                        }}
+                      >
+                        取消
+                      </Button>
+                    </div>
+                  )}
+                  {!proposed && (
+                    <p className="text-[11px] text-muted-foreground">
+                      會先讀一遍答覆，看看規格表需不需要跟著改，改什麼由你決定。
+                    </p>
+                  )}
                 </div>
               ) : (
                 <div className="flex gap-3 pl-8 text-xs">
@@ -212,6 +335,7 @@ export function GapReview({ docId, onChanged }: { docId: string; onChanged?: () 
                     onClick={() => {
                       setAnswering(f.id);
                       setAnswerText("");
+                      setProposed(null);
                     }}
                   >
                     記錄答覆

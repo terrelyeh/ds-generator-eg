@@ -9,6 +9,17 @@ import {
   type Finding,
 } from "@/lib/project-datasheet/gap-scan";
 import { buildBrief, type BriefFinding } from "@/lib/project-datasheet/brief";
+import { chatComplete } from "@eg/llm/openrouter";
+import { PROJECT_INTAKE_MODEL } from "@/lib/llm/models";
+import { sanitizeItems } from "@/lib/project-datasheet/intake";
+import { applyItems } from "@/lib/project-datasheet/apply-items";
+import {
+  ANSWER_SYSTEM,
+  annotateReplacements,
+  blankRows,
+  buildAnswerPrompt,
+  currentValues,
+} from "@/lib/project-datasheet/answer";
 import type { BlankMode, DocRules } from "@/lib/project-datasheet/types";
 import type {
   ProjectDatasheet,
@@ -219,4 +230,131 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
+}
+
+/**
+ * POST — turn an answer into proposed rules, then apply the ticked ones.
+ *
+ *   { action: "propose", questionId, answer }        → { items }
+ *   { action: "apply", questionId, answer, items }   → applies + marks answered
+ *
+ * Split for the same reason intake is: reading an answer and rewriting the
+ * document must not be one click. The proposal comes back for review with
+ * every overwrite spelled out, and only the ticked subset is applied.
+ */
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const denied = await gate("project_datasheet.edit");
+  if (denied) return denied;
+
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as {
+    action?: string;
+    questionId?: string;
+    answer?: string;
+    items?: unknown;
+  };
+  const answer = body.answer?.trim();
+  if (!body.questionId || !answer) {
+    return NextResponse.json({ error: "questionId and answer are required" }, { status: 400 });
+  }
+
+  const supabase = createAdminClient();
+  const [{ data: docRow }, { data: modelRows }, { data: questionRow }] = await Promise.all([
+    supabase.from("project_datasheets").select("*").eq("id", id).maybeSingle(),
+    supabase
+      .from("project_datasheet_models")
+      .select("*")
+      .eq("project_datasheet_id", id)
+      .order("position"),
+    supabase
+      .from("project_datasheet_questions")
+      .select("*")
+      .eq("id", body.questionId)
+      .eq("project_datasheet_id", id)
+      .maybeSingle(),
+  ]);
+
+  const doc = docRow as ProjectDatasheet | null;
+  const question = questionRow as ProjectDatasheetQuestion | null;
+  if (!doc || !question) return NextResponse.json({ error: "not found" }, { status: 404 });
+
+  const models = (modelRows ?? []) as ProjectDatasheetModel[];
+  const modelNames = models.map((m) => m.model_name);
+  const rows = resolveMatrix({
+    models,
+    docRules: (doc.doc_rules ?? {}) as DocRules,
+    blankPolicy: (doc.blank_policy as BlankMode) ?? "tbd",
+  });
+
+  if (body.action === "apply") {
+    const items = sanitizeItems(body.items, modelNames);
+    const user = await getCurrentUser();
+    // The answer is filed whether or not it produced an edit. Most answers to
+    // a doubt-class question are confirmations, and "RD said the housing is
+    // rated IP67" is exactly the sentence someone will want six months later.
+    await supabase
+      .from("project_datasheet_questions")
+      .update({
+        state: "answered",
+        answer,
+        answered_by: user?.id ?? null,
+        answered_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", body.questionId)
+      .eq("project_datasheet_id", id);
+
+    const result = items.length
+      ? await applyItems(supabase, id, doc, models, items)
+      : { applied: 0, questions: 0 };
+    return NextResponse.json(result);
+  }
+
+  // ── propose ────────────────────────────────────────────────────────────
+  let reply: string;
+  try {
+    reply = await chatComplete({
+      model: PROJECT_INTAKE_MODEL,
+      system: ANSWER_SYSTEM,
+      user: buildAnswerPrompt({
+        questionTitle: question.title,
+        questionDetail: question.detail,
+        answer,
+        rowKey: question.row_key,
+        modelNames,
+        current: currentValues(rows, question.row_key, modelNames),
+        blanks: blankRows(rows, modelNames),
+      }),
+      json: true,
+      temperature: 0,
+      feature: "project-intake",
+      ref: doc.name,
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message : "propose failed" },
+      { status: 502 },
+    );
+  }
+
+  const items = sanitizeItems(extractItems(reply), modelNames);
+  annotateReplacements(items, rows, modelNames);
+  return NextResponse.json({ items });
+}
+
+/** Pull the `items` array out of a reply that may be fenced or padded. */
+function extractItems(raw: string): unknown {
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const body = fenced ? fenced[1] : raw;
+  const start = body.indexOf("{");
+  const end = body.lastIndexOf("}");
+  if (start === -1 || end <= start) return [];
+  try {
+    return (JSON.parse(body.slice(start, end + 1)) as { items?: unknown }).items ?? [];
+  } catch {
+    return [];
+  }
 }
