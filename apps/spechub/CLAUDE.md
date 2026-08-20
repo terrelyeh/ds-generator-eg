@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-08-13。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-08-20。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
 > **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
@@ -12,6 +12,8 @@
 > **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
 > 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
 > 細節在下方 Brand & Visual System 與 pitfall #50。
+> **2026-08-20：規格頁的「值續段」不再重複印規格名稱**（原本掛 `「原標籤 (cont.)」`）——
+> 四個語系一致,pagination 與 renderer 兩邊都要動,見 pitfall #50。
 
 ## Project Overview
 
@@ -323,12 +325,29 @@ npm run lint
     BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、
     **CATEGORY_HEADER_HEIGHT 18pt + SECTION_GAP 12pt**（2026-08-13 拆開:分類條高度與「分區之間」
     的間距是兩回事,SECTION_GAP 不套用在每欄第一個分區,合成一個數字會每欄高估 12pt）；
-    **CJK row metrics 更大**（JA 24pt / zh-TW 25pt）。`splitIntoPages(sections, locale)` 必須傳
+    **CJK row metrics 更大**（JA 24pt / zh-TW 25pt）；**`SPEC_LABEL_LINE_HEIGHT` 8pt**
+    是「值續段」那一列沒有標籤時要扣回去的高度（見下）。`splitIntoPages(sections, locale)` 必須傳
     locale。每改 preview CSS 必須同步檢查這些常數。
+    ⚠️ **不要用 CSS 加總去「精算」這些數字** —— baseRowHeight 是量真實 PDF 得到的,不是推導的
+    （日文照 CSS 把 padding/標籤/值/框線加起來是 ~28pt,校準值卻是 24）。所以 8pt 這個回饋值
+    **故意小於標籤實際佔的高度**:少扣一點 = 估計偏保守 = 浪費一點留白,多扣 = 印出紙外。
+    在一個已知會錯的模型上做精算,錯的方向會反過來。
     ⚠️ **規格頁分區間距放在 `.spec-col > div + div`,不是分類條上**（2026-08-13）—— 每個分區是自己的
     wrapper div,所以灰色分類條全都是 `:first-child`,`.spec-category-header:first-child{margin-top:0}`
     會把**所有**分區的上緣間距清成 0（原本 CSS 寫的 6pt 從沒生效過,分類條一直貼著上一區最後一列）。
     最後一列另用 `.spec-row:last-child{border:none}` 去掉懸空的底線。
+    ⚠️ **值被切到下一欄時,續段那列不印標籤**（2026-08-20,四個語系一致）—— 一條規格的值塞不進
+    左欄時會從換行處切開,頭段留在原標籤下、尾段流到右欄。尾段以前掛 `「原標籤 (cont.)」`,
+    在欄首讀起來像「另一條名字結尾是 (cont.) 的規格」而不是上一條的延續,而且會把一個英文字
+    塞進 ja/zh-TW 的規格表中間。現在改成 `SpecRow.isValueContinuation`,渲染端**整個不輸出**
+    `.spec-label` 那個 div。
+    ⚠️ **標籤設成空字串沒有用** —— 空 div 照樣佔一個 line box（日文 8pt × 1.5 ≈ 12pt）,右欄
+    頂端會開一塊空白。必須是條件式不渲染。
+    ⚠️ **這條規則橫跨 pagination 與 renderer,只改一邊會靜靜錯位** —— 凡是量「分頁後」的列高
+    都要走 `estimateRowHeight(row, locale)`（會扣 `SPEC_LABEL_LINE_HEIGHT`）,不是
+    `estimateItemHeight(value, locale)`;後者只服務還沒分頁、不可能有續段的呼叫端
+    （`layout-check` 的 long_items）。另外值長到跨三欄時,中間那段自己也已經沒有標籤了,
+    切點算式要依「這一列實際有沒有標籤」取 base,否則中間段會少算約 8pt。
     ⚠️ **`splitIntoPages` 的 force-fit 分支會塞爆欄位** —— 欄位空但 section 過高時硬塞（防無限迴圈）,
     塞完原本沒人檢查 → 內容印出紙外。已加 `HARD_COLUMN_LIMIT`（= AVAILABLE + 大部分 BOTTOM_MARGIN,
     留 30pt 給頁碼）事後把超出的 section 擠到下一頁;順序要注意:**左欄溢出得連右欄一起擠**,否則規格

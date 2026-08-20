@@ -5,9 +5,27 @@
  * page budget.
  */
 
+/** One row of the spec table: a label and its value. */
+export interface SpecRow {
+  label: string;
+  value: string;
+  /**
+   * This row carries the TAIL of a value that was split across a column
+   * break, so the renderer must NOT print the label — the head row in the
+   * previous column already carries it.
+   *
+   * The tail used to be labelled "<label> (cont.)". Sitting at the top of a
+   * column that reads as a separate spec whose name happens to end in
+   * "(cont.)" rather than as the rest of the one before it, and it drops an
+   * English word into the middle of a ja / zh-TW spec table. Suppressing the
+   * label lets the value simply flow on, which is what a continued row is.
+   */
+  isValueContinuation?: boolean;
+}
+
 export interface Section {
   category: string;
-  items: { label: string; value: string }[];
+  items: SpecRow[];
   /**
    * True when this section is a continuation of one that started in the
    * previous column or page. The renderer uses this flag to SKIP the
@@ -187,6 +205,23 @@ export const LOCALE_ROW_METRICS: Record<string, LocaleRowMetrics> = {
   ja: { baseRowHeight: 24, lineExtra: 11 },
   "zh-TW": { baseRowHeight: 25, lineExtra: 12 },
 };
+/**
+ * What a row gets back when its label is suppressed (see
+ * `SpecRow.isValueContinuation`).
+ *
+ * Deliberately LESS than the label line really occupies. The baseRowHeights
+ * above are measured off real PDFs, not derived — summing the CSS by hand
+ * does not reproduce them (ja's parts add to ~28pt against a calibrated 24),
+ * so a "precise" subtraction here would be precision borrowed from a model
+ * that is already known to be wrong. Under-crediting the saving keeps the
+ * estimate on the over-estimating side, which is the direction that costs
+ * whitespace instead of printing past the trim edge.
+ *
+ * One flat number rather than a per-locale one: the label sizes involved
+ * (7-8pt) differ by less than the safety margin already built in.
+ */
+export const SPEC_LABEL_LINE_HEIGHT = 8;
+
 function rowMetricsFor(locale?: string): LocaleRowMetrics {
   return LOCALE_ROW_METRICS[locale ?? "default"] ?? LOCALE_ROW_METRICS.default;
 }
@@ -222,6 +257,17 @@ export function estimateItemHeight(value: string, locale?: string): number {
   const m = rowMetricsFor(locale);
   const lines = countWrappedLines(value);
   return m.baseRowHeight + (lines - 1) * m.lineExtra;
+}
+
+/**
+ * Height of a row as it will actually render — `estimateItemHeight` plus the
+ * label suppression a value-continuation row gets. Everything that measures
+ * PAGINATED rows must use this; `estimateItemHeight` still serves callers
+ * holding raw sections, where no row can be a continuation yet.
+ */
+export function estimateRowHeight(row: SpecRow, locale?: string): number {
+  const h = estimateItemHeight(row.value, locale);
+  return row.isValueContinuation ? h - SPEC_LABEL_LINE_HEIGHT : h;
 }
 
 /**
@@ -261,7 +307,7 @@ function estimateSectionHeight(section: Section, locale?: string): number {
   // Continuation sections don't re-render the category header
   let h = section.isContinuation ? 0 : CATEGORY_HEADER_HEIGHT;
   for (const item of section.items) {
-    h += estimateItemHeight(item.value, locale);
+    h += estimateRowHeight(item, locale);
   }
   return h;
 }
@@ -324,9 +370,9 @@ function balanceColumns(sections: Section[], locale?: string): SpecPage {
  * Mid-item splitting: if a single item's value is too tall to fit in the
  * remaining space, we split the value text at a line boundary. The head
  * portion fits in the current column under its original label; the tail
- * becomes a continuation item with label "<label> (cont.)" in the next
- * column. This "(cont.)" stays because the item label visually makes
- * sense to repeat (otherwise the tail value has no label at all).
+ * flows on in the next column with NO label of its own (`isValueContinuation`
+ * — the renderer suppresses it). A repeated "<label> (cont.)" at the top of
+ * a column read as a second spec rather than the rest of the previous one.
  *
  * Guarantees at least one item per call (even if it's technically too tall
  * — better to let one item overflow slightly than to loop forever).
@@ -359,11 +405,11 @@ function fitSection(
   let h = headerH;
   const fittedItems: typeof section.items = [];
   let i = 0;
-  let midItemTail: { label: string; value: string } | null = null;
+  let midItemTail: SpecRow | null = null;
 
   for (; i < section.items.length; i++) {
     const item = section.items[i];
-    const itemH = estimateItemHeight(item.value, locale);
+    const itemH = estimateRowHeight(item, locale);
 
     if (h + itemH <= availableHeight) {
       fittedItems.push(item);
@@ -375,16 +421,26 @@ function fitSection(
     // Need room for base row (1 line) + at least 1 extra wrap line to make
     // the split worthwhile (otherwise just push the whole item to next col).
     const roomLeft = availableHeight - h;
-    const linesThatFit = Math.floor(
-      (roomLeft - rowM.baseRowHeight) / rowM.lineExtra,
-    ) + 1;
+    // A row that is ALREADY a value-continuation prints no label, so it
+    // starts a label-line lower than a normal row. Measure the split against
+    // the base this particular row has, or a value spanning three columns
+    // loses ~8pt of its middle piece.
+    const baseH = item.isValueContinuation
+      ? rowM.baseRowHeight - SPEC_LABEL_LINE_HEIGHT
+      : rowM.baseRowHeight;
+    const linesThatFit = Math.floor((roomLeft - baseH) / rowM.lineExtra) + 1;
     const totalLines = countWrappedLines(item.value);
 
     if (linesThatFit >= 2 && linesThatFit < totalLines) {
       const [head, tail] = splitValueAtLines(item.value, linesThatFit);
       if (head && tail) {
-        fittedItems.push({ label: item.label, value: head });
-        midItemTail = { label: `${item.label} (cont.)`, value: tail };
+        // Spread, so a head that was itself a continuation keeps its flag
+        // and stays label-less too.
+        fittedItems.push({ ...item, value: head });
+        // The label is kept in the data — it is still this row's identity
+        // for anything inspecting the layout — but the flag tells the
+        // renderer not to print it.
+        midItemTail = { label: item.label, value: tail, isValueContinuation: true };
         i++;
         break;
       }
