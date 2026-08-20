@@ -120,7 +120,20 @@ export interface ImageLabel {
   /** 0–100, from the top edge of the image */
   y: number;
   text: string;
+  /**
+   * Which way the text sits from the point.
+   *
+   * The point marks the thing; the text sits BESIDE it. Centring the box on
+   * the point — the first version — meant that clicking the device you wanted
+   * to name covered the device you wanted to show, which is the one thing an
+   * application diagram exists to do.
+   */
+  side?: LabelSide;
 }
+
+export type LabelSide = "right" | "left" | "top" | "bottom";
+
+export const LABEL_SIDES: LabelSide[] = ["right", "left", "top", "bottom"];
 
 /** One image attached to a model column. */
 export interface ModelImage {

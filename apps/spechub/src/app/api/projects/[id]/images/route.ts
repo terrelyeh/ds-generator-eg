@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
-import type { ImageLabel, ModelImage } from "@/lib/project-datasheet/types";
+import { LABEL_SIDES } from "@/lib/project-datasheet/types";
+import type { ImageLabel, LabelSide, ModelImage } from "@/lib/project-datasheet/types";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 
 /** Product renders, not source documents. */
@@ -220,10 +221,17 @@ function asLabels(value: unknown): ImageLabel[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((l) => {
     if (!l || typeof l !== "object") return [];
-    const { x, y, text } = l as ImageLabel;
+    const { x, y, text, side } = l as ImageLabel;
     const t = typeof text === "string" ? text.trim().slice(0, 60) : "";
     if (!t || !Number.isFinite(x) || !Number.isFinite(y)) return [];
-    return [{ x: clamp(x), y: clamp(y), text: t }];
+    return [
+      {
+        x: clamp(x),
+        y: clamp(y),
+        text: t,
+        side: LABEL_SIDES.includes(side as LabelSide) ? (side as LabelSide) : "right",
+      },
+    ];
   });
 }
 

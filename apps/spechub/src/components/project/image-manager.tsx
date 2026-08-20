@@ -4,7 +4,8 @@ import { useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import type { ImageLabel, ModelImage } from "@/lib/project-datasheet/types";
+import { LABEL_SIDES } from "@/lib/project-datasheet/types";
+import type { ImageLabel, LabelSide, ModelImage } from "@/lib/project-datasheet/types";
 
 /**
  * Upload and arrange the images a project datasheet prints.
@@ -257,25 +258,34 @@ function LabelEditor({
           className="block max-h-[420px] w-auto max-w-full"
           onClick={(e) => {
             const at = pointToPercent(e);
-            if (at) setLabels((ls) => [...ls, { ...at, text: "" }]);
+            if (at) setLabels((ls) => [...ls, { ...at, text: "", side: "right" }]);
           }}
         />
         {labels.map((l, i) => (
-          <span
-            key={i}
-            onPointerDown={(e) => {
-              e.preventDefault();
-              setDrag(i);
-            }}
-            style={{ left: `${l.x}%`, top: `${l.y}%` }}
-            className="absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-nowrap rounded border border-[#d8dfe6] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#1b3a5c] shadow-sm"
-          >
-            {l.text || `標籤 ${i + 1}`}
+          <span key={i}>
+            {/* The dot is what gets positioned; the box hangs off it. Same
+                geometry as the print layout, so what is placed here is what
+                comes out of the PDF. */}
+            <span
+              style={{ left: `${l.x}%`, top: `${l.y}%` }}
+              className="pointer-events-none absolute h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1b3a5c] ring-2 ring-white/95"
+            />
+            <span
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setDrag(i);
+              }}
+              style={{ left: `${l.x}%`, top: `${l.y}%`, transform: OFFSET[l.side ?? "right"] }}
+              className="absolute cursor-move whitespace-nowrap rounded border border-[#d8dfe6] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#1b3a5c] shadow-sm"
+            >
+              {l.text || `標籤 ${i + 1}`}
+            </span>
           </span>
         ))}
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        點圖片任一處新增標籤，拖曳可移動。文字在下方輸入。
+        點設備上（或旁邊）新增一個標記點，拖曳可移動。文字會印在標記點的旁邊，
+        用下方的箭頭選要放哪一邊，才不會蓋到設備。
       </p>
 
       <div className="space-y-2">
@@ -290,9 +300,25 @@ function LabelEditor({
               }
               className="h-8 text-xs"
             />
-            <span className="w-20 shrink-0 text-right text-[10px] tabular-nums text-muted-foreground">
-              {l.x} / {l.y}
-            </span>
+            <div className="flex shrink-0 gap-0.5">
+              {LABEL_SIDES.map((side) => (
+                <button
+                  key={side}
+                  type="button"
+                  title={SIDE_LABEL[side]}
+                  onClick={() =>
+                    setLabels((ls) => ls.map((x, j) => (j === i ? { ...x, side } : x)))
+                  }
+                  className={`h-6 w-6 rounded border text-[11px] leading-none ${
+                    (l.side ?? "right") === side
+                      ? "border-[#1b3a5c] bg-[#1b3a5c] text-white"
+                      : "text-muted-foreground hover:bg-muted"
+                  }`}
+                >
+                  {SIDE_GLYPH[side]}
+                </button>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() => setLabels((ls) => ls.filter((_, j) => j !== i))}
@@ -335,6 +361,22 @@ function LabelEditor({
     </div>
   );
 }
+
+/** Same offsets as the print layout, in px rather than pt. */
+const OFFSET: Record<LabelSide, string> = {
+  right: "translate(9px, -50%)",
+  left: "translate(-100%, -50%) translateX(-9px)",
+  top: "translate(-50%, -100%) translateY(-9px)",
+  bottom: "translate(-50%, 0) translateY(9px)",
+};
+
+const SIDE_GLYPH: Record<LabelSide, string> = { right: "→", left: "←", top: "↑", bottom: "↓" };
+const SIDE_LABEL: Record<LabelSide, string> = {
+  right: "文字放右邊",
+  left: "文字放左邊",
+  top: "文字放上面",
+  bottom: "文字放下面",
+};
 
 export const MODEL_SLOTS = [
   { value: "product", label: "封面主圖" },
