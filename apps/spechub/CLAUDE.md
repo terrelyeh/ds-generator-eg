@@ -12,6 +12,9 @@
 > **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
 > 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
 > 細節在下方 Brand & Visual System 與 pitfall #50。
+> **2026-08-20：新模組 Project Datasheet Builder**（專案／標案用的暫時性 datasheet,
+> `/projects`;M1 = 資料層 + 手動建案 + 出 PDF）——**它是刻意跟目錄平行的孤島**,
+> 動之前先讀 [`docs/project-datasheets.md`](docs/project-datasheets.md)。
 > **2026-08-20：規格頁的「值續段」不再重複印規格名稱**（原本掛 `「原標籤 (cont.)」`）——
 > 四個語系一致,pagination 與 renderer 兩邊都要動,見 pitfall #50。
 
@@ -20,6 +23,9 @@
 **Product SpecHub** — EnGenius 產品規格管理與 Datasheet 自動化系統。
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
+
+另含 **Project Datasheet Builder**（`/projects`;專案／標案用的暫時性 datasheet,
+與產品目錄平行、永不進 sync/RAG）。
 
 **6 個 solution 上線**：**Cloud**（9 條線,含 **Cloud PDU**——ECP 四台,預設藍、
 無天線頁、保留 QSG QR）、**Accessories ▸ Transceiver**（綠色、
@@ -120,6 +126,30 @@ path `/api/sync`、以及 `PUBLIC_EXACT_PATHS` **精確比對**的單頁白名�
 以免之後丟進那個資料夾的檔案自動變公開)→ `(main)/layout.tsx`(whitelist 檢查)→ per-route gates
 (`gate()`/`gateOrCron()`/`adminOnly()`/`requirePagePermission()` + client `can()`)。
 4 角色矩陣在 **`@eg/auth/permissions`**(packages/auth)。**改 auth/proxy/權限前先讀該檔。**
+
+### Project Datasheet Builder（專案／標案 datasheet, on-demand）→ [`docs/project-datasheets.md`](docs/project-datasheets.md)
+
+Project business 用的暫時性 datasheet：拿 ODM／他牌規格表 → 換 EnGenius 命名/照片/版型
+→ 出一份談 tender 的 PDF。`/projects`（gate `project_datasheet.*`，**只有 admin/editor**）、
+渲染在 `/preview/project/[id]`、表是 `project_datasheet*`（migration 00038）。
+**改這塊前必讀該檔。** 關鍵雷:
+① **這是平行孤島,沒有升格成 products 的路徑**——一台只報過價的型號進了 `products`,
+EnGenie 就會開始跟人說我們有賣它;
+② **最終規格表不存**,是 `raw_doc ⊕ rules` 每次 render 算出來的（換模型重抽/原廠出新版
+才不會洗掉人為修改）;規則 key 是 label 正規化字串,**重抽後失效的規則要當孤兒列出來,不能默默吃掉**;
+③ **PRELIMINARY 聲明關不掉**（DB not null + check）、圖片註記同理——文字可編、存在與否不可編;
+④ **`project-preview.tsx` 是獨立元件**,不是 broadband-preview 加參數;配色是**抄的不是共用的**,
+否則一次性標案的調色會回頭改到出貨中的 EOC datasheet;
+⑤ 出 PDF 走**瀏覽器列印**不走 `/api/generate-pdf`（後者會寫 version、進 datasheets bucket、開 Drive 資料夾）;
+⑥ 這支元件**不在** type-spec 產生器的 COMPONENTS 清單裡,**不要加**——那頁是免登入的;
+⑦ **gap review 是這個模組的核心不是打磨**（`gap-scan.ts`,缺／疑／險三類,**deterministic 無 LLM**）——
+blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 14 格 TBD 不擋、一個沒來源的 IP67 擋;
+finding 是算出來的,`project_datasheet_questions` 只存人做了什麼,**severity 不存**;
+真正的產出是**可以貼給業務/RD/ODM 的澄清訊息**（`brief.ts`,模板不是 LLM）——能回答的人都不在站內;
+⑧ **兩種起點**:ODM 規格表,或**從既有型號帶入**（`seed-from-product`,目錄→專案**單向**,
+反向永遠不開）。兩者的 gap review 判斷**方向相反**——ODM 補一個沒來源的規格是 blocking,
+既有型號補一個官方沒寫的規格是 advisory（那正是標案要的）;反過來,改動既有型號的值是
+最尖銳的 finding（`catalog_deviation`),因為客戶可以把公開 datasheet 拿來並排比對。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 
