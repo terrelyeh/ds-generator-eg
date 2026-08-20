@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { layoutOptions } from "@/lib/project-datasheet/themes";
 import { GapReview } from "@/components/project/gap-review";
+import { RequirementsIntake } from "@/components/project/requirements-intake";
 import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
@@ -79,6 +80,15 @@ export function ProjectEditor({
   const [imageNote, setImageNote] = useState(doc.image_note ?? "");
   const [blankPolicy, setBlankPolicy] = useState(doc.blank_policy);
   const [docRules, setDocRules] = useState(() => serializeRules(asRules(doc.doc_rules)));
+  const [notes, setNotes] = useState(doc.notes ?? "");
+
+  // Internal deal context — never printed.
+  const [branch, setBranch] = useState(doc.branch ?? "");
+  const [salesOwner, setSalesOwner] = useState(doc.sales_owner ?? "");
+  const [opportunity, setOpportunity] = useState(doc.opportunity ?? "");
+  const [estQuantity, setEstQuantity] = useState(doc.est_quantity ?? "");
+  const [dueDate, setDueDate] = useState(doc.due_date ?? "");
+  const [dealStage, setDealStage] = useState(doc.deal_stage ?? "inquiry");
   const [sections, setSections] = useState<SectionToggles>({
     ...DEFAULT_SECTIONS,
     ...((doc.sections as Partial<SectionToggles>) ?? {}),
@@ -143,6 +153,13 @@ export function ProjectEditor({
           blank_policy: blankPolicy,
           doc_rules: parseRules(docRules),
           sections,
+          notes: notes || null,
+          branch: branch || null,
+          sales_owner: salesOwner || null,
+          opportunity: opportunity || null,
+          est_quantity: estQuantity || null,
+          due_date: dueDate || null,
+          deal_stage: dealStage,
         }),
       });
       const docJson = await docRes.json();
@@ -225,8 +242,17 @@ export function ProjectEditor({
         </div>
       </div>
 
-      {/* Above the fields on purpose: what the document still needs is more
-          actionable than what it currently says. */}
+      {/* Intake first, review second, fields last — the order the work
+          actually happens in: sales sends a note, the tool says what is still
+          missing, you edit. */}
+      <RequirementsIntake
+        docId={doc.id}
+        onApplied={() => {
+          setReviewKey((k) => k + 1);
+          router.refresh();
+        }}
+      />
+
       <GapReview docId={doc.id} key={reviewKey} />
 
       <Panel title="Document">
@@ -252,6 +278,60 @@ export function ProjectEditor({
             />
           </Field>
         </Grid>
+      </Panel>
+
+      <Panel
+        title="內部資訊"
+        note="只給我們自己看 — 這一區的內容不會出現在 PDF 上。用來知道這份是誰要的、哪個案子、還在不在。"
+      >
+        <Grid>
+          <Field label="分公司／區域" hint="需求從哪裡來的">
+            <Input
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+              placeholder="EnGenius Malaysia"
+            />
+          </Field>
+          <Field label="業務負責人" hint="問題要問誰、誰在跟客戶談">
+            <Input value={salesOwner} onChange={(e) => setSalesOwner(e.target.value)} />
+          </Field>
+          <Field label="專案／案號" hint="對得上報價單或 CRM 的編號">
+            <Input value={opportunity} onChange={(e) => setOpportunity(e.target.value)} />
+          </Field>
+          <Field label="預估數量" hint="決定值不值得投工，也影響 ODM 願不願意配合">
+            <Input
+              value={estQuantity}
+              onChange={(e) => setEstQuantity(e.target.value)}
+              placeholder="500–1000 台／年"
+            />
+          </Field>
+          <Field label="客戶要的時間" hint="tender 幾乎都有 deadline">
+            <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
+          </Field>
+          <Field label="案子進度" hint="這是「案子」的狀態，不是「文件」的狀態">
+            <Select
+              value={dealStage}
+              onChange={setDealStage}
+              options={[
+                { value: "inquiry", label: "洽談中" },
+                { value: "quoted", label: "已報價" },
+                { value: "waiting", label: "等客戶回覆" },
+                { value: "won", label: "結案 — 拿到" },
+                { value: "lost", label: "結案 — 沒拿到" },
+              ]}
+            />
+          </Field>
+        </Grid>
+        <Field label="備註" hint="任何之後的自己會想知道的事">
+          <Textarea rows={3} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </Field>
+        <p className="text-xs text-muted-foreground">
+          建立者與最後更新時間是自動記錄的 — 最後更新：
+          <span className="tabular-nums">
+            {" "}
+            {new Date(doc.updated_at).toISOString().slice(0, 16).replace("T", " ")}
+          </span>
+        </p>
       </Panel>
 
       <Panel title="Cover">

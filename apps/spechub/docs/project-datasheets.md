@@ -101,6 +101,38 @@ EOC datasheet。這裡分岔很便宜，耦合出事很貴。
 [type-spec 頁](https://…/design/datasheet-type-spec.html)。**不要加進去**——那頁是
 免登入的，上面有產品線名稱與機種數量，標案版型不該在那裡。
 
+## Intake — 業務需求進來的地方
+
+業務給的從來不是規格，是幾行中英夾雜的字，裡面混著**能執行的指令**（「不要放 chipset」）
+和**只有人能決定的事**（「圖片是 EnGenius model」——哪一台？哪張圖？）。
+
+`lib/project-datasheet/intake.ts` 把前者變成建議規則、後者變成待問問題，**然後停下來。**
+
+### 只建議，不套用
+
+解析完什麼都沒動。每一項都帶著它出自哪一行（`because`），人一項一項勾。
+跟這個模組其他地方同一個姿勢：抽取只建議、raw 不可變、記錄答覆不改規格表。
+**一個會偷偷改寫報價文件規則的 LLM，會是整個工具裡最難稽核的東西。**
+
+### 兩個真的會出事的地方
+
+**① 覆寫會蓋掉整格。** 第一版跑真實需求時，模型把「poe 是 802.3af/at」
+變成 `doc_override interface = "PoE: 802.3af/at"` ——那會**把 LAN port、reset、
+SIM slot 整格刪掉**，而且在建議清單上讀起來完全合理。
+
+兩層修法：prompt 明講「新規格就開新列，不要塞進相關的列」，
+**而且 API 會算出每一項「會蓋掉什麼」**（`annotateReplacements`）顯示在卡片上，
+**這種項目預設不勾**。prompt 會改善，review 才擋得住。
+
+**② 不確定就問，不要猜。** prompt 裡最難的一條。工具在報價文件裡默默把模糊變確定，
+就是把「業務沒講」變成「datasheet 說了」——那正是 gap review 存在的理由。
+
+### 需求note是 source 不是設定
+
+存進 `project_datasheet_sources`，`kind='requirements'`（跟 `'text'` 分開:
+`text` 是貼進來的**規格內容**，會被抽成 `raw_doc`;`requirements` 是**對文件的指令**）。
+`extraction` 存解析結果 + 誰被勾選套用——規則合併之後就回不去的那個資訊。
+
 ## Gap review — 引導層
 
 這個模組不是「一次把 datasheet 生對」的轉換器。業務手上的資訊永遠不完整，
@@ -156,6 +188,20 @@ ODM 在另一個時區的 email。一個只有作者看得到的漂亮清單補�
 每一件都是標案草稿不該有的目錄副作用。瀏覽器列印的爆炸半徑就是使用者自己電腦上的一個檔案，
 對一份可能永遠不會寄出去的文件來說這是對的。
 
+## 內部資訊欄位
+
+`branch` / `sales_owner` / `opportunity` / `est_quantity` / `due_date` / `deal_stage`
+（migration 00041）。
+
+⚠️ **這些永遠不會印。** `project-preview.tsx` 不讀這些欄位，也不該開始讀——
+一份指名我方業務、我們內部的案子階段、我們猜客戶會買多少的報價文件，
+是根本不該離開公司的東西。
+
+`deal_stage`（案子的狀態）跟 `status`（文件的狀態）**是兩件事**：
+文件可以做完寄出去而案子還在談，案子可以輸掉而文件還停在 draft。合成一個會弄丟其中一半。
+
+刻意**沒有**客戶聯絡人姓名／email——SpecHub 不是 CRM，個資放進來只是多一個要守的地方。
+
 ## 權限
 
 `project_datasheet.view` / `.edit` → **只有 admin / editor**。
@@ -174,6 +220,9 @@ src/lib/project-datasheet/
   resolve.ts      raw ⊕ rules → 矩陣（含孤兒規則偵測）
   themes.ts       PROJECT_LAYOUTS registry + 預設聲明文字
   text-format.ts  純文字 ⇄ jsonb（編輯器用的貼上格式）
+  gap-scan.ts     缺／疑／險掃描（deterministic、無 LLM）
+  brief.ts        澄清訊息（模板、zh-TW、按誰能回答分組）
+  intake.ts       業務需求 → 建議規則 + 待問問題（唯一用 LLM 的地方）
 src/app/(main)/projects/                列表 + 編輯器
 src/app/(print)/preview/project/[id]/   渲染
 src/app/api/projects/                   CRUD（admin client 寫，gate() 授權）
@@ -189,9 +238,11 @@ scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
 **M2 完成**：gap review（缺／疑／險三類掃描）、questions 表對帳、澄清訊息、
 readiness gate。跑 EOR 這份的結果是 22 項（7 blocking）。
 
+**M2.5 完成**：requirements intake（LLM 解析 → 建議 → 勾選套用）、
+覆寫預警（會蓋掉什麼、預設不勾）、內部資訊欄位（分公司／業務／案號／數量／期限／案子進度，
+**都不會印在 PDF 上**）、編輯區放大 15%。
+
 **還沒做**：
-- **M2.5 intake** — 業務給的一段需求（「不要放 WiFi / poe 是 802.3af/at / IP67」）
-  → 拆成「可執行的規則」+「答不出來的問題」。這是引導迴圈的前門，也是唯一該用 LLM 的地方
 - **答案 → 規則** — 現在記錄答覆只留文字，套用還是手動改欄位
 - **M3 抽取** — PDF（Vercel 上沒有 poppler，要用 JS 的 `unpdf`/`pdf-parse`，這是第一個要驗的技術點）、
   XLSX（sheetjs）、貼上文字；LLM 只做結構化不做改寫，逐格帶 `source_page` + `confidence`。

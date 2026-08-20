@@ -6,6 +6,15 @@ import type { ProjectDatasheet } from "@eg/db/types";
 
 export const dynamic = "force-dynamic";
 
+/** Deal stage, which is not the same thing as document status. */
+const DEAL_STAGE: Record<string, string> = {
+  inquiry: "洽談中",
+  quoted: "已報價",
+  waiting: "等客戶",
+  won: "拿到",
+  lost: "沒拿到",
+};
+
 /**
  * Project Datasheet Builder — the list of on-demand project datasheets.
  *
@@ -78,13 +87,34 @@ function ProjectList({ docs }: { docs: ProjectDatasheet[] }) {
             >
               {d.name}
             </Link>
+            {/* Internal context, so a list of a dozen deals stays legible.
+                None of this reaches the PDF. */}
             <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
               {d.customer && <span>{d.customer}</span>}
+              {d.branch && <span>{d.branch}</span>}
+              {d.sales_owner && <span>{d.sales_owner}</span>}
+              {d.est_quantity && <span className="tabular-nums">{d.est_quantity}</span>}
               <span className="rounded bg-muted px-1.5 py-0.5 uppercase tracking-wide">
                 {d.status}
               </span>
+              {DEAL_STAGE[d.deal_stage] && (
+                <span
+                  className={`rounded px-1.5 py-0.5 ${
+                    d.deal_stage === "won"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : d.deal_stage === "lost"
+                        ? "bg-muted"
+                        : "bg-sky-100 text-sky-800"
+                  }`}
+                >
+                  {DEAL_STAGE[d.deal_stage]}
+                </span>
+              )}
+              {d.due_date && (
+                <span className="tabular-nums">期限 {d.due_date}</span>
+              )}
               <span className="tabular-nums">
-                {new Date(d.updated_at).toISOString().slice(0, 10)}
+                更新 {new Date(d.updated_at).toISOString().slice(0, 10)}
               </span>
             </div>
           </div>

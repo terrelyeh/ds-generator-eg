@@ -29,7 +29,10 @@ export default async function ProjectEditorPage({
   if (!doc) notFound();
 
   return (
-    <div className="mx-auto max-w-[1000px] px-6 py-8">
+    // 15% larger all round — `zoom` scales layout AND type together, which is
+    // what "wider, with the text to match" means; bumping max-width alone just
+    // spreads the same small text over more page.
+    <div className="mx-auto max-w-[1000px] px-6 py-8" style={{ zoom: 1.15 }}>
       <ProjectEditor doc={doc} models={(modelRows ?? []) as ProjectDatasheetModel[]} />
     </div>
   );

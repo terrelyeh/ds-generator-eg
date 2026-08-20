@@ -82,8 +82,18 @@ export async function GET(
   // Findings that no longer fire. Resolved, not deleted — the trail of what
   // was asked and how it settled is how a spec commitment gets defended six
   // months later.
+  //
+  // `intake:` rows are exempt: they came from a person reading sales' note,
+  // not from a check, so the scanner has no basis for deciding they are
+  // settled. Reconciling them would close every question intake raised on the
+  // very next page load.
   const resolved = stored
-    .filter((q) => q.state !== "resolved" && !live.has(storedFindingId(q)))
+    .filter(
+      (q) =>
+        q.state !== "resolved" &&
+        !isIntake(q.code) &&
+        !live.has(storedFindingId(q)),
+    )
     .map((q) => q.id);
 
   await Promise.all([
@@ -124,6 +134,28 @@ export async function GET(
     };
   });
 
+  // Questions intake raised have no scanner finding behind them, so they have
+  // to be folded in by hand or they would exist in the table and nowhere else.
+  const fromIntake: (BriefFinding & { id: string })[] = ((finalRows ?? []) as ProjectDatasheetQuestion[])
+    .filter((q) => isIntake(q.code) && q.state !== "resolved")
+    .map((q) => ({
+      code: q.code,
+      // Advisory, always. A question sales asked is the document being
+      // incomplete, not the document being wrong — the same line the rest of
+      // the review draws.
+      kind: "missing" as const,
+      severity: "advisory" as const,
+      askedOf: q.asked_of as BriefFinding["askedOf"],
+      modelId: q.model_id,
+      rowKey: q.row_key,
+      title: q.title,
+      detail: q.detail,
+      id: q.id,
+      state: q.state as BriefFinding["state"],
+      answer: q.answer,
+    }));
+  merged.push(...fromIntake);
+
   const openFindings = merged.filter((f) => f.state === "open");
   return NextResponse.json({
     findings: merged,
@@ -140,6 +172,11 @@ export async function GET(
       date: new Date().toISOString().slice(0, 10),
     }),
   });
+}
+
+/** Questions raised by requirements intake, not by a scanner check. */
+function isIntake(code: string): boolean {
+  return code.startsWith("intake:");
 }
 
 /** PATCH — record an answer, dismiss, or reopen one question. */

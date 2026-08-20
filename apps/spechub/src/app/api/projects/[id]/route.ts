@@ -30,6 +30,13 @@ const DOC_FIELDS = [
   "blank_policy",
   "doc_rules",
   "notes",
+  // Internal deal context. Writable here, never read by the renderer.
+  "branch",
+  "sales_owner",
+  "opportunity",
+  "est_quantity",
+  "due_date",
+  "deal_stage",
 ] as const;
 
 /** PATCH /api/projects/[id] — update the document. */

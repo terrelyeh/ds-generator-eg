@@ -910,6 +910,12 @@ export type Database = {
       project_datasheets: {
         Row: {
           blank_policy: string
+          branch: string | null
+          deal_stage: string
+          due_date: string | null
+          est_quantity: string | null
+          opportunity: string | null
+          sales_owner: string | null
           category_label: string | null
           created_at: string
           created_by: string | null
@@ -933,6 +939,12 @@ export type Database = {
         }
         Insert: {
           blank_policy?: string
+          branch?: string | null
+          deal_stage?: string
+          due_date?: string | null
+          est_quantity?: string | null
+          opportunity?: string | null
+          sales_owner?: string | null
           category_label?: string | null
           created_at?: string
           created_by?: string | null
@@ -956,6 +968,12 @@ export type Database = {
         }
         Update: {
           blank_policy?: string
+          branch?: string | null
+          deal_stage?: string
+          due_date?: string | null
+          est_quantity?: string | null
+          opportunity?: string | null
+          sales_owner?: string | null
           category_label?: string | null
           created_at?: string
           created_by?: string | null

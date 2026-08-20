@@ -484,6 +484,14 @@ export interface Database {
           /** document-wide spec rules; per-model rules layer on top */
           doc_rules: Json;
           notes: string | null;
+          /** ── internal only; never rendered on the PDF ── */
+          branch: string | null;
+          sales_owner: string | null;
+          opportunity: string | null;
+          est_quantity: string | null;
+          due_date: string | null;
+          /** the DEAL's state, distinct from `status` (the DOCUMENT's) */
+          deal_stage: string;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -492,7 +500,7 @@ export interface Database {
           Database["public"]["Tables"]["project_datasheets"]["Row"],
           "id" | "created_at" | "updated_at"
         > &
-          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "created_by">>;
+          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "branch" | "sales_owner" | "opportunity" | "est_quantity" | "due_date" | "deal_stage" | "created_by">>;
         Update: Partial<Database["public"]["Tables"]["project_datasheets"]["Insert"]>;
       };
       project_datasheet_sources: {

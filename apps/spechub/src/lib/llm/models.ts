@@ -17,3 +17,14 @@
  * makes them work, which is why there's no direct fallback here.
  */
 export const BATTLECARD_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";
+
+/**
+ * Project Datasheet Builder requirements intake.
+ *
+ * The job is reading a scrappy bilingual note from sales and deciding which
+ * lines are actionable rules and which are questions — judgement over a short
+ * input, which is what the mid-tier model is for. Same slug as battlecard
+ * extraction because it is the same kind of task at the same stakes: it
+ * proposes, a human confirms.
+ */
+export const PROJECT_INTAKE_MODEL = "anthropic/claude-sonnet-4.6";

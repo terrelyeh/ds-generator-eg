@@ -28,7 +28,12 @@
  * option on every entry point, so a new call site that skips this table
  * fails to compile rather than landing silently in `unmapped`.
  */
-export type Feature = "ask" | "translate" | "battlecard" | "budget-check";
+export type Feature =
+  | "ask"
+  | "translate"
+  | "battlecard"
+  | "project-intake"
+  | "budget-check";
 
 export const FEATURE_TAGS: Record<Feature, string> = {
   /**
@@ -55,6 +60,14 @@ export const FEATURE_TAGS: Record<Feature, string> = {
    * and the 🔍 web search fill.
    */
   battlecard: "engenius-spechub.spechub.battlecard",
+
+  /**
+   * Project Datasheet Builder intake — turning a sales requirements note
+   * ("no Wi-Fi, PoE is 802.3af/at, IP67") into proposed spec rules and the
+   * questions it could not answer. One bucket: it is one button, run a
+   * handful of times per deal.
+   */
+  "project-intake": "engenius-spechub.spechub.project-intake",
 
   /**
    * scripts/check-translation-budget.ts — a real translation, run by hand
