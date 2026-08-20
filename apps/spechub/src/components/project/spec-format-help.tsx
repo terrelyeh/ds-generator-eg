@@ -54,11 +54,28 @@ function SpecsHelp() {
         </li>
         <li>· 沒有 Tab 的話，連續兩個以上的空白也算分隔</li>
       </ul>
-      <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-amber-900">
-        <strong>不要在這裡整理格式。</strong>
-        全形符號、怪單位、含彩盒的重量，全部照原樣留著。要改請寫成規則——
-        這樣「哪些是原廠寫的、哪些是我們改的」才分得出來，出去被問也才答得出來。
-      </p>
+      <div className="space-y-1.5 rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-amber-900">
+        <p>
+          <strong>照原樣貼，不要在這一格順手改。</strong>
+          全形符號、怪單位、「含彩盒」的重量，全部留著。
+        </p>
+        <p>
+          聽起來很矛盾——「不要在這裡改，去下面寫規則改」不還是在改嗎？
+          差別不在改哪裡，<strong>在於改完之後原文還在不在</strong>：
+        </p>
+        <p className="font-mono text-[11px]">
+          原文 1.35KG（Includes color box accessories）
+          <br />
+          規則 weight = 1.35 kg
+          <br />
+          印出來 1.35 kg
+        </p>
+        <p>
+          三件事同時留著，所以「這是原廠寫的還是我們改的」永遠答得出來。
+          直接在這一格改成 <code className="rounded bg-white px-1">1.35 kg</code>，
+          原廠那句就沒了——之後客戶拿原廠文件來對、或你重讀一次來源，都會出事。
+        </p>
+      </div>
     </>
   );
 }

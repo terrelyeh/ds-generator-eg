@@ -17,7 +17,7 @@ import { ImageManager, MODEL_SLOTS, DOC_SLOTS } from "@/components/project/image
 import { SpecFormatHelp } from "@/components/project/spec-format-help";
 import { LayoutPicker } from "@/components/project/layout-picker";
 import { SpecPreview, toggleHideLine } from "@/components/project/spec-preview";
-import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
+import { asRawDoc, asRules, findOrphanedRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
   parseRules,
@@ -67,6 +67,7 @@ export function ProjectEditor({
   const [reviewKey, setReviewKey] = useState(0);
   const [counts, setCounts] = useState<ReviewCounts | null>(null);
   const [tab, setTab] = useState("status");
+  const [modelTab, setModelTab] = useState<string | null>(null);
 
   // ── printed content ──────────────────────────────────────────────────
   const [name, setName] = useState(doc.name);
@@ -142,18 +143,36 @@ export function ProjectEditor({
   ]);
   const dirty = current !== initial;
 
-  const orphans = useMemo(
-    () =>
-      drafts.map((d) => ({
-        model: d.model_name,
-        keys: findOrphanedRules(
-          parseSpecRows(d.raw),
-          mergeRules(parseRules(docRules), parseRules(d.rules)),
-        ),
-      })),
-    [drafts, docRules],
-  );
+  /**
+   * Rules that match nothing at all.
+   *
+   * A model's OWN rules are checked against its own rows — that's the case
+   * that matters, and the reason the check exists: a rule that silently stops
+   * applying is how a hidden chipset reappears.
+   *
+   * Document-level rules are checked against EVERY model's rows combined. A
+   * doc-level `- flash` is doing its job even though only the 5G unit has a
+   * flash row, and flagging it on the 4G column was reporting correct
+   * behaviour as a mistake — which is the fastest way to teach someone that
+   * this warning is noise.
+   */
+  const orphans = useMemo(() => {
+    const allRows = drafts.flatMap((d) => parseSpecRows(d.raw));
+    const docOrphans = findOrphanedRules(allRows, parseRules(docRules));
+    return drafts.map((d) => ({
+      model: d.model_name,
+      keys: [
+        ...new Set([...docOrphans, ...findOrphanedRules(parseSpecRows(d.raw), parseRules(d.rules))]),
+      ],
+    }));
+  }, [drafts, docRules]);
 
+  // Falls back to the first column rather than storing an id that a delete
+  // or a refresh can invalidate.
+  const activeModel =
+    modelTab && drafts.some((d) => d.id === modelTab) ? modelTab : (drafts[0]?.id ?? "");
+
+  const docImageCount = parseImagesJson(doc.images).length;
   const withSpecs = drafts.filter((d) => d.raw.trim().length > 0).length;
   const withImages = models.filter(
     (m) => Array.isArray(m.images) && (m.images as unknown[]).length > 0,
@@ -519,17 +538,47 @@ export function ProjectEditor({
             >
               <Textarea rows={9} value={features} onChange={(e) => setFeatures(e.target.value)} />
             </Field>
-            <Field label="註腳" hint="封面底部的小字，可留空">
-              <Input value={footnote} onChange={(e) => setFootnote(e.target.value)} />
+            <Field
+              label="註腳"
+              hint="封面底部的小字。放規格的但書——原廠 datasheet 常見的那種：「① B29/B32 僅支援 Rx」「實際速率視電信商而定」。沒有就留空，留空不會印。"
+            >
+              <Input
+                value={footnote}
+                onChange={(e) => setFootnote(e.target.value)}
+                placeholder="Actual throughput varies by carrier and network conditions."
+              />
             </Field>
-            <ImageManager
-              docId={doc.id}
-              modelId={null}
-              initial={parseImagesJson(doc.images)}
-              slots={DOC_SLOTS}
-              label="文件層圖片"
-              hint="部署示意圖等不屬於單一型號的圖。要印出來還要把下面「要印哪些頁」的部署示意圖打開。"
-            />
+            <div className="space-y-2">
+              <ImageManager
+                docId={doc.id}
+                modelId={null}
+                initial={parseImagesJson(doc.images)}
+                slots={DOC_SLOTS}
+                label="文件層圖片"
+                hint="不屬於任何單一型號的圖 —— 目前只有部署示意圖（客戶案場的架構圖那種）。產品照請到「規格與型號」裡各台底下傳。"
+              />
+              {/* Two steps for one outcome is a trap, so the dependency says
+                  so out loud in whichever direction it is currently broken. */}
+              {docImageCount > 0 && !sections.diagram && (
+                <p className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span>
+                    有圖，但「要印哪些頁」的<strong>部署示意圖沒有勾選</strong>，所以不會印出來。
+                  </span>
+                  <button
+                    type="button"
+                    className="rounded border border-amber-500 bg-white px-2 py-0.5 font-medium"
+                    onClick={() => setSections((x) => ({ ...x, diagram: true }))}
+                  >
+                    幫我勾起來
+                  </button>
+                </p>
+              )}
+              {docImageCount === 0 && sections.diagram && (
+                <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  「部署示意圖」勾了但還沒有圖，那一頁不會印。傳一張上來就會出現。
+                </p>
+              )}
+            </div>
           </Panel>
 
           <Panel
@@ -597,8 +646,8 @@ export function ProjectEditor({
           </Panel>
 
           <Panel
-            title="整份文件的規格規則"
-            note="對「所有型號」都生效的規格調整。業務的要求通常就是這種——「不要放 chipset」「都是 IP67」。每一台底下還可以有自己的規則，會疊在這上面；但這裡藏掉的規格列，個別型號不能放回來。"
+            title={`全部型號都套用的調整（${drafts.length} 台都會生效）`}
+            note="業務的要求通常就是這種——「不要放 chipset」「都是 IP67」，講的是整份文件。每一台底下還有自己的調整區，會疊在這上面；但這裡藏掉的規格列，個別型號放不回來。"
           >
             <SpecFormatHelp kind="rules" />
             <Textarea
@@ -614,11 +663,12 @@ export function ProjectEditor({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="font-heading text-lg font-semibold text-[#231f20]">
-                  型號（{drafts.length}）
+                  型號 — 這份文件有 {drafts.length} 台
                 </h2>
                 <p className="mt-0.5 max-w-[620px] text-xs text-muted-foreground">
-                  <strong>一個型號 = 規格表上的一欄</strong>，由左至右照下面的順序排。
-                  規格列會自動對齊：某一台有、另一台沒有的列，缺的那格會印 TBD 或 —。
+                  <strong>一台型號 = 規格表上的一欄</strong>，所以規格表會有 {drafts.length} 欄，
+                  由左至右照下面分頁的順序排。規格列會自動對齊：某一台有、另一台沒有的列，
+                  缺的那格會印 TBD 或 —。
                 </p>
               </div>
               <AddModelMenu docId={doc.id} onAdded={() => router.refresh()} />
@@ -631,107 +681,158 @@ export function ProjectEditor({
               </p>
             )}
 
-            {drafts.length === 0 && (
+            {drafts.length === 0 ? (
               <div className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-                還沒有型號。用右上角加一個——
+                還沒有型號。用右上角加一台——
                 <strong>「從既有型號帶入」</strong>是拿我們已經在賣的機種（規格、文案、產品圖一起帶），
                 <strong>「加空白型號」</strong>是開一欄全空的自己填。
               </div>
+            ) : (
+              /* One model per tab. Stacked, two models ran to several screens
+                 of near-identical fields and it stopped being obvious which
+                 one you were editing. */
+              <Tabs value={activeModel} onValueChange={(v) => setModelTab(v as string)}>
+                <TabsList className="w-full justify-start">
+                  {drafts.map((d, i) => (
+                    <TabsTrigger key={d.id} value={d.id}>
+                      第 {i + 1} 欄 · {d.model_name || "（未命名）"}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+
+                {drafts.map((d, i) => {
+                  const orphan = orphans.find((o) => o.model === d.model_name);
+                  const model = models.find((m) => m.id === d.id);
+                  const rowCount = parseSpecRows(d.raw).length;
+                  const shortName = d.model_name || `第 ${i + 1} 欄`;
+                  return (
+                    <TabsContent key={d.id} value={d.id} className="space-y-4 pt-4">
+                      <section className="space-y-4 rounded-lg border p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3 border-b pb-3">
+                          <div>
+                            {/* Big, because the previous small-caps panel
+                                title left people unsure which unit they were
+                                looking at. */}
+                            <div className="flex items-baseline gap-2">
+                              <span className="rounded bg-[#231f20] px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                                第 {i + 1} 欄
+                              </span>
+                              <h3 className="font-heading text-xl font-semibold text-[#231f20]">
+                                {shortName}
+                              </h3>
+                            </div>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {rowCount > 0
+                                ? `目前 ${rowCount} 列規格`
+                                : "還沒有規格——用下面的「上傳原廠 PDF / Excel」或直接手打"}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeModel(d.id, d.model_name)}
+                            className="text-xs text-muted-foreground hover:text-destructive"
+                          >
+                            移除這一欄
+                          </button>
+                        </div>
+
+                        <Grid>
+                          <Field label="型號" hint="印在封面圖下方與規格表的表頭">
+                            <Input
+                              value={d.model_name}
+                              onChange={(e) => setDraft(d.id, { model_name: e.target.value })}
+                            />
+                          </Field>
+                          <Field label="品名／說明" hint="印在型號下面那一行小字">
+                            <Input
+                              value={d.display_name}
+                              onChange={(e) => setDraft(d.id, { display_name: e.target.value })}
+                              placeholder="4G Indoor / Outdoor Router"
+                            />
+                          </Field>
+                        </Grid>
+
+                        <ImageManager
+                          docId={doc.id}
+                          modelId={d.id}
+                          initial={parseImagesJson(model?.images)}
+                          slots={MODEL_SLOTS}
+                          label="產品圖"
+                          hint="封面主圖一張（再傳會換掉舊的）；硬體外觀可以多張，照上傳順序排在 Hardware Overview 頁。圖片下方會自動帶「僅供參考」的註記。"
+                        />
+                      </section>
+
+                      {/* ① evidence ─────────────────────────────────── */}
+                      <section className="space-y-3 rounded-lg border p-5">
+                        <div>
+                          <h4 className="font-heading text-sm font-semibold text-[#231f20]">
+                            ① 來源規格 —— 原廠說的話
+                          </h4>
+                          <p className="mt-1 max-w-[660px] text-xs text-muted-foreground">
+                            原廠的 PDF／Excel 讀進來就長這樣，或你自己手打。
+                            <strong>這一格是「原廠怎麼寫」，② 那一格是「我們決定怎麼改」。</strong>
+                            <br />
+                            兩邊都留著，是為了讓規格表上每一格都答得出「這是原廠寫的，還是我們改的」——
+                            客戶問起來、或原廠之後出新版重讀一次的時候，差別都還在。
+                            <span className="text-amber-800">
+                                如果直接在這一格改掉，那個差別就永遠消失了，重讀來源時你的修改也會一起不見。
+                            </span>
+                          </p>
+                        </div>
+                        <SourceExtract
+                          docId={doc.id}
+                          modelId={d.id}
+                          modelName={d.model_name}
+                          hasExistingSpecs={rowCount > 0}
+                          onApplied={() => {
+                            setReviewKey((k) => k + 1);
+                            router.refresh();
+                          }}
+                        />
+                        <SpecFormatHelp kind="specs" />
+                        <Textarea
+                          rows={12}
+                          value={d.raw}
+                          onChange={(e) => setDraft(d.id, { raw: e.target.value })}
+                          className="font-mono text-xs"
+                        />
+                      </section>
+
+                      {/* ② decisions ────────────────────────────────── */}
+                      <section className="space-y-3 rounded-lg border border-amber-300 bg-amber-50/40 p-5">
+                        <div>
+                          <h4 className="font-heading text-sm font-semibold text-[#231f20]">
+                            ② 只有 {shortName} 的調整
+                          </h4>
+                          <p className="mt-1 max-w-[640px] text-xs text-muted-foreground">
+                            寫在這裡的規則<strong>只動這一欄</strong>，其他型號不受影響。
+                            值本來就一台一個的東西寫這裡——例如 EOR100 的 PoE 是 802.3af/at、
+                            EOR200 只有 at。
+                            <br />
+                            要對<strong>每一台</strong>都生效的（「不要放 chipset」「都是 IP67」），
+                            寫在上面那個「全部型號都套用的調整」。
+                          </p>
+                        </div>
+                        <Textarea
+                          rows={4}
+                          value={d.rules}
+                          onChange={(e) => setDraft(d.id, { rules: e.target.value })}
+                          className="bg-background font-mono text-xs"
+                          placeholder={"power_consumption = < 18 W"}
+                        />
+                        {orphan && orphan.keys.length > 0 && (
+                          <p className="rounded-md border border-amber-400 bg-amber-100 px-3 py-2 text-xs text-amber-900">
+                            <strong>這些規則沒有對象：</strong>
+                            {orphan.keys.join("、")}。
+                            來源裡找不到這些規格名（可能重新讀取後改名或消失了），所以它們現在完全不生效。
+                          </p>
+                        )}
+                      </section>
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
             )}
-
-            {drafts.map((d, i) => {
-              const orphan = orphans.find((o) => o.model === d.model_name);
-              const model = models.find((m) => m.id === d.id);
-              const rowCount = parseSpecRows(d.raw).length;
-              return (
-                <Panel
-                  key={d.id}
-                  title={`第 ${i + 1} 欄 · ${d.model_name}`}
-                  note={
-                    rowCount > 0
-                      ? `目前 ${rowCount} 列規格`
-                      : "還沒有規格——用下面的「從來源讀取規格」或直接手打"
-                  }
-                  action={
-                    <button
-                      type="button"
-                      onClick={() => removeModel(d.id, d.model_name)}
-                      className="text-xs text-muted-foreground hover:text-destructive"
-                    >
-                      移除這一欄
-                    </button>
-                  }
-                >
-                  <Grid>
-                    <Field label="型號" hint="印在封面圖下方與規格表的表頭">
-                      <Input
-                        value={d.model_name}
-                        onChange={(e) => setDraft(d.id, { model_name: e.target.value })}
-                      />
-                    </Field>
-                    <Field label="品名／說明" hint="印在型號下面那一行小字">
-                      <Input
-                        value={d.display_name}
-                        onChange={(e) => setDraft(d.id, { display_name: e.target.value })}
-                        placeholder="4G Indoor / Outdoor Router"
-                      />
-                    </Field>
-                  </Grid>
-
-                  <ImageManager
-                    docId={doc.id}
-                    modelId={d.id}
-                    initial={parseImagesJson(model?.images)}
-                    slots={MODEL_SLOTS}
-                    label="產品圖"
-                    hint="封面主圖一張（再傳會換掉舊的）；硬體外觀可以多張，照上傳順序排在 Hardware Overview 頁。圖片下方會自動帶「僅供參考」的註記。"
-                  />
-
-                  <div className="space-y-2 border-t pt-4">
-                    <SourceExtract
-                      docId={doc.id}
-                      modelId={d.id}
-                      modelName={d.model_name}
-                      onApplied={() => {
-                        setReviewKey((k) => k + 1);
-                        router.refresh();
-                      }}
-                    />
-                    <Field
-                      label="來源規格（原文）"
-                      hint="從原廠 PDF／Excel 讀進來的原文會落在這裡，也可以自己手打。⚠️ 不要在這裡「整理」——要改單位、刪字、換寫法，請寫成下面的規則，不然之後看不出哪些是我們改的。"
-                    >
-                      <SpecFormatHelp kind="specs" />
-                      <Textarea
-                        rows={12}
-                        value={d.raw}
-                        onChange={(e) => setDraft(d.id, { raw: e.target.value })}
-                        className="font-mono text-xs"
-                      />
-                    </Field>
-                    <Field
-                      label="這一台的規格規則"
-                      hint="只影響這一欄。值本來就一台一個的東西寫這裡——例如 EOR100 是 802.3af/at、EOR200 只有 at。"
-                    >
-                      <Textarea
-                        rows={4}
-                        value={d.rules}
-                        onChange={(e) => setDraft(d.id, { rules: e.target.value })}
-                        className="font-mono text-xs"
-                        placeholder={"power_consumption = < 18 W"}
-                      />
-                    </Field>
-                    {orphan && orphan.keys.length > 0 && (
-                      <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                        <strong>這些規則沒有對象：</strong>
-                        {orphan.keys.join("、")}。
-                        來源裡找不到這些規格名（可能重新讀取後改名或消失了），所以它們現在完全不生效。
-                      </p>
-                    )}
-                  </div>
-                </Panel>
-              );
-            })}
           </div>
         </TabsContent>
       </Tabs>

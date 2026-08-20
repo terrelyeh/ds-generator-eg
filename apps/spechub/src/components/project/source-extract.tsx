@@ -35,11 +35,14 @@ export function SourceExtract({
   docId,
   modelId,
   modelName,
+  hasExistingSpecs = false,
   onApplied,
 }: {
   docId: string;
   modelId: string;
   modelName: string;
+  /** Drives the warning — reading a source REPLACES what's already there. */
+  hasExistingSpecs?: boolean;
   onApplied?: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -103,9 +106,16 @@ export function SourceExtract({
     // "can I upload a PDF here?", which is precisely what it does. A button
     // that names the file types answers that without being clicked.
     return (
-      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        上傳原廠 PDF / Excel 讀規格
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          上傳原廠 PDF / Excel 讀規格
+        </Button>
+        {hasExistingSpecs && (
+          <span className="text-xs text-amber-800">
+            ⚠️ {modelName} 已經有規格了，讀新的會<strong>整份取代</strong>掉現在這些
+          </span>
+        )}
+      </div>
     );
   }
 
@@ -113,8 +123,21 @@ export function SourceExtract({
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
       <p className="text-xs text-muted-foreground">
         上傳原廠的 PDF／Excel，或直接貼規格表。讀進來的是<strong>原文照抄</strong>——
-        單位、全形符號都不會動，要改的部分留給規則層，這樣才看得出哪些是我們改的。
+        單位、全形符號都不會動。
       </p>
+      {hasExistingSpecs && (
+        <p className="rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
+          <strong>{modelName} 目前已經有規格。</strong>
+          讀新的來源會把「① 來源規格」<strong>整份換掉</strong>——不是合併，因為兩份讀取混在一起
+          會變成跟哪一份原廠文件都對不起來的東西。
+          <br />
+          你下的調整規則<strong>不會</strong>被動到，但新來源如果找不到某個規格名，
+          對應的規則就會失去對象——套用前的預覽會先把那些列出來。
+          <br />
+          想「多加一台」而不是「換掉這一台」的話，關掉這裡，用上面的
+          <strong>「從既有型號帶入」／「加空白型號」</strong>——那會新開一欄，完全不動現有的。
+        </p>
+      )}
 
       {!preview && (
         <>
@@ -138,15 +161,22 @@ export function SourceExtract({
             >
               {busy ? "讀取中…" : "選擇 PDF / Excel"}
             </Button>
-            <span className="text-xs text-muted-foreground">或貼在下面 ↓</span>
           </div>
-          <Textarea
-            rows={5}
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder={"Model\tM16K06\nCPU\tMTK7621AT+SDX12\nDimension\t145X130X45MM"}
-            className="font-mono text-xs"
-          />
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-[#231f20]">或直接貼上規格表</p>
+            <p className="text-xs text-muted-foreground">
+              沒有檔案、或原廠只給一段文字的時候用。從 PDF／Excel 複製整張表貼進來就行，
+              一行一列：<code className="rounded bg-muted px-1">規格名 ⇥ Tab ⇥ 值</code>。
+              貼完按「讀取貼上的內容」，一樣會整理成規格列給你確認。
+            </p>
+            <Textarea
+              rows={5}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={"Model\tM16K06\nCPU\tMTK7621AT+SDX12\nDimension\t145X130X45MM"}
+              className="font-mono text-xs"
+            />
+          </div>
           <div className="flex gap-2">
             <Button
               size="sm"
