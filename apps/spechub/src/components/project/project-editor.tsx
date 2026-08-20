@@ -9,13 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { layoutOptions } from "@/lib/project-datasheet/themes";
 import { GapReview, type ReviewCounts } from "@/components/project/gap-review";
 import { RequirementsIntake } from "@/components/project/requirements-intake";
 import { SourceExtract } from "@/components/project/source-extract";
 import { AddModelMenu } from "@/components/project/add-model-menu";
 import { ImageManager, MODEL_SLOTS, DOC_SLOTS } from "@/components/project/image-manager";
 import { SpecFormatHelp } from "@/components/project/spec-format-help";
+import { LayoutPicker } from "@/components/project/layout-picker";
+import { SpecPreview, toggleHideLine } from "@/components/project/spec-preview";
 import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
@@ -96,9 +97,7 @@ export function ProjectEditor({
   const [branch, setBranch] = useState(doc.branch ?? "");
   const [salesOwner, setSalesOwner] = useState(doc.sales_owner ?? "");
   const [opportunity, setOpportunity] = useState(doc.opportunity ?? "");
-  const [estQuantity, setEstQuantity] = useState(doc.est_quantity ?? "");
-  const [dueDate, setDueDate] = useState(doc.due_date ?? "");
-  const [dealStage, setDealStage] = useState(doc.deal_stage ?? "inquiry");
+  const [tenderDate, setTenderDate] = useState(doc.tender_date ?? "");
 
   const [drafts, setDrafts] = useState<ModelDraft[]>(() =>
     models.map((m) => ({
@@ -122,7 +121,7 @@ export function ProjectEditor({
         doc.series_name ?? "", doc.category_label ?? "", doc.overview ?? "",
         doc.footnote ?? "", doc.disclaimer, doc.image_note ?? "", doc.blank_policy,
         doc.notes ?? "", doc.branch ?? "", doc.sales_owner ?? "", doc.opportunity ?? "",
-        doc.est_quantity ?? "", doc.due_date ?? "", doc.deal_stage,
+        doc.tender_date ?? "",
         serializeFeatureBlocks(
           Array.isArray(doc.features) ? (doc.features as { title: string; bullets: string[] }[]) : [],
         ),
@@ -138,7 +137,7 @@ export function ProjectEditor({
   const current = JSON.stringify([
     name, customer, status, layout, headline, seriesName, categoryLabel, overview,
     footnote, disclaimer, imageNote, blankPolicy, notes, branch, salesOwner,
-    opportunity, estQuantity, dueDate, dealStage, features, docRules, sections,
+    opportunity, tenderDate, features, docRules, sections,
     drafts.map((d) => [d.model_name, d.display_name, d.raw, d.rules]),
   ]);
   const dirty = current !== initial;
@@ -232,9 +231,7 @@ export function ProjectEditor({
           branch: branch || null,
           sales_owner: salesOwner || null,
           opportunity: opportunity || null,
-          est_quantity: estQuantity || null,
-          due_date: dueDate || null,
-          deal_stage: dealStage,
+          tender_date: tenderDate || null,
         }),
       });
       const docJson = await docRes.json();
@@ -346,7 +343,22 @@ export function ProjectEditor({
           <span className="font-semibold">下一步：</span> {nextStep.text}
         </p>
         {nextStep.action && nextStep.tab && (
-          <Button size="sm" variant="outline" onClick={() => setTab(nextStep.tab!)}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              // Already on that tab, so switching would do nothing visible —
+              // a button that appears to be broken. Scroll to the section
+              // instead, which is what "去看" meant either way.
+              if (tab === nextStep.tab) {
+                document
+                  .getElementById(`section-${nextStep.tab}`)
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              } else {
+                setTab(nextStep.tab!);
+              }
+            }}
+          >
             {nextStep.action}
           </Button>
         )}
@@ -368,14 +380,14 @@ export function ProjectEditor({
               </span>
             )}
           </TabsTrigger>
+          <TabsTrigger value="internal">內部資訊</TabsTrigger>
+          <TabsTrigger value="content">封面與文案</TabsTrigger>
           <TabsTrigger value="specs">
             規格與型號
             <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
               {drafts.length}
             </span>
           </TabsTrigger>
-          <TabsTrigger value="content">封面與文案</TabsTrigger>
-          <TabsTrigger value="internal">內部資訊</TabsTrigger>
         </TabsList>
 
         {/* ══ 狀態與待辦 ══════════════════════════════════════════ */}
@@ -387,11 +399,203 @@ export function ProjectEditor({
               router.refresh();
             }}
           />
-          <GapReview docId={doc.id} key={reviewKey} onCounts={setCounts} />
+          <div id="section-status">
+            <GapReview docId={doc.id} key={reviewKey} onCounts={setCounts} />
+          </div>
         </TabsContent>
 
-        {/* ══ 規格與型號 ═════════════════════════════════════════ */}
-        <TabsContent value="specs" className="space-y-5 pt-5">
+        <TabsContent value="internal" className="space-y-5 pt-5">
+          {/* Tinted and labelled, because the complaint that started this
+              redesign was that internal and printed content sat side by side
+              looking identical. */}
+          <section className="space-y-4 rounded-lg border-2 border-dashed border-slate-400 bg-slate-100 p-5">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-slate-700">
+                  內部資訊
+                </h2>
+                <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  不會印出來
+                </span>
+              </div>
+              <p className="mt-1 max-w-[640px] text-xs text-slate-600">
+                這一頁的每一個欄位都只給我們自己看，PDF 上完全不會出現。
+                一份指名我方業務、內部案子階段、我們猜客戶會買多少的報價文件，
+                是根本不該離開公司的東西。
+              </p>
+            </div>
+
+            <Grid>
+              <Field label="文件狀態" hint="「可以送出」要等沒有會出錯的項目才切得過去">
+                <Select
+                  value={status}
+                  onChange={setStatus}
+                  options={[
+                    { value: "draft", label: "草稿" },
+                    { value: "ready", label: "可以送出" },
+                    { value: "archived", label: "已封存" },
+                  ]}
+                />
+              </Field>
+              <Field label="分公司／區域" hint="需求從哪裡來的">
+                <Input
+                  value={branch}
+                  onChange={(e) => setBranch(e.target.value)}
+                  placeholder="EnGenius Malaysia"
+                />
+              </Field>
+              <Field label="業務負責人" hint="澄清訊息要寄給誰">
+                <Input value={salesOwner} onChange={(e) => setSalesOwner(e.target.value)} />
+              </Field>
+              <Field label="專案／案號" hint="對得上報價單或 CRM 的編號">
+                <Input value={opportunity} onChange={(e) => setOpportunity(e.target.value)} />
+              </Field>
+              <Field label="標案時間" hint="怎麼寫都行 ——「2026 Q3」「三月底前」「RFQ 截止 3/14」">
+                <Input
+                  value={tenderDate}
+                  onChange={(e) => setTenderDate(e.target.value)}
+                  placeholder="2026 Q3"
+                />
+              </Field>
+            </Grid>
+            <Field label="備註" hint="任何之後的自己會想知道的事">
+              <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </Field>
+            <p className="text-xs text-slate-500">
+              最後更新：
+              <span className="tabular-nums">
+                {" "}
+                {new Date(doc.updated_at).toISOString().slice(0, 16).replace("T", " ")}
+              </span>
+            </p>
+          </section>
+        </TabsContent>
+
+        <TabsContent value="content" className="space-y-5 pt-5">
+          <Panel title="基本設定">
+            <Grid>
+              <Field label="文件名稱" hint="只在列表上顯示，不會印出來">
+                <Input value={name} onChange={(e) => setName(e.target.value)} />
+              </Field>
+              <Field label="客戶" hint="會出現在對外聲明裡（「Prepared for …」）">
+                <Input value={customer} onChange={(e) => setCustomer(e.target.value)} />
+              </Field>
+            </Grid>
+            <Field label="版型">
+              <LayoutPicker value={layout} onChange={setLayout} />
+            </Field>
+          </Panel>
+
+          <Panel title="封面" note="這一區的內容全部會印在 PDF 第一頁。">
+            <Grid>
+              <Field label="主標" hint="封面最大的那行字">
+                <Input
+                  value={headline}
+                  onChange={(e) => setHeadline(e.target.value)}
+                  placeholder="Outdoor 4G / 5G Cellular Routers"
+                />
+              </Field>
+              <Field label="副標" hint="主標下面的藍字">
+                <Input
+                  value={seriesName}
+                  onChange={(e) => setSeriesName(e.target.value)}
+                  placeholder="EOR100 / EOR200"
+                />
+              </Field>
+              <Field label="分類標籤" hint="藍色橫幅右上角的小型大寫字">
+                <Input
+                  value={categoryLabel}
+                  onChange={(e) => setCategoryLabel(e.target.value)}
+                  placeholder="CELLULAR ROUTER"
+                />
+              </Field>
+            </Grid>
+            <Field label="Overview" hint="封面的說明文字，兩段左右">
+              <Textarea rows={6} value={overview} onChange={(e) => setOverview(e.target.value)} />
+            </Field>
+            <Field
+              label="Features & Benefits"
+              hint="賣點頁。空一行分隔一個區塊；每個區塊第一行是標題，其餘每行是一個條列。"
+            >
+              <Textarea rows={9} value={features} onChange={(e) => setFeatures(e.target.value)} />
+            </Field>
+            <Field label="註腳" hint="封面底部的小字，可留空">
+              <Input value={footnote} onChange={(e) => setFootnote(e.target.value)} />
+            </Field>
+            <ImageManager
+              docId={doc.id}
+              modelId={null}
+              initial={parseImagesJson(doc.images)}
+              slots={DOC_SLOTS}
+              label="文件層圖片"
+              hint="部署示意圖等不屬於單一型號的圖。要印出來還要把下面「要印哪些頁」的部署示意圖打開。"
+            />
+          </Panel>
+
+          <Panel
+            title="要印哪些頁"
+            note="還不存在的東西就關掉，不要印一頁空的。報價階段通常還沒有包裝，所以 Package Contents 預設是關的。"
+          >
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+              {SECTION_LABELS.map(({ key, label, hint }) => (
+                <label key={key} className="flex items-start gap-2 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={sections[key]}
+                    onChange={(e) => setSections((s) => ({ ...s, [key]: e.target.checked }))}
+                    className="mt-1"
+                  />
+                  <span>
+                    {label}
+                    <span className="block text-xs text-muted-foreground">{hint}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            <Field label="沒有值的格子印什麼" hint="某一台缺這項規格時，那一格要顯示什麼">
+              <Select
+                value={blankPolicy}
+                onChange={setBlankPolicy}
+                options={[
+                  { value: "tbd", label: "TBD —— 之後會補（預設）" },
+                  { value: "na", label: "— —— 本來就沒有這項" },
+                  { value: "blank", label: "留白" },
+                ]}
+              />
+            </Field>
+          </Panel>
+
+          <Panel
+            title="對外聲明"
+            note="兩則都會印在文件上。措辭是你的，但「有沒有」不是——這份文件最大的風險就是它看起來跟正式 datasheet 一模一樣。"
+          >
+            <Field label="PRELIMINARY 聲明" hint="印在封面和頁尾。不能空白。">
+              <Textarea
+                rows={3}
+                value={disclaimer}
+                onChange={(e) => setDisclaimer(e.target.value)}
+                aria-invalid={!disclaimer.trim()}
+              />
+            </Field>
+            <Field label="圖片註記" hint="只要文件有圖，就會印在硬體圖下方">
+              <Input value={imageNote} onChange={(e) => setImageNote(e.target.value)} />
+            </Field>
+          </Panel>
+        </TabsContent>
+
+        <TabsContent value="specs" className="space-y-5 pt-5" id="section-specs">
+          <Panel
+            title="最終規格表（會印出來的）"
+            note="來源規格套上規則之後的樣子，你一邊改一邊變。有標記的格子就是被規則動過的——這是看「規則到底做了什麼」最快的地方。"
+          >
+            <SpecPreview
+              models={drafts}
+              docRulesText={docRules}
+              blankPolicy={blankPolicy}
+              onToggleHide={(key, hide) => setDocRules((r) => toggleHideLine(r, key, hide))}
+            />
+          </Panel>
+
           <Panel
             title="整份文件的規格規則"
             note="對「所有型號」都生效的規格調整。業務的要求通常就是這種——「不要放 chipset」「都是 IP67」。每一台底下還可以有自己的規則，會疊在這上面；但這裡藏掉的規格列，個別型號不能放回來。"
@@ -529,203 +733,6 @@ export function ProjectEditor({
               );
             })}
           </div>
-        </TabsContent>
-
-        {/* ══ 封面與文案 ═════════════════════════════════════════ */}
-        <TabsContent value="content" className="space-y-5 pt-5">
-          <Panel title="基本設定">
-            <Grid>
-              <Field label="文件名稱" hint="只在列表上顯示，不會印出來">
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </Field>
-              <Field label="客戶" hint="會出現在對外聲明裡（「Prepared for …」）">
-                <Input value={customer} onChange={(e) => setCustomer(e.target.value)} />
-              </Field>
-              <Field label="版型" hint="配色。之後可以加新的版型讓不同案子選">
-                <Select value={layout} onChange={setLayout} options={layoutOptions()} />
-              </Field>
-            </Grid>
-          </Panel>
-
-          <Panel title="封面" note="這一區的內容全部會印在 PDF 第一頁。">
-            <Grid>
-              <Field label="主標" hint="封面最大的那行字">
-                <Input
-                  value={headline}
-                  onChange={(e) => setHeadline(e.target.value)}
-                  placeholder="Outdoor 4G / 5G Cellular Routers"
-                />
-              </Field>
-              <Field label="副標" hint="主標下面的藍字">
-                <Input
-                  value={seriesName}
-                  onChange={(e) => setSeriesName(e.target.value)}
-                  placeholder="EOR100 / EOR200"
-                />
-              </Field>
-              <Field label="分類標籤" hint="藍色橫幅右上角的小型大寫字">
-                <Input
-                  value={categoryLabel}
-                  onChange={(e) => setCategoryLabel(e.target.value)}
-                  placeholder="CELLULAR ROUTER"
-                />
-              </Field>
-            </Grid>
-            <Field label="Overview" hint="封面的說明文字，兩段左右">
-              <Textarea rows={6} value={overview} onChange={(e) => setOverview(e.target.value)} />
-            </Field>
-            <Field
-              label="Features & Benefits"
-              hint="賣點頁。空一行分隔一個區塊；每個區塊第一行是標題，其餘每行是一個條列。"
-            >
-              <Textarea rows={9} value={features} onChange={(e) => setFeatures(e.target.value)} />
-            </Field>
-            <Field label="註腳" hint="封面底部的小字，可留空">
-              <Input value={footnote} onChange={(e) => setFootnote(e.target.value)} />
-            </Field>
-            <ImageManager
-              docId={doc.id}
-              modelId={null}
-              initial={parseImagesJson(doc.images)}
-              slots={DOC_SLOTS}
-              label="文件層圖片"
-              hint="部署示意圖等不屬於單一型號的圖。要印出來還要把下面「要印哪些頁」的部署示意圖打開。"
-            />
-          </Panel>
-
-          <Panel
-            title="要印哪些頁"
-            note="還不存在的東西就關掉，不要印一頁空的。報價階段通常還沒有包裝，所以 Package Contents 預設是關的。"
-          >
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {SECTION_LABELS.map(({ key, label, hint }) => (
-                <label key={key} className="flex items-start gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={sections[key]}
-                    onChange={(e) => setSections((s) => ({ ...s, [key]: e.target.checked }))}
-                    className="mt-1"
-                  />
-                  <span>
-                    {label}
-                    <span className="block text-xs text-muted-foreground">{hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <Field label="沒有值的格子印什麼" hint="某一台缺這項規格時，那一格要顯示什麼">
-              <Select
-                value={blankPolicy}
-                onChange={setBlankPolicy}
-                options={[
-                  { value: "tbd", label: "TBD —— 之後會補（預設）" },
-                  { value: "na", label: "— —— 本來就沒有這項" },
-                  { value: "blank", label: "留白" },
-                ]}
-              />
-            </Field>
-          </Panel>
-
-          <Panel
-            title="對外聲明"
-            note="兩則都會印在文件上。措辭是你的，但「有沒有」不是——這份文件最大的風險就是它看起來跟正式 datasheet 一模一樣。"
-          >
-            <Field label="PRELIMINARY 聲明" hint="印在封面和頁尾。不能空白。">
-              <Textarea
-                rows={3}
-                value={disclaimer}
-                onChange={(e) => setDisclaimer(e.target.value)}
-                aria-invalid={!disclaimer.trim()}
-              />
-            </Field>
-            <Field label="圖片註記" hint="只要文件有圖，就會印在硬體圖下方">
-              <Input value={imageNote} onChange={(e) => setImageNote(e.target.value)} />
-            </Field>
-          </Panel>
-        </TabsContent>
-
-        {/* ══ 內部資訊 ═══════════════════════════════════════════ */}
-        <TabsContent value="internal" className="space-y-5 pt-5">
-          {/* Tinted and labelled, because the complaint that started this
-              redesign was that internal and printed content sat side by side
-              looking identical. */}
-          <section className="space-y-4 rounded-lg border-2 border-dashed border-slate-400 bg-slate-100 p-5">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h2 className="font-heading text-sm font-semibold uppercase tracking-wide text-slate-700">
-                  內部資訊
-                </h2>
-                <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                  不會印出來
-                </span>
-              </div>
-              <p className="mt-1 max-w-[640px] text-xs text-slate-600">
-                這一頁的每一個欄位都只給我們自己看，PDF 上完全不會出現。
-                一份指名我方業務、內部案子階段、我們猜客戶會買多少的報價文件，
-                是根本不該離開公司的東西。
-              </p>
-            </div>
-
-            <Grid>
-              <Field label="文件狀態" hint="「可以送出」要等沒有會出錯的項目才切得過去">
-                <Select
-                  value={status}
-                  onChange={setStatus}
-                  options={[
-                    { value: "draft", label: "草稿" },
-                    { value: "ready", label: "可以送出" },
-                    { value: "archived", label: "已封存" },
-                  ]}
-                />
-              </Field>
-              <Field label="案子進度" hint="這是「案子」的狀態，跟上面「文件」的狀態是兩回事">
-                <Select
-                  value={dealStage}
-                  onChange={setDealStage}
-                  options={[
-                    { value: "inquiry", label: "洽談中" },
-                    { value: "quoted", label: "已報價" },
-                    { value: "waiting", label: "等客戶回覆" },
-                    { value: "won", label: "結案 — 拿到" },
-                    { value: "lost", label: "結案 — 沒拿到" },
-                  ]}
-                />
-              </Field>
-              <Field label="分公司／區域" hint="需求從哪裡來的">
-                <Input
-                  value={branch}
-                  onChange={(e) => setBranch(e.target.value)}
-                  placeholder="EnGenius Malaysia"
-                />
-              </Field>
-              <Field label="業務負責人" hint="澄清訊息要寄給誰">
-                <Input value={salesOwner} onChange={(e) => setSalesOwner(e.target.value)} />
-              </Field>
-              <Field label="專案／案號" hint="對得上報價單或 CRM 的編號">
-                <Input value={opportunity} onChange={(e) => setOpportunity(e.target.value)} />
-              </Field>
-              <Field label="預估數量" hint="決定值不值得投工，也影響 ODM 願不願意配合">
-                <Input
-                  value={estQuantity}
-                  onChange={(e) => setEstQuantity(e.target.value)}
-                  placeholder="500–1000 台／年"
-                />
-              </Field>
-              <Field label="客戶要的時間" hint="tender 幾乎都有 deadline">
-                <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
-              </Field>
-            </Grid>
-            <Field label="備註" hint="任何之後的自己會想知道的事">
-              <Textarea rows={4} value={notes} onChange={(e) => setNotes(e.target.value)} />
-            </Field>
-            <p className="text-xs text-slate-500">
-              最後更新：
-              <span className="tabular-nums">
-                {" "}
-                {new Date(doc.updated_at).toISOString().slice(0, 16).replace("T", " ")}
-              </span>
-            </p>
-          </section>
         </TabsContent>
       </Tabs>
     </div>

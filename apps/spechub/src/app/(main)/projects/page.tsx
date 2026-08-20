@@ -6,13 +6,10 @@ import type { ProjectDatasheet } from "@eg/db/types";
 
 export const dynamic = "force-dynamic";
 
-/** Deal stage, which is not the same thing as document status. */
-const DEAL_STAGE: Record<string, string> = {
-  inquiry: "洽談中",
-  quoted: "已報價",
-  waiting: "等客戶",
-  won: "拿到",
-  lost: "沒拿到",
+const STATUS_LABEL: Record<string, string> = {
+  draft: "草稿",
+  ready: "可以送出",
+  archived: "已封存",
 };
 
 /**
@@ -93,26 +90,10 @@ function ProjectList({ docs }: { docs: ProjectDatasheet[] }) {
               {d.customer && <span>{d.customer}</span>}
               {d.branch && <span>{d.branch}</span>}
               {d.sales_owner && <span>{d.sales_owner}</span>}
-              {d.est_quantity && <span className="tabular-nums">{d.est_quantity}</span>}
               <span className="rounded bg-muted px-1.5 py-0.5 uppercase tracking-wide">
-                {d.status}
+                {STATUS_LABEL[d.status] ?? d.status}
               </span>
-              {DEAL_STAGE[d.deal_stage] && (
-                <span
-                  className={`rounded px-1.5 py-0.5 ${
-                    d.deal_stage === "won"
-                      ? "bg-emerald-100 text-emerald-800"
-                      : d.deal_stage === "lost"
-                        ? "bg-muted"
-                        : "bg-sky-100 text-sky-800"
-                  }`}
-                >
-                  {DEAL_STAGE[d.deal_stage]}
-                </span>
-              )}
-              {d.due_date && (
-                <span className="tabular-nums">期限 {d.due_date}</span>
-              )}
+              {d.tender_date && <span>標案 {d.tender_date}</span>}
               <span className="tabular-nums">
                 更新 {new Date(d.updated_at).toISOString().slice(0, 10)}
               </span>

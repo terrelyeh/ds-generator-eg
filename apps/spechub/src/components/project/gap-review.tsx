@@ -201,9 +201,23 @@ export function GapReview({
             系統會讀一遍，<strong>告訴你規格表要不要跟著改</strong>，改什麼由你勾。
             只是確認（「對，就是 IP67」）就不會有任何改動，只留下紀錄。
           </p>
+          <p className="mt-1.5 max-w-[640px] text-xs text-muted-foreground">
+            <strong>「重新檢查」不用 AI、不花錢</strong>——這裡的每一條都是固定規則比對，
+            按幾次都一樣。會用到 AI 的只有三個地方：上面的「解析」、這裡的「記錄答覆」、
+            以及型號區的「上傳原廠 PDF / Excel」。
+          </p>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Button variant="outline" size="sm" onClick={() => void load()} disabled={loading}>
+          {/* People reasonably assume anything that "checks" costs tokens.
+              It doesn't — every rule here is deterministic — and saying so
+              is what stops the button being used less than it should be. */}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void load()}
+            disabled={loading}
+            title="這個檢查不用 AI，是固定的規則比對，按幾次都不花錢"
+          >
             重新檢查
           </Button>
           <Button size="sm" onClick={() => setShowBrief((v) => !v)}>

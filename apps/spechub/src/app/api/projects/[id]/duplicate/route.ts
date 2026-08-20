@@ -25,8 +25,8 @@ import type {
  *   open questions    DROPPED — they re-derive on the first scan, and copying
  *                     them would strand rows keyed to the OLD model ids
  *   customer, notes,  RESET — every one of these belongs to the deal that is
- *   deal fields,      ending, and a stale salesperson or a quantity from
- *   status            another tender is worse than a blank field
+ *   internal fields,  ending, and a stale salesperson or a tender date from
+ *   status            another bid is worse than a blank field
  *   disclaimer        REGENERATED for the new customer — it names them
  *   sources           NOT copied; the new document points at the same specs
  *                     but its own provenance starts today
@@ -87,7 +87,6 @@ export async function POST(
       blank_policy: source.blank_policy,
       doc_rules: source.doc_rules as never,
       notes: null,
-      deal_stage: "inquiry",
       created_by: user?.id ?? null,
     })
     .select("id")

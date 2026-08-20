@@ -488,10 +488,8 @@ export interface Database {
           branch: string | null;
           sales_owner: string | null;
           opportunity: string | null;
-          est_quantity: string | null;
-          due_date: string | null;
-          /** the DEAL's state, distinct from `status` (the DOCUMENT's) */
-          deal_stage: string;
+          /** free text — "2026 Q3", "三月底前"; a date picker loses the qualifier */
+          tender_date: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -500,7 +498,7 @@ export interface Database {
           Database["public"]["Tables"]["project_datasheets"]["Row"],
           "id" | "created_at" | "updated_at"
         > &
-          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "branch" | "sales_owner" | "opportunity" | "est_quantity" | "due_date" | "deal_stage" | "created_by">>;
+          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "branch" | "sales_owner" | "opportunity" | "tender_date" | "created_by">>;
         Update: Partial<Database["public"]["Tables"]["project_datasheets"]["Insert"]>;
       };
       project_datasheet_sources: {

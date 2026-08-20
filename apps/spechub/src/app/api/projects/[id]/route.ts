@@ -34,9 +34,7 @@ const DOC_FIELDS = [
   "branch",
   "sales_owner",
   "opportunity",
-  "est_quantity",
-  "due_date",
-  "deal_stage",
+  "tender_date",
 ] as const;
 
 /** PATCH /api/projects/[id] — update the document. */

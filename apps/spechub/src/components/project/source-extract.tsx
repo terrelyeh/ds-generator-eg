@@ -98,14 +98,14 @@ export function SourceExtract({
   }
 
   if (!open) {
+    // A text link reading "從來源讀取規格…" was doing the work of the whole
+    // feature and got mistaken for a label — the question it produced was
+    // "can I upload a PDF here?", which is precisely what it does. A button
+    // that names the file types answers that without being clicked.
     return (
-      <button
-        type="button"
-        className="text-xs text-engenius-blue hover:underline"
-        onClick={() => setOpen(true)}
-      >
-        從來源讀取規格…
-      </button>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        上傳原廠 PDF / Excel 讀規格
+      </Button>
     );
   }
 
