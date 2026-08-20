@@ -60,14 +60,17 @@ export async function GET(
   const models = (modelRows ?? []) as ProjectDatasheetModel[];
   const stored = (questionRows ?? []) as ProjectDatasheetQuestion[];
 
-  const sourceText = await loadSourceText(supabase, id);
+  const [sourceText, catalogModels] = await Promise.all([
+    loadSourceText(supabase, id),
+    loadCatalogModels(supabase, id, models),
+  ]);
 
   const rows = resolveMatrix({
     models,
     docRules: (doc.doc_rules ?? {}) as DocRules,
     blankPolicy: (doc.blank_policy as BlankMode) ?? "tbd",
   });
-  const findings = scanDocument({ doc, models, rows, sourceText });
+  const findings = scanDocument({ doc, models, rows, sourceText, catalogModels });
 
   const byId = new Map(stored.map((q) => [storedFindingId(q), q]));
   const live = new Set(findings.map(findingId));
@@ -207,6 +210,27 @@ async function loadSourceText(
     .filter((s) => s.kind !== "requirements" && s.extracted_text)
     .map((s) => s.extracted_text as string)
     .join("\n\n");
+}
+
+/** Model ids whose rows were seeded from a shipping product. */
+async function loadCatalogModels(
+  supabase: ReturnType<typeof createAdminClient>,
+  docId: string,
+  models: ProjectDatasheetModel[],
+): Promise<Set<string>> {
+  const sourceIds = models.map((m) => m.source_id).filter((v): v is string => !!v);
+  if (sourceIds.length === 0) return new Set();
+  const { data } = await supabase
+    .from("project_datasheet_sources")
+    .select("id, kind")
+    .eq("project_datasheet_id", docId)
+    .in("id", sourceIds);
+  const catalog = new Set(
+    ((data ?? []) as { id: string; kind: string }[])
+      .filter((s) => s.kind === "catalog")
+      .map((s) => s.id),
+  );
+  return new Set(models.filter((m) => m.source_id && catalog.has(m.source_id)).map((m) => m.id));
 }
 
 /** Questions raised by requirements intake, not by a scanner check. */

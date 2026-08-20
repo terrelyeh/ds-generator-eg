@@ -86,6 +86,21 @@ export interface ScanInput {
    * less useful than "the source says IP66".
    */
   sourceText?: string;
+  /**
+   * Model ids whose rows were seeded from a SHIPPING product rather than a
+   * supplier sheet. Two checks invert for these:
+   *
+   *   ODM sheet   a value the source lacks = a number we invented   → blocking
+   *   catalogue   a value the source lacks = the reason we're here  → advisory
+   *
+   *   ODM sheet   a changed value = speccing a product that doesn't exist
+   *   catalogue   a changed value = contradicting the PUBLISHED datasheet for
+   *               something the customer can already buy and compare against
+   *
+   * Without the distinction the review either blocks the normal workflow or
+   * waves through the one thing that can actually be caught out.
+   */
+  catalogModels?: Set<string>;
 }
 
 // ── residue detection ──────────────────────────────────────────────────────
@@ -195,7 +210,10 @@ function words(v: string): Set<string> {
       // possible way to report a space.
       .replace(/([0-9])([a-z])/g, "$1 $2")
       .replace(/([a-z])([0-9])/g, "$1 $2")
-      .replace(/[^a-z0-9.]+/g, " ")
+      // \p{L} rather than a-z: stripping to ASCII made every CJK-only edit
+      // invisible, so an override that changed nothing but the Chinese in a
+      // value compared EQUAL to its source and was silently passed over.
+      .replace(/[^\p{L}\p{N}.]+/gu, " ")
       .split(/\s+/)
       .filter((w) => w.length > 1),
   );
@@ -300,10 +318,17 @@ const SHOULD_MATCH = new Set([
 
 // ── the scan ───────────────────────────────────────────────────────────────
 
-export function scanDocument({ doc, models, rows, sourceText }: ScanInput): Finding[] {
+export function scanDocument({
+  doc,
+  models,
+  rows,
+  sourceText,
+  catalogModels,
+}: ScanInput): Finding[] {
   const findings: Finding[] = [];
   const add = (f: Finding) => findings.push(f);
   const sourceCodes = sourceText ? codesIn(sourceText) : new Map<string, Set<string>>();
+  const fromCatalog = (modelId: string) => catalogModels?.has(modelId) ?? false;
 
   const docRules = (doc.doc_rules ?? {}) as DocRules;
   const perModel = models.map((m) => ({
@@ -432,6 +457,21 @@ export function scanDocument({ doc, models, rows, sourceText }: ScanInput): Find
               `（不在規格表裡，在敘述段落）。改這個等於改${contradiction.name}，` +
               `要 RD 確認做得到。`,
           });
+        } else if (fromCatalog(model.id)) {
+          // Filling in what the public sheet omits is the point of this use
+          // case, not a red flag — so it informs rather than blocks.
+          add({
+            code: "catalog_added_spec",
+            kind: "doubt",
+            severity: "advisory",
+            askedOf: "rd",
+            modelId: model.id,
+            rowKey: key,
+            title: `${model.model_name} — 補了官方 datasheet 沒有的 ${labelFor(rows, key)}`,
+            detail:
+              `文件寫「${value}」。官方 datasheet 沒有這一項——標案要求比公開規格細，` +
+              `補這種欄位本來就是這份文件的用途。只要確認數字有依據（RD／測試報告）就好。`,
+          });
         } else {
           add({
             code: "unsourced_value",
@@ -449,6 +489,30 @@ export function scanDocument({ doc, models, rows, sourceText }: ScanInput): Find
       } else {
         const verdict = compareToSource(src, value);
         if (verdict.kind === "same") continue;
+
+        if (fromCatalog(model.id) && verdict.kind !== "dropped") {
+          // The sharpest finding in the module. This model ships; the
+          // customer can pull our public datasheet up beside this PDF.
+          add({
+            code: "catalog_deviation",
+            kind: "risk",
+            severity: "blocking",
+            askedOf: "rd",
+            modelId: model.id,
+            rowKey: key,
+            title: `${model.model_name} — ${labelFor(rows, key)} 跟官方 datasheet 不一樣`,
+            detail:
+              // The diff, not the two strings. On a long value the change is
+              // usually past the truncation point, so printing both sides
+              // gives the reader two identical-looking quotes and no answer
+              // to the only question they have: what changed?
+              `${verdict.detail} 官方寫「${truncate(src, 44)}」。` +
+              `這是出貨中的產品，客戶可以把公開的 datasheet 拿來對——` +
+              `要嘛改回官方值，要嘛先讓官方那份跟著更新。`,
+          });
+          continue;
+        }
+
         add({
           code:
             verdict.kind === "measurement"
@@ -471,18 +535,33 @@ export function scanDocument({ doc, models, rows, sourceText }: ScanInput): Find
     for (const added of rules.add ?? []) {
       const key = added.key || normalizeKey(added.label);
       if (sourced.has(key) || rules.override?.[key] !== undefined) continue;
-      add({
-        code: "unsourced_value",
-        kind: "doubt",
-        severity: "blocking",
-        askedOf: "rd",
-        modelId: model.id,
-        rowKey: key,
-        title: `${model.model_name} — ${added.label} 的值不是來源給的`,
-        detail:
-          `文件寫「${added.value}」，來源規格表沒有這一項。這個數字是我們自己加的，` +
-          `送出去就是對客戶的承諾——請 RD 確認。`,
-      });
+      add(
+        fromCatalog(model.id)
+          ? {
+              code: "catalog_added_spec",
+              kind: "doubt",
+              severity: "advisory",
+              askedOf: "rd",
+              modelId: model.id,
+              rowKey: key,
+              title: `${model.model_name} — 補了官方 datasheet 沒有的 ${added.label}`,
+              detail:
+                `文件寫「${added.value}」。官方 datasheet 沒有這一項——標案要求比公開規格細，` +
+                `補這種欄位本來就是這份文件的用途。只要確認數字有依據（RD／測試報告）就好。`,
+            }
+          : {
+              code: "unsourced_value",
+              kind: "doubt",
+              severity: "blocking",
+              askedOf: "rd",
+              modelId: model.id,
+              rowKey: key,
+              title: `${model.model_name} — ${added.label} 的值不是來源給的`,
+              detail:
+                `文件寫「${added.value}」，來源規格表沒有這一項。這個數字是我們自己加的，` +
+                `送出去就是對客戶的承諾——請 RD 確認。`,
+            },
+      );
     }
   }
 

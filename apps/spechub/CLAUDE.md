@@ -145,7 +145,11 @@ EnGenie 就會開始跟人說我們有賣它;
 ⑦ **gap review 是這個模組的核心不是打磨**（`gap-scan.ts`,缺／疑／險三類,**deterministic 無 LLM**）——
 blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 14 格 TBD 不擋、一個沒來源的 IP67 擋;
 finding 是算出來的,`project_datasheet_questions` 只存人做了什麼,**severity 不存**;
-真正的產出是**可以貼給業務/RD/ODM 的澄清訊息**（`brief.ts`,模板不是 LLM）——能回答的人都不在站內。
+真正的產出是**可以貼給業務/RD/ODM 的澄清訊息**（`brief.ts`,模板不是 LLM）——能回答的人都不在站內;
+⑧ **兩種起點**:ODM 規格表,或**從既有型號帶入**（`seed-from-product`,目錄→專案**單向**,
+反向永遠不開）。兩者的 gap review 判斷**方向相反**——ODM 補一個沒來源的規格是 blocking,
+既有型號補一個官方沒寫的規格是 advisory（那正是標案要的）;反過來,改動既有型號的值是
+最尖銳的 finding（`catalog_deviation`),因為客戶可以把公開 datasheet 拿來並排比對。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 

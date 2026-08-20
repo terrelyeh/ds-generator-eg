@@ -12,6 +12,7 @@ import { layoutOptions } from "@/lib/project-datasheet/themes";
 import { GapReview } from "@/components/project/gap-review";
 import { RequirementsIntake } from "@/components/project/requirements-intake";
 import { SourceExtract } from "@/components/project/source-extract";
+import { AddModelMenu } from "@/components/project/add-model-menu";
 import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
@@ -193,17 +194,27 @@ export function ProjectEditor({
     }
   }
 
-  async function addModel() {
-    const modelName = window.prompt("Model name (e.g. EOR100)")?.trim();
-    if (!modelName) return;
-    const res = await fetch(`/api/projects/${doc.id}/models`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model_name: modelName }),
-    });
-    const json = await res.json();
-    if (!res.ok) return toast.error(json.error ?? "Could not add model");
-    router.refresh();
+  /** Same hardware, next customer. Specs and settled answers carry over. */
+  async function duplicate() {
+    const name = window.prompt("新的名稱", `${doc.name}（複製）`)?.trim();
+    if (!name) return;
+    const customer = window.prompt("新的客戶（可留空，之後再填）")?.trim() ?? "";
+    try {
+      const res = await fetch(`/api/projects/${doc.id}/duplicate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, customer }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "複製失敗");
+      toast.success(
+        `已複製 ${json.models} 個型號` +
+          (json.carriedAnswers ? `，帶過 ${json.carriedAnswers} 筆已確認的答覆` : ""),
+      );
+      router.push(`/projects/${json.id}`);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "複製失敗");
+    }
   }
 
   async function removeModel(id: string, modelName: string) {
@@ -237,6 +248,9 @@ export function ProjectEditor({
           >
             Preview
           </Link>
+          <Button variant="outline" onClick={() => void duplicate()} disabled={saving}>
+            複製給別的客戶
+          </Button>
           <Button onClick={save} disabled={saving}>
             {saving ? "Saving…" : "Save"}
           </Button>
@@ -438,13 +452,11 @@ export function ProjectEditor({
       </Panel>
 
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-heading text-lg font-semibold text-[#231f20]">
             Models ({drafts.length})
           </h2>
-          <Button variant="outline" size="sm" onClick={addModel}>
-            Add model
-          </Button>
+          <AddModelMenu docId={doc.id} onAdded={() => router.refresh()} />
         </div>
 
         {drafts.length === 0 && (
