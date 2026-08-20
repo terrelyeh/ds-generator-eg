@@ -359,6 +359,12 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 .spec-row td {
   font-size: ${PT.tableSm}pt; line-height: 1.4; padding: 4pt 8pt;
   vertical-align: top; white-space: pre-line; border-bottom: .5pt solid #dcdedf;
+  /* Cellular band lists are slash-separated with no spaces
+     ("n1/2/3/5/7/8/12/…"), so a fixed-layout table has nowhere to wrap them
+     and they run straight off the page and over the next column. Catalogue
+     datasheets never hit this because Wi-Fi specs are ordinary prose;
+     cellular ones do it in every second row. */
+  overflow-wrap: anywhere;
 }
 .spec-row td.k { color: ${INK}; font-weight: ${WT.medium}; }
 .spec-row:nth-child(even) td { background: ${theme.rowAlt}; }
