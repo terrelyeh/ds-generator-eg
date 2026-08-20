@@ -618,6 +618,7 @@ export type Database = {
         Row: {
           benefits: Json
           category_label: string | null
+          confidentiality: string | null
           created_at: string
           current_version: string | null
           features: Json
@@ -637,6 +638,7 @@ export type Database = {
         Insert: {
           benefits?: Json
           category_label?: string | null
+          confidentiality?: string | null
           created_at?: string
           current_version?: string | null
           features?: Json
@@ -656,6 +658,7 @@ export type Database = {
         Update: {
           benefits?: Json
           category_label?: string | null
+          confidentiality?: string | null
           created_at?: string
           current_version?: string | null
           features?: Json
@@ -915,9 +918,12 @@ export type Database = {
           opportunity: string | null
           sales_owner: string | null
           category_label: string | null
+          confidentiality: string | null
           created_at: string
           created_by: string | null
           customer: string | null
+          diagram_note: string | null
+          diagram_title: string | null
           disclaimer: string
           doc_rules: Json
           features: Json
@@ -942,9 +948,12 @@ export type Database = {
           opportunity?: string | null
           sales_owner?: string | null
           category_label?: string | null
+          confidentiality?: string | null
           created_at?: string
           created_by?: string | null
           customer?: string | null
+          diagram_note?: string | null
+          diagram_title?: string | null
           disclaimer: string
           doc_rules?: Json
           features?: Json
@@ -969,9 +978,12 @@ export type Database = {
           opportunity?: string | null
           sales_owner?: string | null
           category_label?: string | null
+          confidentiality?: string | null
           created_at?: string
           created_by?: string | null
           customer?: string | null
+          diagram_note?: string | null
+          diagram_title?: string | null
           disclaimer?: string
           doc_rules?: Json
           features?: Json

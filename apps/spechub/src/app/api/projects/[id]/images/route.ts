@@ -148,7 +148,13 @@ function asImages(value: unknown): ModelImage[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((i) =>
     i && typeof i === "object" && typeof (i as ModelImage).url === "string"
-      ? [{ slot: (i as ModelImage).slot || "product", url: (i as ModelImage).url }]
+      ? [
+          {
+            slot: (i as ModelImage).slot || "product",
+            url: (i as ModelImage).url,
+            caption: (i as ModelImage).caption ?? null,
+          },
+        ]
       : [],
   );
 }

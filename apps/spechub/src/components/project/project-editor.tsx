@@ -86,7 +86,10 @@ export function ProjectEditor({
   );
   const [disclaimer, setDisclaimer] = useState(doc.disclaimer);
   const [imageNote, setImageNote] = useState(doc.image_note ?? "");
+  const [confidentiality, setConfidentiality] = useState(doc.confidentiality ?? "");
   const [blankPolicy, setBlankPolicy] = useState(doc.blank_policy);
+  const [diagramTitle, setDiagramTitle] = useState(doc.diagram_title ?? "");
+  const [diagramNote, setDiagramNote] = useState(doc.diagram_note ?? "");
   const [docRules, setDocRules] = useState(() => serializeRules(asRules(doc.doc_rules)));
   const [sections, setSections] = useState<SectionToggles>({
     ...DEFAULT_SECTIONS,
@@ -120,9 +123,9 @@ export function ProjectEditor({
       JSON.stringify([
         doc.name, doc.customer ?? "", doc.status, doc.layout, doc.headline ?? "",
         doc.series_name ?? "", doc.category_label ?? "", doc.overview ?? "",
-        doc.footnote ?? "", doc.disclaimer, doc.image_note ?? "", doc.blank_policy,
+        doc.footnote ?? "", doc.disclaimer, doc.confidentiality ?? "", doc.image_note ?? "", doc.blank_policy,
         doc.notes ?? "", doc.branch ?? "", doc.sales_owner ?? "", doc.opportunity ?? "",
-        doc.tender_date ?? "",
+        doc.tender_date ?? "", doc.diagram_title ?? "", doc.diagram_note ?? "",
         serializeFeatureBlocks(
           Array.isArray(doc.features) ? (doc.features as { title: string; bullets: string[] }[]) : [],
         ),
@@ -137,8 +140,8 @@ export function ProjectEditor({
   );
   const current = JSON.stringify([
     name, customer, status, layout, headline, seriesName, categoryLabel, overview,
-    footnote, disclaimer, imageNote, blankPolicy, notes, branch, salesOwner,
-    opportunity, tenderDate, features, docRules, sections,
+    footnote, disclaimer, confidentiality, imageNote, blankPolicy, notes, branch, salesOwner,
+    opportunity, tenderDate, diagramTitle, diagramNote, features, docRules, sections,
     drafts.map((d) => [d.model_name, d.display_name, d.raw, d.rules]),
   ]);
   const dirty = current !== initial;
@@ -250,8 +253,11 @@ export function ProjectEditor({
           footnote: footnote || null,
           features: parseFeatureBlocks(features),
           disclaimer,
+          confidentiality: confidentiality || null,
           image_note: imageNote || null,
           blank_policy: blankPolicy,
+          diagram_title: diagramTitle || null,
+          diagram_note: diagramNote || null,
           doc_rules: parseRules(docRules),
           sections,
           // `images` is deliberately absent from both payloads: the uploader
@@ -562,13 +568,33 @@ export function ProjectEditor({
               />
             </Field>
             <div className="space-y-2">
+              <Field
+                label="應用情境圖的標題"
+                hint="印在圖上方。留空就用預設的「Application Diagram」。"
+              >
+                <Input
+                  value={diagramTitle}
+                  onChange={(e) => setDiagramTitle(e.target.value)}
+                  placeholder="Application scenarios"
+                />
+              </Field>
+              <Field
+                label="應用情境圖的說明"
+                hint="圖上刻意沒有文字（圖像模型會把 802.3af/at 這種標籤畫成錯字），所以說明由版面用真字型排。"
+              >
+                <Textarea
+                  rows={3}
+                  value={diagramNote}
+                  onChange={(e) => setDiagramNote(e.target.value)}
+                />
+              </Field>
               <ImageManager
                 docId={doc.id}
                 modelId={null}
                 initial={parseImagesJson(doc.images)}
                 slots={DOC_SLOTS}
-                label="文件層圖片"
-                hint="不屬於任何單一型號的圖 —— 目前只有應用情境圖（產品用在什麼場景、怎麼接的架構圖）。產品照請到「規格與型號」裡各台底下傳。"
+                label="應用情境圖"
+                hint="第一張是主圖（畫得比較細、有接線的那種），之後每一張會排成下方一列情境小圖。產品照請到「規格與型號」裡各台底下傳。"
               />
               {/* Two steps for one outcome is a trap, so the dependency says
                   so out loud in whichever direction it is currently broken. */}
@@ -637,6 +663,16 @@ export function ProjectEditor({
                 value={disclaimer}
                 onChange={(e) => setDisclaimer(e.target.value)}
                 aria-invalid={!disclaimer.trim()}
+              />
+            </Field>
+            <Field
+              label="機密標示"
+              hint="印在封面和頁尾。跟 PRELIMINARY 是兩件事——那個講「數字可能還會變」，這個講「誰可以看」。留空就不印。"
+            >
+              <Input
+                value={confidentiality}
+                onChange={(e) => setConfidentiality(e.target.value)}
+                placeholder="CONFIDENTIAL — Provided for tender evaluation. Not for public distribution."
               />
             </Field>
             <Field label="圖片註記" hint="只要文件有圖，就會印在硬體圖下方">
