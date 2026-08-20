@@ -23,9 +23,14 @@ interface Proposal {
  */
 export function RequirementsIntake({
   docId,
+  modelCount,
+  onGoToModels,
   onApplied,
 }: {
   docId: string;
+  /** Rules need something to apply to; with no columns this can only fail. */
+  modelCount: number;
+  onGoToModels?: () => void;
   onApplied?: () => void;
 }) {
   const [text, setText] = useState("");
@@ -117,11 +122,35 @@ export function RequirementsIntake({
           </p>
         </div>
         {!open && !proposal && (
-          <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setOpen(true)}
+            disabled={modelCount === 0}
+          >
             貼上需求
           </Button>
         )}
       </div>
+
+      {/* The ① numbering reads as "start here", but rules need a column to
+          apply to — "don't show the chipset" has to know whose chipset. So
+          the first step is a model, and saying that here beats letting the
+          parse fail with the same sentence after the fact. */}
+      {modelCount === 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-md border border-dashed bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+          <span>
+            <strong>要先有型號才能貼需求。</strong>
+            規則得知道套在哪一台身上——「不要放 chipset」總得是某一台的 chipset。
+            第一步請先去「規格與型號」加一台。
+          </span>
+          {onGoToModels && (
+            <Button variant="outline" size="sm" onClick={onGoToModels}>
+              去加型號
+            </Button>
+          )}
+        </div>
+      )}
 
       {(open || proposal) && (
         <>
