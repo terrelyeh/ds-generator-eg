@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
-import type { ModelImage } from "@/lib/project-datasheet/types";
+import type { ImageLabel, ModelImage } from "@/lib/project-datasheet/types";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 
 /** Product renders, not source documents. */
@@ -10,6 +10,7 @@ const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml
 
 /**
  * POST /api/projects/[id]/images — multipart { file, slot, modelId? }
+ * PATCH /api/projects/[id]/images — json { url, modelId?, caption?, labels? }
  * DELETE /api/projects/[id]/images — json { url, modelId? }
  *
  * Uploads land in the PUBLIC `project-images` bucket and the returned URL is
@@ -74,6 +75,54 @@ export async function POST(
   if (saved) return NextResponse.json({ error: saved }, { status: 500 });
 
   return NextResponse.json({ url, slot, images: next });
+}
+
+/**
+ * Caption and on-image labels. Separate from POST because the file is already
+ * uploaded and re-sending a 12 MB render to fix a typo is absurd; separate
+ * from the document's own save because the uploader writes immediately and a
+ * form save must not clobber what it never loaded.
+ */
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const denied = await gate("project_datasheet.edit");
+  if (denied) return denied;
+
+  const { id } = await params;
+  const body = (await request.json().catch(() => ({}))) as {
+    url?: string;
+    modelId?: string | null;
+    caption?: string | null;
+    labels?: unknown;
+  };
+  if (!body.url) return NextResponse.json({ error: "url is required" }, { status: 400 });
+
+  const supabase = createAdminClient();
+  const modelId = body.modelId ?? null;
+  const current = await loadImages(supabase, id, modelId);
+  if (current === null) return NextResponse.json({ error: "not found" }, { status: 404 });
+  if (!current.some((i) => i.url === body.url)) {
+    return NextResponse.json({ error: "image not found" }, { status: 404 });
+  }
+
+  const next = current.map((i) =>
+    i.url === body.url
+      ? {
+          ...i,
+          // Absent means "leave alone"; an empty string means "clear it".
+          caption:
+            body.caption === undefined ? (i.caption ?? null) : (body.caption?.trim() || null),
+          labels: body.labels === undefined ? (i.labels ?? []) : asLabels(body.labels),
+        }
+      : i,
+  );
+
+  const saved = await saveImages(supabase, id, modelId, next);
+  if (saved) return NextResponse.json({ error: saved }, { status: 500 });
+
+  return NextResponse.json({ images: next });
 }
 
 export async function DELETE(
@@ -153,8 +202,29 @@ function asImages(value: unknown): ModelImage[] {
             slot: (i as ModelImage).slot || "product",
             url: (i as ModelImage).url,
             caption: (i as ModelImage).caption ?? null,
+            labels: asLabels((i as ModelImage).labels),
           },
         ]
       : [],
   );
 }
+
+/**
+ * Coordinates are clamped rather than rejected. They arrive from a click on a
+ * preview, and a click one pixel outside the image is a slip, not an attack —
+ * dropping the label would lose the text the author just typed. Out-of-range
+ * values do have to be stopped though: a label at 400% prints outside the
+ * page box, where it is invisible on screen and still there in the PDF.
+ */
+function asLabels(value: unknown): ImageLabel[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((l) => {
+    if (!l || typeof l !== "object") return [];
+    const { x, y, text } = l as ImageLabel;
+    const t = typeof text === "string" ? text.trim().slice(0, 60) : "";
+    if (!t || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+    return [{ x: clamp(x), y: clamp(y), text: t }];
+  });
+}
+
+const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n * 10) / 10));

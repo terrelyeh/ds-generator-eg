@@ -102,10 +102,31 @@ export interface FeatureBlock {
   bullets: string[];
 }
 
+/**
+ * A word printed ON an illustration, positioned as a percentage of the
+ * image's own box (not the page), so it survives the image being scaled to
+ * whatever height the layout gives it.
+ *
+ * Typeset by the renderer, never baked into the raster. Asking an image
+ * model for the label is the obvious shortcut and it does not work: "EOR200"
+ * comes back as "E0R2OO", "802.3af/at" as something that merely looks like a
+ * standard. A wrong part number on a tender document is worse than no label.
+ * Drawn by the layout it is real type, editable after the fact, translatable,
+ * and sharp at print resolution.
+ */
+export interface ImageLabel {
+  /** 0–100, from the left edge of the image */
+  x: number;
+  /** 0–100, from the top edge of the image */
+  y: number;
+  text: string;
+}
+
 /** One image attached to a model column. */
 export interface ModelImage {
   /** 'product' for the cover shot, anything else lands on the hardware page */
   slot: string;
   url: string;
   caption?: string | null;
+  labels?: ImageLabel[] | null;
 }

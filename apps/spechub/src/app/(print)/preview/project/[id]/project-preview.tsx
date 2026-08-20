@@ -124,7 +124,16 @@ function asImages(value: unknown): ModelImage[] {
     if (!i || typeof i !== "object") return [];
     const img = i as Partial<ModelImage>;
     if (typeof img.url !== "string" || !img.url) return [];
-    return [{ slot: img.slot || "product", url: img.url, caption: img.caption ?? null }];
+    return [
+      {
+        slot: img.slot || "product",
+        url: img.url,
+        caption: img.caption ?? null,
+        // Dropping this silently is how a label the author placed and saved
+        // turns into an image that simply prints without it.
+        labels: Array.isArray(img.labels) ? img.labels : [],
+      },
+    ];
   });
 }
 
@@ -252,15 +261,49 @@ export function ProjectPreview({
             ? "specs"
             : "cover";
 
+  /**
+   * "Ports and yards — outdoor mounting, cameras on the same run" is a name
+   * and then an explanation. Splitting on the em dash lets the name carry the
+   * weight, so the page can be scanned for the scenarios without reading
+   * every sentence. A caption with no dash is left exactly as written.
+   */
+  const Caption = ({ text }: { text: string }) => {
+    const at = text.indexOf("—");
+    if (at <= 0) return <>{text}</>;
+    return (
+      <>
+        <strong>{text.slice(0, at).trimEnd()}</strong>
+        {" " + text.slice(at)}
+      </>
+    );
+  };
+
   /* Measured, not guessed: 792pt page - 21pt top bar - 30pt top padding -
      the footer band leaves ~596pt, and the title eats ~32pt of it. 560 keeps
      a margin for a caption that wraps to two lines. Divided by the number of
      vignettes rather than fixed, so two get a half-page each and four still
-     land on one page. */
+     land on one page. 34pt per caption, not 26: at bodyMd a caption that
+     wraps to two lines is 14pt taller, and the one that overran the footer
+     band was the second of two. */
+  /* The labels are positioned against the wrapper, and the wrapper
+     shrink-wraps the image, so a percentage means the same place on the
+     picture no matter what size the page gives it. */
+  const Illustration = ({ img, alt }: { img: ModelImage; alt: string }) => (
+    <span className="img-wrap">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={img.url} alt={alt} />
+      {(img.labels ?? []).map((l, i) => (
+        <span className="img-label" key={i} style={{ left: `${l.x}%`, top: `${l.y}%` }}>
+          {l.text}
+        </span>
+      ))}
+    </span>
+  );
+
   const ScenarioRow = ({ items, big }: { items: ModelImage[]; big: boolean }) => {
     const cols = items.length > 2;
     const rows = cols ? Math.ceil(items.length / 2) : items.length;
-    const each = Math.floor((560 - (rows - 1) * 22 - rows * 26) / rows);
+    const each = Math.floor((560 - (rows - 1) * 22 - rows * 34) / rows);
     return (
     <div
       className={`scenarios${big ? " big" : ""}${big && cols ? " cols" : ""}`}
@@ -268,9 +311,12 @@ export function ProjectPreview({
     >
       {items.map((d, i) => (
         <div className="scenario" key={i}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={d.url} alt={d.caption ?? "Application scenario"} />
-          {d.caption && <div className="scenario-cap">{d.caption}</div>}
+          <Illustration img={d} alt={d.caption ?? "Application scenario"} />
+          {d.caption && (
+            <div className="scenario-cap">
+              <Caption text={d.caption} />
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -350,6 +396,10 @@ export function ProjectPreview({
   return (
     <>
       {showToolbar && <ProjectPrintToolbar id={doc.id} name={doc.name} />}
+      {/* ⚠️ Everything below is ONE template literal. A backtick inside a CSS
+          comment — quoting a property name, say — closes it, and the parse
+          error lands on a line nowhere near the comment. Write property names
+          plainly: object-fit: contain, not the quoted form. */}
       <style
         dangerouslySetInnerHTML={{
           __html: `
@@ -468,11 +518,13 @@ body {
   flex: 1; min-height: 0; margin-top: 18pt;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-/* flex:1 on the image sizes the FLEX ITEM but leaves the replaced element
-   free to overflow it, which cropped the illustration at the page edge.
-   A definite height plus object-fit makes it scale to the box instead.
-   (No backticks in here — this whole block is a template literal.) */
-.deploy img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+/* A capped natural size rather than object-fit: contain letterboxes, so the
+   element box stays the size of its container while the painted image sits
+   somewhere inside it, so a label at 50%/50% of the ELEMENT lands nowhere
+   near the middle of the picture. Sized by max-height with auto width the
+   element and the picture are the same rectangle, and the wrapper the labels
+   are positioned against shrink-wraps to exactly that. */
+.deploy img { display: block; width: auto; height: auto; max-width: 100%; max-height: 250pt; }
 /* On a page of their own the vignettes get real size; squeezed under a
    benefits grid they stay thumbnails.
 
@@ -484,10 +536,9 @@ body {
 .scenarios.big { flex-direction: column; align-items: stretch; gap: 22pt; margin-top: 20pt; }
 .scenarios.big .scenario { flex: none; }
 .scenarios.big .scenario img {
-  display: block; margin: 0 auto;
-  width: auto; max-width: 100%; max-height: var(--scenario-h); object-fit: contain;
+  display: block; width: auto; max-width: 100%; max-height: var(--scenario-h);
 }
-.scenarios.big .scenario-cap { font-size: ${PT.bodySm}pt; margin-top: 7pt; }
+.scenarios.big .scenario-cap { font-size: ${PT.bodyMd}pt; margin-top: 9pt; }
 .scenarios.big.cols { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
 .scenarios.big.cols .scenario { flex: 0 0 calc(50% - 11pt); }
 .block {
@@ -559,7 +610,23 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 .scenario { flex: 1; min-width: 0; text-align: center; }
 .scenario img { width: 100%; max-height: 118pt; object-fit: contain; }
 .scenario-cap {
-  font-size: ${PT.table}pt; color: ${MUTED}; margin-top: 2pt; line-height: 1.35;
+  font-size: ${PT.bodySm}pt; color: ${MUTED}; margin-top: 4pt; line-height: 1.4;
+}
+/* The half before the em dash names the scene; the half after explains it.
+   Bolding the name lets someone scanning the page collect the scenarios
+   without reading the sentences. */
+.scenario-cap strong { font-weight: ${WT.semi}; color: ${INK}; }
+
+/* A word printed on the illustration itself. Positioned as a percentage of
+   the image box, so it stays put whatever height the page gives the image.
+   The pale plate behind it is what keeps it readable over line art without
+   having to know what is underneath. */
+.img-wrap { position: relative; display: inline-block; line-height: 0; max-width: 100%; }
+.img-label {
+  position: absolute; transform: translate(-50%, -50%);
+  font-size: ${PT.table}pt; font-weight: ${WT.semi}; color: ${theme.primary};
+  background: rgba(255, 255, 255, 0.92); border: 0.5pt solid #d8dfe6;
+  border-radius: 2pt; padding: 1.5pt 4pt; white-space: nowrap; line-height: 1.25;
 }
 
 /* ── footer ─────────────────────────────────────────────────────────
@@ -664,8 +731,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
                   </div>
                 )}
                 <div className="deploy">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={diagram.url} alt="Application diagram" />
+                  <Illustration img={diagram} alt="Application diagram" />
                 </div>
               </div>
             )}
@@ -768,8 +834,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
             <div className="diagram-block">
               {!heroWithFeatures && (
                 <div className="deploy">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={diagram.url} alt="Application diagram" />
+                  <Illustration img={diagram} alt="Application diagram" />
                 </div>
               )}
               {scenarios.length > 0 && <ScenarioRow items={scenarios} big={heroWithFeatures} />}
