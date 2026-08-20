@@ -284,7 +284,12 @@ export function ProjectPreview({
      vignettes rather than fixed, so two get a half-page each and four still
      land on one page. 34pt per caption, not 26: at bodyMd a caption that
      wraps to two lines is 14pt taller, and the one that overran the footer
-     band was the second of two. */
+     band was the second of two.
+
+     590 rather than 596: the measurement is of the gap between the title and
+     the footer band, and a few points of it should stay empty. Height is what
+     bounds these images — the width follows from the aspect ratio — so every
+     point given back here is a wider picture. */
   /* The labels are positioned against the wrapper, and the wrapper
      shrink-wraps the image, so a percentage means the same place on the
      picture no matter what size the page gives it. */
@@ -293,8 +298,14 @@ export function ProjectPreview({
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={img.url} alt={alt} />
       {(img.labels ?? []).map((l, i) => (
-        <span className="img-label" key={i} style={{ left: `${l.x}%`, top: `${l.y}%` }}>
-          {l.text}
+        <span key={i}>
+          <span className="img-dot" style={{ left: `${l.x}%`, top: `${l.y}%` }} />
+          <span
+            className={`img-label ${l.side ?? "right"}`}
+            style={{ left: `${l.x}%`, top: `${l.y}%` }}
+          >
+            {l.text}
+          </span>
         </span>
       ))}
     </span>
@@ -303,7 +314,7 @@ export function ProjectPreview({
   const ScenarioRow = ({ items, big }: { items: ModelImage[]; big: boolean }) => {
     const cols = items.length > 2;
     const rows = cols ? Math.ceil(items.length / 2) : items.length;
-    const each = Math.floor((560 - (rows - 1) * 22 - rows * 34) / rows);
+    const each = Math.floor((590 - (rows - 1) * 22 - rows * 34) / rows);
     return (
     <div
       className={`scenarios${big ? " big" : ""}${big && cols ? " cols" : ""}`}
@@ -533,7 +544,14 @@ body {
    an otherwise blank page. Stacked one per row they can be as wide as the
    aspect ratio allows and actually fill the paper. Three or more go back to
    two columns, where stacking would shrink each one below legibility. */
-.scenarios.big { flex-direction: column; align-items: stretch; gap: 22pt; margin-top: 20pt; }
+/* Centred in the space left over, not pinned to the title. At full column
+   width the stack fills most of the page, so the remainder reads as balanced
+   margins rather than as the floating-in-a-blank-page problem that made them
+   stack in the first place. */
+.scenarios.big {
+  flex: 1; min-height: 0; flex-direction: column; align-items: stretch;
+  justify-content: center; gap: 22pt; margin-top: 20pt;
+}
 .scenarios.big .scenario { flex: none; }
 .scenarios.big .scenario img {
   display: block; width: auto; max-width: 100%; max-height: var(--scenario-h);
@@ -622,12 +640,24 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
    The pale plate behind it is what keeps it readable over line art without
    having to know what is underneath. */
 .img-wrap { position: relative; display: inline-block; line-height: 0; max-width: 100%; }
+/* The dot marks the thing; the text sits beside it. A box centred on the
+   point covers whatever was being pointed at, which on an application
+   diagram is the one thing the picture is for. */
+.img-dot {
+  position: absolute; width: 3pt; height: 3pt; border-radius: 50%;
+  background: ${theme.primary}; transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 1.2pt rgba(255, 255, 255, 0.95);
+}
 .img-label {
-  position: absolute; transform: translate(-50%, -50%);
+  position: absolute;
   font-size: ${PT.table}pt; font-weight: ${WT.semi}; color: ${theme.primary};
   background: rgba(255, 255, 255, 0.92); border: 0.5pt solid #d8dfe6;
   border-radius: 2pt; padding: 1.5pt 4pt; white-space: nowrap; line-height: 1.25;
 }
+.img-label.right { transform: translate(7pt, -50%); }
+.img-label.left { transform: translate(-100%, -50%) translateX(-7pt); }
+.img-label.top { transform: translate(-50%, -100%) translateY(-7pt); }
+.img-label.bottom { transform: translate(-50%, 0) translateY(7pt); }
 
 /* ── footer ─────────────────────────────────────────────────────────
    The catalogue footer, unchanged: grey band, logo + disclaimer on the
