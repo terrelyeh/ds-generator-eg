@@ -187,12 +187,25 @@ function placeAdds(out: Column, adds: AddedRow[]): Column {
   return new Map(entries);
 }
 
-/** `poe_input` → `Poe Input`. Only used when a rule invents a row. */
+/**
+ * Acronyms that must not be title-cased. Without them an invented row shows
+ * up as "Ip Rating" or "Poe Input" — which looks like a typo on a document
+ * a customer is reading, and is one, ours.
+ */
+const ACRONYMS = new Set([
+  "ip", "poe", "led", "sim", "lan", "wan", "usb", "rf", "nr", "lte", "gsm",
+  "mimo", "qos", "vpn", "ddns", "upnp", "dhcp", "dns", "ipv4", "ipv6", "emi",
+  "esd", "cpu", "ram", "rom", "sku", "mtbf", "poe_plus", "gps", "ntp", "snmp",
+]);
+
+/** `poe_input` → `PoE Input`, `ip_rating` → `IP Rating`. */
 function humanizeKey(key: string): string {
   return key
     .split("_")
     .filter(Boolean)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .map((w) =>
+      w === "poe" ? "PoE" : ACRONYMS.has(w) ? w.toUpperCase() : w.charAt(0).toUpperCase() + w.slice(1),
+    )
     .join(" ");
 }
 

@@ -112,15 +112,18 @@ export function layoutOptions(): { value: string; label: string }[] {
 /**
  * The Preliminary notice a new project datasheet starts with.
  *
- * Editable afterwards — the DB only enforces that it isn't blank. `{customer}`
- * is substituted at creation, not at render, so editing the customer field
- * later doesn't silently rewrite wording someone approved.
+ * Deliberately NAMES NOBODY. One sourced product is approached to several
+ * projects, so a customer's name printed on the document makes it useless
+ * for the next one — and worse, a sheet that reaches the wrong reader with
+ * another buyer's name on it says who else we are quoting.
+ *
+ * Who it was prepared for lives in the internal fields, which never print.
+ * Editable afterwards — the DB only enforces that it isn't blank.
  */
-export function defaultDisclaimer(customer?: string | null): string {
-  const who = customer?.trim() ? ` for ${customer.trim()}` : "";
+export function defaultDisclaimer(): string {
   return (
-    `PRELIMINARY — Prepared${who}. Specifications are subject to change ` +
-    `without notice and do not constitute a commitment to supply.`
+    "PRELIMINARY — Specifications are subject to change without notice and " +
+    "do not constitute a commitment to supply."
   );
 }
 

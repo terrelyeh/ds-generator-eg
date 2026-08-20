@@ -30,10 +30,7 @@ export async function POST(request: Request) {
       name,
       customer: body.customer?.trim() || null,
       layout: body.layout || DEFAULT_LAYOUT,
-      // Substituted once, at creation. Re-deriving it whenever `customer`
-      // changes would silently rewrite wording someone may have cleared with
-      // the customer — the notice is editable text from here on.
-      disclaimer: defaultDisclaimer(body.customer),
+      disclaimer: defaultDisclaimer(),
       image_note: DEFAULT_IMAGE_NOTE,
       created_by: user?.id ?? null,
     })

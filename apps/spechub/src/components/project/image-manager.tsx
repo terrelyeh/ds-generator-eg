@@ -161,4 +161,4 @@ export const MODEL_SLOTS = [
   { value: "view", label: "硬體外觀" },
 ];
 
-export const DOC_SLOTS = [{ value: "diagram", label: "部署示意圖" }];
+export const DOC_SLOTS = [{ value: "diagram", label: "應用情境圖" }];
