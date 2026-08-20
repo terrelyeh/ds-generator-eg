@@ -225,6 +225,14 @@ function LabelEditor({
   const [caption, setCaption] = useState(image.caption ?? "");
   const [labels, setLabels] = useState<ImageLabel[]>(image.labels ?? []);
   const [drag, setDrag] = useState<number | null>(null);
+  /**
+   * Index of the label just placed, so its text box takes the caret.
+   *
+   * Without it, clicking the picture drops a dot and nothing else visibly
+   * happens — the row that wants typing is below the image, out of the eye's
+   * path. The gesture reads as "nothing was added".
+   */
+  const [fresh, setFresh] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
 
   function pointToPercent(e: { clientX: number; clientY: number }) {
@@ -258,7 +266,11 @@ function LabelEditor({
           className="block max-h-[420px] w-auto max-w-full"
           onClick={(e) => {
             const at = pointToPercent(e);
-            if (at) setLabels((ls) => [...ls, { ...at, text: "", side: "right" }]);
+            if (!at) return;
+            setLabels((ls) => {
+              setFresh(ls.length);
+              return [...ls, { ...at, text: "", side: "right" }];
+            });
           }}
         />
         {labels.map((l, i) => (
@@ -284,8 +296,9 @@ function LabelEditor({
         ))}
       </div>
       <p className="text-center text-xs text-muted-foreground">
-        點設備上（或旁邊）新增一個標記點，拖曳可移動。文字會印在標記點的旁邊，
-        用下方的箭頭選要放哪一邊，才不會蓋到設備。
+        <strong className="font-medium text-[#231f20]">點圖片上任一處就新增一個標記點</strong>
+        ，可以加很多個；拖曳標籤可移動。文字會印在標記點旁邊，用下方的箭頭選要放哪一邊，
+        才不會蓋到設備。
       </p>
 
       <div className="space-y-2">
@@ -295,6 +308,12 @@ function LabelEditor({
               value={l.text}
               maxLength={60}
               placeholder="例：EOR200"
+              ref={(el) => {
+                if (el && fresh === i) {
+                  el.focus();
+                  setFresh(null);
+                }
+              }}
               onChange={(e) =>
                 setLabels((ls) => ls.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))
               }
