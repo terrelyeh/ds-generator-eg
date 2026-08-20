@@ -801,13 +801,25 @@ export function ProjectEditor({
                           <p className="mt-1 max-w-[660px] text-xs text-muted-foreground">
                             原廠的 PDF／Excel 讀進來就長這樣，或你自己手打。
                             <strong>這一格是「原廠怎麼寫」，② 那一格是「我們決定怎麼改」。</strong>
-                            <br />
-                            兩邊都留著，是為了讓規格表上每一格都答得出「這是原廠寫的，還是我們改的」——
-                            客戶問起來、或原廠之後出新版重讀一次的時候，差別都還在。
-                            <span className="text-amber-800">
-                                如果直接在這一格改掉，那個差別就永遠消失了，重讀來源時你的修改也會一起不見。
-                            </span>
                           </p>
+                          {/* "Don't edit this" was heard as "this is
+                              read-only", which is both wrong and unsafe —
+                              editing works fine, and transcription errors
+                              SHOULD be fixed here. What matters is which of
+                              the two acts you are performing. */}
+                          <div className="mt-1.5 max-w-[660px] space-y-1 text-xs text-muted-foreground">
+                            <p>
+                              <strong className="text-[#231f20]">這一格可以改，改了也真的會生效</strong>
+                              ——但只為了一個理由：<strong>抽取讀錯了</strong>
+                              （併行、漏列、值讀歪），也就是修正「原廠到底寫了什麼」的紀錄。
+                            </p>
+                            <p className="text-amber-800">
+                              「我們決定要跟原廠不一樣」的（淨重、統一溫度、IP67）
+                              <strong>一律寫成 ② 的規則</strong>。寫進這一格有兩個後果：
+                              原廠那句話永遠消失、規格表上再也分不出哪格是我們改的；
+                              而且哪天重新上傳來源，這一格會被整份取代，你的修改跟著不見。
+                            </p>
+                          </div>
                         </div>
                         <SourceExtract
                           docId={doc.id}
