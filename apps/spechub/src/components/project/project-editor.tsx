@@ -424,6 +424,8 @@ export function ProjectEditor({
         <TabsContent value="status" className="space-y-5 pt-5">
           <RequirementsIntake
             docId={doc.id}
+            modelCount={drafts.length}
+            onGoToModels={() => setTab("specs")}
             onApplied={() => {
               setReviewKey((k) => k + 1);
               router.refresh();
