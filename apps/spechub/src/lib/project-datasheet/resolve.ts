@@ -76,6 +76,13 @@ export function asRawDoc(value: unknown): RawSpecRow[] {
  * chipset" is a statement about the document, and letting a column re-enable
  * a row the document suppressed would defeat the reason doc-level rules
  * exist at all.
+ *
+ * `add` is model-only: a new row needs a value for the column it appears in.
+ * Wanting the same new row on every model already has a spelling — a
+ * doc-level `key = value` invents the row wherever it is missing — so this
+ * drops rather than supports a second way to say it. The editor warns when a
+ * doc-level rule set carries `add`, because a silently ignored rule is
+ * exactly the failure this module exists to prevent.
  */
 export function mergeRules(doc: DocRules, model: SpecRules): SpecRules {
   return {

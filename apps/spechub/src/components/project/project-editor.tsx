@@ -172,6 +172,17 @@ export function ProjectEditor({
   const activeModel =
     modelTab && drafts.some((d) => d.id === modelTab) ? modelTab : (drafts[0]?.id ?? "");
 
+  /**
+   * `+` lines written in the DOCUMENT-level box.
+   *
+   * `mergeRules` takes `add` from the model only, so a doc-level addition is
+   * parsed, stored, and then silently dropped — the row never appears and
+   * nothing says why. Adding a row for every model already has a spelling
+   * (`key = value`, which invents the row wherever it's missing), so the fix
+   * is to point at it rather than to accept two syntaxes for one act.
+   */
+  const docAddLines = (parseRules(docRules).add ?? []).map((a) => a.label);
+
   const docImageCount = parseImagesJson(doc.images).length;
   const withSpecs = drafts.filter((d) => d.raw.trim().length > 0).length;
   const withImages = models.filter(
@@ -657,6 +668,25 @@ export function ProjectEditor({
               className="font-mono text-xs"
               placeholder={"- cpu\ningress_protection = IP67"}
             />
+            {docAddLines.length > 0 && (
+              <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                <strong>這裡的 + 不會生效：</strong>
+                {docAddLines.join("、")}。
+                <code className="mx-1 rounded bg-white px-1">+</code>
+                只在個別型號的調整區有用（新增一列要有那一台自己的值）。
+                <br />
+                如果每一台的值都一樣，直接寫{" "}
+                <code className="rounded bg-white px-1">
+                  {docAddLines[0]
+                    .trim()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, "_")
+                    .replace(/^_+|_+$/g, "")}{" "}
+                  = 值
+                </code>{" "}
+                就好——來源沒有這一列的話會自己長出來，效果一樣。
+              </p>
+            )}
           </Panel>
 
           <div className="space-y-4">
