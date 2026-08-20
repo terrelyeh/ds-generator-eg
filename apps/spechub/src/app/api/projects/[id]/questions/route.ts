@@ -60,12 +60,14 @@ export async function GET(
   const models = (modelRows ?? []) as ProjectDatasheetModel[];
   const stored = (questionRows ?? []) as ProjectDatasheetQuestion[];
 
+  const sourceText = await loadSourceText(supabase, id);
+
   const rows = resolveMatrix({
     models,
     docRules: (doc.doc_rules ?? {}) as DocRules,
     blankPolicy: (doc.blank_policy as BlankMode) ?? "tbd",
   });
-  const findings = scanDocument({ doc, models, rows });
+  const findings = scanDocument({ doc, models, rows, sourceText });
 
   const byId = new Map(stored.map((q) => [storedFindingId(q), q]));
   const live = new Set(findings.map(findingId));
@@ -183,6 +185,28 @@ export async function GET(
       date: new Date().toISOString().slice(0, 10),
     }),
   });
+}
+
+/**
+ * The extracted text of every spec source on this document.
+ *
+ * `requirements` sources are excluded: sales' own note is where half these
+ * values came from, so treating it as independent corroboration would have
+ * the scanner cite our own instruction back at us as if the supplier had
+ * said it.
+ */
+async function loadSourceText(
+  supabase: ReturnType<typeof createAdminClient>,
+  docId: string,
+): Promise<string> {
+  const { data } = await supabase
+    .from("project_datasheet_sources")
+    .select("extracted_text, kind")
+    .eq("project_datasheet_id", docId);
+  return ((data ?? []) as { extracted_text: string | null; kind: string }[])
+    .filter((s) => s.kind !== "requirements" && s.extracted_text)
+    .map((s) => s.extracted_text as string)
+    .join("\n\n");
 }
 
 /** Questions raised by requirements intake, not by a scanner check. */

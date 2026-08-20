@@ -76,6 +76,16 @@ export interface ScanInput {
   models: ScanModel[];
   /** the resolved matrix, so the scanner sees exactly what will print */
   rows: ResolvedRow[];
+  /**
+   * The source documents' full text, when extraction has run.
+   *
+   * A supplier states plenty of specs in PROSE that never reach its spec
+   * table — the 5G sheet's overview says "the waterproof level is up to
+   * IP66" while the table says nothing about ingress at all. Without this the
+   * scanner can only report "no source for IP67", which is true and much
+   * less useful than "the source says IP66".
+   */
+  sourceText?: string;
 }
 
 // ── residue detection ──────────────────────────────────────────────────────
@@ -244,6 +254,31 @@ function compareToSource(src: string, override: string): Verdict {
   };
 }
 
+// ── coded specs stated in prose ────────────────────────────────────────────
+
+/**
+ * Specs written as codes, which is what makes them findable in running text.
+ *
+ * Only patterns where a mismatch is unambiguous belong here. "-40°C" appears
+ * in prose in a dozen shapes and half of them are storage rather than
+ * operating temperature, so matching it would produce confident nonsense.
+ */
+const CODED_SPECS: { name: string; re: RegExp }[] = [
+  { name: "防護等級", re: /\bIP\s?(\d{2}K?)\b/gi },
+  { name: "PoE 等級", re: /\b802\.3\s?(af|at|bt)\b/gi },
+];
+
+/** Distinct codes of each kind found in a blob of text. */
+function codesIn(text: string): Map<string, Set<string>> {
+  const out = new Map<string, Set<string>>();
+  for (const spec of CODED_SPECS) {
+    const found = new Set<string>();
+    for (const m of text.matchAll(spec.re)) found.add(m[0].replace(/\s+/g, "").toUpperCase());
+    if (found.size) out.set(spec.name, found);
+  }
+  return out;
+}
+
 // ── cross-model consistency ────────────────────────────────────────────────
 
 /**
@@ -265,9 +300,10 @@ const SHOULD_MATCH = new Set([
 
 // ── the scan ───────────────────────────────────────────────────────────────
 
-export function scanDocument({ doc, models, rows }: ScanInput): Finding[] {
+export function scanDocument({ doc, models, rows, sourceText }: ScanInput): Finding[] {
   const findings: Finding[] = [];
   const add = (f: Finding) => findings.push(f);
+  const sourceCodes = sourceText ? codesIn(sourceText) : new Map<string, Set<string>>();
 
   const docRules = (doc.doc_rules ?? {}) as DocRules;
   const perModel = models.map((m) => ({
@@ -378,18 +414,38 @@ export function scanDocument({ doc, models, rows }: ScanInput): Finding[] {
       if (rules.hide?.includes(key)) continue;
       const src = sourced.get(key);
       if (src === undefined) {
-        add({
-          code: "unsourced_value",
-          kind: "doubt",
-          severity: "blocking",
-          askedOf: "rd",
-          modelId: model.id,
-          rowKey: key,
-          title: `${model.model_name} — ${labelFor(rows, key)} 的值不是來源給的`,
-          detail:
-            `文件寫「${value}」，但來源規格表沒有這一項。這個數字是我們自己填進去的，` +
-            `送出去就是對客戶的承諾——請 RD 確認。`,
-        });
+        // A value the spec TABLE lacks may still be stated in the source's
+        // prose, and if the prose says something else that is a far sharper
+        // question than "where did this come from".
+        const contradiction = proseConflict(value, sourceCodes);
+        if (contradiction) {
+          add({
+            code: "source_prose_conflict",
+            kind: "doubt",
+            severity: "blocking",
+            askedOf: "rd",
+            modelId: model.id,
+            rowKey: key,
+            title: `${model.model_name} — ${labelFor(rows, key)} 跟來源內文不一樣`,
+            detail:
+              `文件寫「${value}」，但來源的內文寫的是「${contradiction.found}」` +
+              `（不在規格表裡，在敘述段落）。改這個等於改${contradiction.name}，` +
+              `要 RD 確認做得到。`,
+          });
+        } else {
+          add({
+            code: "unsourced_value",
+            kind: "doubt",
+            severity: "blocking",
+            askedOf: "rd",
+            modelId: model.id,
+            rowKey: key,
+            title: `${model.model_name} — ${labelFor(rows, key)} 的值不是來源給的`,
+            detail:
+              `文件寫「${value}」，但來源規格表沒有這一項。這個數字是我們自己填進去的，` +
+              `送出去就是對客戶的承諾——請 RD 確認。`,
+          });
+        }
       } else {
         const verdict = compareToSource(src, value);
         if (verdict.kind === "same") continue;
@@ -567,6 +623,29 @@ function renderedColumns(rows: ResolvedRow[], modelCount: number): Map<string, S
     }
   }
   return out;
+}
+
+/**
+ * Does the source's prose state a DIFFERENT code of the same kind?
+ *
+ * "Different" is the whole test. A source that also says IP67 is agreement,
+ * not conflict, and reporting it would train people to skip these.
+ */
+function proseConflict(
+  value: string,
+  sourceCodes: Map<string, Set<string>>,
+): { name: string; found: string } | null {
+  for (const spec of CODED_SPECS) {
+    const ours = new Set(
+      [...value.matchAll(spec.re)].map((m) => m[0].replace(/\s+/g, "").toUpperCase()),
+    );
+    if (ours.size === 0) continue;
+    const theirs = sourceCodes.get(spec.name);
+    if (!theirs || theirs.size === 0) continue;
+    if ([...ours].some((o) => theirs.has(o))) continue;
+    return { name: spec.name, found: [...theirs].join("、") };
+  }
+  return null;
 }
 
 /** Stable identity for a finding across rescans. */

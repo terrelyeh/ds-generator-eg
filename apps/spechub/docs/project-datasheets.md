@@ -133,6 +133,52 @@ SIM slot 整格刪掉**，而且在建議清單上讀起來完全合理。
 `text` 是貼進來的**規格內容**，會被抽成 `raw_doc`;`requirements` 是**對文件的指令**）。
 `extraction` 存解析結果 + 誰被勾選套用——規則合併之後就回不去的那個資訊。
 
+## 抽取 — 來源進來的地方
+
+`lib/project-datasheet/extract.ts`。三種輸入（PDF / XLSX / 貼文字）先各自轉成
+**頁文字**，之後只有一種格式要處理，新增一種輸入只要多一個 reader。
+
+### 原文照抄，不做好心的整理
+
+單位不換、全形不轉、`＜24W（POE 48V/0.6A）` 就是原封不動進來。
+**每一個「整理」都是人為修改，屬於 `rules`**——放在那裡才會在 gap review 上
+顯示成「某人改了什麼」。`raw_doc` 保持不可變的意義就是它要能跟客戶哪天拿出來的
+那份 PDF 對得起來。
+
+實測（EOR 那兩份 WPS PDF）：4G 4 頁 → 15 列，5G 7 頁 → 45 列，
+group（spec / software / package）全對、頁碼全對，
+連來源自己把 DDNS 打成 `DNNS` 都照抄並在 notes 裡提了一句。
+
+### 套件選擇
+
+- **PDF：`unpdf`**。Vercel 上**沒有 poppler**，所以不能用 `pdftotext`。
+  unpdf 是純 JS、serverless 友善。沒有文字層（掃描檔）會**明講讀不到**，
+  不會安靜回一個空的。
+- **XLSX：`exceljs`，不是 `xlsx`**。npm 上的 `xlsx` 最新版（0.18.5）
+  仍帶著兩個未修的 advisory（prototype pollution + ReDoS）**而且就在 parser 裡**——
+  那正是上傳的原廠檔案會經過的路徑。exceljs 只有一個 transitive `uuid` 的
+  moderate，不在我們的路徑上。
+- **不做 OCR**。這些 ODM 檔都是 WPS 匯出、文字層乾淨。對一份自己就帶文字的文件
+  動用視覺模型，比較慢、比較貴、也比較不準。
+
+### 套用是「取代」不是「合併」
+
+`raw_doc` 是**一份來源的一次讀取**。合併兩次讀取會得到一份跟哪一份 PDF 都對不起來的文件。
+所以套用前的預覽會先講清楚代價：**會取代幾列**，以及**哪些規則會失去對象**
+（`findOrphanedRules`）。規則不會消失，只是靜靜不生效——而那正是這個模組要吵出來的失敗模式。
+
+### 來源原文會餵進殘留掃描
+
+供應商有一堆規格是寫在**敘述段落**裡、從來沒進規格表。5G 那份的 overview 寫
+「the waterproof level is up to IP66」，規格表則完全沒提防護等級。
+
+沒有來源原文時，掃描器只能說「IP67 沒有來源」——是實話，但沒什麼用。
+有了之後它會說：**「來源的內文寫的是 IP66」**。`unsourced_value` 會換成
+`source_prose_conflict`——是**另一個問題**，所以舊的關掉、新的打開是對的行為。
+
+只比對**代碼型**規格（IP 等級、802.3 等級）。像 `-40°C` 在內文有十幾種寫法、
+一半還是儲存溫度而不是工作溫度，比對它只會產出很有自信的胡說。
+
 ## Gap review — 引導層
 
 這個模組不是「一次把 datasheet 生對」的轉換器。業務手上的資訊永遠不完整，
@@ -242,6 +288,7 @@ src/lib/project-datasheet/
   brief.ts        澄清訊息（模板、zh-TW、按誰能回答分組）
   intake.ts       業務需求 → 建議規則 + 待問問題
   answer.ts       答覆 → 規格改動建議（跟 intake 共用提案格式）
+  extract.ts      PDF / XLSX / 文字 → 頁文字 → raw_doc 列
   apply-items.ts  套用提案（intake 與 answer 共用的唯一寫入點）
 src/app/(main)/projects/                列表 + 編輯器
 src/app/(print)/preview/project/[id]/   渲染
@@ -258,6 +305,9 @@ scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
 **M2 完成**：gap review（缺／疑／險三類掃描）、questions 表對帳、澄清訊息、
 readiness gate。跑 EOR 這份的結果是 22 項（7 blocking）。
 
+**M3 完成**：來源抽取（PDF `unpdf` / XLSX `exceljs` / 貼文字）、
+套用前預警（取代幾列、哪些規則會失效）、來源原文餵進殘留掃描（IP66 vs IP67）。
+
 **答案→規則 完成**：記錄答覆會提出規格改動建議，共用 intake 的提案／審查／套用管線。
 
 **M2.5 完成**：requirements intake（LLM 解析 → 建議 → 勾選套用）、
@@ -265,11 +315,9 @@ readiness gate。跑 EOR 這份的結果是 22 項（7 blocking）。
 **都不會印在 PDF 上**）、編輯區放大 15%。
 
 **還沒做**：
-- **M3 抽取** — PDF（Vercel 上沒有 poppler，要用 JS 的 `unpdf`/`pdf-parse`，這是第一個要驗的技術點）、
-  XLSX（sheetjs）、貼上文字；LLM 只做結構化不做改寫，逐格帶 `source_page` + `confidence`。
-  抽進來之後**來源全文也要進殘留掃描**——現在只掃得到規格列，
-  掃不到 overview 原文裡的 "based on the new SDX62 platform"
 - **M4** — Duplicate（複製給下一個客戶）、封存
+- 掃描版 PDF（現在會明講讀不到）
+- 殘留掃描目前比對代碼型規格（IP／802.3）；溫度、天線數這類要更聰明的比對
 - **自由排序** — 目前的順序是「合併各欄、各欄保持自己的相對順序」＋ `add.after`
   指定新列位置。這個組合對 EOR 這種案子已經對了（5G NR 排到最上面跟其他射頻規格一起、
   Antenna gain 落在 Dimensions 旁邊、PoE 落在 Interface 後面），但沒有「把這列拖到那裡」

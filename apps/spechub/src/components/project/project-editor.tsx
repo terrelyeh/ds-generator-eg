@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { layoutOptions } from "@/lib/project-datasheet/themes";
 import { GapReview } from "@/components/project/gap-review";
 import { RequirementsIntake } from "@/components/project/requirements-intake";
+import { SourceExtract } from "@/components/project/source-extract";
 import { asRawDoc, asRules, findOrphanedRules, mergeRules } from "@/lib/project-datasheet/resolve";
 import {
   parseFeatureBlocks,
@@ -493,9 +494,20 @@ export function ProjectEditor({
                   className="font-mono text-xs"
                 />
               </Field>
+              <div className="space-y-2">
+                <SourceExtract
+                  docId={doc.id}
+                  modelId={d.id}
+                  modelName={d.model_name}
+                  onApplied={() => {
+                    setReviewKey((k) => k + 1);
+                    router.refresh();
+                  }}
+                />
+              </div>
               <Field
                 label="Source specs"
-                hint="paste the supplier table: `label ⇥ value`, a line starting with a tab continues the value above, `## software` / `## package` start a new table"
+                hint="上面讀進來的原文會落在這裡，也可以直接手打：`label ⇥ value`，行首是 tab 表示接續上一列的值，`## software` / `## package` 開新的表"
               >
                 <Textarea
                   rows={12}

@@ -28,3 +28,13 @@ export const BATTLECARD_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";
  * proposes, a human confirms.
  */
 export const PROJECT_INTAKE_MODEL = "anthropic/claude-sonnet-4.6";
+
+/**
+ * Project Datasheet Builder source extraction.
+ *
+ * Long-input transcription with a hard "change nothing" rule — a different
+ * job from intake's short-input judgement, so it gets its own constant even
+ * though the slug currently matches. Tuning one should not silently move the
+ * other.
+ */
+export const PROJECT_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";

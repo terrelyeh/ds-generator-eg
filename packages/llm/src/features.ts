@@ -33,6 +33,7 @@ export type Feature =
   | "translate"
   | "battlecard"
   | "project-intake"
+  | "project-extract"
   | "budget-check";
 
 export const FEATURE_TAGS: Record<Feature, string> = {
@@ -68,6 +69,14 @@ export const FEATURE_TAGS: Record<Feature, string> = {
    * handful of times per deal.
    */
   "project-intake": "engenius-spechub.spechub.project-intake",
+
+  /**
+   * Project Datasheet Builder source extraction — an ODM PDF or spreadsheet
+   * transcribed into spec rows. Separate from `project-intake` because the
+   * shapes of the spend are nothing alike: intake is a paragraph, extraction
+   * is ten pages, and one bucket would hide which of them costs anything.
+   */
+  "project-extract": "engenius-spechub.spechub.project-extract",
 
   /**
    * scripts/check-translation-budget.ts — a real translation, run by hand
