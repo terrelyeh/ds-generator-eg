@@ -21,9 +21,23 @@
  * and TBD says so honestly.
  *
  *   advisory = the document is INCOMPLETE   (normal at this stage)
- *   blocking = the document would be WRONG  (a number we invented, a spec
- *                                            that contradicts itself, a
- *                                            term we said we'd removed)
+ *   blocking = the document would be WRONG  (hardware nobody has agreed to
+ *                                            build, a spec that contradicts
+ *                                            itself, a term we said we'd
+ *                                            removed)
+ *
+ * ── What an override MEANS here ─────────────────────────────────────────
+ * The sourcing workflow is: find a vendor whose product mostly fits, brand
+ * it, and layer the customer's actual requirements on top. So the rules are
+ * not us fudging a spec sheet — they are the DELTA we will hand the vendor
+ * as an engineering change request once the deal lands ("based on this
+ * datasheet, change these"). Findings are worded to match: the question is
+ * not "where did you get this number" but "can the ODM build it, and what
+ * does it cost". It still blocks, because until they agree, the number is a
+ * promise printed in a customer's hands.
+ *
+ * Catalogue-seeded columns are the exception and keep their own wording —
+ * an EnGenius model we already ship has no ODM to ask.
  *
  * That is why an unsourced value blocks and fourteen TBD cells do not.
  */
@@ -243,7 +257,8 @@ function compareToSource(src: string, override: string): Verdict {
       kind: "measurement",
       headline: `改了數值（${changedUnits.join("、")}）`,
       detail:
-        "這是規格本身的改動，不是寫法的改動。送出去等於承諾一個來源沒背書的數字——請 RD 確認。",
+        "這是規格本身的改動，不是寫法的改動——等於要請 ODM 把這一項做到不一樣的數字。" +
+        "先確認做得到、以及成本。",
     };
   }
 
@@ -296,6 +311,26 @@ function codesIn(text: string): Map<string, Set<string>> {
   }
   return out;
 }
+
+/**
+ * Rows that are labels, not hardware.
+ *
+ * The ODM framing turns every unsourced value into "we need the vendor to
+ * build this", which is right for an ingress rating and absurd for a product
+ * name — nobody asks a factory to manufacture a Description. These are ours
+ * to write, carry no engineering cost, and promise nothing about the
+ * hardware, so they inform instead of blocking.
+ */
+const NON_HARDWARE_KEYS = new Set([
+  "description",
+  "model",
+  "model_name",
+  "model_number",
+  "product_name",
+  "series",
+  "series_name",
+  "brand",
+]);
 
 // ── cross-model consistency ────────────────────────────────────────────────
 
@@ -438,7 +473,20 @@ export function scanDocument({
     for (const [key, value] of Object.entries(rules.override ?? {})) {
       if (rules.hide?.includes(key)) continue;
       const src = sourced.get(key);
-      if (src === undefined) {
+      if (src === undefined && NON_HARDWARE_KEYS.has(key)) {
+        add({
+          code: "unsourced_label",
+          kind: "doubt",
+          severity: "advisory",
+          askedOf: "internal",
+          modelId: model.id,
+          rowKey: key,
+          title: `${model.model_name} — ${labelFor(rows, key)} 是我們自己命名的`,
+          detail:
+            `文件寫「${value}」。這是命名不是硬體規格，不用問 ODM——` +
+            `但確認一下措辭跟封面、跟業務對客戶講的說法一致。`,
+        });
+      } else if (src === undefined) {
         // A value the spec TABLE lacks may still be stated in the source's
         // prose, and if the prose says something else that is a far sharper
         // question than "where did this come from".
@@ -454,8 +502,8 @@ export function scanDocument({
             title: `${model.model_name} — ${labelFor(rows, key)} 跟來源內文不一樣`,
             detail:
               `文件寫「${value}」，但來源的內文寫的是「${contradiction.found}」` +
-              `（不在規格表裡，在敘述段落）。改這個等於改${contradiction.name}，` +
-              `要 RD 確認做得到。`,
+              `（不在規格表裡，在敘述段落）。等於要請 ODM 把${contradiction.name}提高到我們寫的程度——` +
+              `先確認做得到、以及成本。`,
           });
         } else if (fromCatalog(model.id)) {
           // Filling in what the public sheet omits is the point of this use
@@ -480,10 +528,11 @@ export function scanDocument({
             askedOf: "rd",
             modelId: model.id,
             rowKey: key,
-            title: `${model.model_name} — ${labelFor(rows, key)} 的值不是來源給的`,
+            title: `${model.model_name} — ${labelFor(rows, key)} 是廠商目前沒有的`,
             detail:
-              `文件寫「${value}」，但來源規格表沒有這一項。這個數字是我們自己填進去的，` +
-              `送出去就是對客戶的承諾——請 RD 確認。`,
+              `文件寫「${value}」，來源規格表沒有這一項——這是我們要在廠商現有機種上` +
+              `「加」的東西。拿到案子後要請 ODM 做，所以現在要先確認做得到、以及成本。` +
+              `在那之前，它印在客戶手上就是一個承諾。`,
           });
         }
       } else {
@@ -535,6 +584,21 @@ export function scanDocument({
     for (const added of rules.add ?? []) {
       const key = added.key || normalizeKey(added.label);
       if (sourced.has(key) || rules.override?.[key] !== undefined) continue;
+      if (NON_HARDWARE_KEYS.has(key)) {
+        add({
+          code: "unsourced_label",
+          kind: "doubt",
+          severity: "advisory",
+          askedOf: "internal",
+          modelId: model.id,
+          rowKey: key,
+          title: `${model.model_name} — ${added.label} 是我們自己命名的`,
+          detail:
+            `文件寫「${added.value}」。這是命名不是硬體規格，不用問 ODM——` +
+            `但確認一下措辭跟封面、跟業務對客戶講的說法一致。`,
+        });
+        continue;
+      }
       add(
         fromCatalog(model.id)
           ? {
@@ -556,10 +620,10 @@ export function scanDocument({
               askedOf: "rd",
               modelId: model.id,
               rowKey: key,
-              title: `${model.model_name} — ${added.label} 的值不是來源給的`,
+              title: `${model.model_name} — ${added.label} 是廠商目前沒有的`,
               detail:
-                `文件寫「${added.value}」，來源規格表沒有這一項。這個數字是我們自己加的，` +
-                `送出去就是對客戶的承諾——請 RD 確認。`,
+                `文件寫「${added.value}」，來源規格表沒有這一項——這是我們要請 ODM 加的功能。` +
+                `先確認做得到、以及成本；在那之前，它印在客戶手上就是一個承諾。`,
             },
       );
     }

@@ -28,8 +28,9 @@ import type {
  *   internal fields,  ending, and a stale salesperson or a tender date from
  *   status            another bid is worse than a blank field
  *   disclaimer        REGENERATED for the new customer — it names them
- *   sources           NOT copied; the new document points at the same specs
- *                     but its own provenance starts today
+ *   sources           COPIED — the source sheet is the BASELINE the rules are
+ *                     a delta against, and the review degrades silently
+ *                     without it (see below)
  */
 export async function POST(
   request: Request,
@@ -47,7 +48,8 @@ export async function POST(
   const supabase = createAdminClient();
   const user = await getCurrentUser();
 
-  const [{ data: docRow }, { data: modelRows }, { data: questionRows }] = await Promise.all([
+  const [{ data: docRow }, { data: modelRows }, { data: questionRows }, { data: sourceRows }] =
+    await Promise.all([
     supabase.from("project_datasheets").select("*").eq("id", id).maybeSingle(),
     supabase
       .from("project_datasheet_models")
@@ -59,6 +61,10 @@ export async function POST(
       .select("*")
       .eq("project_datasheet_id", id)
       .in("state", ["answered", "dismissed"]),
+    supabase
+      .from("project_datasheet_sources")
+      .select("*")
+      .eq("project_datasheet_id", id),
   ]);
 
   const source = docRow as ProjectDatasheet | null;
@@ -93,6 +99,56 @@ export async function POST(
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  /**
+   * Sources come along, and their ids are remapped onto the copies.
+   *
+   * They were left behind at first, on the reasoning that a new deal starts
+   * its own provenance. That was wrong once the workflow became clear: the
+   * source sheet is the BASELINE the rules are a delta against — it is what
+   * the sourced vendor currently builds, and the edits on top are what the
+   * customer additionally needs. A copy without it keeps the deltas and
+   * loses what they are deltas from.
+   *
+   * It also degrades the review silently. `source_prose_conflict` needs the
+   * source text ("the overview says IP66"), and catalogue-seeded columns are
+   * recognised by their source's `kind` — both quietly fall back to vaguer
+   * findings when the link is gone, with nothing to say they have.
+   */
+  const sources = (sourceRows ?? []) as { id: string; [k: string]: unknown }[];
+  const sourceIdMap = new Map<string, string>();
+  if (sources.length > 0) {
+    const { data: newSources } = await supabase
+      .from("project_datasheet_sources")
+      .insert(
+        sources.map((src) => ({
+          project_datasheet_id: created.id,
+          kind: src.kind,
+          filename: src.filename,
+          // The uploaded file itself is shared, not re-uploaded: it is the
+          // same document, and a second copy would drift if either were
+          // replaced.
+          storage_path: src.storage_path,
+          extracted_text: src.extracted_text,
+          extraction: src.extraction,
+          extraction_model: src.extraction_model,
+          extracted_at: src.extracted_at,
+        })) as never,
+      )
+      .select("id, filename, kind, extracted_at");
+    // Matched on the tuple that identifies a source within one document;
+    // insert order is not guaranteed to come back in order.
+    const pool = [...((newSources ?? []) as { id: string; filename: string | null; kind: string; extracted_at: string | null }[])];
+    for (const src of sources) {
+      const i = pool.findIndex(
+        (n) =>
+          n.kind === src.kind &&
+          n.filename === (src.filename ?? null) &&
+          n.extracted_at === (src.extracted_at ?? null),
+      );
+      if (i >= 0) sourceIdMap.set(src.id, pool.splice(i, 1)[0].id);
+    }
+  }
+
   const models = (modelRows ?? []) as ProjectDatasheetModel[];
   const oldToNew = new Map<string, string>();
 
@@ -102,10 +158,7 @@ export async function POST(
       .insert(
         models.map((m) => ({
           project_datasheet_id: created.id,
-          // Not carried: it points at a source row belonging to the old
-          // document, and following it would attribute this copy's provenance
-          // to a file uploaded under a different deal.
-          source_id: null,
+          source_id: m.source_id ? (sourceIdMap.get(m.source_id) ?? null) : null,
           position: m.position,
           model_name: m.model_name,
           display_name: m.display_name,
