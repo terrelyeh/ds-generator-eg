@@ -11,6 +11,7 @@ import {
   SPEC_BASE_ROW_HEIGHT,
   SPEC_LINE_EXTRA,
   estimateItemHeight,
+  estimateRowHeight,
   splitIntoPages,
 } from "./pagination";
 import { estimateCoverLayout, FEATURES_MAX_HEIGHT } from "./cover-layout";
@@ -197,7 +198,7 @@ export function checkSpecLayout(
       for (const section of column) {
         h += CATEGORY_HEADER_HEIGHT;
         for (const item of section.items) {
-          h += estimateItemHeight(item.value, locale);
+          h += estimateRowHeight(item, locale);
         }
       }
       const pct = (h / AVAILABLE_HEIGHT) * 100;

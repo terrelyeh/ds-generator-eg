@@ -1132,7 +1132,15 @@ ${isCJK ? `
                     )}
                     {section.items.map((item, ii) => (
                       <div key={ii} className="spec-row">
-                        <div className="spec-label">{item.label}</div>
+                        {/* A row carrying the tail of a value split across a
+                            column break prints no label — the head row in the
+                            previous column has it. Rendering an EMPTY label
+                            div instead of omitting it would not do: it still
+                            occupies a line box (~12pt on ja) and would open
+                            the column with a blank gap. */}
+                        {!item.isValueContinuation && (
+                          <div className="spec-label">{item.label}</div>
+                        )}
                         <div className="spec-value">{item.value}</div>
                       </div>
                     ))}
@@ -1149,7 +1157,15 @@ ${isCJK ? `
                     )}
                     {section.items.map((item, ii) => (
                       <div key={ii} className="spec-row">
-                        <div className="spec-label">{item.label}</div>
+                        {/* A row carrying the tail of a value split across a
+                            column break prints no label — the head row in the
+                            previous column has it. Rendering an EMPTY label
+                            div instead of omitting it would not do: it still
+                            occupies a line box (~12pt on ja) and would open
+                            the column with a blank gap. */}
+                        {!item.isValueContinuation && (
+                          <div className="spec-label">{item.label}</div>
+                        )}
                         <div className="spec-value">{item.value}</div>
                       </div>
                     ))}
