@@ -187,7 +187,14 @@ export function ProjectPreview({
     shots: asImages(m.images).filter((i) => i.slot !== "product"),
   }));
   const hasAnyImage = coverShots.some((c) => c.img) || hardwareShots.some((h) => h.shots.length);
-  const diagram = docImages.find((i) => i.slot === "diagram") ?? null;
+  /**
+   * Every application illustration, in upload order. The first is the hero —
+   * the detailed one that carries the wiring — and any others are scenario
+   * vignettes shown as a row beneath it, which is the shape the supplier's
+   * own "Application scenarios" block uses and the shape a reader expects.
+   */
+  const diagrams = docImages.filter((i) => i.slot === "diagram");
+  const diagram = diagrams[0] ?? null;
 
   let pageNo = 0;
   const nextPage = () => ++pageNo;
@@ -215,11 +222,25 @@ export function ProjectPreview({
    * product is FOR — so it belongs in the same breath. It only gets a page of
    * its own when there is no benefits page to sit under.
    */
-  const diagramWithFeatures = showDiagram && sections.features && featureBlocks.length > 0;
+  /**
+   * The hero illustration goes under Features & Benefits; the scenario
+   * vignettes get their own page after the specs.
+   *
+   * They are doing different jobs. The hero shows how the ONE product wires
+   * up, which is the same argument the benefits are making, and it fills the
+   * half page the benefits leave. The vignettes show the RANGE of sites it
+   * suits — a separate claim, and one that reads better given room than
+   * crammed under a benefits grid.
+   *
+   * With no benefits page, both fall back onto the standalone page.
+   */
+  const heroWithFeatures = showDiagram && sections.features && featureBlocks.length > 0;
+  const scenarios = diagrams.slice(1);
+  const showScenarioPage = showDiagram && (scenarios.length > 0 || !heroWithFeatures);
 
   // The footer rides the LAST page whichever section that turns out to be,
   // so toggling a section off can never orphan the disclaimer.
-  const lastSection: string = showDiagram && !diagramWithFeatures
+  const lastSection: string = showScenarioPage
     ? "diagram"
     : showPackage
       ? "package"
@@ -230,6 +251,31 @@ export function ProjectPreview({
           : sections.specs
             ? "specs"
             : "cover";
+
+  /* Measured, not guessed: 792pt page - 21pt top bar - 30pt top padding -
+     the footer band leaves ~596pt, and the title eats ~32pt of it. 560 keeps
+     a margin for a caption that wraps to two lines. Divided by the number of
+     vignettes rather than fixed, so two get a half-page each and four still
+     land on one page. */
+  const ScenarioRow = ({ items, big }: { items: ModelImage[]; big: boolean }) => {
+    const cols = items.length > 2;
+    const rows = cols ? Math.ceil(items.length / 2) : items.length;
+    const each = Math.floor((560 - (rows - 1) * 22 - rows * 26) / rows);
+    return (
+    <div
+      className={`scenarios${big ? " big" : ""}${big && cols ? " cols" : ""}`}
+      style={big ? ({ "--scenario-h": `${each}pt` } as React.CSSProperties) : undefined}
+    >
+      {items.map((d, i) => (
+        <div className="scenario" key={i}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={d.url} alt={d.caption ?? "Application scenario"} />
+          {d.caption && <div className="scenario-cap">{d.caption}</div>}
+        </div>
+      ))}
+    </div>
+    );
+  };
 
   const Footer = () => (
     <div className="footer">
@@ -243,7 +289,10 @@ export function ProjectPreview({
           {/* No customer name: one sourced product is approached to several
               projects, and a sheet reaching the wrong reader with another
               buyer's name on it says who else we are quoting. */}
-          <div className="footer-version">{today}</div>
+          <div className="footer-version">
+            {doc.confidentiality ? `${doc.confidentiality}  ·  ` : ""}
+            {today}
+          </div>
         </div>
         <div className="footer-right">
           <div className="footer-qr">
@@ -397,22 +446,50 @@ body {
   border-left: 3pt solid ${theme.primary}; background: ${theme.featuresBox};
   padding: 8pt 12pt; font-size: ${PT.table}pt; line-height: 1.5; color: ${INK};
 }
+.prelim-conf {
+  font-weight: ${WT.bold}; letter-spacing: .04em; color: #a15c07; margin-bottom: 2pt;
+}
 
 /* ── features & benefits ───────────────────────────────────────────── */
 .body-page {
-  padding: 30pt 44pt 0; height: calc(792pt - 21pt);
+  padding: 30pt 44pt 34pt; height: calc(792pt - 21pt);
   display: flex; flex-direction: column;
 }
+/* The footer is absolutely positioned over the bottom of the page, so a page
+   that carries one has to keep its content above it. */
+.body-page.with-footer { padding-bottom: 104pt; }
 .page-title { margin-bottom: 18pt; }
 .blocks { display: grid; grid-template-columns: 1fr 1fr; gap: 14pt 24pt; }
 /* Give the diagram the rest of the page rather than a fixed height — the
    benefits list is written per deal and its length is not predictable. */
 .blocks.with-diagram { flex: none; }
+.diagram-block { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .deploy {
-  flex: 1; min-height: 0; margin-top: 18pt; padding-bottom: 46pt;
+  flex: 1; min-height: 0; margin-top: 18pt;
   display: flex; flex-direction: column; align-items: center; justify-content: center;
 }
-.deploy img { max-width: 100%; flex: 1; min-height: 0; object-fit: contain; }
+/* flex:1 on the image sizes the FLEX ITEM but leaves the replaced element
+   free to overflow it, which cropped the illustration at the page edge.
+   A definite height plus object-fit makes it scale to the box instead.
+   (No backticks in here — this whole block is a template literal.) */
+.deploy img { width: 100%; height: 100%; min-height: 0; object-fit: contain; }
+/* On a page of their own the vignettes get real size; squeezed under a
+   benefits grid they stay thumbnails.
+
+   Side by side they were two landscape images contained inside a 600pt-tall
+   flex box, so object-fit letterboxed them and they floated in the middle of
+   an otherwise blank page. Stacked one per row they can be as wide as the
+   aspect ratio allows and actually fill the paper. Three or more go back to
+   two columns, where stacking would shrink each one below legibility. */
+.scenarios.big { flex-direction: column; align-items: stretch; gap: 22pt; margin-top: 20pt; }
+.scenarios.big .scenario { flex: none; }
+.scenarios.big .scenario img {
+  display: block; margin: 0 auto;
+  width: auto; max-width: 100%; max-height: var(--scenario-h); object-fit: contain;
+}
+.scenarios.big .scenario-cap { font-size: ${PT.bodySm}pt; margin-top: 7pt; }
+.scenarios.big.cols { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
+.scenarios.big.cols .scenario { flex: 0 0 calc(50% - 11pt); }
 .block {
   background: ${theme.featuresBox}; border-radius: 3pt; padding: 12pt 14pt;
 }
@@ -468,8 +545,22 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 .image-note {
   font-size: ${PT.table}pt; font-style: italic; color: ${MUTED}; margin-top: 10pt;
 }
-.diagram img { max-width: 100%; max-height: 420pt; object-fit: contain; }
-.diagram { text-align: center; }
+.diagram-copy { margin-top: 18pt; }
+.diagram-title {
+  font-family: ${displayFont}; font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi};
+  color: ${theme.primary}; margin-bottom: 3pt;
+}
+.diagram-note {
+  font-size: ${PT.bodySm}pt; line-height: 1.55; color: ${MUTED}; max-width: 470pt;
+  margin-bottom: 4pt;
+}
+/* Scenario vignettes: equal columns so they read as a set, not a sequence. */
+.scenarios { display: flex; gap: 16pt; margin-top: 14pt; }
+.scenario { flex: 1; min-width: 0; text-align: center; }
+.scenario img { width: 100%; max-height: 118pt; object-fit: contain; }
+.scenario-cap {
+  font-size: ${PT.table}pt; color: ${MUTED}; margin-top: 2pt; line-height: 1.35;
+}
 
 /* ── footer ─────────────────────────────────────────────────────────
    The catalogue footer, unchanged: grey band, logo + disclaimer on the
@@ -526,6 +617,10 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
         {/* Clears the footer band on the rare single-page document where
             the cover is also the last page. */}
         <div className="prelim" style={lastSection === "cover" ? { bottom: "104pt" } : undefined}>
+          {/* Two separate claims, so two lines: PRELIMINARY is about the
+              numbers still moving, CONFIDENTIAL is about who may see the
+              document. One cannot stand in for the other. */}
+          {doc.confidentiality && <div className="prelim-conf">{doc.confidentiality}</div>}
           {doc.disclaimer}
         </div>
         {lastSection === "cover" && <Footer />}
@@ -540,7 +635,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
             <div className="page-title">
               <span className="section-title">Features &amp; Benefits</span>
             </div>
-            <div className={`blocks${diagramWithFeatures ? " with-diagram" : ""}`}>
+            <div className={`blocks${heroWithFeatures ? " with-diagram" : ""}`}>
               {featureBlocks.map((b, i) => (
                 <div className="block" key={i}>
                   <div className="block-title">{b.title}</div>
@@ -558,10 +653,20 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
             {/* No image note under the diagram: that note says the product
                 PHOTO is a stand-in, and a schematic is not a photo of
                 anything. It belongs under the hardware renders, where it is. */}
-            {diagramWithFeatures && diagram && (
-              <div className="deploy">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={diagram.url} alt="Application diagram" />
+            {heroWithFeatures && diagram && (
+              <div className="diagram-block">
+                {(doc.diagram_title || doc.diagram_note) && (
+                  <div className="diagram-copy">
+                    {doc.diagram_title && (
+                      <div className="diagram-title">{doc.diagram_title}</div>
+                    )}
+                    {doc.diagram_note && <div className="diagram-note">{doc.diagram_note}</div>}
+                  </div>
+                )}
+                <div className="deploy">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={diagram.url} alt="Application diagram" />
+                </div>
               </div>
             )}
           </div>
@@ -648,16 +753,26 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
       )}
 
       {/* ═══ APPLICATION DIAGRAM (own page — only when there is no benefits page) ═══ */}
-      {showDiagram && !diagramWithFeatures && diagram && (
+      {showScenarioPage && diagram && (
         <div className="page">
           <div className="top-bar" />
-          <div className="body-page">
+          <div className="body-page with-footer">
             <div className="page-title">
-              <span className="section-title">Application Diagram</span>
+              <span className="section-title">
+                {doc.diagram_title || "Application Diagram"}
+              </span>
             </div>
-            <div className="diagram">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={diagram.url} alt="Application diagram" />
+            {!heroWithFeatures && doc.diagram_note && (
+              <div className="diagram-note">{doc.diagram_note}</div>
+            )}
+            <div className="diagram-block">
+              {!heroWithFeatures && (
+                <div className="deploy">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={diagram.url} alt="Application diagram" />
+                </div>
+              )}
+              {scenarios.length > 0 && <ScenarioRow items={scenarios} big={heroWithFeatures} />}
             </div>
           </div>
           {lastSection === "diagram" && <Footer />}

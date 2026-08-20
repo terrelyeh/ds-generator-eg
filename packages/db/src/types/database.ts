@@ -476,8 +476,13 @@ export interface Database {
           footnote: string | null;
           /** document-level artwork (diagram etc.) — [{slot,url,caption}] */
           images: Json;
+          /** heading and paragraph for the application diagram section */
+          diagram_title: string | null;
+          diagram_note: string | null;
           /** PRELIMINARY notice — wording editable, existence is not */
           disclaimer: string;
+          /** distinct from `disclaimer`: circulation, not accuracy */
+          confidentiality: string | null;
           image_note: string | null;
           sections: Json;
           blank_policy: string; // 'tbd' | 'na' | 'blank'
@@ -498,7 +503,7 @@ export interface Database {
           Database["public"]["Tables"]["project_datasheets"]["Row"],
           "id" | "created_at" | "updated_at"
         > &
-          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "branch" | "sales_owner" | "opportunity" | "tender_date" | "created_by">>;
+          Partial<Pick<Database["public"]["Tables"]["project_datasheets"]["Row"], "id" | "created_at" | "updated_at" | "customer" | "status" | "layout" | "headline" | "series_name" | "category_label" | "overview" | "features" | "footnote" | "images" | "diagram_title" | "diagram_note" | "confidentiality" | "image_note" | "sections" | "blank_policy" | "doc_rules" | "notes" | "branch" | "sales_owner" | "opportunity" | "tender_date" | "created_by">>;
         Update: Partial<Database["public"]["Tables"]["project_datasheets"]["Insert"]>;
       };
       project_datasheet_sources: {
