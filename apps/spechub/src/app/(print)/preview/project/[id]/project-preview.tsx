@@ -561,7 +561,7 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
             {diagramWithFeatures && diagram && (
               <div className="deploy">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={diagram.url} alt="Deployment" />
+                <img src={diagram.url} alt="Application diagram" />
               </div>
             )}
           </div>
@@ -647,17 +647,17 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
         </div>
       )}
 
-      {/* ═══ APPLICATION DIAGRAM ═══ */}
+      {/* ═══ APPLICATION DIAGRAM (own page — only when there is no benefits page) ═══ */}
       {showDiagram && !diagramWithFeatures && diagram && (
         <div className="page">
           <div className="top-bar" />
           <div className="body-page">
             <div className="page-title">
-              <span className="section-title">Deployment</span>
+              <span className="section-title">Application Diagram</span>
             </div>
             <div className="diagram">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={diagram.url} alt="Deployment diagram" />
+              <img src={diagram.url} alt="Application diagram" />
             </div>
           </div>
           {lastSection === "diagram" && <Footer />}

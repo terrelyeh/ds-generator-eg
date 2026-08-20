@@ -36,7 +36,7 @@ const SECTION_LABELS: { key: keyof SectionToggles; label: string; hint: string }
   { key: "software", label: "Software Features", hint: "標了 ## software 的規格列" },
   { key: "hardware", label: "Hardware Overview", hint: "封面以外的產品圖" },
   { key: "package", label: "Package Contents", hint: "標了 ## package 的規格列" },
-  { key: "diagram", label: "部署示意圖", hint: "文件層圖片裡的 diagram" },
+  { key: "diagram", label: "應用情境圖", hint: "文件層圖片裡的 diagram" },
 ];
 
 /**
@@ -568,14 +568,14 @@ export function ProjectEditor({
                 initial={parseImagesJson(doc.images)}
                 slots={DOC_SLOTS}
                 label="文件層圖片"
-                hint="不屬於任何單一型號的圖 —— 目前只有部署示意圖（客戶案場的架構圖那種）。產品照請到「規格與型號」裡各台底下傳。"
+                hint="不屬於任何單一型號的圖 —— 目前只有應用情境圖（產品用在什麼場景、怎麼接的架構圖）。產品照請到「規格與型號」裡各台底下傳。"
               />
               {/* Two steps for one outcome is a trap, so the dependency says
                   so out loud in whichever direction it is currently broken. */}
               {docImageCount > 0 && !sections.diagram && (
                 <p className="flex flex-wrap items-center gap-2 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                   <span>
-                    有圖，但「要印哪些頁」的<strong>部署示意圖沒有勾選</strong>，所以不會印出來。
+                    有圖，但「要印哪些頁」的<strong>應用情境圖沒有勾選</strong>，所以不會印出來。
                   </span>
                   <button
                     type="button"
@@ -588,7 +588,7 @@ export function ProjectEditor({
               )}
               {docImageCount === 0 && sections.diagram && (
                 <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  「部署示意圖」勾了但還沒有圖，那一頁不會印。傳一張上來就會出現。
+                  「應用情境圖」勾了但還沒有圖，那一頁不會印。傳一張上來就會出現。
                 </p>
               )}
             </div>
