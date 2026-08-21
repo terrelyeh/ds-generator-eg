@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createAdminClient } from "@eg/db/admin";
 import { getCurrentUser } from "@eg/auth/session";
 import { can } from "@eg/auth/permissions";
 import { ProjectPreview } from "../../project-preview";
+import { printTitle } from "@/lib/project-datasheet/filename";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 
 export const dynamic = "force-dynamic";
@@ -18,6 +20,40 @@ export const dynamic = "force-dynamic";
  * No toolbar: this is a record, not a draft. Printing it again would record a
  * new issue of a document nobody edited, which would make the history lie.
  */
+/**
+ * Names the file after the ISSUE, not after today — a saved copy of issue 3
+ * should not land in Downloads carrying the date somebody happened to open
+ * it, next to the file that was actually sent that day.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string; issueId: string }>;
+}): Promise<Metadata> {
+  const { id, issueId } = await params;
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("project_datasheet_issues")
+      .select("issue_no, issued_at, snapshot")
+      .eq("id", issueId)
+      .eq("project_datasheet_id", id)
+      .maybeSingle();
+    const row = data as {
+      issue_no: number;
+      issued_at: string;
+      snapshot: { doc?: { name?: string } } | null;
+    } | null;
+    const name = row?.snapshot?.doc?.name;
+    if (name) {
+      return { title: printTitle({ name }, new Date(row.issued_at), row.issue_no) };
+    }
+  } catch {
+    // A title is not worth failing a page render over.
+  }
+  return { title: "Project datasheet — issue" };
+}
+
 export default async function IssuePage({
   params,
 }: {

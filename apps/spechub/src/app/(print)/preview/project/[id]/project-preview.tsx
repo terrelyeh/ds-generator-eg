@@ -7,6 +7,7 @@ import { getDict } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL } from "@/lib/datasheet/qr";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
 import { getProjectTheme } from "@/lib/project-datasheet/themes";
+import { LABEL_DOT_PT, LABEL_PT } from "@/lib/project-datasheet/label-geometry";
 import { DEFAULT_SECTIONS } from "@/lib/project-datasheet/types";
 import type {
   DocRules,
@@ -730,13 +731,13 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
    point covers whatever was being pointed at, which on an application
    diagram is the one thing the picture is for. */
 .img-dot {
-  position: absolute; width: 3pt; height: 3pt; border-radius: 50%;
+  position: absolute; width: ${LABEL_DOT_PT}pt; height: ${LABEL_DOT_PT}pt; border-radius: 50%;
   background: ${theme.primary}; transform: translate(-50%, -50%);
   box-shadow: 0 0 0 1.2pt rgba(255, 255, 255, 0.95);
 }
 .img-label {
   position: absolute;
-  font-size: ${PT.table}pt; font-weight: ${WT.semi}; color: ${theme.primary};
+  font-size: ${LABEL_PT}pt; font-weight: ${WT.semi}; color: ${theme.primary};
   background: rgba(255, 255, 255, 0.92); border: 0.5pt solid #d8dfe6;
   border-radius: 2pt; padding: 1.5pt 4pt; white-space: nowrap; line-height: 1.25;
 }

@@ -1,9 +1,11 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import type { Metadata } from "next";
 import { createClient } from "@eg/db/server";
 import { createAdminClient } from "@eg/db/admin";
 import { requirePagePermission } from "@eg/auth/page-guards";
 import { ProjectPreview } from "./project-preview";
+import { printTitle } from "@/lib/project-datasheet/filename";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 
 /**
@@ -32,6 +34,35 @@ import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
  * header is the only thing that opens the door, which is the same trust
  * boundary the proxy already draws rather than a second one.
  */
+/**
+ * The browser uses this as the suggested filename for "Save as PDF".
+ *
+ * Read through the ordinary server client, not the admin one: RLS keeps a
+ * tender draft's name out of a page title for anyone who could not open the
+ * document anyway. A request that cannot read it gets the generic title,
+ * which is the right amount to tell them.
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const { id } = await params;
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("project_datasheets")
+      .select("name")
+      .eq("id", id)
+      .maybeSingle();
+    const doc = data as Pick<ProjectDatasheet, "name"> | null;
+    if (doc?.name) return { title: printTitle(doc, new Date()) };
+  } catch {
+    // A title is not worth failing a page render over.
+  }
+  return { title: "Project datasheet" };
+}
+
 export default async function ProjectPreviewPage({
   params,
   searchParams,
