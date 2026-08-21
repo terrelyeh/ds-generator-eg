@@ -60,15 +60,18 @@ interface ModelDraft {
 export function ProjectEditor({
   doc,
   models,
+  initialTab = "status",
 }: {
   doc: ProjectDatasheet;
   models: ProjectDatasheetModel[];
+  /** where to land — the page picks it from whether anything is blocking */
+  initialTab?: string;
 }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [reviewKey, setReviewKey] = useState(0);
   const [counts, setCounts] = useState<ReviewCounts | null>(null);
-  const [tab, setTab] = useState("status");
+  const [tab, setTab] = useState(initialTab);
   const [modelTab, setModelTab] = useState<string | null>(null);
 
   // ── printed content ──────────────────────────────────────────────────
