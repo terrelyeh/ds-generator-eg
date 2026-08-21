@@ -113,10 +113,25 @@ function RulesHelp() {
         what="這格空的時候印什麼"
         why="tbd = 之後會補；na = 本來就沒有，印 —"
       />
+      <Rule
+        code="+ Description @first = Outdoor 5G NR Cellular Router"
+        what="新增的列放在最前面"
+        why="不寫的話新增的列一律排在最後"
+      />
+      <Rule
+        code="+ IP Rating @after Weight = IP67"
+        what="新增的列放在某一列後面"
+        why="後面接的是那一列的名稱，找不到就排最後"
+      />
       <p className="text-muted-foreground">
         改一列的<strong>值</strong>用 <code className="rounded bg-muted px-1">=</code>，
         它會整格取代掉原本的內容——所以要「補充」而不是「取代」的時候，用{" "}
         <code className="rounded bg-muted px-1">+</code> 開一列新的，不要塞進相關的那一列。
+      </p>
+      <p className="text-muted-foreground">
+        <code className="rounded bg-muted px-1">@first</code> 是「這張表的最前面」，
+        不是整份文件的最前面——寫在 <code className="rounded bg-muted px-1">## software</code>{" "}
+        底下的列，會排到軟體那張表的最前面。
       </p>
     </>
   );
