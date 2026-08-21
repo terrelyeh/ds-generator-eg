@@ -19,6 +19,8 @@ interface Preview {
   rows: ExtractedRow[];
   notes: string;
   orphans: string[];
+  /** this column's spec table currently comes from our own catalogue */
+  fromCatalog: boolean;
   replacing: number;
   lowConfidence: number;
 }
@@ -215,6 +217,26 @@ export function SourceExtract({
                 你自己下的規則不會動——但下面列出的那些會失去對象。
               </p>
             )}
+            {/* The one change here that is invisible afterwards. Everything
+                else on this screen shows up in the spec table; this shows up
+                only as findings that quietly stop appearing. */}
+            {preview.fromCatalog && (
+              <div className="rounded border-2 border-red-300 bg-red-50 px-2.5 py-2 text-red-900">
+                <strong>這一欄目前是從我們自己的型號帶入的。</strong>
+                <span className="ml-1">套用廠商規格書之後，它會變成廠商來源，而且：</span>
+                <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                  <li>
+                    <strong>「改了公開 datasheet 上查得到的數字」這條檢查會停止對它發動</strong>
+                    ——但型號名稱還是我們的，客戶還是可以拿官網那份並排比。
+                  </li>
+                  <li>補一條原廠沒寫的規格，會從「提醒」變成「擋住送出」。</li>
+                </ul>
+                <span className="mt-1 block">
+                  如果你要的是「我們自己的型號 + 一台 sourcing 的」並排，請
+                  <strong>另外新增一台型號</strong>再對那一欄讀取，不要覆蓋這一欄。
+                </span>
+              </div>
+            )}
             {preview.orphans.length > 0 && (
               <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-amber-900">
                 <strong>這些規則會失效：</strong>
@@ -257,8 +279,17 @@ export function SourceExtract({
           </div>
 
           <div className="flex gap-2">
-            <Button size="sm" disabled={busy || preview.rows.length === 0} onClick={() => void apply()}>
-              {busy ? "寫入中…" : `寫入 ${preview.rows.length} 列`}
+            <Button
+              size="sm"
+              variant={preview.fromCatalog ? "destructive" : "default"}
+              disabled={busy || preview.rows.length === 0}
+              onClick={() => void apply()}
+            >
+              {busy
+                ? "寫入中…"
+                : preview.fromCatalog
+                  ? `覆蓋這一欄，寫入 ${preview.rows.length} 列`
+                  : `寫入 ${preview.rows.length} 列`}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setPreview(null)}>
               丟掉這次讀取

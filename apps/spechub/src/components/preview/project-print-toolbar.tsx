@@ -12,8 +12,36 @@
  */
 
 import Link from "next/link";
+import { useState } from "react";
 
 export function ProjectPrintToolbar({ id, name }: { id: string; name: string }) {
+  const [status, setStatus] = useState<string | null>(null);
+
+  /**
+   * Record the issue, THEN print.
+   *
+   * A failure here does not stop the print. Refusing to open the print dialog
+   * because the audit row failed would trade a missing log line for a person
+   * who cannot send their customer a datasheet — the wrong way round. The bar
+   * says so instead, so nobody later believes the history is complete.
+   */
+  async function printAndRecord() {
+    setStatus("記錄版本…");
+    try {
+      const res = await fetch(`/api/projects/${id}/issues`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "記錄失敗");
+      setStatus(`已存為第 ${json.issue.issue_no} 版`);
+    } catch (e) {
+      setStatus(`未記錄版本：${e instanceof Error ? e.message : "unknown"}`);
+    }
+    window.print();
+  }
+
   return (
     <div className="print-toolbar">
       <div className="pt-left">
@@ -23,7 +51,8 @@ export function ProjectPrintToolbar({ id, name }: { id: string; name: string }) 
         <span className="pt-name">{name}</span>
         <span className="pt-badge">PRELIMINARY</span>
       </div>
-      <button type="button" onClick={() => window.print()} className="pt-print">
+      {status && <span className="pt-status">{status}</span>}
+      <button type="button" onClick={() => void printAndRecord()} className="pt-print">
         Print / Save as PDF
       </button>
       <style
@@ -51,6 +80,7 @@ export function ProjectPrintToolbar({ id, name }: { id: string; name: string }) 
   white-space: nowrap;
 }
 .pt-print:hover { background: #0398db; }
+.pt-status { color: #9aa3ab; white-space: nowrap; margin-left: auto; padding-right: 12px; }
 @media print { .print-toolbar { display: none !important; } }
 `,
         }}

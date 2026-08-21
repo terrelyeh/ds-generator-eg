@@ -1077,6 +1077,50 @@ export type Database = {
           },
         ]
       }
+      project_datasheet_issues: {
+        Row: {
+          id: string;
+          project_datasheet_id: string;
+          issue_no: number;
+          issued_at: string;
+          issued_by: string | null;
+          issued_by_email: string | null;
+          note: string | null;
+          snapshot: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_datasheet_id: string;
+          issue_no: number;
+          issued_at?: string;
+          issued_by?: string | null;
+          issued_by_email?: string | null;
+          note?: string | null;
+          snapshot: Json;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_datasheet_id?: string;
+          issue_no?: number;
+          issued_at?: string;
+          issued_by?: string | null;
+          issued_by_email?: string | null;
+          note?: string | null;
+          snapshot?: Json;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "project_datasheet_issues_project_datasheet_id_fkey";
+            columns: ["project_datasheet_id"];
+            isOneToOne: false;
+            referencedRelation: "project_datasheets";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
       project_datasheet_questions: {
         Row: {
           answer: string | null

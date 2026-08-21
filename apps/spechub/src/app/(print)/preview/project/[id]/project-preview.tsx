@@ -655,10 +655,18 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 
 /* ── hardware ──────────────────────────────────────────────────────── */
 .views-grid {
-  display: flex; gap: 20pt; justify-content: center; align-items: center;
+  display: flex; gap: 20pt; justify-content: center; align-items: flex-start;
   flex-wrap: wrap; margin-bottom: 10pt;
 }
-.views-grid img { max-width: 210pt; max-height: 250pt; object-fit: contain; }
+.view { text-align: center; }
+.views-grid img {
+  display: block; max-width: 210pt; max-height: 250pt; object-fit: contain;
+  margin: 0 auto;
+}
+.view-cap {
+  font-size: ${PT.bodySm}pt; font-weight: ${WT.semi}; color: ${MUTED};
+  margin-top: 6pt;
+}
 .views-model {
   font-family: ${displayFont}; font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi};
   color: ${INK}; margin: 14pt 0 6pt;
@@ -872,8 +880,14 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
                   <div className="views-model">{model.model_name}</div>
                   <div className="views-grid">
                     {shots.map((s, i) => (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img key={i} src={s.url} alt={`${model.model_name} ${s.slot}`} />
+                      <div className="view" key={i}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={s.url} alt={`${model.model_name} ${s.slot}`} />
+                        {/* Which face this is. Two renders of a white box side
+                            by side are not self-explanatory, and on a tender
+                            sheet "where does the SIM go" is a real question. */}
+                        {s.caption && <div className="view-cap">{s.caption}</div>}
+                      </div>
                     ))}
                   </div>
                 </div>
