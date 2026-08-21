@@ -96,6 +96,7 @@ export async function PATCH(
     url?: string;
     modelId?: string | null;
     caption?: string | null;
+    body?: unknown;
     labels?: unknown;
   };
   if (!body.url) return NextResponse.json({ error: "url is required" }, { status: 400 });
@@ -115,6 +116,7 @@ export async function PATCH(
           // Absent means "leave alone"; an empty string means "clear it".
           caption:
             body.caption === undefined ? (i.caption ?? null) : (body.caption?.trim() || null),
+          body: body.body === undefined ? (i.body ?? []) : asBody(body.body),
           labels: body.labels === undefined ? (i.labels ?? []) : asLabels(body.labels),
         }
       : i,
@@ -203,6 +205,7 @@ function asImages(value: unknown): ModelImage[] {
             slot: (i as ModelImage).slot || "product",
             url: (i as ModelImage).url,
             caption: (i as ModelImage).caption ?? null,
+            body: asBody((i as ModelImage).body),
             labels: asLabels((i as ModelImage).labels),
           },
         ]
@@ -236,3 +239,12 @@ function asLabels(value: unknown): ImageLabel[] {
 }
 
 const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n * 10) / 10));
+
+/** Bullets for the copy column. Blank lines are how people space a textarea. */
+function asBody(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .flatMap((b) => (typeof b === "string" ? [b.trim().slice(0, 200)] : []))
+    .filter(Boolean)
+    .slice(0, 6);
+}
