@@ -27,7 +27,7 @@ export const BATTLECARD_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";
  * extraction because it is the same kind of task at the same stakes: it
  * proposes, a human confirms.
  */
-export const PROJECT_INTAKE_MODEL = "anthropic/claude-sonnet-4.6";
+export const PROJECT_INTAKE_MODEL_DEFAULT = "anthropic/claude-sonnet-4.6";
 
 /**
  * Tender Datasheets source extraction.
@@ -37,4 +37,32 @@ export const PROJECT_INTAKE_MODEL = "anthropic/claude-sonnet-4.6";
  * though the slug currently matches. Tuning one should not silently move the
  * other.
  */
-export const PROJECT_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";
+export const PROJECT_EXTRACT_MODEL_DEFAULT = "anthropic/claude-sonnet-4.6";
+
+/**
+ * Settings keys holding the chosen slugs, and the resolvers the routes call.
+ *
+ * The constants above stay as the DEFAULTS rather than the values: an empty
+ * setting, a settings row somebody deleted, or a database that is briefly
+ * unreachable should leave these two features working on a known-good model,
+ * not fail at the moment a person clicks Extract.
+ *
+ * The catalog itself — which models exist at all — is still edited in EnGenie
+ * (`llm_models`). This picks one of them; it does not invent slugs. A slug
+ * that has since been removed from the catalog is caught on save, not at
+ * call time.
+ */
+export const PROJECT_MODEL_KEYS = {
+  intake: "project_intake_model",
+  extract: "project_extract_model",
+} as const;
+
+export async function getProjectIntakeModel(): Promise<string> {
+  const { getSetting } = await import("@eg/db/settings");
+  return (await getSetting(PROJECT_MODEL_KEYS.intake)) ?? PROJECT_INTAKE_MODEL_DEFAULT;
+}
+
+export async function getProjectExtractModel(): Promise<string> {
+  const { getSetting } = await import("@eg/db/settings");
+  return (await getSetting(PROJECT_MODEL_KEYS.extract)) ?? PROJECT_EXTRACT_MODEL_DEFAULT;
+}

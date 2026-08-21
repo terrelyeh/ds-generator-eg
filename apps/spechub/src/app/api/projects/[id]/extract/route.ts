@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
-import { PROJECT_EXTRACT_MODEL } from "@/lib/llm/models";
+import { getProjectExtractModel } from "@/lib/llm/models";
 import { asRawDoc, asRules } from "@/lib/project-datasheet/resolve";
 import { findOrphanedRules } from "@/lib/project-datasheet/resolve";
 import {
@@ -156,10 +156,11 @@ async function preview(
   storagePath: string | null,
   read: { pages: string[]; full: string },
 ) {
+  const llmModel = await getProjectExtractModel();
   let reply: string;
   try {
     reply = await chatComplete({
-      model: PROJECT_EXTRACT_MODEL,
+      model: llmModel,
       system: EXTRACT_SYSTEM,
       user: buildExtractPrompt(trimPages(read.pages), model.model_name),
       json: true,
@@ -185,7 +186,7 @@ async function preview(
       storage_path: storagePath,
       extracted_text: read.full.slice(0, 400_000),
       extraction: { rows, notes } as never,
-      extraction_model: PROJECT_EXTRACT_MODEL,
+      extraction_model: llmModel,
       extracted_at: new Date().toISOString(),
     })
     .select("id")

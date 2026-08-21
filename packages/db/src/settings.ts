@@ -63,3 +63,32 @@ export const API_KEY_MAP = {
   google_ai_api_key: "GOOGLE_AI_API_KEY",
   wifi_reghub_api_key: "WIFI_REGHUB_API_KEY",
 } as const;
+
+/**
+ * A plain app_settings value — not a credential.
+ *
+ * Separate from `getApiKey` on purpose: that one falls back to an env var and
+ * caches, both of which are right for a secret read on every request and
+ * wrong for a preference somebody just changed in a settings page and expects
+ * to see take effect.
+ */
+export async function getSetting(key: string): Promise<string | null> {
+  try {
+    const { data } = (await createAdminClient()
+      .from("app_settings" as "products")
+      .select("value")
+      .eq("key", key)
+      .maybeSingle()) as { data: { value: string } | null };
+    return data?.value || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Write one app_settings value, creating the row if it is not there. */
+export async function setSetting(key: string, value: string): Promise<void> {
+  const { error } = await createAdminClient()
+    .from("app_settings" as "products")
+    .upsert({ key, value } as never, { onConflict: "key" });
+  if (error) throw new Error(error.message);
+}
