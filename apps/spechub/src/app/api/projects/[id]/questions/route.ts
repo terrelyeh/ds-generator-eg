@@ -10,7 +10,7 @@ import {
 } from "@/lib/project-datasheet/gap-scan";
 import { buildBrief, type BriefFinding } from "@/lib/project-datasheet/brief";
 import { chatComplete } from "@eg/llm/openrouter";
-import { PROJECT_INTAKE_MODEL } from "@/lib/llm/models";
+import { getProjectIntakeModel } from "@/lib/llm/models";
 import { sanitizeItems } from "@/lib/project-datasheet/intake";
 import { applyItems } from "@/lib/project-datasheet/apply-items";
 import {
@@ -362,10 +362,11 @@ export async function POST(
   }
 
   // ── propose ────────────────────────────────────────────────────────────
+  const llmModel = await getProjectIntakeModel();
   let reply: string;
   try {
     reply = await chatComplete({
-      model: PROJECT_INTAKE_MODEL,
+      model: llmModel,
       system: ANSWER_SYSTEM,
       user: buildAnswerPrompt({
         questionTitle: question.title,

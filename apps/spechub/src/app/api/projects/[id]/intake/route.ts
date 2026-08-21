@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
-import { PROJECT_INTAKE_MODEL } from "@/lib/llm/models";
+import { getProjectIntakeModel } from "@/lib/llm/models";
 import { asRawDoc } from "@/lib/project-datasheet/resolve";
 import { applyItems } from "@/lib/project-datasheet/apply-items";
 import {
@@ -67,10 +67,11 @@ export async function POST(
   }
 
   const specKeys = dedupeKeys(models);
+  const llmModel = await getProjectIntakeModel();
   let reply: string;
   try {
     reply = await chatComplete({
-      model: PROJECT_INTAKE_MODEL,
+      model: llmModel,
       system: INTAKE_SYSTEM,
       user: buildIntakePrompt({
         note: text,
@@ -105,7 +106,7 @@ export async function POST(
       filename: null,
       extracted_text: text,
       extraction: { proposal, applied: [] } as never,
-      extraction_model: PROJECT_INTAKE_MODEL,
+      extraction_model: llmModel,
       extracted_at: new Date().toISOString(),
     })
     .select("id")

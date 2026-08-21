@@ -69,6 +69,18 @@ async function loadAll(): Promise<ModelRow[]> {
   return rows;
 }
 
+/**
+ * Every enabled model, whatever surface it is offered on.
+ *
+ * For pickers that choose a model for a feature rather than for one of the
+ * catalog's surfaces — Tender Datasheets picks its own intake and extraction
+ * models, and requiring an admin to first tick a surface in another app
+ * before the model appeared would make that a two-app errand.
+ */
+export async function listEnabledModels(): Promise<ModelRow[]> {
+  return (await loadAll()).filter((m) => m.enabled);
+}
+
 /** Enabled models offered on a surface, in display order. */
 export async function listModels(surface: Surface | "translate"): Promise<ModelRow[]> {
   const rows = await loadAll();
