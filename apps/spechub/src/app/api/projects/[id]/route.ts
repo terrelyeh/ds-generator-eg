@@ -176,7 +176,18 @@ async function openBlockers(
     .map((f) => f.title);
 }
 
-/** DELETE /api/projects/[id] — models and sources cascade. */
+/**
+ * DELETE /api/projects/[id] — models, sources and issues cascade.
+ *
+ * ⚠️ Refused once the document has been issued. The issues table is the record
+ * of what a customer was actually shown (00047), and the cascade would take it
+ * with the document — quietly, and precisely for the sheets where it matters.
+ * Hard delete is for a row somebody created by accident; a sheet that went out
+ * gets archived, which is what `status = archived` is for.
+ *
+ * Storage objects are left alone, as elsewhere in this module: an orphaned
+ * image costs nothing and a URL can still be referenced by a duplicate.
+ */
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -186,6 +197,23 @@ export async function DELETE(
 
   const { id } = await params;
   const supabase = createAdminClient();
+
+  const { count } = await supabase
+    .from("project_datasheet_issues")
+    .select("id", { count: "exact", head: true })
+    .eq("project_datasheet_id", id);
+
+  if ((count ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `這份文件已經出過 ${count} 版 PDF，刪掉會連同「客戶手上那份長什麼樣」的存檔一起消失。` +
+          `不要用的話請改成封存。`,
+      },
+      { status: 409 },
+    );
+  }
+
   const { error } = await supabase.from("project_datasheets").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

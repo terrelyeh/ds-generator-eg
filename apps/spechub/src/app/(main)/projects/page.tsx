@@ -2,6 +2,7 @@ import Link from "next/link";
 import { createClient } from "@eg/db/server";
 import { requirePagePermission } from "@eg/auth/page-guards";
 import { NewProjectButton } from "@/components/project/new-project-button";
+import { ProjectRowActions } from "@/components/project/project-row-actions";
 import type { ProjectDatasheet } from "@eg/db/types";
 
 export const dynamic = "force-dynamic";
@@ -169,6 +170,12 @@ function ProjectList({
             >
               Preview
             </Link>
+            <ProjectRowActions
+              id={d.id}
+              name={d.name}
+              archived={d.status === "archived"}
+              issued={lastIssue.has(d.id)}
+            />
           </div>
         </li>
       ))}
