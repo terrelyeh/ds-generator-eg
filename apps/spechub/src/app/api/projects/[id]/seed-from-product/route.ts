@@ -130,6 +130,27 @@ export async function POST(
   // The source row is what makes the gap review able to tell this column came
   // from a shipping product rather than an ODM sheet — which flips two of its
   // checks (see migration 00042).
+  /**
+   * A column per model name, checked before anything is written.
+   *
+   * The unique index caught this, but only after the source row had been
+   * inserted — so every retry left an orphan behind, and what reached the
+   * screen was the raw constraint name. One document collected three
+   * catalogue sources for the same model that way.
+   */
+  const { data: clash } = await supabase
+    .from("project_datasheet_models")
+    .select("id")
+    .eq("project_datasheet_id", id)
+    .eq("model_name", modelName)
+    .maybeSingle();
+  if (clash) {
+    return NextResponse.json(
+      { error: `這份文件已經有 ${modelName} 了。要再放一台同型號請改個欄位名稱。` },
+      { status: 409 },
+    );
+  }
+
   const { data: source, error: sourceError } = await supabase
     .from("project_datasheet_sources")
     .insert({
@@ -171,6 +192,11 @@ export async function POST(
     .select("id")
     .single();
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // The source was written first and is useless without its column; leaving
+    // it would put junk into `sourceText`, which the gap scanner reads.
+    await supabase.from("project_datasheet_sources").delete().eq("id", source.id);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ id: created.id, rows: rows.length, images: images.length });
 }

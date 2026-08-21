@@ -54,7 +54,11 @@ export function LayoutPicker({
         })}
       </div>
       <p className="text-xs text-muted-foreground">
-        只有配色不同，版面結構都一樣。改完按上面「預覽 / 列印」看實際效果。
+        只有配色不同，版面結構都一樣。
+        <strong className="font-medium text-[#231f20]">
+          改完要先按右上角的「儲存」，預覽才會變
+        </strong>
+        ——預覽讀的是存檔後的內容，不是這一頁上的暫時狀態。
         <br />
         要加新的配色或全新版面，目前得改程式（
         <code className="rounded bg-muted px-1">lib/project-datasheet/themes.ts</code>

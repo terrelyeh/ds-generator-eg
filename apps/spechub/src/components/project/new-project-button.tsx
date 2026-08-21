@@ -45,11 +45,11 @@ export function NewProjectButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button className="shrink-0">New project datasheet</Button>}
+        render={<Button className="shrink-0">New tender datasheet</Button>}
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New project datasheet</DialogTitle>
+          <DialogTitle>New tender datasheet</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
