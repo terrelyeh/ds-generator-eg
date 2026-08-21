@@ -900,15 +900,19 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
         </div>
       )}
 
-      {/* ═══ APPLICATION DIAGRAM (own page — only when there is no benefits page) ═══ */}
+      {/* ═══ APPLICATION SCENARIOS (own page, after the specs) ═══
+           Fixed heading, NOT `diagram_title`. The two pages stopped being the
+           same thing: page 2 carries one architecture diagram — how the parts
+           connect — and this page carries the places it gets installed. They
+           shared a title field while they shared a subject, and kept sharing it
+           for one revision after they stopped, which put "System architecture"
+           over a page of sites. */}
       {showScenarioPage && diagram && (
         <div className="page">
           <div className="top-bar" />
           <div className="body-page with-footer">
             <div className="page-title">
-              <span className="section-title">
-                {doc.diagram_title || "Application Diagram"}
-              </span>
+              <span className="section-title">Application scenarios</span>
             </div>
             {!heroWithFeatures && doc.diagram_note && (
               <div className="diagram-note">{doc.diagram_note}</div>
