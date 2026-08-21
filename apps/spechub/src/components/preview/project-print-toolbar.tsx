@@ -14,7 +14,25 @@
 import Link from "next/link";
 import { useState } from "react";
 
-export function ProjectPrintToolbar({ id, name }: { id: string; name: string }) {
+export function ProjectPrintToolbar({
+  id,
+  name,
+  blockers = 0,
+}: {
+  id: string;
+  name: string;
+  /**
+   * Open blocking findings. Shown, never enforced.
+   *
+   * Blocking a print would take away the ordinary reason to print — reading
+   * your own draft on paper before it is finished. But a PDF of a document
+   * with unanswered questions is indistinguishable from a finished one once
+   * it leaves here: the cover says PRELIMINARY, which is about the numbers
+   * moving, not about the questions we have not asked yet. So the bar says
+   * so, and the person decides.
+   */
+  blockers?: number;
+}) {
   const [status, setStatus] = useState<string | null>(null);
 
   /**
@@ -51,6 +69,11 @@ export function ProjectPrintToolbar({ id, name }: { id: string; name: string }) 
         <span className="pt-name">{name}</span>
         <span className="pt-badge">PRELIMINARY</span>
       </div>
+      {blockers > 0 && (
+        <a href={`/projects/${id}#section-specs`} className="pt-warn">
+          ⚠ 還有 {blockers} 項未確認的問題
+        </a>
+      )}
       {status && <span className="pt-status">{status}</span>}
       <button type="button" onClick={() => void printAndRecord()} className="pt-print">
         Print / Save as PDF
@@ -80,7 +103,12 @@ export function ProjectPrintToolbar({ id, name }: { id: string; name: string }) 
   white-space: nowrap;
 }
 .pt-print:hover { background: #0398db; }
-.pt-status { color: #9aa3ab; white-space: nowrap; margin-left: auto; padding-right: 12px; }
+.pt-status { color: #9aa3ab; white-space: nowrap; padding-right: 12px; }
+.pt-warn {
+  margin-left: auto; color: #fbbf24; text-decoration: none; white-space: nowrap;
+  border: 1px solid rgba(251, 191, 36, .45); border-radius: 4px; padding: 4px 9px;
+}
+.pt-warn:hover { background: rgba(251, 191, 36, .12); }
 @media print { .print-toolbar { display: none !important; } }
 `,
         }}
