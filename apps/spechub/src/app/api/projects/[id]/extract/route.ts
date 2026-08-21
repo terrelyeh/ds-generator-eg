@@ -198,14 +198,45 @@ async function preview(
   // is how a hidden chipset reappears on a tender document.
   const orphans = findOrphanedRules(rows, asRules(model.rules) as SpecRules);
 
+  /**
+   * Is this column currently seeded from our own catalogue?
+   *
+   * Applying reassigns `source_id` to the vendor sheet, which flips the column
+   * out of `catalogModels` — and with it the whole direction of the gap
+   * review. Adding an undocumented spec goes from advisory to blocking, and
+   * `catalog_deviation` — the sharpest finding there is, the one that catches
+   * changing a number a customer can look up on our public datasheet — stops
+   * firing entirely, on a column still carrying our model name.
+   *
+   * All of that is arguably correct once the column really is vendor-sourced.
+   * None of it should happen without the person being told.
+   */
+  const fromCatalog = await isCatalogSeeded(supabase, docId, model);
+
   return NextResponse.json({
     sourceId: source.id,
     rows,
     notes,
     orphans,
+    fromCatalog,
     replacing: asRawDoc(model.raw_doc).length,
     lowConfidence: rows.filter((r) => (r.confidence ?? 1) < 0.7).length,
   });
+}
+
+async function isCatalogSeeded(
+  supabase: ReturnType<typeof createAdminClient>,
+  docId: string,
+  model: ProjectDatasheetModel,
+): Promise<boolean> {
+  if (!model.source_id) return false;
+  const { data } = await supabase
+    .from("project_datasheet_sources")
+    .select("kind")
+    .eq("id", model.source_id)
+    .eq("project_datasheet_id", docId)
+    .maybeSingle();
+  return (data as { kind: string } | null)?.kind === "catalog";
 }
 
 async function loadModel(

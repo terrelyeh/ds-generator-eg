@@ -526,6 +526,27 @@ export interface Database {
           Partial<Pick<Database["public"]["Tables"]["project_datasheet_sources"]["Row"], "id" | "created_at" | "filename" | "storage_path" | "extracted_text" | "extraction" | "extraction_model" | "extracted_at">>;
         Update: Partial<Database["public"]["Tables"]["project_datasheet_sources"]["Insert"]>;
       };
+      project_datasheet_issues: {
+        Row: {
+          id: string;
+          project_datasheet_id: string;
+          /** 1-based, per document */
+          issue_no: number;
+          issued_at: string;
+          issued_by: string | null;
+          issued_by_email: string | null;
+          note: string | null;
+          /** { doc, models } — the resolved document, not foreign keys */
+          snapshot: unknown;
+          created_at: string;
+        };
+        Insert: Omit<
+          Database["public"]["Tables"]["project_datasheet_issues"]["Row"],
+          "id" | "created_at" | "issued_at"
+        > &
+          Partial<Pick<Database["public"]["Tables"]["project_datasheet_issues"]["Row"], "id" | "created_at" | "issued_at" | "issued_by" | "issued_by_email" | "note">>;
+        Update: Partial<Database["public"]["Tables"]["project_datasheet_issues"]["Insert"]>;
+      };
       project_datasheet_questions: {
         Row: {
           id: string;
@@ -615,6 +636,8 @@ export type ProjectDatasheetModel =
   Database["public"]["Tables"]["project_datasheet_models"]["Row"];
 export type ProjectDatasheetQuestion =
   Database["public"]["Tables"]["project_datasheet_questions"]["Row"];
+export type ProjectDatasheetIssue =
+  Database["public"]["Tables"]["project_datasheet_issues"]["Row"];
 
 // Composite types for API responses
 export type ProductWithSpecs = Product & {

@@ -303,10 +303,10 @@ export function ProjectPreview({
      wraps to two lines is 14pt taller, and the one that overran the footer
      band was the second of two.
 
-     590 rather than 596: the measurement is of the gap between the title and
-     the footer band, and a few points of it should stay empty. Height is what
-     bounds these images — the width follows from the aspect ratio — so every
-     point given back here is a wider picture. */
+     572 rather than the ~596 measured between the title and the footer band:
+     a few points of it should stay empty, and at four rows 590 left only 12pt
+     of clearance. Costs nothing at two or three rows, where the 58% width cap
+     binds first and the height budget is never reached. */
   /* The labels are positioned against the wrapper, and the wrapper
      shrink-wraps the image, so a percentage means the same place on the
      picture no matter what size the page gives it. */
@@ -314,12 +314,38 @@ export function ProjectPreview({
     <span className="img-wrap">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={img.url} alt={alt} />
+      {/* Leaders first, so the dots and the plates sit on top of them.
+          preserveAspectRatio="none" makes the viewBox percentages line up with
+          the label percentages exactly whatever the image's aspect; the stroke
+          would be stretched with it, which `vector-effect` prevents. */}
+      {(img.labels ?? []).some((l) => l.lx != null && l.ly != null) && (
+        <svg className="img-leaders" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {(img.labels ?? []).map((l, i) =>
+            l.lx != null && l.ly != null ? (
+              <line
+                key={i}
+                x1={l.x}
+                y1={l.y}
+                x2={l.lx}
+                y2={l.ly}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null,
+          )}
+        </svg>
+      )}
       {(img.labels ?? []).map((l, i) => (
         <span key={i}>
           <span className="img-dot" style={{ left: `${l.x}%`, top: `${l.y}%` }} />
           <span
-            className={`img-label ${l.side ?? "right"}`}
-            style={{ left: `${l.x}%`, top: `${l.y}%` }}
+            className={
+              l.lx != null && l.ly != null ? "img-label placed" : `img-label ${l.side ?? "right"}`
+            }
+            style={
+              l.lx != null && l.ly != null
+                ? { left: `${l.lx}%`, top: `${l.ly}%` }
+                : { left: `${l.x}%`, top: `${l.y}%` }
+            }
           >
             {l.text}
           </span>
@@ -332,7 +358,7 @@ export function ProjectPreview({
     /* One row per scenario, sharing the page evenly rather than each taking a
        fixed height — so adding a fourth shrinks all four instead of pushing
        one onto a page of its own. */
-    const each = Math.floor((590 - (items.length - 1) * 16) / Math.max(items.length, 1));
+    const each = Math.floor((572 - (items.length - 1) * 16) / Math.max(items.length, 1));
     return (
       <div
         className={`scenarios${big ? " big" : ""}`}
@@ -655,10 +681,18 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
 
 /* ── hardware ──────────────────────────────────────────────────────── */
 .views-grid {
-  display: flex; gap: 20pt; justify-content: center; align-items: center;
+  display: flex; gap: 20pt; justify-content: center; align-items: flex-start;
   flex-wrap: wrap; margin-bottom: 10pt;
 }
-.views-grid img { max-width: 210pt; max-height: 250pt; object-fit: contain; }
+.view { text-align: center; }
+.views-grid img {
+  display: block; max-width: 210pt; max-height: 250pt; object-fit: contain;
+  margin: 0 auto;
+}
+.view-cap {
+  font-size: ${PT.bodySm}pt; font-weight: ${WT.semi}; color: ${MUTED};
+  margin-top: 6pt;
+}
 .views-model {
   font-family: ${displayFont}; font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi};
   color: ${INK}; margin: 14pt 0 6pt;
@@ -706,6 +740,14 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
   background: rgba(255, 255, 255, 0.92); border: 0.5pt solid #d8dfe6;
   border-radius: 2pt; padding: 1.5pt 4pt; white-space: nowrap; line-height: 1.25;
 }
+.img-leaders {
+  position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+}
+.img-leaders line { stroke: ${theme.primary}; stroke-width: 0.6pt; opacity: 0.55; }
+/* Freely placed: the text is centred on its own point and a leader runs back
+   to the thing it names. A fixed offset from the dot cannot clear a device —
+   how far it would have to move depends on how large that device is drawn. */
+.img-label.placed { transform: translate(-50%, -50%); }
 .img-label.right { transform: translate(7pt, -50%); }
 .img-label.left { transform: translate(-100%, -50%) translateX(-7pt); }
 .img-label.top { transform: translate(-50%, -100%) translateY(-7pt); }
@@ -872,8 +914,14 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
                   <div className="views-model">{model.model_name}</div>
                   <div className="views-grid">
                     {shots.map((s, i) => (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img key={i} src={s.url} alt={`${model.model_name} ${s.slot}`} />
+                      <div className="view" key={i}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={s.url} alt={`${model.model_name} ${s.slot}`} />
+                        {/* Which face this is. Two renders of a white box side
+                            by side are not self-explanatory, and on a tender
+                            sheet "where does the SIM go" is a real question. */}
+                        {s.caption && <div className="view-cap">{s.caption}</div>}
+                      </div>
                     ))}
                   </div>
                 </div>

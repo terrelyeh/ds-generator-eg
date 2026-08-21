@@ -14,6 +14,7 @@ import { RequirementsIntake } from "@/components/project/requirements-intake";
 import { SourceExtract } from "@/components/project/source-extract";
 import { AddModelMenu } from "@/components/project/add-model-menu";
 import { ImageManager, MODEL_SLOTS, DOC_SLOTS } from "@/components/project/image-manager";
+import { IssueHistory } from "@/components/project/issue-history";
 import type { ModelImage } from "@/lib/project-datasheet/types";
 import { SpecFormatHelp } from "@/components/project/spec-format-help";
 import { LayoutPicker } from "@/components/project/layout-picker";
@@ -444,6 +445,13 @@ export function ProjectEditor({
         </TabsContent>
 
         <TabsContent value="internal" className="space-y-5 pt-5">
+          <Panel
+            title="出圖紀錄"
+            note="這份文件每一次產生 PDF 都會存一版，可以回頭查客戶手上那份寫了什麼。"
+          >
+            <IssueHistory docId={doc.id} updatedAt={doc.updated_at} />
+          </Panel>
+
           {/* Tinted and labelled, because the complaint that started this
               redesign was that internal and printed content sat side by side
               looking identical. */}

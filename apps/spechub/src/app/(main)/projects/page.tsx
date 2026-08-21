@@ -23,12 +23,20 @@ export default async function ProjectsPage() {
   await requirePagePermission("project_datasheet.view");
 
   const supabase = await createClient();
-  const { data } = await supabase
-    .from("project_datasheets")
-    .select("*")
-    .order("updated_at", { ascending: false });
+  const [{ data }, { data: issueRows }] = await Promise.all([
+    supabase.from("project_datasheets").select("*").order("updated_at", { ascending: false }),
+    // Every issue, not the latest per document: Postgres has no DISTINCT ON
+    // through PostgREST, and the row count here is one per PDF ever printed
+    // across a handful of deals. Reducing in JS is cheaper than a view.
+    supabase
+      .from("project_datasheet_issues")
+      .select("project_datasheet_id, issue_no, issued_at, issued_by_email")
+      .order("issue_no", { ascending: true }),
+  ]);
 
   const docs = (data ?? []) as ProjectDatasheet[];
+  const lastIssue = new Map<string, Issue>();
+  for (const r of (issueRows ?? []) as Issue[]) lastIssue.set(r.project_datasheet_id, r);
   const live = docs.filter((d) => d.status !== "archived");
   const archived = docs.filter((d) => d.status === "archived");
 
@@ -56,13 +64,13 @@ export default async function ProjectsPage() {
         </div>
       ) : (
         <div className="mt-8 space-y-8">
-          <ProjectList docs={live} />
+          <ProjectList docs={live} lastIssue={lastIssue} />
           {archived.length > 0 && (
             <div>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Archived
               </h2>
-              <ProjectList docs={archived} />
+              <ProjectList docs={archived} lastIssue={lastIssue} />
             </div>
           )}
         </div>
@@ -71,7 +79,22 @@ export default async function ProjectsPage() {
   );
 }
 
-function ProjectList({ docs }: { docs: ProjectDatasheet[] }) {
+type Issue = {
+  project_datasheet_id: string;
+  issue_no: number;
+  issued_at: string;
+  issued_by_email: string | null;
+};
+
+const day = (iso: string) => iso.slice(0, 10).replace(/-/g, "/");
+
+function ProjectList({
+  docs,
+  lastIssue,
+}: {
+  docs: ProjectDatasheet[];
+  lastIssue: Map<string, Issue>;
+}) {
   if (docs.length === 0) return null;
   return (
     <ul className="divide-y rounded-lg border">
@@ -85,20 +108,56 @@ function ProjectList({ docs }: { docs: ProjectDatasheet[] }) {
               {d.name}
             </Link>
             {/* Internal context, so a list of a dozen deals stays legible.
-                None of this reaches the PDF. */}
-            <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-              {d.customer && <span>{d.customer}</span>}
-              {d.branch && <span>{d.branch}</span>}
-              {d.sales_owner && <span>{d.sales_owner}</span>}
+                None of this reaches the PDF.
+
+                The branch gets its own chip rather than sitting in the row of
+                grey text with the customer and the owner: it is the field
+                people scan this list by, and three interchangeable grey words
+                are not scannable. */}
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {d.branch && (
+                <span className="rounded bg-[#eef2f7] px-1.5 py-0.5 font-medium text-[#1b3a5c]">
+                  {d.branch}
+                </span>
+              )}
               <span className="rounded bg-muted px-1.5 py-0.5 uppercase tracking-wide">
                 {STATUS_LABEL[d.status] ?? d.status}
               </span>
+              {d.customer && <span>{d.customer}</span>}
+              {d.sales_owner && <span>{d.sales_owner}</span>}
               {d.tender_date && <span>標案 {d.tender_date}</span>}
-              <span className="tabular-nums">
-                更新 {new Date(d.updated_at).toISOString().slice(0, 10)}
-              </span>
             </div>
           </div>
+          {/* When a PDF was last made, and whether the document has moved
+              since. `updated_at` alone answered neither: it shifts when
+              somebody fixes an internal note, so it never meant "sent". */}
+          <div className="shrink-0 text-right text-xs">
+            {(() => {
+              const issue = lastIssue.get(d.id);
+              if (!issue) {
+                return <span className="text-muted-foreground">尚未出圖</span>;
+              }
+              const stale = new Date(d.updated_at) > new Date(issue.issued_at);
+              return (
+                <div className="space-y-0.5">
+                  <div className="font-medium tabular-nums text-[#231f20]">
+                    出圖 {day(issue.issued_at)}
+                    <span className="ml-1.5 font-normal text-muted-foreground">
+                      第 {issue.issue_no} 版
+                    </span>
+                  </div>
+                  {stale ? (
+                    <div className="text-[#b45309]">出圖後又改過</div>
+                  ) : (
+                    issue.issued_by_email && (
+                      <div className="text-muted-foreground">{issue.issued_by_email}</div>
+                    )
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+
           <div className="flex shrink-0 items-center gap-3 text-sm">
             <Link href={`/projects/${d.id}`} className="text-engenius-blue hover:underline">
               Edit

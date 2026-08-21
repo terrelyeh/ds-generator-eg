@@ -121,12 +121,24 @@ export interface ImageLabel {
   y: number;
   text: string;
   /**
-   * Which way the text sits from the point.
+   * Where the TEXT sits, as its own percentage of the image box, with a thin
+   * leader drawn back to (x, y).
    *
-   * The point marks the thing; the text sits BESIDE it. Centring the box on
-   * the point — the first version — meant that clicking the device you wanted
-   * to name covered the device you wanted to show, which is the one thing an
-   * application diagram exists to do.
+   * Free placement rather than a side: a fixed offset from the point cannot
+   * reliably clear a device, because how far it would have to move depends on
+   * how big that device is drawn — which nothing but the eye knows. Dragging
+   * the label is the only version of "move it out of the way" that actually
+   * moves it out of the way.
+   *
+   * Optional, so labels written before this existed still render: without it
+   * the layout falls back to `side`.
+   */
+  lx?: number;
+  ly?: number;
+  /**
+   * Legacy placement — one of four fixed offsets from the point. Kept as the
+   * fallback for labels saved before free placement, and as what the quick
+   * arrows in the editor set.
    */
   side?: LabelSide;
 }
