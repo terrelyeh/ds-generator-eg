@@ -1,5 +1,5 @@
 /**
- * Project Datasheet Builder — shared shapes for on-demand datasheets.
+ * Tender Datasheets — shared shapes for on-demand, non-catalogue datasheets.
  *
  * These describe the jsonb columns of `project_datasheets` and
  * `project_datasheet_models` (migration 00038). The DB types say `Json`

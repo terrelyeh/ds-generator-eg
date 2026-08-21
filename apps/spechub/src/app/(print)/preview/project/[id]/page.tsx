@@ -6,6 +6,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { requirePagePermission } from "@eg/auth/page-guards";
 import { ProjectPreview } from "./project-preview";
 import { printTitle } from "@/lib/project-datasheet/filename";
+import { openBlockers } from "@/lib/project-datasheet/blockers";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
 
 /**
@@ -96,7 +97,20 @@ export default async function ProjectPreviewPage({
   const models = (modelRows ?? []) as ProjectDatasheetModel[];
   if (models.length === 0) notFound();
 
+  const showToolbar = toolbar !== "false";
+
+  /**
+   * Only when somebody is looking. The scan costs two more queries, and the
+   * path that skips the toolbar is the PDF renderer, which has nobody to warn.
+   */
+  const blockers = showToolbar ? (await openBlockers(createAdminClient(), id)).length : 0;
+
   return (
-    <ProjectPreview doc={doc} models={models} showToolbar={toolbar !== "false"} />
+    <ProjectPreview
+      doc={doc}
+      models={models}
+      showToolbar={showToolbar}
+      blockers={blockers}
+    />
   );
 }

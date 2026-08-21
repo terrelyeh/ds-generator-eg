@@ -164,10 +164,13 @@ export function ProjectPreview({
   doc,
   models,
   showToolbar,
+  blockers = 0,
 }: {
   doc: ProjectDatasheet;
   models: ProjectDatasheetModel[];
   showToolbar: boolean;
+  /** open blocking findings, shown on the print bar */
+  blockers?: number;
 }) {
   const theme = getProjectTheme(doc.layout);
   // The footer carries the same neutral boilerplate every EnGenius datasheet
@@ -472,7 +475,7 @@ export function ProjectPreview({
 
   return (
     <>
-      {showToolbar && <ProjectPrintToolbar id={doc.id} name={doc.name} />}
+      {showToolbar && <ProjectPrintToolbar id={doc.id} name={doc.name} blockers={blockers} />}
       {/* ⚠️ Everything below is ONE template literal. A backtick inside a CSS
           comment — quoting a property name, say — closes it, and the parse
           error lands on a line nowhere near the comment. Write property names
