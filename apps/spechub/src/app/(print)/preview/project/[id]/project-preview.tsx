@@ -129,12 +129,29 @@ function asImages(value: unknown): ModelImage[] {
         slot: img.slot || "product",
         url: img.url,
         caption: img.caption ?? null,
+        body: Array.isArray(img.body) ? img.body : [],
         // Dropping this silently is how a label the author placed and saved
         // turns into an image that simply prints without it.
         labels: Array.isArray(img.labels) ? img.labels : [],
       },
     ];
   });
+}
+
+/**
+ * "Rural and remote sites — where fixed line has not been built" is a name
+ * and then an explanation. The scenarios page wants those in two different
+ * type styles in two different places, so it needs them apart.
+ *
+ * Split rather than a second field: every caption already written uses this
+ * shape, and a new field would have left them all with an empty heading until
+ * someone re-typed them.
+ */
+function splitCaption(caption?: string | null): [string, string] {
+  const text = (caption ?? "").trim();
+  const at = text.indexOf("\u2014");
+  if (at <= 0) return [text, ""];
+  return [text.slice(0, at).trimEnd(), text.slice(at + 1).trim()];
 }
 
 function asSections(value: unknown): SectionToggles {
@@ -312,25 +329,47 @@ export function ProjectPreview({
   );
 
   const ScenarioRow = ({ items, big }: { items: ModelImage[]; big: boolean }) => {
-    const cols = items.length > 2;
-    const rows = cols ? Math.ceil(items.length / 2) : items.length;
-    const each = Math.floor((590 - (rows - 1) * 22 - rows * 34) / rows);
+    /* One row per scenario, sharing the page evenly rather than each taking a
+       fixed height — so adding a fourth shrinks all four instead of pushing
+       one onto a page of its own. */
+    const each = Math.floor((590 - (items.length - 1) * 16) / Math.max(items.length, 1));
     return (
-    <div
-      className={`scenarios${big ? " big" : ""}${big && cols ? " cols" : ""}`}
-      style={big ? ({ "--scenario-h": `${each}pt` } as React.CSSProperties) : undefined}
-    >
-      {items.map((d, i) => (
-        <div className="scenario" key={i}>
-          <Illustration img={d} alt={d.caption ?? "Application scenario"} />
-          {d.caption && (
-            <div className="scenario-cap">
-              <Caption text={d.caption} />
+      <div
+        className={`scenarios${big ? " big" : ""}`}
+        style={big ? ({ "--scenario-h": `${each}pt` } as React.CSSProperties) : undefined}
+      >
+        {items.map((d, i) => {
+          const [head, lead] = splitCaption(d.caption);
+          const bullets = (d.body ?? []).filter((b) => b.trim());
+          return (
+            <div className="scenario" key={i}>
+              <Illustration img={d} alt={head || "Application scenario"} />
+              {big ? (
+                <div className="scenario-copy">
+                  {head && <div className="scenario-head">{head}</div>}
+                  {lead && <div className="scenario-lead">{lead}</div>}
+                  {bullets.length > 0 && (
+                    <ul className="block-body">
+                      {bullets.map((t, j) => (
+                        <li key={j}>
+                          <span className="dot" />
+                          <span>{t}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              ) : (
+                d.caption && (
+                  <div className="scenario-cap">
+                    <Caption text={d.caption} />
+                  </div>
+                )
+              )}
             </div>
-          )}
-        </div>
-      ))}
-    </div>
+          );
+        })}
+      </div>
     );
   };
 
@@ -536,29 +575,42 @@ body {
    element and the picture are the same rectangle, and the wrapper the labels
    are positioned against shrink-wraps to exactly that. */
 .deploy img { display: block; width: auto; height: auto; max-width: 100%; max-height: 250pt; }
-/* On a page of their own the vignettes get real size; squeezed under a
-   benefits grid they stay thumbnails.
+/* On a page of their own the scenarios read as rows: picture on the left,
+   what it is on the right.
 
-   Side by side they were two landscape images contained inside a 600pt-tall
-   flex box, so object-fit letterboxed them and they floated in the middle of
-   an otherwise blank page. Stacked one per row they can be as wide as the
-   aspect ratio allows and actually fill the paper. Three or more go back to
-   two columns, where stacking would shrink each one below legibility. */
-/* Centred in the space left over, not pinned to the title. At full column
-   width the stack fills most of the page, so the remainder reads as balanced
-   margins rather than as the floating-in-a-blank-page problem that made them
-   stack in the first place. */
+   A one-line caption under a picture can only name the scene. A column beside
+   it has room to say why that scene is a reason to buy, which is what a
+   tender reader is actually looking for — and it uses the width that a
+   caption centred under a picture throws away.
+
+   Centred in the space left over rather than pinned to the title, so a page
+   of two rows and a page of four both look deliberate. */
 .scenarios.big {
   flex: 1; min-height: 0; flex-direction: column; align-items: stretch;
-  justify-content: center; gap: 22pt; margin-top: 20pt;
+  justify-content: center; gap: 16pt; margin-top: 18pt;
 }
-.scenarios.big .scenario { flex: none; }
+.scenarios.big .scenario {
+  flex: none; display: flex; align-items: center; gap: 22pt; text-align: left;
+}
+/* Height-bound first, then capped at 58% of the row. The wrapper has to
+   shrink-wrap the picture — that is what makes a label at 40%/60% land in the
+   same place on paper as it did in the editor — so the width cap goes on the
+   wrapper and the picture fills it, rather than the wrapper being sized on
+   its own and the picture floating inside it. */
+.scenarios.big .scenario > .img-wrap { flex: 0 0 auto; max-width: 58%; }
 .scenarios.big .scenario img {
-  display: block; width: auto; max-width: 100%; max-height: var(--scenario-h);
+  display: block; width: auto; height: auto;
+  max-width: 100%; max-height: var(--scenario-h);
 }
-.scenarios.big .scenario-cap { font-size: ${PT.bodyMd}pt; margin-top: 9pt; }
-.scenarios.big.cols { flex-direction: row; flex-wrap: wrap; align-items: flex-start; }
-.scenarios.big.cols .scenario { flex: 0 0 calc(50% - 11pt); }
+.scenario-copy { flex: 1; min-width: 0; }
+.scenario-head {
+  font-family: ${displayFont}; font-size: ${PT.bodyMd}pt; font-weight: ${WT.semi};
+  color: ${theme.primary}; margin-bottom: 5pt; line-height: 1.3;
+}
+.scenario-lead {
+  font-size: ${PT.bodySm}pt; line-height: 1.5; color: ${MUTED}; margin-bottom: 5pt;
+}
+.scenario-copy .block-body { font-size: ${PT.bodySm}pt; }
 .block {
   background: ${theme.featuresBox}; border-radius: 3pt; padding: 12pt 14pt;
 }

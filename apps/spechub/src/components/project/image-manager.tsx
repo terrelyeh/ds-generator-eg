@@ -48,7 +48,10 @@ export function ImageManager({
    * form save posts whatever it loaded on mount — which is how an image
    * uploaded mid-edit used to vanish on the next Save.
    */
-  async function saveMeta(url: string, patch: { caption?: string | null; labels?: ImageLabel[] }) {
+  async function saveMeta(
+    url: string,
+    patch: { caption?: string | null; body?: string[]; labels?: ImageLabel[] },
+  ) {
     setBusy(true);
     try {
       const res = await fetch(`/api/projects/${docId}/images`, {
@@ -220,9 +223,12 @@ function LabelEditor({
 }: {
   image: ModelImage;
   busy: boolean;
-  onSave: (patch: { caption: string | null; labels: ImageLabel[] }) => void;
+  onSave: (patch: { caption: string | null; body: string[]; labels: ImageLabel[] }) => void;
 }) {
   const [caption, setCaption] = useState(image.caption ?? "");
+  /* Held as text, not an array: a textarea is how anyone writes a short list,
+     and splitting on save keeps blank lines from becoming empty bullets. */
+  const [body, setBody] = useState((image.body ?? []).join("\n"));
   const [labels, setLabels] = useState<ImageLabel[]>(image.labels ?? []);
   const [drag, setDrag] = useState<number | null>(null);
   /**
@@ -351,15 +357,29 @@ function LabelEditor({
       </div>
 
       <div>
-        <label className="text-xs font-medium text-[#231f20]">圖說</label>
+        <label className="text-xs font-medium text-[#231f20]">圖說標題</label>
         <Input
           value={caption}
-          placeholder="場景名稱 — 一句說明"
+          placeholder="場景名稱 — 一句說明（破折號後面可留空）"
           onChange={(e) => setCaption(e.target.value)}
           className="mt-1 h-8 text-xs"
         />
         <p className="mt-1 text-[11px] text-muted-foreground">
-          破折號（—）前面的字會印成粗體小標，後面是說明。沒有破折號就整句照印。
+          破折號（—）前面是小標，後面那句會印在小標下面當引言。
+        </p>
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-[#231f20]">說明列點</label>
+        <textarea
+          value={body}
+          rows={3}
+          placeholder={"一行一點，例：\n免固網，插卡即可開通\n單條 PoE 供電＋回傳"}
+          onChange={(e) => setBody(e.target.value)}
+          className="mt-1 w-full rounded-lg border border-input bg-transparent p-2 text-xs"
+        />
+        <p className="mt-1 text-[11px] text-muted-foreground">
+          印在圖片右邊。一行一個列點，最多 6 點；留空就只印小標。
         </p>
       </div>
 
@@ -369,6 +389,10 @@ function LabelEditor({
         onClick={() =>
           onSave({
             caption: caption.trim() || null,
+            body: body
+              .split("\n")
+              .map((l) => l.replace(/^[-•*]\s*/, "").trim())
+              .filter(Boolean),
             // A label with no text prints as an empty white box. Dropping it
             // here is what the author meant by leaving it blank.
             labels: labels.filter((l) => l.text.trim()),

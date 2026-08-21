@@ -140,6 +140,14 @@ export interface ModelImage {
   /** 'product' for the cover shot, anything else lands on the hardware page */
   slot: string;
   url: string;
+  /**
+   * On the scenarios page this is the heading, not a sentence under the
+   * picture. Existing captions written as "Name — explanation" still work:
+   * the layout splits on the dash and the tail becomes the opening line of
+   * the copy, so nothing already typed has to be re-entered.
+   */
   caption?: string | null;
+  /** Bullets in the copy column beside the image. One string per bullet. */
+  body?: string[] | null;
   labels?: ImageLabel[] | null;
 }
