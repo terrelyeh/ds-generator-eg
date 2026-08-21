@@ -314,12 +314,38 @@ export function ProjectPreview({
     <span className="img-wrap">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src={img.url} alt={alt} />
+      {/* Leaders first, so the dots and the plates sit on top of them.
+          preserveAspectRatio="none" makes the viewBox percentages line up with
+          the label percentages exactly whatever the image's aspect; the stroke
+          would be stretched with it, which `vector-effect` prevents. */}
+      {(img.labels ?? []).some((l) => l.lx != null && l.ly != null) && (
+        <svg className="img-leaders" viewBox="0 0 100 100" preserveAspectRatio="none">
+          {(img.labels ?? []).map((l, i) =>
+            l.lx != null && l.ly != null ? (
+              <line
+                key={i}
+                x1={l.x}
+                y1={l.y}
+                x2={l.lx}
+                y2={l.ly}
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null,
+          )}
+        </svg>
+      )}
       {(img.labels ?? []).map((l, i) => (
         <span key={i}>
           <span className="img-dot" style={{ left: `${l.x}%`, top: `${l.y}%` }} />
           <span
-            className={`img-label ${l.side ?? "right"}`}
-            style={{ left: `${l.x}%`, top: `${l.y}%` }}
+            className={
+              l.lx != null && l.ly != null ? "img-label placed" : `img-label ${l.side ?? "right"}`
+            }
+            style={
+              l.lx != null && l.ly != null
+                ? { left: `${l.lx}%`, top: `${l.ly}%` }
+                : { left: `${l.x}%`, top: `${l.y}%` }
+            }
           >
             {l.text}
           </span>
@@ -714,6 +740,14 @@ ${bulletDotCss(".block-body .dot", theme.primary)}
   background: rgba(255, 255, 255, 0.92); border: 0.5pt solid #d8dfe6;
   border-radius: 2pt; padding: 1.5pt 4pt; white-space: nowrap; line-height: 1.25;
 }
+.img-leaders {
+  position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible;
+}
+.img-leaders line { stroke: ${theme.primary}; stroke-width: 0.6pt; opacity: 0.55; }
+/* Freely placed: the text is centred on its own point and a leader runs back
+   to the thing it names. A fixed offset from the dot cannot clear a device —
+   how far it would have to move depends on how large that device is drawn. */
+.img-label.placed { transform: translate(-50%, -50%); }
 .img-label.right { transform: translate(7pt, -50%); }
 .img-label.left { transform: translate(-100%, -50%) translateX(-7pt); }
 .img-label.top { transform: translate(-50%, -100%) translateY(-7pt); }

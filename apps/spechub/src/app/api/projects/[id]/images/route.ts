@@ -224,13 +224,17 @@ function asLabels(value: unknown): ImageLabel[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((l) => {
     if (!l || typeof l !== "object") return [];
-    const { x, y, text, side } = l as ImageLabel;
+    const { x, y, lx, ly, text, side } = l as ImageLabel;
     const t = typeof text === "string" ? text.trim().slice(0, 60) : "";
     if (!t || !Number.isFinite(x) || !Number.isFinite(y)) return [];
+    // Both coordinates or neither: half a placement would put the text at the
+    // top of the image and the leader nowhere near it.
+    const placed = Number.isFinite(lx) && Number.isFinite(ly);
     return [
       {
         x: clamp(x),
         y: clamp(y),
+        ...(placed ? { lx: clamp(lx as number), ly: clamp(ly as number) } : {}),
         text: t,
         side: LABEL_SIDES.includes(side as LabelSide) ? (side as LabelSide) : "right",
       },

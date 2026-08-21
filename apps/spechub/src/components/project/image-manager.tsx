@@ -230,7 +230,8 @@ function LabelEditor({
      and splitting on save keeps blank lines from becoming empty bullets. */
   const [body, setBody] = useState((image.body ?? []).join("\n"));
   const [labels, setLabels] = useState<ImageLabel[]>(image.labels ?? []);
-  const [drag, setDrag] = useState<number | null>(null);
+  /** which label is being dragged, and whether by its dot or its text */
+  const [drag, setDrag] = useState<{ i: number; part: "dot" | "label" } | null>(null);
   /**
    * Index of the label just placed, so its text box takes the caret.
    *
@@ -257,9 +258,26 @@ function LabelEditor({
         ref={boxRef}
         className="relative mx-auto w-fit max-w-full cursor-crosshair select-none bg-white"
         onPointerMove={(e) => {
-          if (drag === null) return;
+          if (!drag) return;
           const at = pointToPercent(e);
-          if (at) setLabels((ls) => ls.map((l, i) => (i === drag ? { ...l, ...at } : l)));
+          if (!at) return;
+          setLabels((ls) =>
+            ls.map((l, i) =>
+              i !== drag.i
+                ? l
+                : drag.part === "dot"
+                  ? // Moving the point carries its text along, so re-aiming a
+                    // label does not fling the words across the picture.
+                    {
+                      ...l,
+                      x: at.x,
+                      y: at.y,
+                      lx: clampPct((l.lx ?? l.x) + (at.x - l.x)),
+                      ly: clampPct((l.ly ?? l.y) + (at.y - l.y)),
+                    }
+                  : { ...l, lx: at.x, ly: at.y },
+            ),
+          );
         }}
         onPointerUp={() => setDrag(null)}
         onPointerLeave={() => setDrag(null)}
@@ -275,26 +293,57 @@ function LabelEditor({
             if (!at) return;
             setLabels((ls) => {
               setFresh(ls.length);
-              return [...ls, { ...at, text: "", side: "right" }];
+              // Offset by a share of the WIDTH, so a new label sits the same
+              // distance from its dot in the editor and on the page.
+              return [
+                ...ls,
+                { ...at, lx: clampPct(at.x + 9), ly: at.y, text: "", side: "right" },
+              ];
             });
           }}
         />
+        {/* Same geometry as the print layout: percentages of the image box and
+            a leader from the dot to the text. That equivalence is the point —
+            the previous version offset the text by 9px here and 7pt there, so
+            a label positioned in the editor landed elsewhere in the PDF. */}
+        <svg
+          viewBox="0 0 100 100"
+          preserveAspectRatio="none"
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+        >
+          {labels.map((l, i) => (
+            <line
+              key={i}
+              x1={l.x}
+              y1={l.y}
+              x2={l.lx ?? l.x}
+              y2={l.ly ?? l.y}
+              stroke="#1b3a5c"
+              strokeWidth={1}
+              opacity={0.55}
+              vectorEffect="non-scaling-stroke"
+            />
+          ))}
+        </svg>
         {labels.map((l, i) => (
           <span key={i}>
-            {/* The dot is what gets positioned; the box hangs off it. Same
-                geometry as the print layout, so what is placed here is what
-                comes out of the PDF. */}
             <span
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setDrag({ i, part: "dot" });
+              }}
+              title="拖曳：改成指向別的設備"
               style={{ left: `${l.x}%`, top: `${l.y}%` }}
-              className="pointer-events-none absolute h-[5px] w-[5px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#1b3a5c] ring-2 ring-white/95"
+              className="absolute h-[11px] w-[11px] -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-[3px] border-white bg-[#1b3a5c] shadow"
             />
             <span
               onPointerDown={(e) => {
                 e.preventDefault();
-                setDrag(i);
+                setDrag({ i, part: "label" });
               }}
-              style={{ left: `${l.x}%`, top: `${l.y}%`, transform: OFFSET[l.side ?? "right"] }}
-              className="absolute cursor-move whitespace-nowrap rounded border border-[#d8dfe6] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#1b3a5c] shadow-sm"
+              title="拖曳：把文字移開設備"
+              style={{ left: `${l.lx ?? l.x}%`, top: `${l.ly ?? l.y}%` }}
+              className="absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-nowrap rounded border border-[#d8dfe6] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#1b3a5c] shadow-sm"
             >
               {l.text || `標籤 ${i + 1}`}
             </span>
@@ -303,8 +352,9 @@ function LabelEditor({
       </div>
       <p className="text-center text-xs text-muted-foreground">
         <strong className="font-medium text-[#231f20]">點圖片上任一處就新增一個標記點</strong>
-        ，可以加很多個；拖曳標籤可移動。文字會印在標記點旁邊，用下方的箭頭選要放哪一邊，
-        才不會蓋到設備。
+        ，可以加很多個。<strong className="font-medium text-[#231f20]">圓點</strong>拖到要指的設備上，
+        <strong className="font-medium text-[#231f20]">文字方塊</strong>拖到空白處，中間會自動連一條細線。
+        下方的箭頭是快速擺位。這裡的位置就是 PDF 上的位置。
       </p>
 
       <div className="space-y-2">
@@ -332,7 +382,9 @@ function LabelEditor({
                   type="button"
                   title={SIDE_LABEL[side]}
                   onClick={() =>
-                    setLabels((ls) => ls.map((x, j) => (j === i ? { ...x, side } : x)))
+                    setLabels((ls) =>
+                      ls.map((x, j) => (j === i ? { ...x, side, ...quickPlace(x, side) } : x)),
+                    )
                   }
                   className={`h-6 w-6 rounded border text-[11px] leading-none ${
                     (l.side ?? "right") === side
@@ -405,13 +457,14 @@ function LabelEditor({
   );
 }
 
-/** Same offsets as the print layout, in px rather than pt. */
-const OFFSET: Record<LabelSide, string> = {
-  right: "translate(9px, -50%)",
-  left: "translate(-100%, -50%) translateX(-9px)",
-  top: "translate(-50%, -100%) translateY(-9px)",
-  bottom: "translate(-50%, 0) translateY(9px)",
-};
+const clampPct = (n: number) => Math.min(100, Math.max(0, Math.round(n * 10) / 10));
+
+/** Where the arrow buttons drop the text, as a share of the image box. */
+function quickPlace(l: ImageLabel, side: LabelSide): { lx: number; ly: number } {
+  const D = 9;
+  const at = { right: [D, 0], left: [-D, 0], top: [0, -D], bottom: [0, D] }[side];
+  return { lx: clampPct(l.x + at[0]), ly: clampPct(l.y + at[1]) };
+}
 
 const SIDE_GLYPH: Record<LabelSide, string> = { right: "→", left: "←", top: "↑", bottom: "↓" };
 const SIDE_LABEL: Record<LabelSide, string> = {
