@@ -935,6 +935,19 @@ export function ProjectEditor({
  * author had written were absent from the component's state, so the next
  * upload wrote the whole array back without them.
  */
+/**
+ * Everything the row carries, not a hand-listed subset.
+ *
+ * The listed version dropped a field three times — first `caption`, then
+ * `labels`, then `body` — and each time the same way: the editor loaded an
+ * image without it, so the panel's state started empty and the next save
+ * wrote that emptiness back. Nothing errored; the bullets were simply gone
+ * from the PDF.
+ *
+ * Spreading is the fix. A field added to `ModelImage` tomorrow survives a
+ * round trip through this editor whether or not anyone remembers this
+ * function exists.
+ */
 function parseImagesJson(value: unknown): ModelImage[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((i) => {
@@ -943,9 +956,11 @@ function parseImagesJson(value: unknown): ModelImage[] {
     if (typeof img.url !== "string" || !img.url) return [];
     return [
       {
+        ...img,
         slot: img.slot ?? "product",
         url: img.url,
         caption: img.caption ?? null,
+        body: Array.isArray(img.body) ? img.body : [],
         labels: Array.isArray(img.labels) ? img.labels : [],
       },
     ];

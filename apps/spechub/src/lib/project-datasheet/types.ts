@@ -36,6 +36,14 @@ export interface AddedRow {
   value: string;
   /** insert after this key; appended when absent or not found */
   after?: string | null;
+  /**
+   * Put the row at the top of its group instead of the bottom.
+   *
+   * `after` cannot express this: there is no row to sit behind. And the row
+   * people want first — a Description under the model name — is by definition
+   * one the supplier's table never had, so there is nothing to anchor to.
+   */
+  first?: boolean;
   /** which table it joins — defaults to the main spec table */
   group?: string;
 }

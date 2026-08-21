@@ -81,6 +81,29 @@ export function serializeSpecRows(rows: RawSpecRow[]): string {
 //   + Power over Ethernet = 802.3af/at          add a row
 //   ? antenna = na           blank mode for this cell (tbd | na | blank)
 
+/**
+ * Where an added row goes, written after its label so the VALUE stays
+ * untouched — a spec value can contain very nearly anything, and a syntax
+ * that reached into it would eventually eat somebody's data.
+ *
+ *   + Description @first = Outdoor 5G NR Cellular Router
+ *   + IP Rating @after Weight = IP67
+ *
+ * Anything else is left alone and appended, which is what happens today.
+ */
+function parsePlacement(text: string): {
+  label: string;
+  place: { first?: boolean; after?: string };
+} {
+  const first = text.match(/^(.*?)\s*@first$/i);
+  if (first) return { label: first[1].trim(), place: { first: true } };
+
+  const after = text.match(/^(.*?)\s*@after\s+(.+)$/i);
+  if (after) return { label: after[1].trim(), place: { after: normalizeKey(after[2].trim()) } };
+
+  return { label: text, place: {} };
+}
+
 export function parseRules(text: string): SpecRules {
   const hide: string[] = [];
   const override: Record<string, string> = {};
@@ -112,8 +135,8 @@ export function parseRules(text: string): SpecRules {
     const rhs = line.slice(eq + 1).trim();
 
     if (lhs.startsWith("+")) {
-      const label = lhs.slice(1).trim();
-      if (label) add.push({ key: normalizeKey(label), label, value: rhs, group });
+      const { label, place } = parsePlacement(lhs.slice(1).trim());
+      if (label) add.push({ key: normalizeKey(label), label, value: rhs, group, ...place });
     } else if (lhs.startsWith("~")) {
       const key = normalizeKey(lhs.slice(1).trim());
       if (key) rename[key] = rhs;
@@ -148,7 +171,11 @@ export function serializeRules(rules: SpecRules): string {
       out.push(`## ${g}`);
       group = g;
     }
-    out.push(`+ ${a.label} = ${a.value}`);
+    // Round-trips: a placement typed once survives every later save, rather
+    // than silently reverting the row to the bottom the next time the editor
+    // reads and rewrites this text.
+    const place = a.first ? " @first" : a.after ? ` @after ${a.after}` : "";
+    out.push(`+ ${a.label}${place} = ${a.value}`);
   }
   return out.join("\n");
 }

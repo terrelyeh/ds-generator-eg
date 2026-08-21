@@ -174,11 +174,22 @@ function placeAdds(out: Column, adds: AddedRow[]): Column {
   if (adds.length === 0) return out;
   const entries = [...out.entries()];
   for (const add of adds) {
-    if (!add.after) continue;
+    if (!add.after && !add.first) continue;
     const key = add.key || normalizeKey(add.label);
     const from = entries.findIndex(([k]) => k === key);
     if (from === -1) continue;
     const [entry] = entries.splice(from, 1);
+
+    if (add.first) {
+      // Top of its OWN group, not of the document. A row added to Software
+      // that jumped to index 0 would render under the spec table's heading,
+      // which is a worse answer than leaving it where it was.
+      const group = entry[1].group;
+      const at = entries.findIndex(([, cell]) => cell.group === group);
+      entries.splice(at === -1 ? 0 : at, 0, entry);
+      continue;
+    }
+
     const afterKey = normalizeKey(add.after ?? "");
     const anchor = entries.findIndex(([k]) => k === afterKey);
     if (anchor === -1) entries.splice(from, 0, entry);

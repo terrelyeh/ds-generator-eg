@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -241,6 +241,36 @@ function LabelEditor({
    */
   const [fresh, setFresh] = useState<number | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+
+  /**
+   * Rendered width of the picture, so the label can be drawn at the same
+   * FRACTION of it that the layout will print.
+   *
+   * Matching the positions was not enough. The editor shows the picture at
+   * ~750px and the page prints it at 304pt, but the label's type stayed 10px
+   * here and 8pt there — so the plate covered about half as much of the
+   * picture in the editor as it does on paper. Everything looked clear in the
+   * editor and was still sitting on the router in the PDF.
+   */
+  const [boxW, setBoxW] = useState(0);
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setBoxW(el.getBoundingClientRect().width));
+    ro.observe(el);
+    setBoxW(el.getBoundingClientRect().width);
+    return () => ro.disconnect();
+  }, []);
+
+  /**
+   * The scenario images print 304pt wide with 8pt labels. The hero on page 2
+   * prints wider, so its labels come out a little smaller than shown here —
+   * erring toward more clearance, which is the safe direction to be wrong in.
+   */
+  const k = boxW ? boxW / 304 : 0;
+  const labelPx = k ? 8 * k : 10;
+  const dotPx = k ? Math.max(6, 3 * k) : 8;
 
   function pointToPercent(e: { clientX: number; clientY: number }) {
     const box = boxRef.current?.getBoundingClientRect();
@@ -284,6 +314,7 @@ function LabelEditor({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          ref={imgRef}
           src={image.url}
           alt=""
           draggable={false}
@@ -333,8 +364,14 @@ function LabelEditor({
                 setDrag({ i, part: "dot" });
               }}
               title="拖曳：改成指向別的設備"
-              style={{ left: `${l.x}%`, top: `${l.y}%` }}
-              className="absolute h-[11px] w-[11px] -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-[3px] border-white bg-[#1b3a5c] shadow"
+              style={{
+                left: `${l.x}%`,
+                top: `${l.y}%`,
+                width: dotPx,
+                height: dotPx,
+                borderWidth: Math.max(2, dotPx / 3),
+              }}
+              className="absolute -translate-x-1/2 -translate-y-1/2 cursor-move rounded-full border-solid border-white bg-[#1b3a5c] shadow"
             />
             <span
               onPointerDown={(e) => {
@@ -342,8 +379,16 @@ function LabelEditor({
                 setDrag({ i, part: "label" });
               }}
               title="拖曳：把文字移開設備"
-              style={{ left: `${l.lx ?? l.x}%`, top: `${l.ly ?? l.y}%` }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-nowrap rounded border border-[#d8dfe6] bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-[#1b3a5c] shadow-sm"
+              style={{
+                left: `${l.lx ?? l.x}%`,
+                top: `${l.ly ?? l.y}%`,
+                fontSize: labelPx,
+                // em-based, so the plate keeps the proportions it prints with
+                // instead of a fixed padding that shrinks as the type grows.
+                padding: "0.19em 0.5em",
+                borderRadius: "0.25em",
+              }}
+              className="absolute -translate-x-1/2 -translate-y-1/2 cursor-move whitespace-nowrap border border-[#d8dfe6] bg-white/90 font-semibold leading-tight text-[#1b3a5c] shadow-sm"
             >
               {l.text || `標籤 ${i + 1}`}
             </span>
@@ -354,7 +399,7 @@ function LabelEditor({
         <strong className="font-medium text-[#231f20]">點圖片上任一處就新增一個標記點</strong>
         ，可以加很多個。<strong className="font-medium text-[#231f20]">圓點</strong>拖到要指的設備上，
         <strong className="font-medium text-[#231f20]">文字方塊</strong>拖到空白處，中間會自動連一條細線。
-        下方的箭頭是快速擺位。這裡的位置就是 PDF 上的位置。
+        下方的箭頭是快速擺位。<strong className="font-medium text-[#231f20]">這裡的位置和大小就是 PDF 上的</strong>——標籤看起來偏大是對的，那就是它在紙上佔的比例。
       </p>
 
       <div className="space-y-2">
