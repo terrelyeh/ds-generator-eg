@@ -14,7 +14,11 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 /**
- * Project Datasheet Builder — the list of on-demand project datasheets.
+ * Tender Datasheets — the list of on-demand, non-catalogue datasheets.
+ *
+ * The route, the permission keys and the tables keep saying `project` — those
+ * are contracts with bookmarks, the role matrix and the database, and renaming
+ * them buys nothing a label change does not.
  *
  * Separate from /dashboard on purpose. The dashboard is the catalogue; these
  * are quotes for hardware that may never exist, and mixing them into the same
@@ -46,13 +50,14 @@ export default async function ProjectsPage() {
       <div className="mb-2 flex items-start justify-between gap-4">
         <div>
           <h1 className="font-heading text-2xl font-semibold text-[#231f20]">
-            Project Datasheet Builder
+            Tender Datasheets
           </h1>
           <p className="mt-1 max-w-[620px] text-sm text-muted-foreground">
-            Preliminary datasheets for project business — retarget a supplier
-            spec sheet onto EnGenius naming and layout to quote a tender. These
-            live outside the product catalogue: they are never synced, never
-            indexed, and never become products. When a customer commits, the
+            Preliminary datasheets for the bids we do not have a catalogue
+            product for — retarget a supplier&apos;s spec sheet onto EnGenius
+            naming and layout, or extend one of our own models with what the
+            tender asks for. These live outside the product catalogue: never
+            synced, never indexed, never products. When a customer commits, the
             line gets built properly in Google Sheets.
           </p>
         </div>

@@ -19,7 +19,7 @@
 export const BATTLECARD_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";
 
 /**
- * Project Datasheet Builder requirements intake.
+ * Tender Datasheets requirements intake.
  *
  * The job is reading a scrappy bilingual note from sales and deciding which
  * lines are actionable rules and which are questions — judgement over a short
@@ -30,7 +30,7 @@ export const BATTLECARD_EXTRACT_MODEL = "anthropic/claude-sonnet-4.6";
 export const PROJECT_INTAKE_MODEL = "anthropic/claude-sonnet-4.6";
 
 /**
- * Project Datasheet Builder source extraction.
+ * Tender Datasheets source extraction.
  *
  * Long-input transcription with a hard "change nothing" rule — a different
  * job from intake's short-input judgement, so it gets its own constant even
