@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -114,6 +114,38 @@ export function ProjectEditor({
       rules: serializeRules(asRules(m.rules)),
     })),
   );
+
+  /**
+   * Pick up models added or removed on the server without discarding edits.
+   *
+   * `drafts` is state seeded from props, so `router.refresh()` after adding a
+   * column re-rendered the page and changed nothing here — the editor kept
+   * saying "0 台" and people clicked Add again, which is how one document
+   * ended up with three catalogue source rows for the same model.
+   *
+   * Re-keying the component would have fixed it by throwing away every unsaved
+   * edit on the other tabs, which is a worse trade. This reconciles instead:
+   * new columns are appended with their server content, deleted ones drop out,
+   * and anything already open keeps exactly what was typed into it.
+   */
+  useEffect(() => {
+    setDrafts((prev) => {
+      const byId = new Map(prev.map((d) => [d.id, d]));
+      const next = models.map(
+        (m) =>
+          byId.get(m.id) ?? {
+            id: m.id,
+            model_name: m.model_name,
+            display_name: m.display_name ?? "",
+            raw: serializeSpecRows(asRawDoc(m.raw_doc)),
+            rules: serializeRules(asRules(m.rules)),
+          },
+      );
+      const same =
+        next.length === prev.length && next.every((d, i) => d.id === prev[i]?.id);
+      return same ? prev : next;
+    });
+  }, [models]);
 
   /**
    * Unsaved-changes flag. Fields now live on four tabs, so "I edited
