@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-08-20。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-08-21。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
 > **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
@@ -12,8 +12,9 @@
 > **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
 > 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
 > 細節在下方 Brand & Visual System 與 pitfall #50。
-> **2026-08-20：新模組 Project Datasheet Builder**（專案／標案用的暫時性 datasheet,
-> `/projects`;M1 = 資料層 + 手動建案 + 出 PDF）——**它是刻意跟目錄平行的孤島**,
+> **2026-08-20~21：新模組 Tender Datasheets**（標案用的暫時性 datasheet, `/projects`;
+> 舊名 Project Datasheet Builder,**只有畫面上的字改了**——網址／權限 key／表名沒動）
+> ——**它是刻意跟目錄平行的孤島**,migrations 00038–00047,
 > 動之前先讀 [`docs/project-datasheets.md`](docs/project-datasheets.md)。
 > **2026-08-20：規格頁的「值續段」不再重複印規格名稱**（原本掛 `「原標籤 (cont.)」`）——
 > 四個語系一致,pagination 與 renderer 兩邊都要動,見 pitfall #50。
@@ -24,7 +25,7 @@
 從 Google Sheets 同步產品資料到 Supabase，前端提供 Dashboard 管理、
 Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 
-另含 **Project Datasheet Builder**（`/projects`;專案／標案用的暫時性 datasheet,
+另含 **Tender Datasheets**（`/projects`;標案用的暫時性 datasheet,
 與產品目錄平行、永不進 sync/RAG）。
 
 **6 個 solution 上線**：**Cloud**（9 條線,含 **Cloud PDU**——ECP 四台,預設藍、
@@ -127,11 +128,11 @@ path `/api/sync`、以及 `PUBLIC_EXACT_PATHS` **精確比對**的單頁白名�
 (`gate()`/`gateOrCron()`/`adminOnly()`/`requirePagePermission()` + client `can()`)。
 4 角色矩陣在 **`@eg/auth/permissions`**(packages/auth)。**改 auth/proxy/權限前先讀該檔。**
 
-### Project Datasheet Builder（專案／標案 datasheet, on-demand）→ [`docs/project-datasheets.md`](docs/project-datasheets.md)
+### Tender Datasheets（標案 datasheet, on-demand）→ [`docs/project-datasheets.md`](docs/project-datasheets.md)
 
 Project business 用的暫時性 datasheet：拿 ODM／他牌規格表 → 換 EnGenius 命名/照片/版型
 → 出一份談 tender 的 PDF。`/projects`（gate `project_datasheet.*`，**只有 admin/editor**）、
-渲染在 `/preview/project/[id]`、表是 `project_datasheet*`（migration 00038）。
+渲染在 `/preview/project/[id]`、表是 `project_datasheet*`（migrations 00038–00047）。
 **改這塊前必讀該檔。** 關鍵雷:
 ① **這是平行孤島,沒有升格成 products 的路徑**——一台只報過價的型號進了 `products`,
 EnGenie 就會開始跟人說我們有賣它;
@@ -150,6 +151,21 @@ finding 是算出來的,`project_datasheet_questions` 只存人做了什麼,**se
 反向永遠不開）。兩者的 gap review 判斷**方向相反**——ODM 補一個沒來源的規格是 blocking,
 既有型號補一個官方沒寫的規格是 advisory（那正是標案要的）;反過來,改動既有型號的值是
 最尖銳的 finding（`catalog_deviation`),因為客戶可以把公開 datasheet 拿來並排比對。
+**在文件層級兩者不衝突**（自家型號 + sourcing 型號並排是真實情境）,**型號層級才互斥**——
+套用抽取會改 `source_id`,那一欄就掉出 `catalogModels`、判斷方向整個反轉,所以覆蓋前會跳警告;
+⑨ **`status` 和「出圖」是兩個軸**:`status` 是「能不能送出去」（draft→ready 有守門）,
+issue 是「實際出過幾份 PDF」。**列印刻意不動 status**(要能印草稿校對),但列印列會顯示
+「還有 N 項未確認」。⚠️ **要講還剩幾項一律用 `openBlockers()`**（`lib/project-datasheet/blockers.ts`）
+——它會扣掉人已 answered/dismissed 的,跟 `scanDocument()` 的原始結果是兩回事;
+Ready 守門、列印列、預設落地頁籤三處共用同一支;
+⑩ **編輯器和列印共用的幾何要放共用模組**——標籤的位移和字級各寫一份,連續兩次
+「編輯器看起來對、PDF 不對」,現在集中在 `label-geometry.ts`;
+⑪ **凡是把 `images` 讀成「手寫欄位清單」的 parser 都會靜靜吃掉資料**——
+caption、labels、body 各中一次:載入時漏掉 → 面板狀態是空的 → 下次存檔寫回空的,**且不報錯**。
+一律用 spread 帶整包;
+⑫ **AI 只有三個呼叫點**（`extract` / `intake` / `questions` 的 propose）,模型在
+**SpecHub `Settings ▸ Tender Datasheets 的 AI 模型`** 改（存 `app_settings`,改完立刻生效）。
+`lib/llm/models.ts` 的常數是 **DEFAULT 不是值**;目錄（有哪些模型）仍是 EnGenie 的 `llm_models`。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 

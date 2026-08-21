@@ -43,6 +43,23 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **競品管理**：可自行新增競品品牌 / 型號 / 對戰機型 / tier / datasheet 連結，改 tier 或移除
 - 純內部使用，不會印在對外 datasheet 上
 
+### Tender Datasheets（標案 datasheet）
+- **給投標用的暫定 datasheet**，做那些目錄裡還沒有產品的案子（`/projects`，admin / editor）
+- **兩種起點**：上傳 sourcing 廠商的規格書（PDF / Excel / 貼文字，AI 逐條抄成規格列），
+  或**從我們自己既有的型號帶入**（標案要的規格常比公開 datasheet 細）
+- **規格表不存檔，是「原始來源 ⊕ 你下的規則」每次算出來的** —— 廠商出新版重抽一次，
+  你手動改過的地方不會被洗掉
+- **缺漏檢查（gap review）**：掃出「缺／可疑／危險」三類，**不用 AI、每次結果一樣**。
+  分界是「這份文件會不會寫錯」而不是「缺多少」——十幾格 TBD 不擋，一個沒有來源的 IP67 會擋。
+  真正的產出是**可以直接貼給業務 / RD / ODM 的澄清訊息**
+- **應用情境圖可以在圖上標字**：點圖片放標記點、拖曳文字避開設備，字由版型排（不是畫進圖裡），
+  所以改得動、之後也能翻譯
+- **出圖存檔**：每按一次列印就存一版當下的完整內容，回頭查得到「客戶手上那份寫了什麼」；
+  文件在出圖後又被改過會標出來
+- **PRELIMINARY 聲明關不掉**（文字可以改），另有可選的 CONFIDENTIAL 標示
+- ⚠️ **這些永遠不會變成產品** —— 不進 sync、不進 RAG、不會出現在 Dashboard。
+  拿到案子之後，產品線要在 Google Sheets 正式建一次
+
 ### Datasheet PDF
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
@@ -117,6 +134,8 @@ SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base�
   - 涵蓋 **English / Spanish / 日本語 / 繁體中文** 四個語言（適用標準版型的 datasheet）
   - Google Font 選擇器（預設 + 自定義 URL 添加）
   - Split layout：左設定、右即時 Datasheet Preview（可縮放）
+- **Tender Datasheets 的 AI 模型**（`/settings/ai-models`）— 標案 datasheet 的兩個 AI 步驟
+  （讀取來源規格 / 解析需求）各自挑要用哪個 OpenRouter 模型，改完立刻生效不用重新部署（admin only）
 - **Users**（`/settings/users`）— 邀請 / 移除使用者、改 role（admin only）
 - **AI Provider Keys / Ask Personas 已移至 [EnGenie](../engenie/README.md)**（settings 首頁有連結卡）；SpecHub 翻譯 runtime 直接讀共用的 `app_settings`
 
