@@ -599,6 +599,28 @@ export function scanDocument({
         });
         continue;
       }
+      // Same check the override path does, and it matters more here: `add` is
+      // for a spec the vendor's TABLE lacks, which is exactly when their prose
+      // is the only place a figure appears. Without this, adding IP67 when the
+      // source's description says IP66 reported only "the vendor does not have
+      // this" — true, but it buries the sharper question underneath.
+      const contradiction = proseConflict(added.value, sourceCodes);
+      if (contradiction) {
+        add({
+          code: "source_prose_conflict",
+          kind: "doubt",
+          severity: "blocking",
+          askedOf: "rd",
+          modelId: model.id,
+          rowKey: key,
+          title: `${model.model_name} — ${added.label} 跟來源內文不一樣`,
+          detail:
+            `文件寫「${added.value}」，但來源的內文寫的是「${contradiction.found}」` +
+            `（不在規格表裡，在敘述段落）。等於要請 ODM 把${contradiction.name}提高到我們寫的程度——` +
+            `先確認做得到、以及成本。`,
+        });
+        continue;
+      }
       add(
         fromCatalog(model.id)
           ? {
