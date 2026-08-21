@@ -5,6 +5,11 @@ import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LABEL_SIDES } from "@/lib/project-datasheet/types";
+import {
+  LABEL_DOT_PT,
+  LABEL_PT,
+  SCENARIO_WIDTH_PT,
+} from "@/lib/project-datasheet/label-geometry";
 import type { ImageLabel, LabelSide, ModelImage } from "@/lib/project-datasheet/types";
 
 /**
@@ -263,14 +268,13 @@ function LabelEditor({
     return () => ro.disconnect();
   }, []);
 
-  /**
-   * The scenario images print 304pt wide with 8pt labels. The hero on page 2
-   * prints wider, so its labels come out a little smaller than shown here —
-   * erring toward more clearance, which is the safe direction to be wrong in.
-   */
-  const k = boxW ? boxW / 304 : 0;
-  const labelPx = k ? 8 * k : 10;
-  const dotPx = k ? Math.max(6, 3 * k) : 8;
+  /* Both numbers come from `label-geometry`, which the print layout reads
+     too — that shared source is what stops the two drifting again. */
+  const k = boxW ? boxW / SCENARIO_WIDTH_PT : 0;
+  const labelPx = k ? LABEL_PT * k : LABEL_PT;
+  // Floored: below ~6px the handle is too small to grab, and being a little
+  // generous with the dot costs nothing — it is the text that has to clear.
+  const dotPx = k ? Math.max(6, LABEL_DOT_PT * k) : 8;
 
   function pointToPercent(e: { clientX: number; clientY: number }) {
     const box = boxRef.current?.getBoundingClientRect();
