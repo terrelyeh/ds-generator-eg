@@ -303,10 +303,10 @@ export function ProjectPreview({
      wraps to two lines is 14pt taller, and the one that overran the footer
      band was the second of two.
 
-     590 rather than 596: the measurement is of the gap between the title and
-     the footer band, and a few points of it should stay empty. Height is what
-     bounds these images — the width follows from the aspect ratio — so every
-     point given back here is a wider picture. */
+     572 rather than the ~596 measured between the title and the footer band:
+     a few points of it should stay empty, and at four rows 590 left only 12pt
+     of clearance. Costs nothing at two or three rows, where the 58% width cap
+     binds first and the height budget is never reached. */
   /* The labels are positioned against the wrapper, and the wrapper
      shrink-wraps the image, so a percentage means the same place on the
      picture no matter what size the page gives it. */
@@ -332,7 +332,7 @@ export function ProjectPreview({
     /* One row per scenario, sharing the page evenly rather than each taking a
        fixed height — so adding a fourth shrinks all four instead of pushing
        one onto a page of its own. */
-    const each = Math.floor((590 - (items.length - 1) * 16) / Math.max(items.length, 1));
+    const each = Math.floor((572 - (items.length - 1) * 16) / Math.max(items.length, 1));
     return (
       <div
         className={`scenarios${big ? " big" : ""}`}
