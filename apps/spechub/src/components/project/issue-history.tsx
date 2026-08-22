@@ -58,8 +58,7 @@ export function IssueHistory({ docId, updatedAt }: { docId: string; updatedAt: s
     <div className="space-y-2">
       {stale && (
         <p className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
-          這份文件在最後一次出圖之後又改過。客戶手上那份是第 {issues[0].issue_no} 版，
-          跟你現在編輯的內容不一樣。
+          這份文件在最後一次出圖之後又改過。客戶手上那份是第 {issues[0].issue_no} 版，跟你現在編輯的內容不一樣。
         </p>
       )}
       <ul className="divide-y rounded-md border text-xs">

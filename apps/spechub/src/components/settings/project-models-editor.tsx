@@ -118,8 +118,7 @@ export function ProjectModelsEditor() {
           {saving ? "儲存中…" : dirty ? "儲存" : "已儲存"}
         </Button>
         <p className="text-xs text-muted-foreground">
-          清單來自 EnGenie 的 Models 目錄（`llm_models`）。要新增或停用模型請去那裡改，
-          這一頁只負責挑其中一個。
+          清單來自 EnGenie 的 Models 目錄（`llm_models`）。要新增或停用模型請去那裡改，這一頁只負責挑其中一個。
         </p>
       </div>
     </div>

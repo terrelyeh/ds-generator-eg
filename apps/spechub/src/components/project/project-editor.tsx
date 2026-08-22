@@ -501,9 +501,7 @@ export function ProjectEditor({
                 </span>
               </div>
               <p className="mt-1 max-w-[640px] text-xs text-slate-600">
-                這一頁的每一個欄位都只給我們自己看，PDF 上完全不會出現。
-                一份指名我方業務、內部案子階段、我們猜客戶會買多少的報價文件，
-                是根本不該離開公司的東西。
+                這一頁的每一個欄位都只給我們自己看，PDF 上完全不會出現。一份指名我方業務、內部案子階段、我們猜客戶會買多少的報價文件，是根本不該離開公司的東西。
               </p>
             </div>
 
@@ -778,9 +776,7 @@ export function ProjectEditor({
                   型號 — 這份文件有 {drafts.length} 台
                 </h2>
                 <p className="mt-0.5 max-w-[620px] text-xs text-muted-foreground">
-                  <strong>一台型號 = 規格表上的一欄</strong>，所以規格表會有 {drafts.length} 欄，
-                  由左至右照下面分頁的順序排。規格列會自動對齊：某一台有、另一台沒有的列，
-                  缺的那格會印 TBD 或 —。
+                  <strong>一台型號 = 規格表上的一欄</strong>，所以規格表會有 {drafts.length} 欄，由左至右照下面分頁的順序排。規格列會自動對齊：某一台有、另一台沒有的列，缺的那格會印 TBD 或 —。
                 </p>
               </div>
               <AddModelMenu docId={doc.id} onAdded={() => router.refresh()} />
@@ -788,8 +784,7 @@ export function ProjectEditor({
 
             {drafts.length >= COMFORTABLE_MODELS && (
               <p className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                已經有 {drafts.length} 欄。再多下去規格表每一欄會窄到很難讀，
-                長的頻段字串會擠成一直條。超過 {COMFORTABLE_MODELS} 台建議拆成兩份文件。
+                已經有 {drafts.length} 欄。再多下去規格表每一欄會窄到很難讀，長的頻段字串會擠成一直條。超過 {COMFORTABLE_MODELS} 台建議拆成兩份文件。
               </p>
             )}
 
@@ -897,9 +892,7 @@ export function ProjectEditor({
                             </p>
                             <p className="text-amber-800">
                               「我們決定要跟原廠不一樣」的（淨重、統一溫度、IP67）
-                              <strong>一律寫成 ② 的規則</strong>。寫進這一格有兩個後果：
-                              原廠那句話永遠消失、規格表上再也分不出哪格是我們改的；
-                              而且哪天重新上傳來源，這一格會被整份取代，你的修改跟著不見。
+                              <strong>一律寫成 ② 的規則</strong>。寫進這一格有兩個後果：原廠那句話永遠消失、規格表上再也分不出哪格是我們改的；而且哪天重新上傳來源，這一格會被整份取代，你的修改跟著不見。
                             </p>
                           </div>
                         </div>
@@ -929,12 +922,10 @@ export function ProjectEditor({
                             ② 只有 {shortName} 的調整
                           </h4>
                           <p className="mt-1 max-w-[640px] text-xs text-muted-foreground">
-                            寫在這裡的規則<strong>只動這一欄</strong>，其他型號不受影響。
-                            值本來就一台一個的東西寫這裡——例如 EOR100 的 PoE 是 802.3af/at、
+                            寫在這裡的規則<strong>只動這一欄</strong>，其他型號不受影響。值本來就一台一個的東西寫這裡——例如 EOR100 的 PoE 是 802.3af/at、
                             EOR200 只有 at。
                             <br />
-                            要對<strong>每一台</strong>都生效的（「不要放 chipset」「都是 IP67」），
-                            寫在上面那個「全部型號都套用的調整」。
+                            要對<strong>每一台</strong>都生效的（「不要放 chipset」「都是 IP67」），寫在上面那個「全部型號都套用的調整」。
                           </p>
                         </div>
                         <Textarea
