@@ -37,8 +37,7 @@ function SpecsHelp() {
   return (
     <>
       <p className="text-muted-foreground">
-        一行一列規格：<strong>規格名</strong> ⇥ Tab ⇥ <strong>值</strong>。
-        直接從 PDF 或 Excel 複製整張表貼上，通常就已經是對的格式了。
+        一行一列規格：<strong>規格名</strong> ⇥ Tab ⇥ <strong>值</strong>。直接從 PDF 或 Excel 複製整張表貼上，通常就已經是對的格式了。
       </p>
       <Example
         code={"Dimension\t145 X 130 X 45 mm\nInterface\t1 × GbE LAN\n\t1 × Reset button\n\t2 × SIM slot"}
@@ -60,8 +59,7 @@ function SpecsHelp() {
           全形符號、怪單位、「含彩盒」的重量，全部留著。
         </p>
         <p>
-          聽起來很矛盾——「不要在這裡改，去下面寫規則改」不還是在改嗎？
-          差別不在改哪裡，<strong>在於改完之後原文還在不在</strong>：
+          聽起來很矛盾——「不要在這裡改，去下面寫規則改」不還是在改嗎？差別不在改哪裡，<strong>在於改完之後原文還在不在</strong>：
         </p>
         <p className="font-mono text-[11px]">
           原文 1.35KG（Includes color box accessories）
@@ -72,8 +70,7 @@ function SpecsHelp() {
         </p>
         <p>
           三件事同時留著，所以「這是原廠寫的還是我們改的」永遠答得出來。
-          直接在這一格改成 <code className="rounded bg-white px-1">1.35 kg</code>，
-          原廠那句就沒了——之後客戶拿原廠文件來對、或你重讀一次來源，都會出事。
+          直接在這一格改成 <code className="rounded bg-white px-1">1.35 kg</code>，原廠那句就沒了——之後客戶拿原廠文件來對、或你重讀一次來源，都會出事。
         </p>
       </div>
     </>

@@ -141,8 +141,7 @@ export function RequirementsIntake({
         <div className="flex flex-wrap items-center gap-3 rounded-md border border-dashed bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
           <span>
             <strong>要先有型號才能貼需求。</strong>
-            規則得知道套在哪一台身上——「不要放 chipset」總得是某一台的 chipset。
-            第一步請先去「規格與型號」加一台。
+            規則得知道套在哪一台身上——「不要放 chipset」總得是某一台的 chipset。第一步請先去「規格與型號」加一台。
           </span>
           {onGoToModels && (
             <Button variant="outline" size="sm" onClick={onGoToModels}>

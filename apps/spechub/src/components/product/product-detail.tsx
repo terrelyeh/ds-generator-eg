@@ -187,8 +187,7 @@ function LayoutWarningBanner({
               status={report.cover.overview_status}
               detail={
                 <>
-                  目前 <strong className="tabular-nums">{report.cover.metrics.overview_chars}</strong> 字，
-                  建議 ≤ <strong>500</strong>（上限 650）。
+                  目前 <strong className="tabular-nums">{report.cover.metrics.overview_chars}</strong> 字，建議 ≤ <strong>500</strong>（上限 650）。
                   {report.cover.metrics.overview_chars > 500 && (
                     <> 建議刪去 <strong className="tabular-nums">{report.cover.metrics.overview_chars - 500}</strong> 字。</>
                   )}
@@ -205,8 +204,7 @@ function LayoutWarningBanner({
               status={report.cover.features_status}
               detail={
                 <>
-                  目前 <strong className="tabular-nums">{report.cover.metrics.features_count}</strong> 項，
-                  建議 ≤ <strong>8</strong>（上限 10）。
+                  目前 <strong className="tabular-nums">{report.cover.metrics.features_count}</strong> 項，建議 ≤ <strong>8</strong>（上限 10）。
                   {report.cover.metrics.features_count > 8 && (
                     <> 建議刪去 <strong className="tabular-nums">{report.cover.metrics.features_count - 8}</strong> 項。</>
                   )}

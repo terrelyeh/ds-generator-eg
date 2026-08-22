@@ -124,17 +124,14 @@ export function SourceExtract({
   return (
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
       <p className="text-xs text-muted-foreground">
-        上傳原廠的 PDF／Excel，或直接貼規格表。讀進來的是<strong>原文照抄</strong>——
-        單位、全形符號都不會動。
+        上傳原廠的 PDF／Excel，或直接貼規格表。讀進來的是<strong>原文照抄</strong>——單位、全形符號都不會動。
       </p>
       {hasExistingSpecs && (
         <p className="rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-xs text-amber-900">
           <strong>{modelName} 目前已經有規格。</strong>
-          讀新的來源會把「① 來源規格」<strong>整份換掉</strong>——不是合併，因為兩份讀取混在一起
-          會變成跟哪一份原廠文件都對不起來的東西。
+          讀新的來源會把「① 來源規格」<strong>整份換掉</strong>——不是合併，因為兩份讀取混在一起會變成跟哪一份原廠文件都對不起來的東西。
           <br />
-          你下的調整規則<strong>不會</strong>被動到，但新來源如果找不到某個規格名，
-          對應的規則就會失去對象——套用前的預覽會先把那些列出來。
+          你下的調整規則<strong>不會</strong>被動到，但新來源如果找不到某個規格名，對應的規則就會失去對象——套用前的預覽會先把那些列出來。
           <br />
           想「多加一台」而不是「換掉這一台」的話，關掉這裡，用上面的
           <strong>「從既有型號帶入」／「加空白型號」</strong>——那會新開一欄，完全不動現有的。
@@ -168,8 +165,7 @@ export function SourceExtract({
             <p className="text-xs font-medium text-[#231f20]">或直接貼上規格表</p>
             <p className="text-xs text-muted-foreground">
               沒有檔案、或原廠只給一段文字的時候用。從 PDF／Excel 複製整張表貼進來就行，
-              一行一列：<code className="rounded bg-muted px-1">規格名 ⇥ Tab ⇥ 值</code>。
-              貼完按「讀取貼上的內容」，一樣會整理成規格列給你確認。
+              一行一列：<code className="rounded bg-muted px-1">規格名 ⇥ Tab ⇥ 值</code>。貼完按「讀取貼上的內容」，一樣會整理成規格列給你確認。
             </p>
             <Textarea
               rows={5}

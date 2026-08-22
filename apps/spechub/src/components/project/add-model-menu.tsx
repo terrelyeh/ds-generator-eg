@@ -118,8 +118,7 @@ export function AddModelMenu({
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs text-muted-foreground">
           帶入我們已經在賣的型號：規格、文案、產品圖一起複製過來，之後可以自由增修。
-          <strong>官方 datasheet 沒寫的欄位就直接加</strong>——標案要的細節本來就比公開規格多。
-          動到官方已經寫過的值會被標成「跟官方不一樣」，因為客戶對得到。
+          <strong>官方 datasheet 沒寫的欄位就直接加</strong>——標案要的細節本來就比公開規格多。動到官方已經寫過的值會被標成「跟官方不一樣」，因為客戶對得到。
         </p>
         <button
           type="button"
