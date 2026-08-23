@@ -267,6 +267,11 @@
     padding: 1px 5px; border-radius: 2px;
   }
 
+  .scope {
+    display: block; margin-top: 4px;
+    font-family: var(--mono); font-size: 11px; font-weight: 400;
+    color: var(--ink-faint);
+  }
   .sev {
     display: inline-block; font-family: var(--sans);
     font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
@@ -396,7 +401,7 @@
         <div>
           <h3>建立文件</h3>
           <p>填文件名稱、客戶、分公司。分公司和業務負責人這類欄位只給我們自己看，PDF 上完全不會出現。</p>
-          <p class="where">Tender Datasheets → New project datasheet</p>
+          <p class="where">Tender Datasheets → 新增標案 datasheet</p>
         </div>
       </div>
 
@@ -404,18 +409,19 @@
         <div class="num">02</div>
         <div>
           <h3>加型號，決定規格從哪裡來</h3>
-          <p>一台型號就是規格表上的一欄。這一步是整個流程唯一的分岔。</p>
+          <p>一台型號就是規格表上的一欄。這一步是整個流程唯一的分岔，選單上的三顆按鈕就是三條路。</p>
           <div class="fork">
             <div class="branch">
-              <h4>A · 讀原廠規格書</h4>
-              <p>上傳 PDF / Excel 或貼上文字，逐條抄成規格列。抄完會先給你預覽，確認才寫進去。</p>
+              <h4>從廠商規格書建立</h4>
+              <p>建好欄位後直接帶你到上傳框。傳 PDF / Excel 或貼上文字，逐條抄成規格列，抄完先給你預覽，確認才寫進去。</p>
               <span class="ai-flag">用到 AI</span>
             </div>
             <div class="branch">
-              <h4>B · 從既有型號帶入</h4>
-              <p>從產品目錄挑一台，規格直接複製過來。純資料搬運。</p>
+              <h4>從既有型號帶入</h4>
+              <p>從產品目錄挑一台，規格、文案、產品圖一起複製過來。純資料搬運，不經過 AI。</p>
             </div>
           </div>
+          <p class="where">第三顆「加空白型號」是規格要自己手打的時候用的</p>
         </div>
       </div>
 
@@ -434,7 +440,7 @@
         <div>
           <h3>調規則</h3>
           <p>隱藏不想印的列、改值、新增原廠沒有的規格、指定新增的列排在哪。原廠那一格永遠留著，所以隨時看得出哪些是我們改的。</p>
-          <p class="where">規格與型號 → ② 只有這一台的調整</p>
+          <p class="where">規格與型號 → ② 只有〈型號〉的調整</p>
         </div>
       </div>
 
@@ -526,35 +532,52 @@
 
   <section>
     <h2>AI 用在哪</h2>
-    <p class="lede">三個地方，全部是「它提案、你確認」。</p>
+    <p class="lede">三個地方，而且每一個的責任邊界都不一樣。</p>
 
     <div class="scroll">
       <table>
         <thead>
           <tr>
             <th scope="col">步驟</th>
-            <th scope="col">做什麼</th>
-            <th scope="col">哪條路會用到</th>
+            <th scope="col">它負責判斷什麼</th>
+            <th scope="col">它不決定什麼</th>
+            <th scope="col">你要看的是</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <th scope="row">讀原廠規格書</th>
-            <td>把 PDF / Excel 逐條抄成規格列。規則是「一個字都不准改」</td>
-            <td>只有 A</td>
+            <th scope="row">
+              讀原廠規格書
+              <span class="scope">只有「從廠商規格書建立」</span>
+            </th>
+            <td>哪幾行是同一列規格、跨頁的表格怎麼接、哪一欄是規格名哪一欄是值。<b>不准改任何一個字</b>——原廠寫錯字也照抄。</td>
+            <td>不判斷數字對不對、合不合理、能不能做到。</td>
+            <td>套用前的預覽。逐列比對頁碼，特別看它標「判讀把握度不高」的那幾列。</td>
           </tr>
           <tr>
-            <th scope="row">解析業務需求</th>
-            <td>把一段話拆成「哪些是規則、哪些是問題」</td>
-            <td>A 和 B 都會</td>
+            <th scope="row">
+              解析業務需求
+              <span class="scope">兩條路都會</span>
+            </th>
+            <td>把一段話拆開，分成「這句可以直接變成規則」和「這句要問人才知道」。會辨認出哪些是覆蓋既有值（那種預設不勾）。</td>
+            <td>不判斷業務講的對不對，也不會替你決定要不要照做。</td>
+            <td>勾選清單。<b>標成「會取代原本的值」的項目預設不勾</b>，那是刻意的——確認過再勾。</td>
           </tr>
           <tr>
-            <th scope="row">把答覆轉成規則</th>
-            <td>你在缺漏檢查裡回一句話，它提案要改哪幾格</td>
-            <td>A 和 B 都會</td>
+            <th scope="row">
+              把答覆轉成規則
+              <span class="scope">兩條路都會</span>
+            </th>
+            <td>你在缺漏檢查裡回一句話，它推論這句話要改哪幾格、改成什麼。</td>
+            <td>不驗證你講的是不是事實。只是確認（「對，就是 IP67」）就不會有任何改動。</td>
+            <td>它提案的那幾格。改動會直接反映在規格表上，改錯了規則欄可以再改回來。</td>
           </tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="note">
+      <b>三個都是「它提案、你確認」。</b>沒有任何一步會自己把東西寫進文件——這是刻意的：這份文件會交到客戶手上，而模型不知道哪些數字是我們承諾得起的。
     </div>
 
     <div class="note">
