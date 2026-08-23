@@ -1,0 +1,41 @@
+# The two checks that catch things nothing else does.
+#
+# Both guard against drift that produces NO symptom — the build stays green,
+# the screen looks right, and the damage shows up weeks later:
+#
+#   check:feature-tags   an OpenRouter call with no `feature` still works;
+#                        its cost just lands in `unmapped` for ever
+#   check:guide-labels   a renamed button leaves the guide describing a tool
+#                        that no longer exists
+#
+# Running them locally was already possible and that was the problem: a guard
+# somebody has to remember to run is a guard for the person who already knew.
+name: Guards
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  guards:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Matches the Vercel project's runtime, so a syntax level that
+          # builds prod cannot fail here for a reason prod would not hit.
+          node-version: 24
+          cache: npm
+
+      # check:feature-tags parses TypeScript with the compiler API, so the
+      # dependencies are needed. check:guide-labels is node builtins only.
+      - run: npm ci
+
+      - name: OpenRouter spend is attributed
+        run: npm run check:feature-tags
+
+      - name: The guide still describes the screen
+        run: npm run check:guide-labels
