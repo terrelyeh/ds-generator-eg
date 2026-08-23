@@ -30,6 +30,12 @@
   所以有一支雙向檢查：`npm run check:feature-tags`（每個呼叫點都有標、每個標籤都有人用、
   **串流那支也送 `user`**、沒有人繞過共用函式自己打 endpoint）。標籤字串是對外契約，
   **改名不會改到舊資料**，儀表板上會裂成兩列。
+- **指南頁裡的 UI 標籤有護欄**：`npm run check:guide-labels`。
+  `apps/spechub/public/docs/tender-datasheets.html` 裡包在 `<span data-ui>` 的字串
+  是「這幾個字就在畫面上」的宣告,腳本拿去比對 `apps/spechub/src/`。
+  **改按鈕/頁籤名字時它會叫**——改名的 PR 本來沒有任何理由去碰那份 HTML,
+  已經靜靜過期兩次。只檢查被標記的字串,全篇比對會把每個提到功能的句子都掃進來,
+  然後這支護欄就會被忽略。`〈…〉` 代表執行期才知道的值。
 - migrations 在 `packages/db/supabase/migrations/`（supabase CLI 的 link 狀態 `.temp` 也在旁邊，`supabase db push` 從 `packages/db` 跑）
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）

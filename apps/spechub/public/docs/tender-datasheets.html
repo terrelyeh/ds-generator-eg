@@ -267,6 +267,9 @@
     padding: 1px 5px; border-radius: 2px;
   }
 
+  /* Marks a string that is literally on screen, so scripts/check-guide-labels
+     can verify it still is. No visual weight of its own. */
+  [data-ui] { font: inherit; color: inherit; }
   .scope {
     display: block; margin-top: 4px;
     font-family: var(--mono); font-size: 11px; font-weight: 400;
@@ -362,7 +365,7 @@
         <dl>
           <div>
             <dt>起點</dt>
-            <dd>「從既有型號帶入」——直接從產品目錄複製規格，不經過 AI</dd>
+            <dd>「<span data-ui>從既有型號帶入</span>」——直接從產品目錄複製規格，不經過 AI</dd>
           </div>
           <div>
             <dt>要小心的地方</dt>
@@ -401,7 +404,7 @@
         <div>
           <h3>建立文件</h3>
           <p>填文件名稱、客戶、分公司。分公司和業務負責人這類欄位只給我們自己看，PDF 上完全不會出現。</p>
-          <p class="where">Tender Datasheets → 新增標案 datasheet</p>
+          <p class="where">Tender Datasheets → <span data-ui>新增標案 datasheet</span></p>
         </div>
       </div>
 
@@ -412,25 +415,25 @@
           <p>一台型號就是規格表上的一欄。這一步是整個流程唯一的分岔，選單上的三顆按鈕就是三條路。</p>
           <div class="fork">
             <div class="branch">
-              <h4>從廠商規格書建立</h4>
+              <h4><span data-ui>從廠商規格書建立</span></h4>
               <p>建好欄位後直接帶你到上傳框。傳 PDF / Excel 或貼上文字，逐條抄成規格列，抄完先給你預覽，確認才寫進去。</p>
               <span class="ai-flag">用到 AI</span>
             </div>
             <div class="branch">
-              <h4>從既有型號帶入</h4>
+              <h4><span data-ui>從既有型號帶入</span></h4>
               <p>從產品目錄挑一台，規格、文案、產品圖一起複製過來。純資料搬運，不經過 AI。</p>
             </div>
           </div>
-          <p class="where">第三顆「加空白型號」是規格要自己手打的時候用的</p>
+          <p class="where">第三顆「<span data-ui>加空白型號</span>」是規格要自己手打的時候用的</p>
         </div>
       </div>
 
       <div class="step">
         <div class="num">03</div>
         <div>
-          <h3>貼上業務需求（可選）</h3>
+          <h3><span data-ui>貼上業務需求</span>（可選）</h3>
           <p>把業務給的那段話原封貼上，系統拆成「哪些是可以直接改的規則、哪些是要問人的問題」。它只提案，勾了才生效。</p>
-          <p class="where">狀態與待辦 → 貼上業務需求</p>
+          <p class="where"><span data-ui>狀態與待辦</span> → <span data-ui>貼上業務需求</span></p>
           <span class="ai-flag">用到 AI</span>
         </div>
       </div>
@@ -440,7 +443,7 @@
         <div>
           <h3>調規則</h3>
           <p>隱藏不想印的列、改值、新增原廠沒有的規格、指定新增的列排在哪。原廠那一格永遠留著，所以隨時看得出哪些是我們改的。</p>
-          <p class="where">規格與型號 → ② 只有〈型號〉的調整</p>
+          <p class="where"><span data-ui>規格與型號</span> → <span data-ui>② 只有〈型號〉的調整</span></p>
         </div>
       </div>
 
@@ -449,7 +452,7 @@
         <div>
           <h3>看缺漏檢查，把問題問出去</h3>
           <p>系統逐格比對，列出缺什麼、哪裡可疑、哪裡危險。真正的產出是一段<b>可以直接貼給業務／RD／ODM 的澄清訊息</b>——因為能回答的人都不在這個系統裡。</p>
-          <p class="where">狀態與待辦 → 還缺什麼</p>
+          <p class="where"><span data-ui>狀態與待辦</span> → <span data-ui>還缺什麼</span></p>
         </div>
       </div>
 
@@ -458,7 +461,7 @@
         <div>
           <h3>封面文案與圖片</h3>
           <p>主標、overview、Features &amp; Benefits、產品照、應用情境圖。圖片可以點上標籤指到設備，文字自己拖到空白處——編輯器上看到的位置和大小就是印出來的。</p>
-          <p class="where">封面與文案 · 各型號的產品圖</p>
+          <p class="where"><span data-ui>封面與文案</span> · 各型號的產品圖</p>
         </div>
       </div>
 
@@ -466,7 +469,7 @@
         <div class="num">07</div>
         <div>
           <h3>預覽，出 PDF</h3>
-          <p>按 Print / Save as PDF。<b>每按一次就自動存一版快照</b>，之後改了規格也不會動到已經存檔的版本，所以隨時查得到客戶手上那份寫了什麼。</p>
+          <p>按 <span data-ui>Print / Save as PDF</span>。<b>每按一次就自動存一版快照</b>，之後改了規格也不會動到已經存檔的版本，所以隨時查得到客戶手上那份寫了什麼。</p>
           <p class="where">預覽頁右上角</p>
         </div>
       </div>
@@ -476,7 +479,7 @@
         <div>
           <h3>標成「可以送出」</h3>
           <p>要所有會讓文件出錯的項目都處理完才切得過去。沒處理完不會擋你出 PDF——只會在列印列上告訴你還剩幾項。</p>
-          <p class="where">內部資訊 → 文件狀態</p>
+          <p class="where"><span data-ui>內部資訊</span> → <span data-ui>文件狀態</span></p>
         </div>
       </div>
     </div>
@@ -548,7 +551,7 @@
           <tr>
             <th scope="row">
               讀原廠規格書
-              <span class="scope">只有「從廠商規格書建立」</span>
+              <span class="scope">只有「<span data-ui>從廠商規格書建立</span>」</span>
             </th>
             <td>哪幾行是同一列規格、跨頁的表格怎麼接、哪一欄是規格名哪一欄是值。<b>不准改任何一個字</b>——原廠寫錯字也照抄。</td>
             <td>不判斷數字對不對、合不合理、能不能做到。</td>
@@ -581,7 +584,7 @@
     </div>
 
     <div class="note">
-      模型可以在 <b>Settings → Tender Datasheets 的 AI 模型</b> 換，改完立刻生效、不用重新部署。其餘步驟（缺漏檢查、規格表合成、澄清訊息、出 PDF）都不碰 AI。
+      模型可以在 <b>Settings → <span data-ui>Tender Datasheets 的 AI 模型</span></b> 換，改完立刻生效、不用重新部署。其餘步驟（缺漏檢查、規格表合成、澄清訊息、出 PDF）都不碰 AI。
     </div>
   </section>
 
@@ -594,7 +597,7 @@
         <thead>
           <tr>
             <th scope="col"></th>
-            <th scope="col">文件狀態</th>
+            <th scope="col"><span data-ui>文件狀態</span></th>
             <th scope="col">出圖紀錄</th>
           </tr>
         </thead>
