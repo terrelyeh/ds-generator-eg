@@ -30,6 +30,8 @@
   所以有一支雙向檢查：`npm run check:feature-tags`（每個呼叫點都有標、每個標籤都有人用、
   **串流那支也送 `user`**、沒有人繞過共用函式自己打 endpoint）。標籤字串是對外契約，
   **改名不會改到舊資料**，儀表板上會裂成兩列。
+- **兩支護欄都在 CI 上跑**（`.github/workflows/guards.yml`,PR 和 push main 都會跑）。
+  在那之前它們只是「記得跑才會叫」——**需要有人記得的護欄,只保護已經知道的人**。
 - **指南頁裡的 UI 標籤有護欄**：`npm run check:guide-labels`。
   `apps/spechub/public/docs/tender-datasheets.html` 裡包在 `<span data-ui>` 的字串
   是「這幾個字就在畫面上」的宣告,腳本拿去比對 `apps/spechub/src/`。
