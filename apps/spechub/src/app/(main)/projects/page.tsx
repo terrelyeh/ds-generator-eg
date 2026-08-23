@@ -52,23 +52,17 @@ export default async function ProjectsPage() {
           <h1 className="font-heading text-2xl font-semibold text-[#231f20]">
             Tender Datasheets
           </h1>
-          {/* Chinese, like the rest of this app's explanatory text. It was
-              the only English paragraph on a page whose every other word —
-              草稿, 出圖, 封存 — is Chinese, so it read as a block of foreign
-              matter rather than as the introduction it is. Proper nouns stay
-              in English because that is what people call them. */}
-          <p className="mt-1 max-w-[760px] text-sm text-muted-foreground">
-            給我們目錄裡沒有現成產品的標案用。可以把外購廠商的規格書換成 EnGenius 的命名和版型，也可以從自家已經在賣的型號延伸出標案要的規格。這些文件不同步、不進索引、永遠不會變成產品——客戶真的下單之後，那條線要在 Google Sheets 正式建一次。
-          </p>
-          {/* Right under the paragraph that explains what this is, because
-              that is where somebody reading it decides they want more. */}
+          {/* The paragraph that used to sit here is gone. A list page is
+              scanned, not read: four lines of explanation above the rows are
+              in the way every single visit, and everything they said is one
+              click away in the guide — which is what the link is for. */}
           <a
             href="/docs/tender-datasheets.html"
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-2 inline-block text-sm text-engenius-blue hover:underline"
+            className="mt-1 inline-block text-sm text-engenius-blue hover:underline"
           >
-            三種情境與完整流程 →
+            這是什麼、三種情境與完整流程 →
           </a>
         </div>
         <NewProjectButton />
@@ -104,6 +98,19 @@ type Issue = {
 
 const day = (iso: string) => iso.slice(0, 10).replace(/-/g, "/");
 
+/**
+ * Column widths live here so the header and the rows cannot drift apart.
+ * A header that no longer sits over its column is worse than no header.
+ */
+const COL = {
+  branch: "w-[72px]",
+  customer: "w-[200px]",
+  status: "w-[64px]",
+  tender: "w-[76px]",
+  pdf: "w-[168px]",
+  actions: "w-[136px]",
+} as const;
+
 function ProjectList({
   docs,
   lastIssue,
@@ -113,80 +120,93 @@ function ProjectList({
 }) {
   if (docs.length === 0) return null;
   return (
-    <ul className="divide-y rounded-lg border">
-      {docs.map((d) => {
-        const issue = lastIssue.get(d.id);
-        const stale = issue ? new Date(d.updated_at) > new Date(issue.issued_at) : false;
-        return (
-          <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-            {/* One line, read left to right: whose deal, what it is, who for,
-                where it stands, when it last went out. The hierarchy is
-                carried by weight and colour rather than by a second row —
-                twelve deals on two lines each is a page nobody scans. */}
-            <span className="w-[72px] shrink-0">
-              {d.branch && (
-                <span className="inline-block rounded bg-[#eef2f7] px-1.5 py-0.5 text-xs font-medium text-[#1b3a5c]">
-                  {d.branch}
-                </span>
-              )}
-            </span>
+    <div className="overflow-hidden rounded-lg border">
+      {/* A header, because five unlabelled columns of grey text is a puzzle.
+          "尚未出圖" in particular said nothing on its own — under 最後產生的
+          PDF it needs no explaining. */}
+      <div className="flex items-center gap-3 border-b bg-muted/40 px-4 py-2 text-[11px] font-medium tracking-wide text-muted-foreground">
+        <span className={`${COL.branch} shrink-0`}>分公司</span>
+        <span className="min-w-0 flex-1">文件</span>
+        <span className={`${COL.customer} shrink-0`}>客戶</span>
+        <span className={`${COL.status} shrink-0`}>狀態</span>
+        <span className={`${COL.tender} shrink-0`}>標案時間</span>
+        <span className={`${COL.pdf} shrink-0`}>最後產生的 PDF</span>
+        <span className={`${COL.actions} shrink-0`} />
+      </div>
 
-            <Link
-              href={`/projects/${d.id}`}
-              className="min-w-0 flex-1 truncate font-medium text-[#231f20] hover:text-engenius-blue"
-            >
-              {d.name}
-            </Link>
-
-            <span className="w-[200px] shrink-0 truncate text-xs text-muted-foreground">
-              {d.customer}
-            </span>
-
-            <span className="w-[64px] shrink-0 text-xs text-muted-foreground">
-              {STATUS_LABEL[d.status] ?? d.status}
-            </span>
-
-            <span className="w-[76px] shrink-0 text-xs text-muted-foreground">
-              {d.tender_date && `標案 ${d.tender_date}`}
-            </span>
-
-            {/* The one column that earns emphasis: it is the only thing here
-                that says something left the building. */}
-            <span className="w-[150px] shrink-0 text-xs tabular-nums">
-              {issue ? (
-                <>
-                  <span className="text-[#231f20]">
-                    出圖 {day(issue.issued_at)}
-                    <span className="ml-1 text-muted-foreground">第 {issue.issue_no} 版</span>
+      <ul className="divide-y">
+        {docs.map((d) => {
+          const issue = lastIssue.get(d.id);
+          const stale = issue ? new Date(d.updated_at) > new Date(issue.issued_at) : false;
+          return (
+            <li key={d.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+              <span className={`${COL.branch} shrink-0`}>
+                {d.branch && (
+                  <span className="inline-block rounded bg-[#eef2f7] px-1.5 py-0.5 text-xs font-medium text-[#1b3a5c]">
+                    {d.branch}
                   </span>
-                  {stale && <span className="ml-1.5 text-[#b45309]">已改過</span>}
-                </>
-              ) : (
-                <span className="text-muted-foreground">尚未出圖</span>
-              )}
-            </span>
+                )}
+              </span>
 
-            <span className="flex shrink-0 items-center gap-3 text-xs">
-              <Link href={`/projects/${d.id}`} className="text-engenius-blue hover:underline">
-                編輯
-              </Link>
               <Link
-                href={`/preview/project/${d.id}`}
-                target="_blank"
-                className="text-engenius-blue hover:underline"
+                href={`/projects/${d.id}`}
+                className="min-w-0 flex-1 truncate font-medium text-[#231f20] hover:text-engenius-blue"
               >
-                預覽
+                {d.name}
               </Link>
-              <ProjectRowActions
-                id={d.id}
-                name={d.name}
-                archived={d.status === "archived"}
-                issued={!!issue}
-              />
-            </span>
-          </li>
-        );
-      })}
-    </ul>
+
+              <span className={`${COL.customer} shrink-0 truncate text-xs text-muted-foreground`}>
+                {d.customer}
+              </span>
+
+              <span className={`${COL.status} shrink-0 text-xs text-muted-foreground`}>
+                {STATUS_LABEL[d.status] ?? d.status}
+              </span>
+
+              <span className={`${COL.tender} shrink-0 text-xs text-muted-foreground`}>
+                {d.tender_date}
+              </span>
+
+              {/* The one column that earns emphasis: it is the only thing here
+                  that says something left the building. */}
+              <span className={`${COL.pdf} shrink-0 text-xs tabular-nums`}>
+                {issue ? (
+                  <>
+                    <span className="text-[#231f20]">
+                      {day(issue.issued_at)}
+                      <span className="ml-1 text-muted-foreground">第 {issue.issue_no} 版</span>
+                    </span>
+                    {stale && <span className="ml-1.5 text-[#b45309]">產生後又改過</span>}
+                  </>
+                ) : (
+                  <span className="text-muted-foreground">還沒產生過</span>
+                )}
+              </span>
+
+              <span
+                className={`${COL.actions} flex shrink-0 items-center justify-end gap-3 text-xs`}
+              >
+                <Link href={`/projects/${d.id}`} className="text-engenius-blue hover:underline">
+                  編輯
+                </Link>
+                <Link
+                  href={`/preview/project/${d.id}`}
+                  target="_blank"
+                  className="text-engenius-blue hover:underline"
+                >
+                  預覽
+                </Link>
+                <ProjectRowActions
+                  id={d.id}
+                  name={d.name}
+                  archived={d.status === "archived"}
+                  issued={!!issue}
+                />
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

@@ -481,7 +481,7 @@ export function ProjectEditor({
 
         <TabsContent value="internal" className="space-y-5 pt-5">
           <Panel
-            title="出圖紀錄"
+            title="PDF 紀錄"
             note="這份文件每一次產生 PDF 都會存一版，可以回頭查客戶手上那份寫了什麼。"
           >
             <IssueHistory docId={doc.id} updatedAt={doc.updated_at} />

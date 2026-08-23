@@ -89,7 +89,7 @@ export default async function IssuePage({
   return (
     <>
       <div className="issue-bar">
-        第 {meta.issue_no} 版 · 出圖於 {meta.issued_at.slice(0, 10)}
+        第 {meta.issue_no} 版 · 產生於 {meta.issued_at.slice(0, 10)}
         {meta.issued_by_email ? ` · ${meta.issued_by_email}` : ""} · 此為存檔內容，不可編輯
       </div>
       <style
