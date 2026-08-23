@@ -14,19 +14,21 @@ interface CatalogProduct {
 }
 
 /**
- * Adding a column: blank, or seeded from a model we already ship.
+ * Adding a column, by where its specs are going to come from.
  *
- * The second path is the more common one. A tender often asks for a product
- * we already sell, at a level of detail the public datasheet deliberately
- * omits — so the work is "start from the real one and add what it doesn't
- * say", not "retype forty rows".
+ * All three end in the same place — a column on the spec table — but naming
+ * them by their SOURCE is what makes them findable. Sourcing is the reason
+ * this module exists, and it used to be the one path not on this menu: you
+ * had to add a blank column, then discover the vendor upload buried inside
+ * it. "從廠商規格書建立" creates the column and takes you to that upload.
  */
 export function AddModelMenu({
   docId,
   onAdded,
 }: {
   docId: string;
-  onAdded: () => void;
+  /** `focusSource` asks the editor to open that column at its upload box */
+  onAdded: (id?: string, focusSource?: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -59,8 +61,12 @@ export function AddModelMenu({
       .slice(0, 12);
   }, [products, query]);
 
-  async function addBlank() {
-    const modelName = window.prompt("型號名稱（例如 EOR100）")?.trim();
+  async function addBlank(focusSource = false) {
+    const modelName = window.prompt(
+      focusSource
+        ? "先給這一欄一個型號名稱（我們要對外用的，例如 EOR100）"
+        : "型號名稱（例如 EOR100）",
+    )?.trim();
     if (!modelName) return;
     setBusy(true);
     try {
@@ -71,7 +77,7 @@ export function AddModelMenu({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "新增失敗");
-      onAdded();
+      onAdded(json.id, focusSource);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "新增失敗");
     } finally {
@@ -92,7 +98,7 @@ export function AddModelMenu({
       toast.success(`帶入 ${product.model}：${json.rows} 列規格、${json.images} 張圖`);
       setOpen(false);
       setQuery("");
-      onAdded();
+      onAdded(json.id);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "帶入失敗");
     } finally {
@@ -102,7 +108,12 @@ export function AddModelMenu({
 
   if (!open) {
     return (
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
+        {/* Ordered by how often each is the answer, sourcing first — it is
+            what this module was built for. */}
+        <Button size="sm" onClick={() => void addBlank(true)} disabled={busy}>
+          從廠商規格書建立
+        </Button>
         <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
           從既有型號帶入
         </Button>
