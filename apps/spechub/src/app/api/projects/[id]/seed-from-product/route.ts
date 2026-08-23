@@ -3,6 +3,10 @@ import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { normalizeKey } from "@/lib/project-datasheet/resolve";
 import type { ModelImage, RawSpecRow } from "@/lib/project-datasheet/types";
+import {
+  coverPatchFromCatalog,
+  type CoverFields,
+} from "@/lib/project-datasheet/catalog-copy";
 import type { Product, SpecItem, SpecSection } from "@eg/db/types";
 
 /**
@@ -67,7 +71,9 @@ export async function POST(
 
   const { data: productRow } = await supabase
     .from("products")
-    .select("*, spec_sections (*, spec_items (*)), image_assets (*)")
+    .select(
+      "*, spec_sections (*, spec_items (*)), image_assets (*), product_lines (category)",
+    )
     .eq("model_name", productModel)
     .maybeSingle();
 
@@ -75,6 +81,7 @@ export async function POST(
     | (Product & {
         spec_sections: (SpecSection & { spec_items: SpecItem[] })[];
         image_assets: { image_type: string; label: string; file_url: string | null }[];
+        product_lines: { category: string } | null;
       })
     | null;
   if (!product) return NextResponse.json({ error: "product not found" }, { status: 404 });
@@ -198,5 +205,55 @@ export async function POST(
     await supabase.from("project_datasheet_sources").delete().eq("id", source.id);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-  return NextResponse.json({ id: created.id, rows: rows.length, images: images.length });
+  const seededCopy = await seedCoverCopy(supabase, id, product, modelName);
+  return NextResponse.json({
+    id: created.id,
+    rows: rows.length,
+    images: images.length,
+    seededCopy,
+  });
+}
+
+/**
+ * Fill the document's cover copy from the catalogue product — blanks only.
+ *
+ * It is our own published English, written and approved for the public
+ * datasheet. That is not the same audience as a tender reader, so most of it
+ * will get rewritten — but starting from our words beats starting from an
+ * empty box, which is what happened before. The decision itself lives in
+ * `catalog-copy.ts`; this only reads a row and writes one.
+ */
+async function seedCoverCopy(
+  supabase: ReturnType<typeof createAdminClient>,
+  docId: string,
+  product: Product & { product_lines?: { category: string } | null },
+  modelName: string,
+): Promise<string[]> {
+  const { data: docRow } = await supabase
+    .from("project_datasheets")
+    .select("headline, series_name, category_label, overview, features")
+    .eq("id", docId)
+    .maybeSingle();
+  if (!docRow) return [];
+
+  const { patch, filled } = coverPatchFromCatalog(
+    docRow as CoverFields,
+    {
+      headline: product.headline,
+      overview: product.overview,
+      features: product.features,
+      category: product.product_lines?.category ?? null,
+    },
+    modelName,
+  );
+  if (filled.length === 0) return [];
+
+  const { error } = await supabase
+    .from("project_datasheets")
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq("id", docId);
+  // A column that landed is worth more than the copy that did not. Reporting
+  // nothing filled is accurate; failing the whole seed here would throw away
+  // forty spec rows over a headline.
+  return error ? [] : filled;
 }

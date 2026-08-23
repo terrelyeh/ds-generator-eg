@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 
 type Model = { slug: string; label: string; tier: string | null; note: string | null };
 
-type StepKey = "extract" | "intake" | "scenarios";
+type StepKey = "extract" | "intake" | "scenarios" | "cover";
 type Picks = Record<StepKey, string>;
 
 type Loaded = Picks & {
@@ -26,6 +26,12 @@ const STEPS = [
     title: "解析需求與答覆",
     where: "「貼上業務需求」和 gap review 裡回答問題",
     what: "把業務給的一段話拆成「哪些是規則、哪些是要問的問題」。短輸入、要判斷。",
+  },
+  {
+    key: "cover" as const,
+    title: "起草封面文案",
+    where: "「封面與文案」的「用 AI 起草封面文案」",
+    what: "從規格表寫出主標、分類、Overview 和 Features & Benefits。從既有型號帶入的文件用不到——那條路直接帶我們自己的文案。",
   },
   {
     key: "scenarios" as const,
@@ -54,7 +60,12 @@ export function ProjectModelsEditor() {
       .then((j: Loaded & { error?: string }) => {
         if (j.error) return toast.error(j.error);
         setData(j);
-        setPick({ intake: j.intake, extract: j.extract, scenarios: j.scenarios });
+        setPick({
+          intake: j.intake,
+          extract: j.extract,
+          scenarios: j.scenarios,
+          cover: j.cover,
+        });
       })
       .catch(() => toast.error("讀取失敗"));
   }, []);

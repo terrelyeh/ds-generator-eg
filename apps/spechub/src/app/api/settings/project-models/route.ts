@@ -7,6 +7,7 @@ import {
   PROJECT_INTAKE_MODEL_DEFAULT,
   PROJECT_MODEL_KEYS,
   PROJECT_SCENARIOS_MODEL_DEFAULT,
+  PROJECT_COVER_MODEL_DEFAULT,
 } from "@/lib/llm/models";
 
 /**
@@ -18,8 +19,8 @@ import {
  *
  * One setting per step rather than one for all of them, because the jobs are
  * different: extraction is long-input transcription with a hard "change
- * nothing" rule, intake is judgement over a short scrappy note, scenario copy
- * is writing prose that must not exceed its evidence. Tuning one should not
+ * nothing" rule, intake is judgement over a short scrappy note, and the two
+ * drafters write prose that must not exceed its evidence. Tuning one should not
  * silently move the others, which is exactly why they were separate constants
  * before.
  */
@@ -27,10 +28,11 @@ export async function GET() {
   const denied = await gate("settings.edit_api_keys");
   if (denied) return denied;
 
-  const [intake, extract, scenarios, models] = await Promise.all([
+  const [intake, extract, scenarios, cover, models] = await Promise.all([
     getSetting(PROJECT_MODEL_KEYS.intake),
     getSetting(PROJECT_MODEL_KEYS.extract),
     getSetting(PROJECT_MODEL_KEYS.scenarios),
+    getSetting(PROJECT_MODEL_KEYS.cover),
     listEnabledModels(),
   ]);
 
@@ -38,10 +40,12 @@ export async function GET() {
     intake: intake ?? PROJECT_INTAKE_MODEL_DEFAULT,
     extract: extract ?? PROJECT_EXTRACT_MODEL_DEFAULT,
     scenarios: scenarios ?? PROJECT_SCENARIOS_MODEL_DEFAULT,
+    cover: cover ?? PROJECT_COVER_MODEL_DEFAULT,
     defaults: {
       intake: PROJECT_INTAKE_MODEL_DEFAULT,
       extract: PROJECT_EXTRACT_MODEL_DEFAULT,
       scenarios: PROJECT_SCENARIOS_MODEL_DEFAULT,
+      cover: PROJECT_COVER_MODEL_DEFAULT,
     },
     // Slug, label and tier — enough for a picker to be readable without the
     // person having to know what "anthropic/claude-sonnet-4.6" is.
@@ -62,12 +66,14 @@ export async function PUT(request: Request) {
     intake?: string;
     extract?: string;
     scenarios?: string;
+    cover?: string;
   };
 
   const wanted = [
     [PROJECT_MODEL_KEYS.intake, body.intake] as const,
     [PROJECT_MODEL_KEYS.extract, body.extract] as const,
     [PROJECT_MODEL_KEYS.scenarios, body.scenarios] as const,
+    [PROJECT_MODEL_KEYS.cover, body.cover] as const,
   ].filter(([, slug]) => typeof slug === "string" && slug.length > 0);
 
   if (wanted.length === 0) {

@@ -16,6 +16,7 @@ import { AddModelMenu } from "@/components/project/add-model-menu";
 import { ImageManager, MODEL_SLOTS, DOC_SLOTS } from "@/components/project/image-manager";
 import { IssueHistory } from "@/components/project/issue-history";
 import { ImagePromptPanel } from "@/components/project/image-prompt-panel";
+import { CoverCopyPanel } from "@/components/project/cover-copy-panel";
 import type { ModelImage } from "@/lib/project-datasheet/types";
 import { SpecFormatHelp } from "@/components/project/spec-format-help";
 import { LayoutPicker } from "@/components/project/layout-picker";
@@ -600,6 +601,19 @@ export function ProjectEditor({
             >
               <Textarea rows={9} value={features} onChange={(e) => setFeatures(e.target.value)} />
             </Field>
+            {/* Under the fields it fills, not above them: the answer to
+                "these boxes are empty" belongs where the empty boxes are. */}
+            <CoverCopyPanel
+              docId={doc.id}
+              onFill={(patch) => {
+                if (patch.headline !== undefined) setHeadline(patch.headline);
+                if (patch.seriesName !== undefined) setSeriesName(patch.seriesName);
+                if (patch.categoryLabel !== undefined) setCategoryLabel(patch.categoryLabel);
+                if (patch.overview !== undefined) setOverview(patch.overview);
+                if (patch.features !== undefined) setFeatures(patch.features);
+                toast.success("填好了，記得按下面的儲存");
+              }}
+            />
             <Field
               label="註腳"
               hint="封面底部的小字。放規格的但書——原廠 datasheet 常見的那種：「① B29/B32 僅支援 Rx」「實際速率視電信商而定」。沒有就留空，留空不會印。"

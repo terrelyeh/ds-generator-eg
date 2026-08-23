@@ -1,4 +1,12 @@
-import type { ResolvedRow } from "./types";
+import {
+  GROUNDING_RULES,
+  bulletText,
+  extractJson,
+  str,
+  type Grounded,
+} from "./grounding";
+
+export { specLines } from "./grounding";
 
 /**
  * Application-scenario copy — a general term in, headings and bullets out.
@@ -29,17 +37,14 @@ import type { ResolvedRow } from "./types";
  * for a stronger reason: this is the prose a customer reads.
  */
 
-export interface ScenarioBullet {
-  text: string;
-  /**
-   * The spec row this bullet rests on, or "" for a claim about deployment
-   * practice rather than the hardware ("no civil works", "mounts on the
-   * existing pole"). Empty is legitimate — it is also the flag that says a
-   * human has to agree with this sentence, because nothing in the table
-   * will contradict it if it is wrong.
-   */
-  basis: string;
-}
+/**
+ * A bullet and the spec row it rests on, or "" for a claim about deployment
+ * practice rather than the hardware ("no civil works", "mounts on the
+ * existing pole"). Empty is legitimate — it is also the flag that says a
+ * human has to agree with this sentence, because nothing in the table will
+ * contradict it if it is wrong.
+ */
+export type ScenarioBullet = Grounded;
 
 export interface ScenarioDraft {
   /** short name of the place — prints as the heading */
@@ -69,48 +74,11 @@ Return ONLY a JSON object:
 {"scenarios":[{"heading":"...","lede":"...","bullets":[{"text":"...","basis":"..."}]}],
  "declined":["..."]}
 
-THE ONE RULE THAT MATTERS
+${GROUNDING_RULES}
 
-You may not state any figure, band, standard, rating, port, interface or
-capability that is not in the SPEC TABLE below. Not a temperature, not an
-ingress rating, not a throughput, not a power figure, not a radio band.
-
-This includes capabilities implied by a spec rather than stated by it. Two SIM
-slots are two SIM slots: they are NOT automatic failover, NOT dual-carrier
-redundancy, NOT seamless switching, unless a row says so in those words. A
-DC input is not battery backup. An Ethernet port is not PoE. If you find
-yourself writing what the hardware would let someone build, stop — that is
-the customer's design, not our claim.
-
-When the site you are describing genuinely needs something the table does not
-list, do not soften it into a vaguer sentence that still implies it. Leave it
-out, and if that makes the whole scenario unsupportable, put the scenario in
-"declined" with one line saying which spec is missing.
-
-WHICH MODEL
-
-The table gives a value per model. A row that lists a value for only SOME of
-the models is a fact about THOSE models and nothing else. A bullet resting on
-such a row must name the model it is true of. Putting "IPsec and WireGuard
-VPN support" in a scenario about the indoor unit, when only the outdoor one
-lists VPN, is the same error as inventing the spec.
-
-Where the models differ, each scenario should be about the one that suits
-that site. Say which.
-
-BASIS
-
-Every bullet carries "basis": the exact LABEL of the spec row it rests on,
-copied from the table. A bullet resting on more than one row names the most
-load-bearing. Where the row is populated for only some models, append them:
-"Environment (EOR200)".
-
-A bullet that rests on NO row — how a place is wired, what it costs to dig a
-trench, how long a permit takes — uses "". That is expected and often right.
-Do NOT reach for a loosely related row to avoid an empty basis: citing
-"Description" for a sentence about mounting practice hides the one thing the
-reviewer needed to know, which is that a person has to agree with it. An
-honest "" is worth more than a stretched label.
+If a site the sector suggests is unsupportable on the specs, put it in
+"declined" with one line saying which spec is missing, rather than writing
+it with the missing part left vague.
 
 WRITING
 
@@ -176,27 +144,6 @@ export function buildScenarioPrompt(input: ScenarioPromptInput): string {
  * to +70, and a scenario that puts the indoor unit on a quayside is exactly
  * the mistake this format makes visible to the model.
  */
-export function specLines(rows: ResolvedRow[], modelNames: string[]): string[] {
-  return rows.flatMap((row) => {
-    // A blank cell is a placeholder — TBD or an em dash. Passing those in
-    // would hand the model "Operating temperature: TBD" as if it were a
-    // fact about the site, and TBD is exactly where invention starts.
-    const cells = row.cells.map((c, i) =>
-      c.isBlank ? "" : `${modelNames[i] ?? `#${i + 1}`} = ${flat(c.value)}`,
-    );
-    const filled = cells.filter(Boolean);
-    if (filled.length === 0) return [];
-
-    // One value shared by every column prints once — repeating it per model
-    // spends tokens saying the same thing and reads as if they differ.
-    const same =
-      filled.length === row.cells.length && new Set(row.cells.map((c) => c.value)).size === 1;
-    return [`${row.label}: ${same ? flat(row.cells[0].value) : filled.join(" | ")}`];
-  });
-}
-
-const flat = (v: string) => v.replace(/\s+/g, " ").trim();
-
 /**
  * Parse the reply, dropping anything malformed.
  *
@@ -222,15 +169,10 @@ export function parseScenarios(raw: string): ScenarioProposal {
       // Accept a bare string too. The instruction asks for objects, and one
       // run in five returns strings anyway; dropping those would show three
       // bullets where the model wrote four and look like OUR bug.
-      const text = typeof b === "string" ? str(b, 200) : str((b as Record<string, unknown>)?.text, 200);
+      const text = bulletText(typeof b === "string" ? b : (b as Record<string, unknown>)?.text);
       if (!text) continue;
       const basis = typeof b === "string" ? "" : str((b as Record<string, unknown>)?.basis, 80);
-      // The textarea stores one bullet per line, so a bullet that arrived
-      // with a line break inside it would split into two on the way in — the
-      // second half printing as its own point, mid-sentence.
-      const clean = text.replace(/^[-•*・]\s*/, "").replace(/\s+/g, " ").trim();
-      if (!clean) continue;
-      bullets.push({ text: clean, basis });
+      bullets.push({ text, basis });
       if (bullets.length === 6) break;
     }
 
@@ -247,24 +189,4 @@ export function parseScenarios(raw: string): ScenarioProposal {
 /** The stored caption is one field; the layout splits it on the em dash. */
 export function toCaption(s: ScenarioDraft): string {
   return `${s.heading} — ${s.lede}`;
-}
-
-// ── helpers ────────────────────────────────────────────────────────────────
-
-function str(v: unknown, max: number): string {
-  return typeof v === "string" ? v.trim().slice(0, max) : "";
-}
-
-/** Models wrap JSON in prose or fences often enough to be worth handling. */
-function extractJson(raw: string): Record<string, unknown> | null {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const body = fenced ? fenced[1] : raw;
-  const start = body.indexOf("{");
-  const end = body.lastIndexOf("}");
-  if (start === -1 || end <= start) return null;
-  try {
-    return JSON.parse(body.slice(start, end + 1)) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
 }

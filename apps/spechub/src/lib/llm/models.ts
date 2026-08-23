@@ -52,6 +52,17 @@ export const PROJECT_EXTRACT_MODEL_DEFAULT = "anthropic/claude-sonnet-4.6";
 export const PROJECT_SCENARIOS_MODEL_DEFAULT = "anthropic/claude-sonnet-4.6";
 
 /**
+ * Tender Datasheets cover copy.
+ *
+ * The same job as scenario copy under the same contract, but on the page
+ * written to persuade — so it is the most over-claim-prone text we generate
+ * anywhere. Its own setting rather than sharing the scenarios one because
+ * they are two buttons in two places, and the reason those constants were
+ * ever separate was that tuning one must not silently move the other.
+ */
+export const PROJECT_COVER_MODEL_DEFAULT = "anthropic/claude-sonnet-4.6";
+
+/**
  * Settings keys holding the chosen slugs, and the resolvers the routes call.
  *
  * The constants above stay as the DEFAULTS rather than the values: an empty
@@ -68,6 +79,7 @@ export const PROJECT_MODEL_KEYS = {
   intake: "project_intake_model",
   extract: "project_extract_model",
   scenarios: "project_scenarios_model",
+  cover: "project_cover_model",
 } as const;
 
 export async function getProjectIntakeModel(): Promise<string> {
@@ -83,4 +95,9 @@ export async function getProjectExtractModel(): Promise<string> {
 export async function getProjectScenariosModel(): Promise<string> {
   const { getSetting } = await import("@eg/db/settings");
   return (await getSetting(PROJECT_MODEL_KEYS.scenarios)) ?? PROJECT_SCENARIOS_MODEL_DEFAULT;
+}
+
+export async function getProjectCoverModel(): Promise<string> {
+  const { getSetting } = await import("@eg/db/settings");
+  return (await getSetting(PROJECT_MODEL_KEYS.cover)) ?? PROJECT_COVER_MODEL_DEFAULT;
 }

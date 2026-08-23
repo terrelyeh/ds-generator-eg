@@ -24,7 +24,7 @@ export default async function AiModelsPage() {
         Tender Datasheets 的 AI 模型
       </h1>
       <p className="mt-1 max-w-[640px] text-sm text-muted-foreground">
-        這個模組有三個步驟會呼叫 AI，各自可以挑不同的模型。改完立刻生效，不用重新部署。其他步驟（缺漏掃描、規格表合成、產生澄清訊息）都不用 AI。
+        這個模組有四個步驟會呼叫 AI，各自可以挑不同的模型。改完立刻生效，不用重新部署。其他步驟（缺漏掃描、規格表合成、產生澄清訊息）都不用 AI。
       </p>
 
       <div className="mt-6">

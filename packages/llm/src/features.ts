@@ -35,6 +35,7 @@ export type Feature =
   | "project-intake"
   | "project-extract"
   | "project-scenarios"
+  | "project-cover"
   | "budget-check";
 
 export const FEATURE_TAGS: Record<Feature, string> = {
@@ -88,6 +89,14 @@ export const FEATURE_TAGS: Record<Feature, string> = {
    * that describes neither.
    */
   "project-scenarios": "engenius-spechub.spechub.project-scenarios",
+
+  /**
+   * Tender Datasheets cover copy — headline, Overview and Features drafted
+   * from the spec table. Separate from `project-scenarios` even though the
+   * contract is shared: they are two buttons on two pages, and one bucket
+   * would hide which of them anyone actually presses.
+   */
+  "project-cover": "engenius-spechub.spechub.project-cover",
 
   /**
    * scripts/check-translation-budget.ts — a real translation, run by hand

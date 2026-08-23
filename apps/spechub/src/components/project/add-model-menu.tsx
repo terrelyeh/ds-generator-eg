@@ -95,7 +95,13 @@ export function AddModelMenu({
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "帶入失敗");
-      toast.success(`帶入 ${product.model}：${json.rows} 列規格、${json.images} 張圖`);
+      // The copy is named, not counted. "3 fields" says nothing; "主標、
+      // Overview" tells you which boxes to go and read before printing.
+      const copy: string[] = Array.isArray(json.seededCopy) ? json.seededCopy : [];
+      toast.success(
+        `帶入 ${product.model}：${json.rows} 列規格、${json.images} 張圖` +
+          (copy.length ? `，封面文案也帶了（${copy.join("、")}）` : ""),
+      );
       setOpen(false);
       setQuery("");
       onAdded(json.id);
