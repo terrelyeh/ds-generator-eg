@@ -130,6 +130,7 @@ function asImages(value: unknown): ModelImage[] {
         slot: img.slot || "product",
         url: img.url,
         caption: img.caption ?? null,
+        prompt: img.prompt ?? null,
         body: Array.isArray(img.body) ? img.body : [],
         // Dropping this silently is how a label the author placed and saved
         // turns into an image that simply prints without it.

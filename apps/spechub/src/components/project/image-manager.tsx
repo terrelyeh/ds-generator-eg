@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { LABEL_SIDES } from "@/lib/project-datasheet/types";
@@ -228,9 +229,15 @@ function LabelEditor({
 }: {
   image: ModelImage;
   busy: boolean;
-  onSave: (patch: { caption: string | null; body: string[]; labels: ImageLabel[] }) => void;
+  onSave: (patch: {
+    caption: string | null;
+    prompt: string | null;
+    body: string[];
+    labels: ImageLabel[];
+  }) => void;
 }) {
   const [caption, setCaption] = useState(image.caption ?? "");
+  const [prompt, setPrompt] = useState(image.prompt ?? "");
   /* Held as text, not an array: a textarea is how anyone writes a short list,
      and splitting on save keeps blank lines from becoming empty bullets. */
   const [body, setBody] = useState((image.body ?? []).join("\n"));
@@ -458,6 +465,23 @@ function LabelEditor({
       </div>
 
       <div>
+        {/* Provenance, never printed. Kept so a picture can be revised rather
+            than only replaced — "same scene, without the crane" needs the
+            words that made it. */}
+        <label className="text-xs font-medium text-[#231f20]">產生這張圖的提示詞</label>
+        <p className="mt-0.5 text-[11px] text-muted-foreground">
+          不會印出來。從上面的提示詞面板複製過來貼在這裡，之後要改這張圖就有東西可以接著改。
+        </p>
+        <Textarea
+          rows={4}
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+          placeholder="還沒記錄"
+          className="mt-1 font-mono text-[11px]"
+        />
+      </div>
+
+      <div>
         <label className="text-xs font-medium text-[#231f20]">圖說標題</label>
         <Input
           value={caption}
@@ -490,6 +514,7 @@ function LabelEditor({
         onClick={() =>
           onSave({
             caption: caption.trim() || null,
+            prompt: prompt.trim() || null,
             body: body
               .split("\n")
               .map((l) => l.replace(/^[-•*]\s*/, "").trim())
@@ -500,7 +525,7 @@ function LabelEditor({
           })
         }
       >
-        {busy ? "儲存中…" : "儲存圖說與標註"}
+        {busy ? "儲存中…" : "儲存圖說、標註與提示詞"}
       </Button>
     </div>
   );
