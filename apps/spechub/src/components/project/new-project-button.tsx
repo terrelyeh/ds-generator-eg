@@ -45,15 +45,15 @@ export function NewProjectButton() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
-        render={<Button className="shrink-0">New tender datasheet</Button>}
+        render={<Button className="shrink-0">新增標案 datasheet</Button>}
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>New tender datasheet</DialogTitle>
+          <DialogTitle>新增標案 datasheet</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <Label htmlFor="pd-name">Name</Label>
+            <Label htmlFor="pd-name">文件名稱</Label>
             <Input
               id="pd-name"
               value={name}
@@ -62,16 +62,16 @@ export function NewProjectButton() {
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pd-customer">Customer</Label>
+            <Label htmlFor="pd-customer">客戶</Label>
             <Input
               id="pd-customer"
               value={customer}
               onChange={(e) => setCustomer(e.target.value)}
-              placeholder="Used in the PRELIMINARY notice"
+              placeholder="會出現在對外聲明裡"
             />
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="pd-layout">Layout</Label>
+            <Label htmlFor="pd-layout">版型</Label>
             <select
               id="pd-layout"
               value={layout}
@@ -88,7 +88,7 @@ export function NewProjectButton() {
         </div>
         <DialogFooter>
           <Button onClick={create} disabled={saving || !name.trim()}>
-            {saving ? "Creating…" : "Create"}
+            {saving ? "建立中…" : "建立"}
           </Button>
         </DialogFooter>
       </DialogContent>

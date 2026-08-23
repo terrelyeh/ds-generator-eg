@@ -52,13 +52,13 @@ export default async function ProjectsPage() {
           <h1 className="font-heading text-2xl font-semibold text-[#231f20]">
             Tender Datasheets
           </h1>
+          {/* Chinese, like the rest of this app's explanatory text. It was
+              the only English paragraph on a page whose every other word —
+              草稿, 出圖, 封存 — is Chinese, so it read as a block of foreign
+              matter rather than as the introduction it is. Proper nouns stay
+              in English because that is what people call them. */}
           <p className="mt-1 max-w-[760px] text-sm text-muted-foreground">
-            Preliminary datasheets for the bids we do not have a catalogue
-            product for — retarget a supplier&apos;s spec sheet onto EnGenius
-            naming and layout, or extend one of our own models with what the
-            tender asks for. These live outside the product catalogue: never
-            synced, never indexed, never products. When a customer commits, the
-            line gets built properly in Google Sheets.
+            給我們目錄裡沒有現成產品的標案用。可以把外購廠商的規格書換成 EnGenius 的命名和版型，也可以從自家已經在賣的型號延伸出標案要的規格。這些文件不同步、不進索引、永遠不會變成產品——客戶真的下單之後，那條線要在 Google Sheets 正式建一次。
           </p>
           {/* Right under the paragraph that explains what this is, because
               that is where somebody reading it decides they want more. */}
@@ -76,7 +76,7 @@ export default async function ProjectsPage() {
 
       {docs.length === 0 ? (
         <div className="mt-10 rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-          No project datasheets yet.
+          還沒有任何標案 datasheet。
         </div>
       ) : (
         <div className="mt-8 space-y-8">
@@ -84,7 +84,7 @@ export default async function ProjectsPage() {
           {archived.length > 0 && (
             <div>
               <h2 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Archived
+                已封存
               </h2>
               <ProjectList docs={archived} lastIssue={lastIssue} />
             </div>
@@ -168,14 +168,14 @@ function ProjectList({
 
             <span className="flex shrink-0 items-center gap-3 text-xs">
               <Link href={`/projects/${d.id}`} className="text-engenius-blue hover:underline">
-                Edit
+                編輯
               </Link>
               <Link
                 href={`/preview/project/${d.id}`}
                 target="_blank"
                 className="text-engenius-blue hover:underline"
               >
-                Preview
+                預覽
               </Link>
               <ProjectRowActions
                 id={d.id}
