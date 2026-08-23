@@ -80,6 +80,7 @@ export async function POST(
           headline: doc.headline,
           categoryLabel: doc.category_label,
           overview: doc.overview,
+          diagramNote: doc.diagram_note,
         },
         hint: body.hint ?? "",
       }),

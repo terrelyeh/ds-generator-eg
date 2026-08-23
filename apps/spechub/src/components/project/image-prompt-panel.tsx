@@ -5,11 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  buildCodexCommand,
-  buildImagePrompt,
-  type PromptKind,
-} from "@/lib/project-datasheet/image-prompt";
+import { buildImagePrompt, type PromptKind } from "@/lib/project-datasheet/image-prompt";
 
 interface ModelPhoto {
   modelName: string;
@@ -212,13 +208,6 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
             先填「{kind === "scene" ? "這是什麼場域" : "這張圖要說明什麼"}」——沒填的話產出來的圖不會是你要的
           </span>
         )}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => void copy(buildCodexCommand(photo ? `${modelName}.jpg` : ""), "指令")}
-        >
-          複製 Codex 指令
-        </Button>
         {photo ? (
           <a
             href={photo}

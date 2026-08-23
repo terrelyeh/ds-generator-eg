@@ -41,6 +41,10 @@ export interface CoverDraft {
   categoryLabel: string;
   overview: string;
   features: CoverFeatureBlock[];
+  /** heading beside the page-2 architecture diagram */
+  diagramTitle: string;
+  /** the paragraph under it — how the unit sits in a site */
+  diagramNote: string;
   /** claims the sector expects that the table cannot support */
   declined: string[];
 }
@@ -53,7 +57,7 @@ it suits the job, without claiming anything we cannot stand behind.
 Return ONLY a JSON object:
 {"headline":"...","categoryLabel":"...","overview":"...",
  "features":[{"title":"...","bullets":[{"text":"...","basis":"..."}]}],
- "declined":["..."]}
+ "diagramTitle":"...","diagramNote":"...","declined":["..."]}
 
 ${GROUNDING_RULES}
 
@@ -79,6 +83,16 @@ WRITING
   name — "Deploy without a fixed line", not "Cellular WAN". Each block has
   1 or 2 bullets, each ONE complete sentence ending in a full stop, saying
   what the spec lets the reader do.
+- diagramTitle: 2-3 words naming what the picture shows, Title Case.
+  "System architecture". No full stop.
+- diagramNote: 2 to 4 sentences, UNDER 420 CHARACTERS, printed beside that
+  picture. It describes HOW ONE SITE IS PUT TOGETHER — where the unit
+  mounts, what one cable carries, what hangs off it downstream — not what
+  the product is (the Overview already said that). You cannot see the
+  picture, so write what is true of the deployment, never "as shown" or
+  "on the left". Downstream equipment is the customer's, so name it in
+  general terms (cameras, payment terminals, indoor wireless) and claim
+  nothing about it.
 - Where the models differ, say which model. A cover that reads as one
   product when it is two is the error this document is most prone to.
 - British or American spelling as it comes; do not translate. The datasheet
@@ -92,7 +106,12 @@ export interface CoverPromptInput {
   /** the resolved matrix, one line per row, already merged across models */
   specLines: string[];
   /** whatever cover fields are already written, so a draft can respect them */
-  existing: { headline?: string | null; categoryLabel?: string | null; overview?: string | null };
+  existing: {
+    headline?: string | null;
+    categoryLabel?: string | null;
+    overview?: string | null;
+    diagramNote?: string | null;
+  };
   /** optional steer from the author: "強調免施工、戶外" */
   hint: string;
 }
@@ -107,6 +126,7 @@ export function buildCoverPrompt({
     existing.headline?.trim() && `HEADLINE: ${existing.headline.trim()}`,
     existing.categoryLabel?.trim() && `CATEGORY: ${existing.categoryLabel.trim()}`,
     existing.overview?.trim() && `OVERVIEW: ${existing.overview.trim()}`,
+    existing.diagramNote?.trim() && `DIAGRAM NOTE: ${existing.diagramNote.trim()}`,
   ].filter(Boolean);
 
   return [
@@ -167,13 +187,21 @@ export function parseCover(raw: string): CoverDraft | null {
     // box is fixed and an accidental third gap costs a line of copy.
     overview: str(json.overview, 900).replace(/\n{3,}/g, "\n\n"),
     features,
+    diagramTitle: str(json.diagramTitle, 60),
+    // One paragraph. The layout sets it as a single block beside the
+    // picture, so a line break here just prints as a gap in a column.
+    diagramNote: str(json.diagramNote, 700).replace(/\s+/g, " "),
     declined: (Array.isArray(json.declined) ? json.declined : [])
       .map((v) => str(v, 200))
       .filter(Boolean),
   };
 
   const empty =
-    !draft.headline && !draft.categoryLabel && !draft.overview && draft.features.length === 0;
+    !draft.headline &&
+    !draft.categoryLabel &&
+    !draft.overview &&
+    !draft.diagramNote &&
+    draft.features.length === 0;
   return empty ? null : draft;
 }
 

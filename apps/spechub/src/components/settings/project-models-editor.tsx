@@ -31,7 +31,7 @@ const STEPS = [
     key: "cover" as const,
     title: "起草封面文案",
     where: "「封面與文案」的「用 AI 起草封面文案」",
-    what: "從規格表寫出主標、分類、Overview 和 Features & Benefits。從既有型號帶入的文件用不到——那條路直接帶我們自己的文案。",
+    what: "從規格表寫出主標、分類、Overview、Features & Benefits，還有第 2 頁架構圖旁邊那段。從既有型號帶入的文件用不到——那條路直接帶我們自己的文案。",
   },
   {
     key: "scenarios" as const,
