@@ -106,68 +106,86 @@ export function AddModelMenu({
     }
   }
 
-  if (!open) {
-    return (
+  return (
+    <div className="w-full space-y-3">
+      {/* The row stays put when the search panel opens.
+          It used to be REPLACED by the panel, which took away more than a
+          cancel button: with the other two buttons gone there was no way to
+          see that another route existed, let alone switch to it. The way out
+          of a choice should be the same control you made it with. */}
       <div className="flex flex-wrap gap-2">
         {/* Ordered by how often each is the answer, sourcing first — it is
             what this module was built for. */}
-        <Button size="sm" onClick={() => void addBlank(true)} disabled={busy}>
+        <Button
+          size="sm"
+          variant={open ? "outline" : "default"}
+          onClick={() => void addBlank(true)}
+          disabled={busy}
+        >
           從廠商規格書建立
         </Button>
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Button
+          variant={open ? "default" : "outline"}
+          size="sm"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+        >
           從既有型號帶入
         </Button>
         <Button variant="outline" size="sm" onClick={() => void addBlank()} disabled={busy}>
           加空白型號
         </Button>
+        {open && (
+          <button
+            type="button"
+            className="px-1 text-xs text-muted-foreground hover:text-[#231f20] hover:underline"
+            onClick={() => {
+              setOpen(false);
+              setQuery("");
+            }}
+          >
+            取消
+          </button>
+        )}
       </div>
-    );
-  }
 
-  return (
-    <div className="w-full space-y-2 rounded-md border bg-muted/30 p-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          帶入我們已經在賣的型號：規格、文案、產品圖一起複製過來，之後可以自由增修。
-          <strong>官方 datasheet 沒寫的欄位就直接加</strong>——標案要的細節本來就比公開規格多。動到官方已經寫過的值會被標成「跟官方不一樣」，因為客戶對得到。
-        </p>
-        <button
-          type="button"
-          className="shrink-0 text-xs text-muted-foreground hover:underline"
-          onClick={() => setOpen(false)}
-        >
-          收起
-        </button>
-      </div>
-      <Input
+      {open && (
+        <div className="w-full space-y-2 rounded-md border bg-muted/30 p-3">
+          <p className="text-xs text-muted-foreground">
+            帶入我們已經在賣的型號：規格、文案、產品圖一起複製過來，之後可以自由增修。
+            <strong>官方 datasheet 沒寫的欄位就直接加</strong>——標案要的細節本來就比公開規格多。動到官方已經寫過的值會被標成「跟官方不一樣」，因為客戶對得到。
+          </p>
+          <Input
         autoFocus
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-        placeholder="搜尋型號、產品線…（ECW536、Cloud AP、EOC…）"
-      />
-      {products === null ? (
-        <p className="text-xs text-muted-foreground">載入產品清單…</p>
-      ) : matches.length === 0 ? (
-        <p className="text-xs text-muted-foreground">沒有符合的型號。</p>
-      ) : (
-        <ul className="max-h-64 divide-y overflow-y-auto rounded-md border bg-background">
-          {matches.map((p) => (
-            <li key={p.model}>
-              <button
-                type="button"
-                disabled={busy}
-                onClick={() => void seed(p)}
-                className="flex w-full items-baseline gap-2 px-3 py-2 text-left hover:bg-muted disabled:opacity-50"
-              >
-                <span className="font-medium text-[#231f20]">{p.model}</span>
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {p.name}
-                </span>
-                <span className="shrink-0 text-[10px] text-muted-foreground">{p.line}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="搜尋型號、產品線…（ECW536、Cloud AP、EOC…）"
+          />
+          {products === null ? (
+            <p className="text-xs text-muted-foreground">載入產品清單…</p>
+          ) : matches.length === 0 ? (
+            <p className="text-xs text-muted-foreground">沒有符合的型號。</p>
+          ) : (
+            <ul className="max-h-64 divide-y overflow-y-auto rounded-md border bg-background">
+              {matches.map((p) => (
+                <li key={p.model}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void seed(p)}
+                    className="flex w-full items-baseline gap-2 px-3 py-2 text-left hover:bg-muted disabled:opacity-50"
+                  >
+                    <span className="font-medium text-[#231f20]">{p.model}</span>
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                      {p.name}
+                    </span>
+                    <span className="shrink-0 text-[10px] text-muted-foreground">{p.line}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       )}
     </div>
   );
