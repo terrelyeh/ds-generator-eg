@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -151,6 +151,101 @@ export function ProjectEditor({
       return same ? prev : next;
     });
   }, [models]);
+
+  /**
+   * The document's own fields, as the server currently has them.
+   *
+   * Recomputed whenever the page re-renders with a fresh row, which is what
+   * `router.refresh()` produces after something writes outside this form.
+   */
+  const serverDoc = useMemo(
+    () => ({
+      name: doc.name,
+      customer: doc.customer ?? "",
+      headline: doc.headline ?? "",
+      seriesName: doc.series_name ?? "",
+      categoryLabel: doc.category_label ?? "",
+      overview: doc.overview ?? "",
+      footnote: doc.footnote ?? "",
+      features: serializeFeatureBlocks(
+        Array.isArray(doc.features) ? (doc.features as { title: string; bullets: string[] }[]) : [],
+      ),
+      imageNote: doc.image_note ?? "",
+      confidentiality: doc.confidentiality ?? "",
+      diagramTitle: doc.diagram_title ?? "",
+      diagramNote: doc.diagram_note ?? "",
+      docRules: serializeRules(asRules(doc.doc_rules)),
+      notes: doc.notes ?? "",
+      branch: doc.branch ?? "",
+      salesOwner: doc.sales_owner ?? "",
+      opportunity: doc.opportunity ?? "",
+      tenderDate: doc.tender_date ?? "",
+      sections: JSON.stringify({
+        ...DEFAULT_SECTIONS,
+        ...((doc.sections as Partial<SectionToggles>) ?? {}),
+      }),
+    }),
+    [doc],
+  );
+  const seenDoc = useRef(serverDoc);
+
+  /**
+   * Pick up writes that happened outside this form, without discarding edits.
+   *
+   * The same shape as the `drafts` reconciliation above, and it exists for a
+   * worse version of the same failure. These fields are state seeded from
+   * props, so a server write plus `router.refresh()` changed nothing here:
+   * seeding a column from a catalogue model filled the cover copy in the
+   * database and the boxes on screen stayed empty.
+   *
+   * Looking blank was the mild half. `initial` is computed from `doc`, so the
+   * refreshed row made the form DIRTY against its own empty boxes — and the
+   * next Save posted those empties back over the copy that had just been
+   * written. Requirements intake writes the same fields, so it could lose an
+   * accepted headline the same way.
+   *
+   * Adopt only where the person has not typed: a field still holding the
+   * value the server last showed us is untouched, and anything else is theirs.
+   */
+  useEffect(() => {
+    const was = seenDoc.current;
+    if (was === serverDoc) return;
+    seenDoc.current = serverDoc;
+
+    // The functional setter reads the current value without making every
+    // keystroke a dependency of this effect.
+    const adopt = (next: string, prev: string, set: (fn: (cur: string) => string) => void) => {
+      if (next === prev) return;
+      set((cur) => (cur === prev ? next : cur));
+    };
+
+    adopt(serverDoc.name, was.name, setName);
+    adopt(serverDoc.customer, was.customer, setCustomer);
+    adopt(serverDoc.headline, was.headline, setHeadline);
+    adopt(serverDoc.seriesName, was.seriesName, setSeriesName);
+    adopt(serverDoc.categoryLabel, was.categoryLabel, setCategoryLabel);
+    adopt(serverDoc.overview, was.overview, setOverview);
+    adopt(serverDoc.footnote, was.footnote, setFootnote);
+    adopt(serverDoc.features, was.features, setFeatures);
+    adopt(serverDoc.imageNote, was.imageNote, setImageNote);
+    adopt(serverDoc.confidentiality, was.confidentiality, setConfidentiality);
+    adopt(serverDoc.diagramTitle, was.diagramTitle, setDiagramTitle);
+    adopt(serverDoc.diagramNote, was.diagramNote, setDiagramNote);
+    adopt(serverDoc.docRules, was.docRules, setDocRules);
+    adopt(serverDoc.notes, was.notes, setNotes);
+    adopt(serverDoc.branch, was.branch, setBranch);
+    adopt(serverDoc.salesOwner, was.salesOwner, setSalesOwner);
+    adopt(serverDoc.opportunity, was.opportunity, setOpportunity);
+    adopt(serverDoc.tenderDate, was.tenderDate, setTenderDate);
+
+    if (serverDoc.sections !== was.sections) {
+      setSections((cur) =>
+        JSON.stringify(cur) === was.sections
+          ? (JSON.parse(serverDoc.sections) as SectionToggles)
+          : cur,
+      );
+    }
+  }, [serverDoc]);
 
   /**
    * Unsaved-changes flag. Fields now live on four tabs, so "I edited
