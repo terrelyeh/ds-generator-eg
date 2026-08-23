@@ -60,6 +60,16 @@ export default async function ProjectsPage() {
             synced, never indexed, never products. When a customer commits, the
             line gets built properly in Google Sheets.
           </p>
+          {/* Right under the paragraph that explains what this is, because
+              that is where somebody reading it decides they want more. */}
+          <a
+            href="/docs/tender-datasheets.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-2 inline-block text-sm text-engenius-blue hover:underline"
+          >
+            三種情境與完整流程 →
+          </a>
         </div>
         <NewProjectButton />
       </div>
