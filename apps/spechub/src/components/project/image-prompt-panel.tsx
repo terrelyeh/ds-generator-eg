@@ -52,6 +52,9 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
   }, [composed, edited]);
 
   const photo = models.find((m) => m.modelName === modelName)?.url ?? null;
+  /* Copying a prompt with 「（還沒填場景）」 in it wastes a three-to-eight
+     minute generation on a brief that says nothing. */
+  const ready = scene.trim().length > 0 || edited;
 
   async function copy(what: string, label: string) {
     try {
@@ -122,9 +125,28 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
         </label>
       </div>
 
+      {/* The dropdown said "抽象，不綁產業" and "一個實際的地方", which names
+          the two but not what changes. This is the sentence that lets someone
+          pick without generating one of each to find out. */}
+      <p className="rounded border bg-background px-2.5 py-2 text-[11px] leading-relaxed text-muted-foreground">
+        {kind === "scene" ? (
+          <>
+            <strong className="text-[#231f20]">場域圖</strong>畫一個真實的地方——港口、店面、機房。
+            用在規格表後面那一頁，一列一張，回答「這台裝在哪裡」。
+          </>
+        ) : (
+          <>
+            <strong className="text-[#231f20]">架構圖</strong>畫的是接線關係，不畫完整建築——
+            基地台、一片切開的牆、機器、switch、下游設備，各自分開排開留白給標籤。
+            用在第 2 頁，回答「這台跟什麼接在一起」。<strong className="text-[#231f20]">不綁產業</strong>，換案子不用重畫。
+          </>
+        )}
+      </p>
+
       <label className="block text-xs">
         <span className="mb-1 block text-muted-foreground">
           {kind === "scene" ? "這是什麼場域" : "這張圖要說明什麼"}
+          <span className="ml-1 text-[#b45309]">必填</span>
         </span>
         <Input
           value={scene}
@@ -140,7 +162,8 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
 
       <label className="block text-xs">
         <span className="mb-1 block text-muted-foreground">
-          畫面裡還要有哪些設備（選填，一個也不填就只畫我們的機器）
+          畫面裡還要有哪些設備
+          <span className="ml-1">選填——不填就只畫我們的機器</span>
         </span>
         <Input
           value={equipment}
@@ -181,9 +204,14 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={() => void copy(text, "提示詞")}>
+        <Button size="sm" disabled={!ready} onClick={() => void copy(text, "提示詞")}>
           複製提示詞
         </Button>
+        {!ready && (
+          <span className="text-xs text-[#b45309]">
+            先填「{kind === "scene" ? "這是什麼場域" : "這張圖要說明什麼"}」——沒填的話產出來的圖不會是你要的
+          </span>
+        )}
         <Button
           variant="outline"
           size="sm"
@@ -209,7 +237,8 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
       </div>
 
       <p className="text-[11px] text-muted-foreground">
-        產完圖回到上面「上傳圖片」加進來。第一張是主圖，之後每一張排成下方一列情境小圖。
+        產完圖回到上面「上傳圖片」加進來，然後<strong>把這段提示詞貼進那張圖的「產生這張圖的提示詞」欄位</strong>——
+        之後要改那張圖才有東西可以接著改，不然只能整張重來。
       </p>
     </div>
   );

@@ -169,5 +169,18 @@ export interface ModelImage {
   caption?: string | null;
   /** Bullets in the copy column beside the image. One string per bullet. */
   body?: string[] | null;
+  /**
+   * What produced this picture.
+   *
+   * Kept because the alternative turned out to be losing it. The five
+   * illustrations on the EOR sheet came from carefully tuned prompts that
+   * lived in a scratch directory for one working session and nowhere else —
+   * so "another one in the same style" or "same scene, without the crane"
+   * would have started from nothing. An image whose origin is unrecorded can
+   * only be replaced, never revised.
+   *
+   * Never printed. It is provenance, not content.
+   */
+  prompt?: string | null;
   labels?: ImageLabel[] | null;
 }

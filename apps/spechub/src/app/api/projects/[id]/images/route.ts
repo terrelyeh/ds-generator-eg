@@ -11,7 +11,7 @@ const ALLOWED = new Set(["image/png", "image/jpeg", "image/webp", "image/svg+xml
 
 /**
  * POST /api/projects/[id]/images — multipart { file, slot, modelId? }
- * PATCH /api/projects/[id]/images — json { url, modelId?, caption?, labels? }
+ * PATCH /api/projects/[id]/images — json { url, modelId?, caption?, prompt?, labels? }
  * DELETE /api/projects/[id]/images — json { url, modelId? }
  *
  * Uploads land in the PUBLIC `project-images` bucket and the returned URL is
@@ -96,6 +96,7 @@ export async function PATCH(
     url?: string;
     modelId?: string | null;
     caption?: string | null;
+    prompt?: string | null;
     body?: unknown;
     labels?: unknown;
   };
@@ -116,6 +117,8 @@ export async function PATCH(
           // Absent means "leave alone"; an empty string means "clear it".
           caption:
             body.caption === undefined ? (i.caption ?? null) : (body.caption?.trim() || null),
+          prompt:
+            body.prompt === undefined ? (i.prompt ?? null) : (body.prompt?.trim() || null),
           body: body.body === undefined ? (i.body ?? []) : asBody(body.body),
           labels: body.labels === undefined ? (i.labels ?? []) : asLabels(body.labels),
         }
