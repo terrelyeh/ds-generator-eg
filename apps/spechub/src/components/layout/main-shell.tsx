@@ -47,6 +47,18 @@ export function MainShell({ children, user }: MainShellProps) {
           >
             Drive Folder &amp; Naming Rules
           </a>
+          &nbsp;&middot;&nbsp;
+          {/* Linked for everyone with an account, not just the admins and
+              editors who can open the tool — the people who ask for a tender
+              datasheet are the ones who most need to know how it works. */}
+          <a
+            href="/docs/tender-datasheets.html"
+            className="text-engenius-blue hover:underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Tender Datasheets 指南
+          </a>
         </div>
       </footer>
       <Toaster />

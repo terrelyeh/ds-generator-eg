@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Behind the login gate like the other pages in /docs — only
+       /design/datasheet-type-spec.html is exempt in proxy.ts. That matters
+       here: the page names a live deal, and it is written for sales and PM,
+       who have SpecHub accounts even though they cannot open the tool
+       itself. -->
+  <meta name="robots" content="noindex">
+  <title>Product SpecHub — Tender Datasheets 使用指南</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700&family=Roboto:wght@300;400;500&family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+TC:wght@300;400;500;700&display=swap">
+
+</head>
+<body>
+<style>
+  /* Light is the base. Every colour is a token so the two dark selectors
+     below only have to redefine values, never restate components. */
+  :root {
+    --ink:        #231f20;
+    --ink-soft:   #5c636e;
+    --ink-faint:  #8d94a0;
+    --paper:      #ffffff;
+    --sunk:       #f5f7fa;   /* neutral pulled slightly toward the navy */
+    --line:       #dfe4ec;
+    --line-soft:  #edf0f5;
+    --navy:       #1b3a5c;   /* the colour these documents actually print in */
+    --navy-soft:  #eaf0f7;
+    --blue:       #0284c7;
+    --amber:      #b45309;   /* the PRELIMINARY badge, reused for warnings */
+    --amber-soft: #fdf5e6;
+    --red:        #b4232c;
+    --red-soft:   #fdf0f0;
+    --green:      #0f7a52;
+
+    --sans: "Manrope", "Noto Sans TC", -apple-system, "PingFang TC", sans-serif;
+    --body: "Roboto", "Noto Sans TC", -apple-system, "PingFang TC", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
+  }
+
+  /* The default "system" setting stamps nothing on the root, so this media
+     query is what most dark-mode viewers actually get. Guarded so an explicit
+     light choice still beats a dark OS. Written flat rather than nested — CSS
+     nesting is not worth betting the page's legibility on. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink:        #e9edf3;
+      --ink-soft:   #a3acbb;
+      --ink-faint:  #737c8b;
+      --paper:      #14181e;
+      --sunk:       #1a1f27;
+      --line:       #2b323d;
+      --line-soft:  #222831;
+      --navy:       #8fb4dd;
+      --navy-soft:  #1a2531;
+      --blue:       #4cb3e8;
+      --amber:      #e0a33c;
+      --amber-soft: #241d10;
+      --red:        #e8767e;
+      --red-soft:   #241516;
+      --green:      #4bbd8e;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink:        #e9edf3;
+    --ink-soft:   #a3acbb;
+    --ink-faint:  #737c8b;
+    --paper:      #14181e;
+    --sunk:       #1a1f27;
+    --line:       #2b323d;
+    --line-soft:  #222831;
+    --navy:       #8fb4dd;
+    --navy-soft:  #1a2531;
+    --blue:       #4cb3e8;
+    --amber:      #e0a33c;
+    --amber-soft: #241d10;
+    --red:        #e8767e;
+    --red-soft:   #241516;
+    --green:      #4bbd8e;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--body);
+    font-weight: 300;
+    font-size: 15px;
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .page { max-width: 1280px; margin: 0 auto; padding: 0 40px 96px; }
+
+  /* ── masthead ─────────────────────────────────────────────── */
+  .masthead {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 56px;
+    align-items: end;
+    padding: 64px 0 32px;
+    border-bottom: 2px solid var(--navy);
+  }
+  .eyebrow {
+    font-family: var(--sans);
+    font-size: 11px; font-weight: 700;
+    letter-spacing: .16em; text-transform: uppercase;
+    color: var(--blue);
+    margin-bottom: 14px;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: 46px; font-weight: 700; line-height: 1.12;
+    letter-spacing: -.02em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+    color: var(--navy);
+  }
+  .standfirst {
+    font-size: 17px; line-height: 1.75; color: var(--ink-soft);
+    max-width: 62ch; margin: 0;
+  }
+  .boundary {
+    border-left: 3px solid var(--amber);
+    background: var(--amber-soft);
+    padding: 16px 18px;
+    font-size: 13.5px; line-height: 1.7;
+    color: var(--ink);
+  }
+  .boundary b { font-family: var(--sans); font-weight: 700; }
+
+  /* ── sections ─────────────────────────────────────────────── */
+  section { padding-top: 64px; }
+  h2 {
+    font-family: var(--sans);
+    font-size: 13px; font-weight: 700;
+    letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 6px;
+  }
+  .lede {
+    font-family: var(--sans);
+    font-size: 26px; font-weight: 600; line-height: 1.35;
+    letter-spacing: -.01em;
+    color: var(--ink);
+    margin: 0 0 28px; max-width: 40ch;
+    text-wrap: balance;
+  }
+  p { max-width: 68ch; }
+
+  /* ── the three cases ──────────────────────────────────────── */
+  .cases { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .case {
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--navy);
+    background: var(--paper);
+    padding: 24px 22px 26px;
+    display: flex; flex-direction: column; gap: 14px;
+  }
+  .case.mixed { border-top-color: var(--amber); }
+  .case-tag {
+    font-family: var(--mono);
+    font-size: 11px; letter-spacing: .08em;
+    color: var(--ink-faint);
+  }
+  .case h3 {
+    font-family: var(--sans);
+    font-size: 20px; font-weight: 700; line-height: 1.3;
+    margin: 0; color: var(--ink);
+  }
+  .case-when { font-size: 14px; color: var(--ink-soft); margin: 0; }
+  .case dl { margin: 0; display: grid; gap: 10px; }
+  .case dt {
+    font-family: var(--sans);
+    font-size: 11px; font-weight: 700; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+  .case dd { margin: 3px 0 0; font-size: 13.5px; line-height: 1.65; }
+  .example {
+    margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line-soft);
+    font-size: 12.5px; color: var(--ink-faint);
+  }
+  .example b { font-family: var(--mono); font-weight: 500; color: var(--ink-soft); }
+
+  /* ── the flow ─────────────────────────────────────────────── */
+  .flow { display: grid; gap: 0; }
+  .step {
+    display: grid;
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 24px;
+    padding: 22px 0;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .step:first-child { border-top: 1px solid var(--line-soft); }
+  .num {
+    font-family: var(--mono);
+    font-size: 13px; font-weight: 500;
+    color: var(--blue);
+    padding-top: 3px;
+  }
+  .step h3 {
+    font-family: var(--sans);
+    font-size: 17px; font-weight: 600; margin: 0 0 5px; color: var(--ink);
+  }
+  .step p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .step .where {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--ink-faint); margin-top: 7px;
+  }
+
+  /* The fork is the one place the sequence genuinely splits, so it is drawn
+     as a split rather than as two more numbered steps. */
+  .fork { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 14px; }
+  .branch {
+    border: 1px solid var(--line);
+    background: var(--sunk);
+    padding: 15px 16px;
+  }
+  .branch h4 {
+    font-family: var(--sans); font-size: 14px; font-weight: 700;
+    margin: 0 0 5px; color: var(--navy);
+  }
+  .branch p { font-size: 13px; margin: 0; color: var(--ink-soft); }
+  .ai-flag {
+    display: inline-block; margin-top: 9px;
+    font-family: var(--sans); font-size: 10.5px; font-weight: 700;
+    letter-spacing: .07em; text-transform: uppercase;
+    color: var(--blue); border: 1px solid currentColor;
+    padding: 2px 7px;
+  }
+
+  /* ── tables ───────────────────────────────────────────────── */
+  .scroll { overflow-x: auto; }
+  table {
+    border-collapse: collapse; width: 100%; min-width: 620px;
+    font-size: 14px;
+  }
+  caption {
+    caption-side: top; text-align: left;
+    font-size: 13px; color: var(--ink-soft);
+    padding-bottom: 12px; max-width: 68ch;
+  }
+  th, td {
+    text-align: left; padding: 13px 16px;
+    border-bottom: 1px solid var(--line-soft);
+    vertical-align: top;
+  }
+  thead th {
+    font-family: var(--sans); font-size: 11px; font-weight: 700;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: var(--ink-faint);
+    border-bottom: 1px solid var(--line);
+  }
+  tbody th {
+    font-family: var(--sans); font-weight: 600; font-size: 14px;
+    color: var(--ink); width: 30%;
+  }
+  td code, p code, li code, dd code {
+    font-family: var(--mono); font-size: 12.5px;
+    background: var(--sunk); border: 1px solid var(--line-soft);
+    padding: 1px 5px; border-radius: 2px;
+  }
+
+  .sev {
+    display: inline-block; font-family: var(--sans);
+    font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; padding: 2px 8px; white-space: nowrap;
+  }
+  .sev.block { color: var(--red); background: var(--red-soft); }
+  .sev.warn  { color: var(--amber); background: var(--amber-soft); }
+
+  /* ── locked rules ─────────────────────────────────────────── */
+  .locks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .lock {
+    border: 1px solid var(--line); padding: 20px 20px 22px;
+    background: var(--sunk);
+  }
+  .lock h3 {
+    font-family: var(--sans); font-size: 15px; font-weight: 700;
+    margin: 0 0 8px; color: var(--ink);
+  }
+  .lock p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+
+  .note {
+    margin-top: 28px; padding: 18px 20px;
+    border: 1px solid var(--line); border-left: 3px solid var(--blue);
+    background: var(--navy-soft);
+    font-size: 13.5px; line-height: 1.75;
+  }
+  .note b { font-family: var(--sans); font-weight: 700; }
+
+  footer a { color: var(--blue); text-decoration: none; }
+  footer a:hover { text-decoration: underline; }
+  footer {
+    margin-top: 72px; padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-size: 12.5px; color: var(--ink-faint);
+    display: flex; flex-wrap: wrap; gap: 8px 22px;
+  }
+
+  @media (max-width: 900px) {
+    .page { padding: 0 22px 64px; }
+    .masthead { grid-template-columns: 1fr; gap: 26px; padding-top: 44px; }
+    h1 { font-size: 34px; }
+    .cases, .locks, .fork { grid-template-columns: 1fr; }
+    .step { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
+  }
+</style>
+
+<div class="page">
+
+  <header class="masthead">
+    <div>
+      <div class="eyebrow">Product SpecHub · 內部工具</div>
+      <h1>Tender Datasheets</h1>
+      <p class="standfirst">
+        給「我們目錄裡沒有現成答案」的標案，做一份掛 EnGenius 名字的暫定規格書。可以從外購廠商的規格書起頭，也可以從我們自己已經在賣的型號延伸。
+      </p>
+    </div>
+    <div class="boundary">
+      <b>它永遠不會變成產品。</b>這裡的資料不同步、不進 RAG、不會出現在目錄或官網。客戶真的下單之後，那條線要在 Google Sheets 正式建一次。
+    </div>
+  </header>
+
+  <section>
+    <h2>三種情境</h2>
+    <p class="lede">差別只在「規格從哪裡來」，後面的流程是同一條。</p>
+
+    <div class="cases">
+      <article class="case">
+        <div class="case-tag">A</div>
+        <h3>外購</h3>
+        <p class="case-when">這條產品線我們沒有貨，但案子要。找 ODM 或他牌拿規格書，換成我們的命名、照片和版型去談。</p>
+        <dl>
+          <div>
+            <dt>起點</dt>
+            <dd>上傳原廠 PDF / Excel，或直接貼上規格文字</dd>
+          </div>
+          <div>
+            <dt>你下的規則等於什麼</dt>
+            <dd><b>拿到案子後要請 ODM 改的硬體變更清單。</b>不是「我們對規格表的修飾」——所以每一條都要問得出「做不做得到、多少錢」。</dd>
+          </div>
+        </dl>
+        <p class="example">實例 <b>EOR100 / EOR200</b> — 馬來西亞連鎖便利店，4G/5G 戶外路由器</p>
+      </article>
+
+      <article class="case">
+        <div class="case-tag">B</div>
+        <h3>從既有型號延伸</h3>
+        <p class="case-when">這台我們有在賣，但公開的 datasheet 寫得不夠深，而標案偏偏在評那些欄位。</p>
+        <dl>
+          <div>
+            <dt>起點</dt>
+            <dd>「從既有型號帶入」——直接從產品目錄複製規格，不經過 AI</dd>
+          </div>
+          <div>
+            <dt>要小心的地方</dt>
+            <dd><b>補規格是正常的，改動既有的值才危險。</b>客戶可以把官網那份拿來並排比對。</dd>
+          </div>
+        </dl>
+        <p class="example">實例 <b>ECW215</b> — 帶入 45 列規格再往下補</p>
+      </article>
+
+      <article class="case mixed">
+        <div class="case-tag">C</div>
+        <h3>兩者混在一份</h3>
+        <p class="case-when">同一個標案要同時報自家型號和外購型號，放在一張規格表上並排比。</p>
+        <dl>
+          <div>
+            <dt>起點</dt>
+            <dd>兩種都用——<b>一台型號 = 規格表上的一欄</b></dd>
+          </div>
+          <div>
+            <dt>唯一的限制</dt>
+            <dd>文件層級沒問題，<b>但同一欄不能兩者都套</b>。要並排就多加一台型號，不要在目錄帶入的欄位上再讀廠商規格書。</dd>
+          </div>
+        </dl>
+        <p class="example">覆蓋前系統會跳紅框警告，並告訴你會失去哪些檢查</p>
+      </article>
+    </div>
+  </section>
+
+  <section>
+    <h2>流程</h2>
+    <p class="lede">從建檔到出圖，八步。中間只有一個地方會分岔。</p>
+
+    <div class="flow">
+      <div class="step">
+        <div class="num">01</div>
+        <div>
+          <h3>建立文件</h3>
+          <p>填文件名稱、客戶、分公司。分公司和業務負責人這類欄位只給我們自己看，PDF 上完全不會出現。</p>
+          <p class="where">Tender Datasheets → New project datasheet</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">02</div>
+        <div>
+          <h3>加型號，決定規格從哪裡來</h3>
+          <p>一台型號就是規格表上的一欄。這一步是整個流程唯一的分岔。</p>
+          <div class="fork">
+            <div class="branch">
+              <h4>A · 讀原廠規格書</h4>
+              <p>上傳 PDF / Excel 或貼上文字，逐條抄成規格列。抄完會先給你預覽，確認才寫進去。</p>
+              <span class="ai-flag">用到 AI</span>
+            </div>
+            <div class="branch">
+              <h4>B · 從既有型號帶入</h4>
+              <p>從產品目錄挑一台，規格直接複製過來。純資料搬運。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">03</div>
+        <div>
+          <h3>貼上業務需求（可選）</h3>
+          <p>把業務給的那段話原封貼上，系統拆成「哪些是可以直接改的規則、哪些是要問人的問題」。它只提案，勾了才生效。</p>
+          <p class="where">狀態與待辦 → 貼上業務需求</p>
+          <span class="ai-flag">用到 AI</span>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">04</div>
+        <div>
+          <h3>調規則</h3>
+          <p>隱藏不想印的列、改值、新增原廠沒有的規格、指定新增的列排在哪。原廠那一格永遠留著，所以隨時看得出哪些是我們改的。</p>
+          <p class="where">規格與型號 → ② 只有這一台的調整</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">05</div>
+        <div>
+          <h3>看缺漏檢查，把問題問出去</h3>
+          <p>系統逐格比對，列出缺什麼、哪裡可疑、哪裡危險。真正的產出是一段<b>可以直接貼給業務／RD／ODM 的澄清訊息</b>——因為能回答的人都不在這個系統裡。</p>
+          <p class="where">狀態與待辦 → 還缺什麼</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">06</div>
+        <div>
+          <h3>封面文案與圖片</h3>
+          <p>主標、overview、Features &amp; Benefits、產品照、應用情境圖。圖片可以點上標籤指到設備，文字自己拖到空白處——編輯器上看到的位置和大小就是印出來的。</p>
+          <p class="where">封面與文案 · 各型號的產品圖</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">07</div>
+        <div>
+          <h3>預覽，出 PDF</h3>
+          <p>按 Print / Save as PDF。<b>每按一次就自動存一版快照</b>，之後改了規格也不會動到已經存檔的版本，所以隨時查得到客戶手上那份寫了什麼。</p>
+          <p class="where">預覽頁右上角</p>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="num">08</div>
+        <div>
+          <h3>標成「可以送出」</h3>
+          <p>要所有會讓文件出錯的項目都處理完才切得過去。沒處理完不會擋你出 PDF——只會在列印列上告訴你還剩幾項。</p>
+          <p class="where">內部資訊 → 文件狀態</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>缺漏檢查</h2>
+    <p class="lede">同一個動作，在 A 和 B 兩條路上的嚴重程度是相反的。</p>
+
+    <div class="scroll">
+      <table>
+        <caption>
+          擋不擋的分界不是「缺多少」，而是「文件會不會寫錯」。十四格 TBD 不擋——暫定規格書本來就該有沒填的地方；一個沒有來源的 IP67 會擋。
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">你做了什麼</th>
+            <th scope="col">A · 外購來源</th>
+            <th scope="col">B · 目錄來源</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">補一條原廠規格表沒有的規格</th>
+            <td><span class="sev block">擋住</span><br>等於要請 ODM 做出來，要先確認做得到、多少錢</td>
+            <td><span class="sev warn">提醒</span><br>標案要的就是這個。確認數字有依據就好</td>
+          </tr>
+          <tr>
+            <th scope="row">改動一格既有的值</th>
+            <td><span class="sev warn">提醒</span><br>會列出你改掉了什麼，確認依據</td>
+            <td><span class="sev block">擋住</span><br>你改了客戶可以在官網並排比對的數字</td>
+          </tr>
+          <tr>
+            <th scope="row">規格自己互相矛盾</th>
+            <td colspan="2"><span class="sev block">擋住</span><br>例如標 18 W 卻寫 802.3af——上限只有 15.4 W，客戶照文件買 af 的 switch 去接，現場就會出事</td>
+          </tr>
+          <tr>
+            <th scope="row">說好要拿掉的東西又冒出來</th>
+            <td colspan="2"><span class="sev block">擋住</span><br>Wi-Fi 那幾列隱藏了，但 overview 還寫著「轉成 Ethernet 和 WiFi 訊號」</td>
+          </tr>
+          <tr>
+            <th scope="row">格子還沒填</th>
+            <td colspan="2"><span class="sev warn">提醒</span><br>暫定規格書的正常狀態，TBD 是誠實的</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      <b>檢查本身不用 AI。</b>同一份文件永遠要跑出同樣的結果，而且問 ODM 的措辭每次都要一樣——所以這一段是寫死的規則，不是模型判斷。
+    </div>
+  </section>
+
+  <section>
+    <h2>AI 用在哪</h2>
+    <p class="lede">三個地方，全部是「它提案、你確認」。</p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">步驟</th>
+            <th scope="col">做什麼</th>
+            <th scope="col">哪條路會用到</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">讀原廠規格書</th>
+            <td>把 PDF / Excel 逐條抄成規格列。規則是「一個字都不准改」</td>
+            <td>只有 A</td>
+          </tr>
+          <tr>
+            <th scope="row">解析業務需求</th>
+            <td>把一段話拆成「哪些是規則、哪些是問題」</td>
+            <td>A 和 B 都會</td>
+          </tr>
+          <tr>
+            <th scope="row">把答覆轉成規則</th>
+            <td>你在缺漏檢查裡回一句話，它提案要改哪幾格</td>
+            <td>A 和 B 都會</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      模型可以在 <b>Settings → Tender Datasheets 的 AI 模型</b> 換，改完立刻生效、不用重新部署。其餘步驟（缺漏檢查、規格表合成、澄清訊息、出 PDF）都不碰 AI。
+    </div>
+  </section>
+
+  <section>
+    <h2>兩個容易搞混的軸</h2>
+    <p class="lede">「已經出過 PDF」和「可以送出去」是兩件事。</p>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">文件狀態</th>
+            <th scope="col">出圖紀錄</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">回答什麼</th>
+            <td>這份文件<b>能不能送出去</b></td>
+            <td><b>實際出過幾份 PDF</b>、什麼時候、誰出的</td>
+          </tr>
+          <tr>
+            <th scope="row">誰決定</th>
+            <td>你手動切，而且要缺漏檢查清零才切得過去</td>
+            <td>按列印按鈕自動記，不用管</td>
+          </tr>
+          <tr>
+            <th scope="row">列印會不會改到它</th>
+            <td>不會。你必須能把草稿印出來自己校對</td>
+            <td>會，每按一次多一版</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note">
+      列表上如果看到「<b>出圖後又改過</b>」，代表客戶手上那份跟你現在編輯的內容已經不一樣了。要看他們當時收到什麼，從出圖紀錄點進去開那一版。
+    </div>
+  </section>
+
+  <section>
+    <h2>關不掉的三件事</h2>
+    <p class="lede">措辭可以改，存在與否不行。</p>
+
+    <div class="locks">
+      <div class="lock">
+        <h3>PRELIMINARY 聲明</h3>
+        <p>封面一定會有一行說明規格可能還會變、不構成供貨承諾。PDF 檔名裡也會帶著——因為檔案會被轉寄，而檔名是沒有封面也還跟著走的東西。</p>
+      </div>
+      <div class="lock">
+        <h3>圖片僅供參考</h3>
+        <p>產品圖下方固定帶註記。借用別台照片的時候，圖說要寫明拍的是哪一台——代換不是問題，默默代換才是。</p>
+      </div>
+      <div class="lock">
+        <h3>不進目錄</h3>
+        <p>這裡的型號不會同步、不會被 EnGenie 索引、沒有升格成產品的路徑。一台只報過價的型號進了產品表，EnGenie 就會開始跟人說我們有賣它。</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>不要的時候</h2>
+    <p class="lede">刪除和封存不是同一件事。</p>
+    <p>
+      <b>沒出過圖</b>的文件可以直接刪除——這個系統以外沒有人知道它存在過。<b>出過圖</b>的只能封存，因為刪除會連同「客戶手上那份長什麼樣」的存檔一起消失，而那正是那份紀錄最有價值的時候。封存隨時可以取消。
+    </p>
+  </section>
+
+  <footer>
+    <span><a href="/projects">← 回到 Tender Datasheets</a></span>
+    <span>只有 admin 和 editor 看得到</span>
+    <span>2026-08-21</span>
+  </footer>
+
+</div>
+</body>
+</html>
