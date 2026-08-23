@@ -15,6 +15,7 @@ import { SourceExtract } from "@/components/project/source-extract";
 import { AddModelMenu } from "@/components/project/add-model-menu";
 import { ImageManager, MODEL_SLOTS, DOC_SLOTS } from "@/components/project/image-manager";
 import { IssueHistory } from "@/components/project/issue-history";
+import { ImagePromptPanel } from "@/components/project/image-prompt-panel";
 import type { ModelImage } from "@/lib/project-datasheet/types";
 import { SpecFormatHelp } from "@/components/project/spec-format-help";
 import { LayoutPicker } from "@/components/project/layout-picker";
@@ -637,6 +638,17 @@ export function ProjectEditor({
                 slots={DOC_SLOTS}
                 label="應用情境圖"
                 hint="第一張是主圖（畫得比較細、有接線的那種），之後每一張會排成下方一列情境小圖。產品照請到「規格與型號」裡各台底下傳。"
+              />
+              {/* Right under the uploader, because "I need one of these" and
+                  "I have one to upload" are the same moment. */}
+              <ImagePromptPanel
+                models={drafts.map((d) => ({
+                  modelName: d.model_name,
+                  url:
+                    parseImagesJson(models.find((m) => m.id === d.id)?.images).find(
+                      (i) => i.slot === "product",
+                    )?.url ?? null,
+                }))}
               />
               {/* Two steps for one outcome is a trap, so the dependency says
                   so out loud in whichever direction it is currently broken. */}
