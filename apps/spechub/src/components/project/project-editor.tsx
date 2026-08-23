@@ -636,6 +636,7 @@ export function ProjectEditor({
                 modelId={null}
                 initial={parseImagesJson(doc.images)}
                 slots={DOC_SLOTS}
+                scenarioCopy
                 label="應用情境圖"
                 hint="第一張是主圖（畫得比較細、有接線的那種），之後每一張會排成下方一列情境小圖。產品照請到「規格與型號」裡各台底下傳。"
               />

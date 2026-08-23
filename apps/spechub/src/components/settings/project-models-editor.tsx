@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 
 type Model = { slug: string; label: string; tier: string | null; note: string | null };
 
-type Loaded = {
-  intake: string;
-  extract: string;
-  defaults: { intake: string; extract: string };
+type StepKey = "extract" | "intake" | "scenarios";
+type Picks = Record<StepKey, string>;
+
+type Loaded = Picks & {
+  defaults: Picks;
   models: Model[];
 };
 
@@ -26,19 +27,25 @@ const STEPS = [
     where: "「貼上業務需求」和 gap review 裡回答問題",
     what: "把業務給的一段話拆成「哪些是規則、哪些是要問的問題」。短輸入、要判斷。",
   },
+  {
+    key: "scenarios" as const,
+    title: "起草情境文案",
+    where: "「應用情境圖」底下的「用 AI 起草情境文案」",
+    what: "填一個產業，寫出情境圖旁邊的小標、引言和列點。輸出很短，但難的是拒絕——它拿到規格表，不准講表上沒有的東西。",
+  },
 ];
 
 /**
- * Which model the two AI steps use.
+ * Which model each AI step uses.
  *
- * Both were hard-coded constants, so changing one meant a code change and a
- * deploy. They are two settings and not one because the jobs are different —
- * transcription against judgement — and tuning one should not silently move
- * the other.
+ * They were hard-coded constants, so changing one meant a code change and a
+ * deploy. One setting per step and not one for all of them, because the jobs
+ * are different — transcription, judgement, writing — and tuning one should
+ * not silently move the others.
  */
 export function ProjectModelsEditor() {
   const [data, setData] = useState<Loaded | null>(null);
-  const [pick, setPick] = useState<{ intake: string; extract: string } | null>(null);
+  const [pick, setPick] = useState<Picks | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -47,14 +54,16 @@ export function ProjectModelsEditor() {
       .then((j: Loaded & { error?: string }) => {
         if (j.error) return toast.error(j.error);
         setData(j);
-        setPick({ intake: j.intake, extract: j.extract });
+        setPick({ intake: j.intake, extract: j.extract, scenarios: j.scenarios });
       })
       .catch(() => toast.error("讀取失敗"));
   }, []);
 
   if (!data || !pick) return <p className="text-sm text-muted-foreground">讀取中…</p>;
 
-  const dirty = pick.intake !== data.intake || pick.extract !== data.extract;
+  // Compared over the steps rather than field by field, so adding a fourth
+  // step cannot leave Save greyed out on a change it does not know about.
+  const dirty = STEPS.some((s) => pick![s.key] !== data![s.key]);
 
   async function save() {
     setSaving(true);

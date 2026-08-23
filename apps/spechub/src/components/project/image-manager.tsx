@@ -12,6 +12,8 @@ import {
   SCENARIO_WIDTH_PT,
 } from "@/lib/project-datasheet/label-geometry";
 import type { ImageLabel, LabelSide, ModelImage } from "@/lib/project-datasheet/types";
+import { toCaption } from "@/lib/project-datasheet/scenarios";
+import { ScenarioCopyPanel } from "./scenario-copy-panel";
 
 /**
  * Upload and arrange the images a project datasheet prints.
@@ -31,6 +33,7 @@ export function ImageManager({
   slots,
   label,
   hint,
+  scenarioCopy = false,
 }: {
   docId: string;
   /** null = the document itself (deployment diagram) */
@@ -40,12 +43,29 @@ export function ImageManager({
   slots: { value: string; label: string }[];
   label: string;
   hint: string;
+  /** offer the AI copy drafter — the scenarios page only, not product shots */
+  scenarioCopy?: boolean;
 }) {
   const [images, setImages] = useState<ModelImage[]>(initial);
   const [slot, setSlot] = useState(slots[0].value);
   const [busy, setBusy] = useState(false);
   /** url of the image whose caption and labels are open for editing */
   const [editing, setEditing] = useState<string | null>(null);
+  /**
+   * A drafted write-up dropped into the editor UNSAVED, plus a counter that
+   * remounts the editor so its fields pick the draft up.
+   *
+   * Unsaved on purpose. A generated paragraph goes into the same boxes as a
+   * typed one and clears the same button — so it gets read once, in place,
+   * beside the picture it is describing, which is where a sentence that is
+   * about the wrong site becomes obvious.
+   */
+  const [prefill, setPrefill] = useState<{
+    url: string;
+    caption: string;
+    body: string[];
+    n: number;
+  } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   /**
@@ -68,6 +88,7 @@ export function ImageManager({
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "儲存失敗");
       setImages(json.images);
+      setPrefill(null);
       toast.success("已儲存");
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "儲存失敗");
@@ -157,7 +178,10 @@ export function ImageManager({
               </span>
               <button
                 type="button"
-                onClick={() => setEditing(editing === img.url ? null : img.url)}
+                onClick={() => {
+                  setPrefill(null);
+                  setEditing(editing === img.url ? null : img.url);
+                }}
                 className="mt-1 w-full rounded border px-1 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
               >
                 {editing === img.url ? "收合" : img.caption ? "改文字／標註" : "加文字／標註"}
@@ -178,8 +202,9 @@ export function ImageManager({
 
       {editing && images.some((i) => i.url === editing) && (
         <LabelEditor
-          key={editing}
+          key={`${editing}:${prefill?.n ?? 0}`}
           image={images.find((i) => i.url === editing)!}
+          prefill={prefill?.url === editing ? prefill : null}
           busy={busy}
           onSave={(patch) => void saveMeta(editing, patch)}
         />
@@ -220,6 +245,26 @@ export function ImageManager({
           PNG / JPEG / WebP / SVG，單張 12 MB 內，可一次選多張
         </span>
       </div>
+
+      {scenarioCopy && (
+        <ScenarioCopyPanel
+          docId={docId}
+          targets={images.map((i) => ({
+            url: i.url,
+            heading: i.caption ? splitHeading(i.caption) : "",
+            slotLabel: slots.find((s) => s.value === i.slot)?.label ?? i.slot,
+          }))}
+          onUse={(draft, url) => {
+            setEditing(url);
+            setPrefill((p) => ({
+              url,
+              caption: toCaption(draft),
+              body: draft.bullets.map((b) => b.text),
+              n: (p?.n ?? 0) + 1,
+            }));
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -238,10 +283,13 @@ export function ImageManager({
  */
 function LabelEditor({
   image,
+  prefill,
   busy,
   onSave,
 }: {
   image: ModelImage;
+  /** a drafted write-up to open with, instead of what is stored */
+  prefill: { caption: string; body: string[] } | null;
   busy: boolean;
   onSave: (patch: {
     caption: string | null;
@@ -250,11 +298,11 @@ function LabelEditor({
     labels: ImageLabel[];
   }) => void;
 }) {
-  const [caption, setCaption] = useState(image.caption ?? "");
+  const [caption, setCaption] = useState(prefill?.caption ?? image.caption ?? "");
   const [prompt, setPrompt] = useState(image.prompt ?? "");
   /* Held as text, not an array: a textarea is how anyone writes a short list,
      and splitting on save keeps blank lines from becoming empty bullets. */
-  const [body, setBody] = useState((image.body ?? []).join("\n"));
+  const [body, setBody] = useState((prefill?.body ?? image.body ?? []).join("\n"));
   const [labels, setLabels] = useState<ImageLabel[]>(image.labels ?? []);
   /** which label is being dragged, and whether by its dot or its text */
   const [drag, setDrag] = useState<{ i: number; part: "dot" | "label" } | null>(null);
