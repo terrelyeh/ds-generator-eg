@@ -138,15 +138,29 @@ export function ImageManager({
                 alt={img.slot}
                 className="mx-auto h-[76px] w-full object-contain"
               />
-              <span className="mt-1 block truncate text-[10px] text-muted-foreground">
-                {slots.find((s) => s.value === img.slot)?.label ?? img.slot}
+              {/* The heading, right on the thumbnail.
+                  It was behind a button called 圖說／標註 — which sounds like a
+                  minor annotation, not "the paragraph that prints beside this
+                  picture" — so the copy on the scenarios page read as
+                  something the tool had generated and would not let you touch.
+                  Showing it here means you can see at a glance which pictures
+                  have words and which are still bare. */}
+              <span className="mt-1 block h-7 overflow-hidden text-left text-[10px] leading-snug">
+                {img.caption ? (
+                  <span className="text-[#231f20]">{splitHeading(img.caption)}</span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    {slots.find((s) => s.value === img.slot)?.label ?? img.slot}
+                    <span className="block text-[#b45309]">還沒寫文字</span>
+                  </span>
+                )}
               </span>
               <button
                 type="button"
                 onClick={() => setEditing(editing === img.url ? null : img.url)}
                 className="mt-1 w-full rounded border px-1 py-0.5 text-[10px] text-muted-foreground hover:bg-muted"
               >
-                {editing === img.url ? "收合" : "圖說／標註"}
+                {editing === img.url ? "收合" : img.caption ? "改文字／標註" : "加文字／標註"}
               </button>
               <button
                 type="button"
@@ -547,6 +561,12 @@ const SIDE_LABEL: Record<LabelSide, string> = {
   top: "文字放上面",
   bottom: "文字放下面",
 };
+
+/** The half before the em dash — the heading, which is what identifies it. */
+function splitHeading(caption: string): string {
+  const at = caption.indexOf("\u2014");
+  return at > 0 ? caption.slice(0, at).trim() : caption;
+}
 
 export const MODEL_SLOTS = [
   { value: "product", label: "封面主圖" },
