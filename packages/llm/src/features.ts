@@ -34,6 +34,7 @@ export type Feature =
   | "battlecard"
   | "project-intake"
   | "project-extract"
+  | "project-scenarios"
   | "budget-check";
 
 export const FEATURE_TAGS: Record<Feature, string> = {
@@ -77,6 +78,16 @@ export const FEATURE_TAGS: Record<Feature, string> = {
    * is ten pages, and one bucket would hide which of them costs anything.
    */
   "project-extract": "engenius-spechub.spechub.project-extract",
+
+  /**
+   * Tender Datasheets application-scenario copy — a general term like
+   * "retail" turned into headings, ledes and bullets for the scenarios page.
+   * Its own bucket rather than folded into `project-intake`: intake reads a
+   * note somebody wrote and this one writes prose from a spec table, so a
+   * shared bucket would average two different shapes of spend into a number
+   * that describes neither.
+   */
+  "project-scenarios": "engenius-spechub.spechub.project-scenarios",
 
   /**
    * scripts/check-translation-budget.ts — a real translation, run by hand

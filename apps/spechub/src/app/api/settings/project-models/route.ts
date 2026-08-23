@@ -6,36 +6,42 @@ import {
   PROJECT_EXTRACT_MODEL_DEFAULT,
   PROJECT_INTAKE_MODEL_DEFAULT,
   PROJECT_MODEL_KEYS,
+  PROJECT_SCENARIOS_MODEL_DEFAULT,
 } from "@/lib/llm/models";
 
 /**
- * Which model Tender Datasheets uses for its two AI steps.
+ * Which model Tender Datasheets uses for its AI steps.
  *
  * The catalog — which models exist at all — is still edited in EnGenie
  * (`llm_models`). This only chooses among them, and stores the choice in
  * `app_settings`, so neither app writes a table the other owns.
  *
- * Two settings rather than one because the jobs are different: extraction is
- * long-input transcription with a hard "change nothing" rule, intake is
- * judgement over a short scrappy note. Tuning one should not silently move
- * the other, which is exactly why they were separate constants before.
+ * One setting per step rather than one for all of them, because the jobs are
+ * different: extraction is long-input transcription with a hard "change
+ * nothing" rule, intake is judgement over a short scrappy note, scenario copy
+ * is writing prose that must not exceed its evidence. Tuning one should not
+ * silently move the others, which is exactly why they were separate constants
+ * before.
  */
 export async function GET() {
   const denied = await gate("settings.edit_api_keys");
   if (denied) return denied;
 
-  const [intake, extract, models] = await Promise.all([
+  const [intake, extract, scenarios, models] = await Promise.all([
     getSetting(PROJECT_MODEL_KEYS.intake),
     getSetting(PROJECT_MODEL_KEYS.extract),
+    getSetting(PROJECT_MODEL_KEYS.scenarios),
     listEnabledModels(),
   ]);
 
   return NextResponse.json({
     intake: intake ?? PROJECT_INTAKE_MODEL_DEFAULT,
     extract: extract ?? PROJECT_EXTRACT_MODEL_DEFAULT,
+    scenarios: scenarios ?? PROJECT_SCENARIOS_MODEL_DEFAULT,
     defaults: {
       intake: PROJECT_INTAKE_MODEL_DEFAULT,
       extract: PROJECT_EXTRACT_MODEL_DEFAULT,
+      scenarios: PROJECT_SCENARIOS_MODEL_DEFAULT,
     },
     // Slug, label and tier — enough for a picker to be readable without the
     // person having to know what "anthropic/claude-sonnet-4.6" is.
@@ -55,11 +61,13 @@ export async function PUT(request: Request) {
   const body = (await request.json().catch(() => ({}))) as {
     intake?: string;
     extract?: string;
+    scenarios?: string;
   };
 
   const wanted = [
     [PROJECT_MODEL_KEYS.intake, body.intake] as const,
     [PROJECT_MODEL_KEYS.extract, body.extract] as const,
+    [PROJECT_MODEL_KEYS.scenarios, body.scenarios] as const,
   ].filter(([, slug]) => typeof slug === "string" && slug.length > 0);
 
   if (wanted.length === 0) {
