@@ -41,13 +41,13 @@ export function IssueHistory({ docId, updatedAt }: { docId: string; updatedAt: s
   }, [docId]);
 
   if (issues === null) {
-    return <p className="text-xs text-muted-foreground">讀取出圖紀錄…</p>;
+    return <p className="text-xs text-muted-foreground">讀取 PDF 紀錄…</p>;
   }
 
   if (issues.length === 0) {
     return (
       <p className="text-xs text-muted-foreground">
-        還沒有出過圖。在預覽頁按「Print / Save as PDF」時會自動存一版。
+        還沒產生過 PDF。在預覽頁按「Print / Save as PDF」時會自動存一版。
       </p>
     );
   }
@@ -58,7 +58,7 @@ export function IssueHistory({ docId, updatedAt }: { docId: string; updatedAt: s
     <div className="space-y-2">
       {stale && (
         <p className="rounded border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-900">
-          這份文件在最後一次出圖之後又改過。客戶手上那份是第 {issues[0].issue_no} 版，跟你現在編輯的內容不一樣。
+          這份文件在最後一次產生 PDF 之後又改過。客戶手上那份是第 {issues[0].issue_no} 版，跟你現在編輯的內容不一樣。
         </p>
       )}
       <ul className="divide-y rounded-md border text-xs">
