@@ -779,7 +779,24 @@ export function ProjectEditor({
                   <strong>一台型號 = 規格表上的一欄</strong>，所以規格表會有 {drafts.length} 欄，由左至右照下面分頁的順序排。規格列會自動對齊：某一台有、另一台沒有的列，缺的那格會印 TBD 或 —。
                 </p>
               </div>
-              <AddModelMenu docId={doc.id} onAdded={() => router.refresh()} />
+              <AddModelMenu
+                docId={doc.id}
+                onAdded={(id, focusSource) => {
+                  router.refresh();
+                  if (!id) return;
+                  setModelTab(id);
+                  // After the refresh paints the new column. Without the
+                  // delay the anchor does not exist yet and the person lands
+                  // at the top of a page that looks the same for every column.
+                  if (focusSource) {
+                    setTimeout(() => {
+                      document
+                        .getElementById(`source-${id}`)
+                        ?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    }, 350);
+                  }
+                }}
+              />
             </div>
 
             {drafts.length >= COMFORTABLE_MODELS && (
@@ -896,16 +913,21 @@ export function ProjectEditor({
                             </p>
                           </div>
                         </div>
-                        <SourceExtract
-                          docId={doc.id}
-                          modelId={d.id}
-                          modelName={d.model_name}
-                          hasExistingSpecs={rowCount > 0}
-                          onApplied={() => {
-                            setReviewKey((k) => k + 1);
-                            router.refresh();
-                          }}
-                        />
+                        {/* Anchored so "從廠商規格書建立" can land the person
+                            on this column's upload instead of at the top of a
+                            page that looks identical for every column. */}
+                        <div id={`source-${d.id}`}>
+                          <SourceExtract
+                            docId={doc.id}
+                            modelId={d.id}
+                            modelName={d.model_name}
+                            hasExistingSpecs={rowCount > 0}
+                            onApplied={() => {
+                              setReviewKey((k) => k + 1);
+                              router.refresh();
+                            }}
+                          />
+                        </div>
                         <SpecFormatHelp kind="specs" />
                         <Textarea
                           rows={12}
