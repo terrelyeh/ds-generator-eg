@@ -239,3 +239,116 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     和寫入端都對齊**;spec_labels 也是同款契約。
     附帶:`Return EXACTLY the same number of lines` 只寫在 prompt 裡,程式沒驗證 ——
     AI 翻譯那條路徑靠 `englishFeatures.map((_, i) => lines[i] ?? "")` 夾取才沒出事。
+
+## 從 CLAUDE.md 移入（2026-08-23）
+
+> 這批不是「已經解決」，是**只在動到特定東西時才需要**：分頁常數、category
+> 判斷、圖片欄位、新版型的多語系、加語系。CLAUDE.md 留一行摘要加連結，
+> 真要動那一塊時再過來讀全文。
+>
+> 留在 CLAUDE.md 的三條（#45 / #62 / #69）是**改任何東西都可能踩到**的，所以不搬。
+
+50. **Pagination 常數一定要對齊實際 CSS** — `AVAILABLE_HEIGHT = 792 - TOP_BAR - SPEC_TITLE -
+    BOTTOM_MARGIN`；SPEC_TITLE_HEIGHT 62pt、SPEC_BASE_ROW_HEIGHT 23pt、
+    **CATEGORY_HEADER_HEIGHT 18pt + SECTION_GAP 12pt**（2026-08-13 拆開:分類條高度與「分區之間」
+    的間距是兩回事,SECTION_GAP 不套用在每欄第一個分區,合成一個數字會每欄高估 12pt）；
+    **CJK row metrics 更大**（JA 24pt / zh-TW 25pt）；**`SPEC_LABEL_LINE_HEIGHT` 8pt**
+    是「值續段」那一列沒有標籤時要扣回去的高度（見下）。`splitIntoPages(sections, locale)` 必須傳
+    locale。每改 preview CSS 必須同步檢查這些常數。
+    ⚠️ **不要用 CSS 加總去「精算」這些數字** —— baseRowHeight 是量真實 PDF 得到的,不是推導的
+    （日文照 CSS 把 padding/標籤/值/框線加起來是 ~28pt,校準值卻是 24）。所以 8pt 這個回饋值
+    **故意小於標籤實際佔的高度**:少扣一點 = 估計偏保守 = 浪費一點留白,多扣 = 印出紙外。
+    在一個已知會錯的模型上做精算,錯的方向會反過來。
+    ⚠️ **規格頁分區間距放在 `.spec-col > div + div`,不是分類條上**（2026-08-13）—— 每個分區是自己的
+    wrapper div,所以灰色分類條全都是 `:first-child`,`.spec-category-header:first-child{margin-top:0}`
+    會把**所有**分區的上緣間距清成 0（原本 CSS 寫的 6pt 從沒生效過,分類條一直貼著上一區最後一列）。
+    最後一列另用 `.spec-row:last-child{border:none}` 去掉懸空的底線。
+    ⚠️ **值被切到下一欄時,續段那列不印標籤**（2026-08-20,四個語系一致）—— 一條規格的值塞不進
+    左欄時會從換行處切開,頭段留在原標籤下、尾段流到右欄。尾段以前掛 `「原標籤 (cont.)」`,
+    在欄首讀起來像「另一條名字結尾是 (cont.) 的規格」而不是上一條的延續,而且會把一個英文字
+    塞進 ja/zh-TW 的規格表中間。現在改成 `SpecRow.isValueContinuation`,渲染端**整個不輸出**
+    `.spec-label` 那個 div。
+    ⚠️ **標籤設成空字串沒有用** —— 空 div 照樣佔一個 line box（日文 8pt × 1.5 ≈ 12pt）,右欄
+    頂端會開一塊空白。必須是條件式不渲染。
+    ⚠️ **這條規則橫跨 pagination 與 renderer,只改一邊會靜靜錯位** —— 凡是量「分頁後」的列高
+    都要走 `estimateRowHeight(row, locale)`（會扣 `SPEC_LABEL_LINE_HEIGHT`）,不是
+    `estimateItemHeight(value, locale)`;後者只服務還沒分頁、不可能有續段的呼叫端
+    （`layout-check` 的 long_items）。另外值長到跨三欄時,中間那段自己也已經沒有標籤了,
+    切點算式要依「這一列實際有沒有標籤」取 base,否則中間段會少算約 8pt。
+    ⚠️ **`splitIntoPages` 的 force-fit 分支會塞爆欄位** —— 欄位空但 section 過高時硬塞（防無限迴圈）,
+    塞完原本沒人檢查 → 內容印出紙外。已加 `HARD_COLUMN_LIMIT`（= AVAILABLE + 大部分 BOTTOM_MARGIN,
+    留 30pt 給頁碼）事後把超出的 section 擠到下一頁;順序要注意:**左欄溢出得連右欄一起擠**,否則規格
+    會亂序。`balanceColumns` 的防溢版只在「沒有 section 被切開」時跑,擋不到 force-fit 這條路徑。
+
+60. **`products.product_image` / `hardware_image` 是 `NOT NULL DEFAULT ''`** —— sync 的
+    「Drive 檔案已刪 → 清空 DB」分支曾寫入 `null`，觸發 23502 但 supabase-js 只回
+    `{error}` 不 throw（pitfall #45 同源），整句 update 靜默失效 —— 連同一句裡的
+    `sheet_last_modified/editor` 也一起沒寫進去。要清空請寫 `""`。
+    推論法則：**空字串 = 從沒填過**（欄位 default），不是「被清掉」。
+    （2026-07-24 補：`/api/upload-image` 的 DELETE 也踩同一坑 —— 刪圖時 Storage/Drive
+    有刪、DB 沒清，等於「刪除圖片」功能一直半殘。已一併改成寫 `""`；
+    `product_translations.hardware_image` 本身 nullable，那裡維持 `null` 才對。）
+
+61. **「依 category 而異」的判斷不要各元件各寫一份** — 同一個特性散在
+    preview/[model]、product-detail、dashboard-content 三處，結果 Data Center 上線後
+    ① 內頁 QR 卡片只認 `isTransceiver`，DC 線落到 `qr.engenius.ai/qsg/{model}`（不存在的頁），
+    但 datasheet 印的是 Contact Us —— **兩個畫面對同一台機器講不同的話**；
+    ② dashboard 的 `isAP` 用 **`category.toLowerCase().includes("ap")`**，
+    `"Edge Network Appliances"` 的 **Appli-ap-ances** 命中 → 長出 Radio Pattern 欄位
+    （另外兩處都是 `=== "APs"`）。**子字串比對 category 是地雷，一律精確比對**。
+    現已集中在 **`lib/datasheet/qr.ts`**（`usesContactUsQr` / `usesTwoHardwareImages`），
+    新增這類特性請加在那裡，不要在元件內就地判斷。
+    （2026-07-30 補：**Cloud 模板自己的 QR 是最後一個沒收編的**——`preview/[model]/page.tsx`
+    還留著本地的 `isTransceiver` 判斷，所以把 category 加進 `CONTACT_US_CATEGORIES`
+    只改到產品頁、datasheet 依然印 `/qsg/`。Station Outdoor 上線時就中這招:兩個畫面
+    又對同一台機器講不同的話,而且指向一個不存在的頁。已改吃 `usesContactUsQr()`,
+    現在加進那個 Set 就真的兩邊都生效。）
+
+63. **新做自訂版型時最容易漏掉多語言**（2026-07-24 EOC610 ja 事件）—— Broadband
+    與 Data Center 兩個組件都寫死 `getDict("en")` / `locale="en"`,而且
+    `page.tsx` 的翻譯載入區塊原本在**版型分派之後**,那兩個分支 early return
+    根本跑不到。症狀:日文 preview 出英文、Generate 產出英文版又卡在英文硬體圖缺。
+    新增版型組件時**必收 `locale` + `translation` 兩個 prop**,並且:
+    ① 標題走 `dict` 不要寫字串;② 硬體圖優先用該語系的（callout 印在圖裡）;
+    ③ `PrintToolbar` 要收真 locale + `translationConfirmed`;④ `canGenerate`
+    讀「該語系實際渲染的值」(同 pitfall #59,已歸檔於 [`docs/common-pitfalls.md`](docs/common-pitfalls.md))。
+
+67. **翻譯陣列（features / spec_labels）不會跟著英文縮短,尾巴 UI 看不見卻會印進 PDF** —
+    新增「陣列長度跟著另一個陣列走」的欄位時,**讀取端和寫入端都要對齊來源長度**
+    （編輯器 `alignToSource()` + `/api/translations/product` 伺服端截齊,不依賴呼叫端）。
+    全文（ECP106 zh-TW 事件）見 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+
+66. **圖片尺寸要由「框」決定,不是由檔案的像素數決定** — `max-width`/`max-height`
+    只封頂不放大,所以渲染尺寸會變成「PNG 像素數說了算」。封面產品圖、hardware 圖、
+    Cloud AP 天線圖三處都中過,而且 `sharp.trim()` 裁掉透明邊後會同時改寫像素數**和長寬比**,
+    把「太小」盪成「太大」。**留白一直在無意間當縮放控制。**
+    修法一律是 `width/height:100% + object-fit:contain`,框用參考稿量到的尺寸。
+    **改共用版面 CSS 前先用 `pymupdf` 量 InDesign 原稿。**
+    全文（含三次事故的實測數字與 row/column gap 算式）見
+    [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+
+64. **CJK 字型要在 CSS 指名、產 PDF 前主動載入** — `font-family` 只寫 Roboto/Manrope
+    沒有 CJK 字符,而 `document.fonts.ready` 不夠（Google Fonts CJK 是數百個 lazy
+    unicode-range 分片）。route 用 `waitForFonts(page)` 對 `body.innerText` 逼出分片。
+    **新版型組件務必把 locale 的 CJK 字型放進 font-family 最前面**（`cjkFontFor`）。
+    ⚠️ **本機有 PingFang TC 會 fallback,這 bug 本地永遠重現不了** —— Vercel 缺字印成
+    `\x00`。全文（EOC610 ja 事件）見 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+
+68. **「是不是 CJK」不要用「有沒有 TYPOGRAPHY_DEFAULTS」來推導**（2026-08-06 加 es 時發現）——
+    `cjkFontFor()` 原本寫 `const defaults = TYPOGRAPHY_DEFAULTS[locale]; if (!defaults) return null;`。
+    在只有 ja / zh-TW 的世界裡「有 defaults」和「是 CJK」是同一件事,所以看不出問題。
+    加西文時如果照舊 recipe 補上 `TYPOGRAPHY_DEFAULTS.es`,`cjkFontFor("es")` 就會回
+    Roboto,被塞到 **Data Center 版型的 Manrope 前面**,整份 DC 西文 datasheet 悄悄換字體。
+    **同一類錯誤的第三次**（#61 用子字串比對 category、#63 版型寫死 locale）——
+    現在改成明確的 `CJK_LOCALES` set + `isCjkLocale()`,`preview/[model]`、
+    `typography-editor`、typography API 三處共用。
+    ⚠️ **原本的衍生規則已於 2026-08-10 作廢**。當時寫「拉丁語系不要有 defaults entry、
+    不要出現在設定頁」,現在 en / es **兩者都有了** —— 而且是安全的,正因為這條 pitfall
+    的修法（明確 set 而非推導)已經就位。真正的規則是:
+    **`TYPOGRAPHY_DEFAULTS` 有沒有某語系 ≠ 那個語系是不是 CJK**,兩件事各自判斷。
+    設定頁的語系清單現在從 `TYPOGRAPHY_DEFAULTS` 推導,所以「設定頁列出它」⇔
+    「算繪端真的會讀它」,不會再出現按了 Save 卻沒作用的面板。
+    **行高／內文色／頁尾樣式刻意不進設定頁** —— 那三項跟著文字系統走（拉丁 vs CJK）,
+    由 `preview/[model]` 依 `isCjkLocale()` 挑。開放成可依語系設定 = 有人能把西文
+    設成 CJK 行距 = 封面破版。
+
