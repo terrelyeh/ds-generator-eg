@@ -706,6 +706,8 @@ export function ProjectEditor({
                 if (patch.categoryLabel !== undefined) setCategoryLabel(patch.categoryLabel);
                 if (patch.overview !== undefined) setOverview(patch.overview);
                 if (patch.features !== undefined) setFeatures(patch.features);
+                if (patch.diagramTitle !== undefined) setDiagramTitle(patch.diagramTitle);
+                if (patch.diagramNote !== undefined) setDiagramNote(patch.diagramNote);
                 toast.success("填好了，記得按下面的儲存");
               }}
             />
@@ -720,19 +722,24 @@ export function ProjectEditor({
               />
             </Field>
             <div className="space-y-2">
+              {/* Named for the page-2 architecture diagram, which is where
+                  they print. They used to say「應用情境圖的…」, left over from
+                  when page 2 and the scenarios page were the same thing and
+                  shared these fields. The pages split; the labels did not, so
+                  anyone following the name went looking on the wrong page. */}
               <Field
-                label="應用情境圖的標題"
-                hint="印在圖上方。留空就用預設的「Application Diagram」。"
+                label="架構圖的標題"
+                hint="印在第 2 頁 Features & Benefits 下方那張架構圖旁邊。留空就不印標題（沒有預設值）。"
               >
                 <Input
                   value={diagramTitle}
                   onChange={(e) => setDiagramTitle(e.target.value)}
-                  placeholder="Application scenarios"
+                  placeholder="System architecture"
                 />
               </Field>
               <Field
-                label="應用情境圖的說明"
-                hint="圖上刻意沒有文字（圖像模型會把 802.3af/at 這種標籤畫成錯字），所以說明由版面用真字型排。"
+                label="架構圖的說明"
+                hint="排在標題下面，說明這台在一個場地裡怎麼接。圖上刻意沒有文字（圖像模型會把 802.3af/at 這種標籤畫成錯字），所以說明由版面用真字型排。沒有印 Features 頁的話，這段會改排在情境圖那一頁的最上面。"
               >
                 <Textarea
                   rows={3}

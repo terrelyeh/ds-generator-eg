@@ -18,6 +18,8 @@ export interface CoverPatch {
   categoryLabel?: string;
   overview?: string;
   features?: string;
+  diagramTitle?: string;
+  diagramNote?: string;
 }
 
 /**
@@ -87,7 +89,7 @@ export function CoverCopyPanel({
     <div className="space-y-3 rounded-md border bg-muted/30 p-3">
       <div className="flex items-start justify-between gap-3">
         <p className="text-xs text-muted-foreground">
-          從這份文件的<strong>規格表</strong>起草主標、分類、Overview 和 Features。
+          從這份文件的<strong>規格表</strong>起草主標、分類、Overview、Features，還有第 2 頁架構圖旁邊那段。
           一格一格填，<strong>填進去不會存檔</strong>，還是按下面原本的儲存。
           <br />
           從既有型號帶入的文件用不到這個——那條路已經把我們自己寫好的文案帶進來了。
@@ -148,6 +150,19 @@ export function CoverCopyPanel({
             note={`${draft.overview.length} 字${draft.overview.length > 500 ? "——超過 500 字，封面會被裁掉" : ""}`}
             warn={draft.overview.length > 500}
             onFill={() => onFill({ overview: draft.overview })}
+          />
+
+          <Row
+            label="架構圖的標題"
+            value={draft.diagramTitle}
+            onFill={() => onFill({ diagramTitle: draft.diagramTitle })}
+          />
+          <Row
+            label="架構圖的說明"
+            value={draft.diagramNote}
+            note={`${draft.diagramNote.length} 字${draft.diagramNote.length > 420 ? "——偏長，版面是圖旁邊的一欄" : ""}`}
+            warn={draft.diagramNote.length > 420}
+            onFill={() => onFill({ diagramNote: draft.diagramNote })}
           />
 
           {draft.features.length > 0 && (

@@ -96,16 +96,3 @@ export function buildImagePrompt({ kind, scene, modelName, equipment }: PromptIn
     NO_TEXT,
   ].join("\n");
 }
-
-/**
- * The same prompt as a runnable command, because that is how these were
- * actually made. `-i` is variadic and will swallow a prompt passed as an
- * argument, so the prompt has to arrive on stdin.
- */
-export function buildCodexCommand(photoPath: string): string {
-  return [
-    "# 1. 把上面的提示詞存成 prompt.txt，產品照放在手邊",
-    `codex exec -s workspace-write --skip-git-repo-check \\`,
-    `  -i "${photoPath || "產品照.jpg"}" - < prompt.txt`,
-  ].join("\n");
-}
