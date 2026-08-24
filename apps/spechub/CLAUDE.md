@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-08-21。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-08-24。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
 > **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
@@ -12,6 +12,11 @@
 > **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
 > 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
 > 細節在下方 Brand & Visual System 與 pitfall #50。
+> **2026-08-23~24：Tender Datasheets 第二輪**——**兩支 AI drafter**（情境文案、封面文案,
+> 共用 `grounding.ts` 的否定契約）、**從既有型號帶入會一起帶封面文案**（只填空的）、
+> 列表改用目錄那張表的元件並拆出 `PDF 現況` / `架構圖` / `情境圖` 三欄。
+> 兩個新 pitfall：**#70**（props 當 state 初值 + 表單外的伺服器寫入 = 畫面不更新**且**
+> 下次存檔會蓋掉）、**#71**（`(main)` 的 UI 拆成元件 + 臨時 `/auth/probe` 才驗得了）。
 > **2026-08-20~21：新模組 Tender Datasheets**（標案用的暫時性 datasheet, `/projects`;
 > 舊名 Project Datasheet Builder,**只有畫面上的字改了**——網址／權限 key／表名沒動）
 > ——**它是刻意跟目錄平行的孤島**,migrations 00038–00047,
@@ -163,8 +168,14 @@ Ready 守門、列印列、預設落地頁籤三處共用同一支;
 ⑪ **凡是把 `images` 讀成「手寫欄位清單」的 parser 都會靜靜吃掉資料**——
 caption、labels、body 各中一次:載入時漏掉 → 面板狀態是空的 → 下次存檔寫回空的,**且不報錯**。
 一律用 spread 帶整包;
-⑫ **AI 只有三個呼叫點**（`extract` / `intake` / `questions` 的 propose）,模型在
+⑫ **AI 有四個步驟／五個呼叫點**（`extract` / `intake` / `questions` 的 propose /
+**`scenarios`** / **`cover`**）,模型在
 **SpecHub `Settings ▸ Tender Datasheets 的 AI 模型`** 改（存 `app_settings`,改完立刻生效）。
+兩支 drafter（情境文案、封面文案）**共用 `grounding.ts` 的否定契約**——只准引用算好的規格表、
+規格隱含的能力不算、每點標依據、撐不起來的進 `declined`;**兩支路由都唯讀**,
+草稿是填進表單欄位不存檔。**封面 drafter 刻意不給來源原文**（那是 gap-scan 的工作,
+餵給起草等於把廠商話術洗成我們的）。**從既有型號帶入不用 AI**——直接帶我們自己的文案,
+只填空的欄位（`catalog-copy.ts`）。
 `lib/llm/models.ts` 的常數是 **DEFAULT 不是值**;目錄（有哪些模型）仍是 EnGenie 的 `llm_models`。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
@@ -384,6 +395,8 @@ npm run lint
     （`(main)/layout.tsx` 的 `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過
     proxy、仍會 307 到 `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。
     所以動到 dashboard/內頁時：typecheck+build 之外，要推 branch preview 請使用者點過再 merge。
+    **本機有解法：把要驗的部分拆成元件 + 一個臨時的 `/auth/probe` 頁（`/auth/` 是公開前綴）**
+    —— 見 #71。**probe 頁 commit 前一定要刪。**
 
 63. **新做版型組件必收 `locale` + `translation` 兩個 prop** —— Broadband/DC 曾寫死 `getDict("en")`,
     而 page.tsx 的翻譯載入在版型分派之後,那兩個分支根本跑不到。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
@@ -411,13 +424,21 @@ npm run lint
     **通則:任何「沒發現問題」的檢查,要先能證明它在有問題時會叫。** 今天兩支
     guard（off-scale、CJK 漂移）都是先故意種一個錯、看它報錯,才算數。
 
+70. **Client component 的 state 用 props 當初值,而伺服器在表單外面寫了同一批欄位** ——
+    畫面不更新是輕的那一半,**未存變更的判斷會把表單標成 dirty,下一次存檔就把空值蓋回去**。
+    seed／AI 套用／批次工具都要問一次「表單會不會知道」。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+
+71. **`(main)` 的東西要驗,就拆成元件 + 臨時的 `/auth/probe` 頁**（#62 的解法）——
+    `/auth/` 是公開前綴,不需要 session;**probe 頁 commit 前一定要刪**。
+    全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+
 ## 詳細文件
 
 - [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md) — 拆分藍圖（歸屬/階段/驗收/回滾）
 - [`docs/file-structure.md`](docs/file-structure.md) — 完整檔案地圖 + 放東西的規則
 - [`docs/schema.md`](docs/schema.md) — DB schema:關係圖、擁有權、各表欄位語意
-- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls 全文。**CLAUDE.md 只留 #45 / #62 / #69**
-  （改任何東西都可能踩到的三條）,其餘都在這裡
+- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls 全文。**CLAUDE.md 只留
+  #45 / #62 / #69 / #70**（改任何東西都可能踩到的四條）,其餘都在這裡
 - [`docs/pending-assets.md`](docs/pending-assets.md) — 待補圖 / 待 PM 處理的庫存清單（某台產不出 PDF 先查這裡）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步

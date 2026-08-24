@@ -352,3 +352,27 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     由 `preview/[model]` 依 `isCjkLocale()` 挑。開放成可依語系設定 = 有人能把西文
     設成 CJK 行距 = 封面破版。
 
+
+70. **Client component 的 state 用 props 當初值,而伺服器在表單外面寫了同一批欄位 ——
+    畫面不更新,而且下一次存檔會把它蓋掉**（2026-08-23,Tender Datasheets 封面文案）。
+    `const [headline, setHeadline] = useState(doc.headline ?? "")` **只在掛載那一次讀 props**。
+    「從既有型號帶入」在伺服器把封面文案寫進 `project_datasheets`,然後 `router.refresh()`
+    讓 server component 帶新的 `doc` 重畫 —— 那幾格還是空的,而資料庫是滿的。
+    **「看起來空的」是輕的那一半。** 未存變更的判斷（`initial`）是從 `doc` 算的,所以
+    refresh 之後 `initial` 有值、`current` 是空的 → **表單變成 dirty,按儲存就把空值寫回去**,
+    蓋掉剛剛才寫進去的文案。intake 接受 `doc_field` 提案時寫同樣那幾格,同一條路。
+    修法跟同檔案上方的 `drafts`（型號清單）協調完全一樣 —— 那段當初就是為了
+    「加了型號但編輯器還顯示 0 台」加的,**這次是同一個 bug 出現在表單的另一半**：
+    記住「伺服器上次給我們看的值」,只在**欄位還等於那個值**（= 人沒動過）時才認領新值,
+    並用 functional setter 讀當下的值,免得每個按鍵都變成 effect 的依賴。
+    **通則:任何會在表單外面寫同一批欄位的動作（seed、AI 套用、批次工具）,
+    都要問一次「表單會不會知道」和「下一次存檔會不會蓋掉」。**
+
+71. **`(main)` 的東西要驗,就把它拆成元件**（#62 的解法,2026-08-24）。
+    #62 說 `(main)` 群組的頁面 headless 驗不了（白名單 gate,帶 bypass header 也會 307）。
+    可行的作法:把要驗的部分從 page 拆成 `components/` 下的元件,再寫一個**臨時**的
+    `src/app/auth/probe/page.tsx` 用假資料渲染它 —— `/auth/` 是 `proxy.ts` 的公開前綴,
+    不需要 session。列表表格三種列的形狀、編輯器的 prefill、面板的 patch 形狀都是這樣驗的。
+    ⚠️ **probe 頁一定要在 commit 前刪掉**,它在 `/auth/` 底下就是免登入的。
+    stub `window.fetch` 可以連 API 都不用碰。**這也是把 UI 從 page 拆出來的第二個理由**
+    （第一個是 page 太長）。

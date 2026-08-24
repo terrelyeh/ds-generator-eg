@@ -261,6 +261,53 @@ group（spec / software / package）全對、頁碼全對，
 只比對**代碼型**規格（IP 等級、802.3 等級）。像 `-40°C` 在內文有十幾種寫法、
 一半還是儲存溫度而不是工作溫度，比對它只會產出很有自信的胡說。
 
+## 起草文案 — 兩個 drafter，一份契約
+
+情境圖旁邊那幾段、以及封面（主標／分類／Overview／Features／架構圖說明），
+可以從**這份文件算好的規格表**起草。`scenarios.ts` 和 `cover-copy.ts` 兩支，
+共用 `grounding.ts` 的約束——**一份，不是兩份**，因為兩份會往「最後被編輯的那一份」漂。
+
+### 這份契約整套都是否定句
+
+它防的不是笨句子，是**好句子**。這份文件曾經寫過：
+
+> a second carrier stands by, protecting payment when one network degrades
+
+通順、合理、像 datasheet 會講的話，而它描述的是廠商從沒宣稱過的自動切換——
+來源只寫 `2 x SIM card slot`。它撐過好幾輪校稿，最後是用手拔掉的。所以：
+
+- 不准講規格表上沒有的數字、頻段、等級、能力
+- **也不准講規格「隱含」但沒寫的能力**——兩張 SIM 卡就是兩張 SIM 卡，不是備援；
+  DC 輸入不是電池；乙太網孔不是 PoE
+- **只有部分型號有值的那一列，就只是那幾台的事**（室內機的段落不能借室外機的 VPN 清單）
+- 每一點帶 `basis` = 引用的規格列名。沒有依據的用空字串，**而且提示詞明講「誠實的空白
+  比硬拗一個標籤有價值」**——少了那句，模型會拿 `Description` 去掛一句講安裝方式的話，
+  正好蓋掉審稿的人唯一需要知道的事
+- 撐不起來的說法進 `declined`，說明缺哪一條。**那份清單通常比文案本身有用**——
+  它就是要回頭去跟原廠要的東西
+
+### 封面 drafter 刻意不給來源原文
+
+gap-scan **要**讀廠商的敘述文字（抓「來源寫 IP66 你寫 IP67」）。起草是相反的工作：
+餵一段寫著「waterproof level is up to IP66」而規格表沒有防水等級的文字進去，
+等於請它把廠商的行銷話術洗成我們的——**用我們的語氣、我們的信紙**。
+規格表裡本來就有 Description 列說明這是什麼產品，那就夠了。
+
+### 兩支 API 都是唯讀
+
+`scenarios` 和 `cover` 兩支路由**什麼都不寫**，連 intake 會留的 source row 都沒有。
+按「填進去」是把文字放進**平常自己打字的那些欄位、不存檔**，還是按原本那顆儲存。
+封面是**一格一格填，不做「全部套用」**：主標三個字一眼看得完，Features 是四句各自
+要對著規格表讀的話，做成一顆按鈕等於讓主標的輕鬆替賣點的風險背書。
+
+### 從既有型號帶入會直接帶文案，不用 AI
+
+`catalog-copy.ts` 的 `coverPatchFromCatalog()`，**只填空的欄位**——加第二台不能蓋掉
+為第一台寫的字。目錄的賣點是平的一串，原樣塞成一個 Key Features 區塊，**不編主題去拆**
+（編主題是寫作，寫作是 drafter 的事）。
+⚠️ 這裡曾經有個 bug：文案抄進的是**型號那一列**的 overview/features，而封面印的是
+文件層——那兩欄只有殘留掃描在讀，features 根本沒人讀。**抄進去然後丟掉。**
+
 ## Gap review — 引導層
 
 這個模組不是「一次把 datasheet 生對」的轉換器。業務手上的資訊永遠不完整，
@@ -416,6 +463,12 @@ API 也會以 409 擋（只把按鈕藏起來不算數）。
 ⚠️ 要 **16:9 不要 21:9**；高度預留 572pt（四列時 590 只剩 12pt 淨空）。
 ⚠️ **`diagram_title`/`diagram_note` 只屬於第 2 頁**，第 6 頁標題寫死——
 兩頁曾經共用同一個欄位，分家後會把「System architecture」印在場域頁上。
+**欄位在畫面上叫「架構圖的標題／說明」**（2026-08-24 改名）。它們原本叫「應用情境圖的…」，
+是兩頁共用時期的遺留：**欄位分了家、名字沒有**，照名字找的人會跑去第 6 頁。
+（同一次也修掉一句假話：標題的提示曾說留空會用預設的「Application Diagram」——
+renderer 裡沒有那個預設值，留空就是不印。）
+沒有印 Features 頁時，`diagram_note` 會改排在第 6 頁最上面，`diagram_title` 不會。
+**這兩格沒有人會自動填**：目錄沒有對應欄位，所以要嘛手打、要嘛按封面 drafter。
 
 ## PDF 檔名
 
@@ -443,7 +496,8 @@ API 也會以 409 擋（只把按鈕藏起來不算數）。
 
 ### 哪些動作會花 AI 的錢
 
-只有三個：**解析業務需求**、**記錄答覆**、**上傳原廠 PDF / Excel**。
+五個：**解析業務需求**、**記錄答覆**、**上傳原廠 PDF / Excel**、
+**起草情境文案**、**起草封面文案**。
 **「重新檢查」不用 AI**——gap-scan 全是固定規則比對，按幾次都一樣。
 這件事寫在畫面上，因為「會檢查的東西應該會花錢」是很合理的假設，
 而這個假設會讓人少按那顆按鈕。
@@ -487,17 +541,26 @@ src/lib/project-datasheet/
   gap-scan.ts     缺／疑／險掃描（deterministic、無 LLM）
   brief.ts        澄清訊息（模板、zh-TW、按誰能回答分組）
   intake.ts       業務需求 → 建議規則 + 待問問題
+  grounding.ts    兩支 drafter 共用的否定契約 + specLines()（規格表 → 提示詞的行）
+  scenarios.ts    產業 → 情境小標／引言／列點
+  cover-copy.ts   規格表 → 主標／分類／Overview／Features／架構圖說明
+  catalog-copy.ts 目錄產品 → 文件層封面文案（只填空的）
+  blockers.ts     openBlockers()：扣掉人已回答/略過的，Ready 守門與列印列共用
+  label-geometry.ts 編輯器與列印共用的標籤字級/位移（不共用就會兩邊不一樣）
+  image-prompt.ts 情境圖提示詞的房規（刻意不從伺服器呼叫圖像模型，理由寫在檔案裡）
+  filename.ts     PDF 檔名
   answer.ts       答覆 → 規格改動建議（跟 intake 共用提案格式）
   extract.ts      PDF / XLSX / 文字 → 頁文字 → raw_doc 列
   apply-items.ts  套用提案（intake 與 answer 共用的唯一寫入點）
-src/app/(main)/projects/                列表 + 編輯器
+src/app/(main)/projects/                列表頁殼 + 編輯器
+src/components/project/project-list.tsx 列表表格（拆出來才驗得了——見 pitfall #62）
 src/app/(print)/preview/project/[id]/   渲染
 src/app/api/projects/                   CRUD（admin client 寫，gate() 授權）
 src/components/project/                 編輯器 UI
 scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
 ```
 
-## 現況（2026-08-21）
+## 現況（2026-08-24）
 
 功能全貌見 [README.md](../README.md) 的 **Tender Datasheets** 一節。這裡只記還沒做的。
 
@@ -510,7 +573,8 @@ scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
 - **自由排序**：目前是「合併各欄、各欄保持自己的相對順序」＋ `@first` / `@after`，
   沒有「把這列拖到那裡」
 - **ODM 硬體變更需求書**（見上方 §還沒做）——資料已經齊了，等真的拿到案子要發給 ODM 時再做
-- **後台串圖像模型**：目前情境圖是本機用 Codex 的 gpt-image 畫完上傳。要做成後台生成的話，
+- **後台串圖像模型**：目前情境圖是把提示詞複製出去、在自己的圖像工具產完再上傳
+  （後台只組提示詞，image-prompt.ts）。要做成後台生成的話，
   關鍵不是按鈕是**提示詞模板**——必須是「固定房規 + 只填場景」，不能給空白 prompt 框
   （不同調整頁就散）。自動帶產品照當參考、一次產 2–3 張候選、**人選一張才掛上去**。
   三個前置：① API 要支援 reference image；② **不要用 `openai_api_key`**（那是 embedding 專用），
