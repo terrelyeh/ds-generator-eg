@@ -43,6 +43,7 @@
  */
 
 import { asRawDoc, asRules, mergeRules, normalizeKey } from "./resolve";
+import { findSplitSpecs } from "./spec-align";
 import type { DocRules, FeatureBlock, ResolvedRow, SpecRules } from "./types";
 
 export type FindingKind = "missing" | "doubt" | "risk";
@@ -61,6 +62,23 @@ export interface Finding {
   rowKey: string | null;
   title: string;
   detail: string;
+  /**
+   * Present only on `same_spec_split`. Everything the one-click merge needs,
+   * computed here so the browser never has to re-derive which rows pair — a
+   * second implementation of the pairing rule is a second thing to be wrong.
+   */
+  merge?: MergePlan;
+}
+
+export interface MergePlan {
+  intoKey: string;
+  intoLabel: string;
+  fromKey: string;
+  fromLabel: string;
+  /** the row the surviving label sits after, so the merged row keeps its place */
+  after: string | null;
+  /** one entry per model whose value moves */
+  moves: { modelId: string; modelName: string; value: string }[];
 }
 
 export interface ScanModel {
@@ -463,6 +481,52 @@ export function scanDocument({
       rowKey: row.key,
       title: `${row.label} — ${blanks.map((m) => m.model_name).join("、")} 沒有值`,
       detail: `其他型號有值，這幾台沒有。跟 ODM 要，或確認「本來就沒有」（那要改成 — 而不是 TBD）。`,
+    });
+  }
+
+  /**
+   * One spec, two names, two half-empty rows.
+   *
+   * Runs BEFORE the doubt section deliberately: `blank_cell` above has
+   * already told the reader "the others have a value, these do not, go ask
+   * the ODM", which is wrong for exactly these rows — the value is not
+   * missing, it is filed under the other name. Sitting next to that finding
+   * is how a person learns to tell the two apart.
+   */
+  for (const split of findSplitSpecs(rows, (row) =>
+    row.cells.some((c, i) => !c.isBlank && fromCatalog(models[i]?.id ?? "")),
+  )) {
+    const moves = split.columns
+      .map((i) => ({
+        modelId: models[i]?.id ?? "",
+        modelName: models[i]?.model_name ?? "",
+        value: split.from.cells[i]?.value ?? "",
+      }))
+      .filter((m) => m.modelId && m.value.trim());
+    if (moves.length === 0) continue;
+
+    const at = rows.findIndex((r) => r.key === split.into.key);
+    add({
+      code: `same_spec_split:${split.from.key}`,
+      kind: "doubt",
+      severity: "advisory",
+      askedOf: "internal",
+      modelId: null,
+      rowKey: split.into.key,
+      title: `「${split.from.label}」和「${split.into.label}」看起來是同一項規格`,
+      detail:
+        `${split.because}，而且沒有任何一台同時有這兩列——` +
+        `所以規格表上會印成兩列、各半空。合併之後 ` +
+        `${moves.map((m) => m.modelName).join("、")} 的值會移到「${split.into.label}」，` +
+        `文字原樣不動。判斷錯的話按「換一邊」或直接不理它。`,
+      merge: {
+        intoKey: split.into.key,
+        intoLabel: split.into.label,
+        fromKey: split.from.key,
+        fromLabel: split.from.label,
+        after: at > 0 ? rows[at - 1].key : null,
+        moves,
+      },
     });
   }
 

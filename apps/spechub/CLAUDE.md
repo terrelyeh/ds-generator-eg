@@ -168,6 +168,11 @@ Ready 守門、列印列、預設落地頁籤三處共用同一支;
 ⑪ **凡是把 `images` 讀成「手寫欄位清單」的 parser 都會靜靜吃掉資料**——
 caption、labels、body 各中一次:載入時漏掉 → 面板狀態是空的 → 下次存檔寫回空的,**且不報錯**。
 一律用 spread 帶整包;
+⑬ **兩家廠商把同一項規格叫成不同名字 → 兩列各半空**（列是用標籤合併的）。
+`spec-align.ts` 用「有值欄位互補 + 同義詞表 + 值的形狀」配對，**同義詞表同時當拒絕條件**
+（兩邊都在表裡但不同組就不配）；缺漏檢查給一顆一鍵合併，走 `model_hide` + `model_add`、
+**值逐字搬不改**，plan 在伺服器重算不收前端的。⚠️ `blank_cell` 對這種列會給錯建議
+（「跟 ODM 要」——值沒缺，在另一列），所以兩條刻意排在一起;
 ⑫ **AI 有四個步驟／五個呼叫點**（`extract` / `intake` / `questions` 的 propose /
 **`scenarios`** / **`cover`**）,模型在
 **SpecHub `Settings ▸ Tender Datasheets 的 AI 模型`** 改（存 `app_settings`,改完立刻生效）。

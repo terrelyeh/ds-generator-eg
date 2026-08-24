@@ -11,7 +11,7 @@ import {
 import { buildBrief, type BriefFinding } from "@/lib/project-datasheet/brief";
 import { chatComplete } from "@eg/llm/openrouter";
 import { getProjectIntakeModel } from "@/lib/llm/models";
-import { sanitizeItems } from "@/lib/project-datasheet/intake";
+import { sanitizeItems, type IntakeItem } from "@/lib/project-datasheet/intake";
 import { applyItems } from "@/lib/project-datasheet/apply-items";
 import {
   ANSWER_SYSTEM,
@@ -20,7 +20,7 @@ import {
   buildAnswerPrompt,
   currentValues,
 } from "@/lib/project-datasheet/answer";
-import type { BlankMode, DocRules } from "@/lib/project-datasheet/types";
+import type { BlankMode, DocRules, ResolvedRow } from "@/lib/project-datasheet/types";
 import type {
   ProjectDatasheet,
   ProjectDatasheetModel,
@@ -191,6 +191,101 @@ export async function GET(
 }
 
 /**
+ * Fold one spec row into another.
+ *
+ * The plan is re-derived here rather than accepted from the browser. The
+ * pairing rule lives in `spec-align`, and a second copy of it — even one that
+ * only has to agree about which rows these are — is a second thing that can
+ * be wrong about a customer-facing spec table. The client sends which finding
+ * and which direction; the server decides what that means.
+ *
+ * `swap` flips which label survives. The default is a guess (our own
+ * catalogue wording, else the first column's), and a guess offered as a
+ * one-way door is worse than one with a way back.
+ */
+async function merge(
+  supabase: ReturnType<typeof createAdminClient>,
+  id: string,
+  doc: ProjectDatasheet,
+  models: ProjectDatasheetModel[],
+  rows: ResolvedRow[],
+  question: ProjectDatasheetQuestion,
+  swap: boolean,
+) {
+  const findings = scanDocument({
+    doc,
+    models,
+    rows,
+    sourceText: await loadSourceText(supabase, id),
+    catalogModels: await loadCatalogModels(supabase, id, models),
+  });
+  const plan = findings.find((f) => f.code === question.code)?.merge;
+  if (!plan) {
+    return NextResponse.json(
+      { error: "這兩列已經不成對了——按「重新檢查」看目前的狀況。" },
+      { status: 409 },
+    );
+  }
+
+  const intoKey = swap ? plan.fromKey : plan.intoKey;
+  const fromKey = swap ? plan.intoKey : plan.fromKey;
+  const intoRow = rows.find((r) => r.key === intoKey);
+  const fromRow = rows.find((r) => r.key === fromKey);
+  if (!intoRow || !fromRow) {
+    return NextResponse.json({ error: "找不到那兩列了" }, { status: 409 });
+  }
+
+  const at = rows.findIndex((r) => r.key === intoKey);
+  const after = at > 0 ? rows[at - 1].key : null;
+
+  const items: IntakeItem[] = [];
+  fromRow.cells.forEach((cell, i) => {
+    const model = models[i];
+    if (!model || cell.isBlank || !cell.value.trim()) return;
+    // Hidden on this model only. `doc_hide` would take the row away from a
+    // third column that legitimately uses that wording.
+    items.push({
+      type: "model_hide",
+      modelName: model.model_name,
+      key: fromKey,
+      because: `合併進「${intoRow.label}」`,
+    });
+    // The VALUE moves verbatim. Re-filing a fact is not the same as editing
+    // it, and a merge that also tidied the text would be doing the one thing
+    // this module refuses to do to a source.
+    items.push({
+      type: "model_add",
+      modelName: model.model_name,
+      key: intoKey,
+      label: intoRow.label,
+      value: cell.value,
+      after,
+      because: `原本在「${fromRow.label}」`,
+    });
+  });
+
+  if (items.length === 0) {
+    return NextResponse.json({ error: "沒有值需要搬" }, { status: 409 });
+  }
+
+  const user = await getCurrentUser();
+  await supabase
+    .from("project_datasheet_questions")
+    .update({
+      state: "answered",
+      answer: `合併成一列：「${fromRow.label}」→「${intoRow.label}」`,
+      answered_by: user?.id ?? null,
+      answered_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", question.id)
+    .eq("project_datasheet_id", id);
+
+  const result = await applyItems(supabase, id, doc, models, items);
+  return NextResponse.json({ ...result, into: intoRow.label, from: fromRow.label });
+}
+
+/**
  * The extracted text of every spec source on this document.
  *
  * `requirements` sources are excluded: sales' own note is where half these
@@ -285,6 +380,8 @@ export async function PATCH(
  *
  *   { action: "propose", questionId, answer }        → { items }
  *   { action: "apply", questionId, answer, items }   → applies + marks answered
+ *   { action: "merge", questionId, swap? }           → folds one spec row
+ *                                                      into another
  *
  * Split for the same reason intake is: reading an answer and rewriting the
  * document must not be one click. The proposal comes back for review with
@@ -303,9 +400,11 @@ export async function POST(
     questionId?: string;
     answer?: string;
     items?: unknown;
+    swap?: boolean;
   };
   const answer = body.answer?.trim();
-  if (!body.questionId || !answer) {
+  // `merge` carries no prose — the action IS the answer.
+  if (!body.questionId || (!answer && body.action !== "merge")) {
     return NextResponse.json({ error: "questionId and answer are required" }, { status: 400 });
   }
 
@@ -336,6 +435,8 @@ export async function POST(
     docRules: (doc.doc_rules ?? {}) as DocRules,
     blankPolicy: (doc.blank_policy as BlankMode) ?? "tbd",
   });
+
+  if (body.action === "merge") return merge(supabase, id, doc, models, rows, question, !!body.swap);
 
   if (body.action === "apply") {
     const items = sanitizeItems(body.items, modelNames);
@@ -371,7 +472,7 @@ export async function POST(
       user: buildAnswerPrompt({
         questionTitle: question.title,
         questionDetail: question.detail,
-        answer,
+        answer: answer ?? "",
         rowKey: question.row_key,
         modelNames,
         current: currentValues(rows, question.row_key, modelNames),

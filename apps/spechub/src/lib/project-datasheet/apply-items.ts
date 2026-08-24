@@ -57,6 +57,11 @@ export async function applyItems(
       case "doc_field":
         docPatch[item.field] = item.value;
         break;
+      case "model_hide": {
+        const r = rulesFor(item.modelName);
+        if (r) r.hide = [...new Set([...(r.hide ?? []), item.key])];
+        break;
+      }
       case "model_override": {
         const r = rulesFor(item.modelName);
         if (r) r.override = { ...(r.override ?? {}), [item.key]: item.value };

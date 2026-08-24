@@ -325,6 +325,38 @@ gap-scan **要**讀廠商的敘述文字（抓「來源寫 IP66 你寫 IP67」�
 finding 才能跨次掃描追蹤，也才不會有人懷疑「沒警告是真的沒事，還是模型沒看到」。
 LLM 屬於 intake（把業務的一段話變成規則＋問題），不屬於這裡。
 
+### 一項規格、兩個名字 → 兩列各半空
+
+`spec-align.ts`。規格列是用 `normalizeKey(label)` 合併的，所以兩家廠商把同一件事叫成
+`Operating Temperature` 和 `Enclosure`，就是兩列，每列只有一半有值。
+**加進既有型號時更嚴重**——目錄的標籤來自 `spec_items`（`Physical Interfaces`、
+`Maximum Power Consumption`），跟廠商 PDF 的叫法幾乎不會對上。
+
+⚠️ **而 `blank_cell` 對這種列會給錯的建議**：「其他型號有值，這幾台沒有，跟 ODM 要」——
+值沒有缺，它在另一列。所以 `same_spec_split` 刻意排在 `blank_cell` 後面，兩條並排，
+人才學得會分辨。
+
+判斷是**寫死的規則，沒有 LLM**（跟整個 gap review 一致）：
+
+1. **兩列的有值欄位互補**——沒有任何一台同時有這兩列。這條做最多的事，
+   也是它敢附一顆按鈕的原因：有重疊就是兩件不同的事，合併會毀掉其中一個。
+2. **同義詞表**（`Environment`↔`Operating Temperature`、`Product Size`↔`Dimensions`…），
+   而且**同時當拒絕條件**——兩邊都在表裡但屬於不同組就直接不配對，
+   這是擋掉「`Power Consumption` 配 `PoE Input`（因為值都以 W 結尾）」的那道防線。
+3. **值的形狀**（溫度、尺寸、重量、瓦數、電壓、IP 等級、濕度、PoE 等級、Wi-Fi 標準）。
+   這半負責抓沒人想到要列進同義詞表的標籤——`Enclosure` 不在表裡，但它裡面寫著 `-40 ~ +70 °C`。
+
+⚠️ **哪一邊的標籤留下**：目錄型號的贏（那是我們自己公開的用字，客戶可以拿去並排比）；
+否則**第一欄的用字贏**。不是「排比較上面的那列」——合併演算法會把後加的欄位獨有的列
+排在前面，所以「上面」等於「後加的」，正好相反。第一版就寫錯過。
+
+⚠️ **合併是 `model_hide` + `model_add`**，值**逐字搬過去不改**。重新歸檔一個事實
+跟編輯它不是同一件事，順手「整理」一下文字正是這個模組對來源絕不做的事。
+`model_hide` 是為此新增的 item 型別——`doc_hide` 會把那個叫法從第三欄也拿走。
+
+⚠️ **plan 在伺服器重算，不收前端傳來的**。配對規則只能有一份。
+前端只送「哪一個 finding、哪一個方向」。
+
 ### blocking vs advisory 的分界不是「缺多少」
 
 ```
@@ -539,6 +571,7 @@ src/lib/project-datasheet/
   themes.ts       PROJECT_LAYOUTS registry + 預設聲明文字
   text-format.ts  純文字 ⇄ jsonb（編輯器用的貼上格式）
   gap-scan.ts     缺／疑／險掃描（deterministic、無 LLM）
+  spec-align.ts   一項規格兩個名字的配對（同義詞 + 值的形狀，也是 deterministic）
   brief.ts        澄清訊息（模板、zh-TW、按誰能回答分組）
   intake.ts       業務需求 → 建議規則 + 待問問題
   grounding.ts    兩支 drafter 共用的否定契約 + specLines()（規格表 → 提示詞的行）
