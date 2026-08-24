@@ -1,12 +1,14 @@
-# The two checks that catch things nothing else does.
+# The three checks that catch things nothing else does.
 #
-# Both guard against drift that produces NO symptom — the build stays green,
+# All three guard against drift that produces NO symptom — the build stays green,
 # the screen looks right, and the damage shows up weeks later:
 #
 #   check:feature-tags   an OpenRouter call with no `feature` still works;
 #                        its cost just lands in `unmapped` for ever
 #   check:guide-labels   a renamed button leaves the guide describing a tool
 #                        that no longer exists
+#   check:guide-layouts  a retuned layout colour, or a sixth layout, leaves
+#                        the guide illustrating a picker that changed
 #
 # Running them locally was already possible and that was the problem: a guard
 # somebody has to remember to run is a guard for the person who already knew.
@@ -39,3 +41,6 @@ jobs:
 
       - name: The guide still describes the screen
         run: npm run check:guide-labels
+
+      - name: The guide still lists the layouts that exist
+        run: npm run check:guide-layouts

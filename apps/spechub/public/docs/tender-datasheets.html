@@ -36,6 +36,24 @@
     --red-soft:   #fdf0f0;
     --green:      #0f7a52;
 
+    /* One scale, eleven steps, every step with a job. The page used to set
+       twelve different sizes ad hoc — 46/26/20/17/15/14/13.5/13/12.5/12/11/
+       10.5 — which is why it read as both "too small" and "no hierarchy":
+       body was 15px while most of the actual content sat at 13-13.5px, and
+       no two sizes meant anything to each other. Content never goes below
+       --t-xs now; --t-label is for uppercase badges only. */
+    --t-display: 46px;    /* h1 */
+    --t-deck:    28px;    /* section deck (.lede) */
+    --t-lead:    19px;    /* standfirst */
+    --t-h3:      21px;    /* card titles */
+    --t-h4:      18px;    /* step and panel titles */
+    --t-h5:      16px;    /* inline card titles — body size, sans + bold */
+    --t-body:    16px;    /* running text */
+    --t-sm:      15px;    /* secondary prose, table cells */
+    --t-xs:      13.5px;  /* captions, mono, footer */
+    --t-label:   11.5px;  /* uppercase eyebrows and badges ONLY */
+    --t-eyebrow: 12.5px;  /* h2 */
+
     --sans: "Manrope", "Noto Sans TC", -apple-system, "PingFang TC", sans-serif;
     --body: "Roboto", "Noto Sans TC", -apple-system, "PingFang TC", sans-serif;
     --mono: "IBM Plex Mono", ui-monospace, "SF Mono", monospace;
@@ -91,8 +109,8 @@
     color: var(--ink);
     font-family: var(--body);
     font-weight: 300;
-    font-size: 15px;
-    line-height: 1.8;
+    font-size: var(--t-body);
+    line-height: 1.75;
     -webkit-font-smoothing: antialiased;
   }
 
@@ -109,28 +127,28 @@
   }
   .eyebrow {
     font-family: var(--sans);
-    font-size: 11px; font-weight: 700;
+    font-size: var(--t-label); font-weight: 700;
     letter-spacing: .16em; text-transform: uppercase;
     color: var(--blue);
     margin-bottom: 14px;
   }
   h1 {
     font-family: var(--sans);
-    font-size: 46px; font-weight: 700; line-height: 1.12;
+    font-size: var(--t-display); font-weight: 700; line-height: 1.12;
     letter-spacing: -.02em;
     margin: 0 0 18px;
     text-wrap: balance;
     color: var(--navy);
   }
   .standfirst {
-    font-size: 17px; line-height: 1.75; color: var(--ink-soft);
+    font-size: var(--t-lead); line-height: 1.7; color: var(--ink-soft);
     max-width: 62ch; margin: 0;
   }
   .boundary {
     border-left: 3px solid var(--amber);
     background: var(--amber-soft);
     padding: 16px 18px;
-    font-size: 13.5px; line-height: 1.7;
+    font-size: var(--t-sm); line-height: 1.7;
     color: var(--ink);
   }
   .boundary b { font-family: var(--sans); font-weight: 700; }
@@ -139,14 +157,14 @@
   section { padding-top: 64px; }
   h2 {
     font-family: var(--sans);
-    font-size: 13px; font-weight: 700;
+    font-size: var(--t-eyebrow); font-weight: 700;
     letter-spacing: .13em; text-transform: uppercase;
     color: var(--ink-faint);
     margin: 0 0 6px;
   }
   .lede {
     font-family: var(--sans);
-    font-size: 26px; font-weight: 600; line-height: 1.35;
+    font-size: var(--t-deck); font-weight: 600; line-height: 1.3;
     letter-spacing: -.01em;
     color: var(--ink);
     margin: 0 0 28px; max-width: 40ch;
@@ -166,25 +184,25 @@
   .case.mixed { border-top-color: var(--amber); }
   .case-tag {
     font-family: var(--mono);
-    font-size: 11px; letter-spacing: .08em;
+    font-size: var(--t-label); letter-spacing: .08em;
     color: var(--ink-faint);
   }
   .case h3 {
     font-family: var(--sans);
-    font-size: 20px; font-weight: 700; line-height: 1.3;
+    font-size: var(--t-h3); font-weight: 700; line-height: 1.3;
     margin: 0; color: var(--ink);
   }
-  .case-when { font-size: 14px; color: var(--ink-soft); margin: 0; }
+  .case-when { font-size: var(--t-sm); color: var(--ink-soft); margin: 0; }
   .case dl { margin: 0; display: grid; gap: 10px; }
   .case dt {
     font-family: var(--sans);
-    font-size: 11px; font-weight: 700; letter-spacing: .09em;
+    font-size: var(--t-label); font-weight: 700; letter-spacing: .09em;
     text-transform: uppercase; color: var(--ink-faint);
   }
-  .case dd { margin: 3px 0 0; font-size: 13.5px; line-height: 1.65; }
+  .case dd { margin: 3px 0 0; font-size: var(--t-sm); line-height: 1.65; }
   .example {
     margin-top: auto; padding-top: 14px; border-top: 1px solid var(--line-soft);
-    font-size: 12.5px; color: var(--ink-faint);
+    font-size: var(--t-xs); color: var(--ink-faint);
   }
   .example b { font-family: var(--mono); font-weight: 500; color: var(--ink-soft); }
 
@@ -200,17 +218,18 @@
   .step:first-child { border-top: 1px solid var(--line-soft); }
   .num {
     font-family: var(--mono);
-    font-size: 13px; font-weight: 500;
+    font-size: var(--t-xs); font-weight: 500;
     color: var(--blue);
     padding-top: 3px;
   }
   .step h3 {
     font-family: var(--sans);
-    font-size: 17px; font-weight: 600; margin: 0 0 5px; color: var(--ink);
+    font-size: var(--t-h4); font-weight: 600; margin: 0 0 5px; color: var(--ink);
   }
-  .step p { margin: 0; font-size: 14px; color: var(--ink-soft); }
+  .step p { margin: 0 0 10px; font-size: var(--t-sm); color: var(--ink-soft); }
+  .step p:last-child { margin-bottom: 0; }
   .step .where {
-    font-family: var(--mono); font-size: 12px;
+    font-family: var(--mono); font-size: var(--t-xs);
     color: var(--ink-faint); margin-top: 7px;
   }
 
@@ -223,13 +242,13 @@
     padding: 15px 16px;
   }
   .branch h4 {
-    font-family: var(--sans); font-size: 14px; font-weight: 700;
+    font-family: var(--sans); font-size: var(--t-h5); font-weight: 700;
     margin: 0 0 5px; color: var(--navy);
   }
-  .branch p { font-size: 13px; margin: 0; color: var(--ink-soft); }
+  .branch p { font-size: var(--t-sm); margin: 0; color: var(--ink-soft); }
   .ai-flag {
     display: inline-block; margin-top: 9px;
-    font-family: var(--sans); font-size: 10.5px; font-weight: 700;
+    font-family: var(--sans); font-size: var(--t-label); font-weight: 700;
     letter-spacing: .07em; text-transform: uppercase;
     color: var(--blue); border: 1px solid currentColor;
     padding: 2px 7px;
@@ -239,11 +258,11 @@
   .scroll { overflow-x: auto; }
   table {
     border-collapse: collapse; width: 100%; min-width: 620px;
-    font-size: 14px;
+    font-size: var(--t-sm);
   }
   caption {
     caption-side: top; text-align: left;
-    font-size: 13px; color: var(--ink-soft);
+    font-size: var(--t-xs); color: var(--ink-soft);
     padding-bottom: 12px; max-width: 68ch;
   }
   th, td {
@@ -252,17 +271,17 @@
     vertical-align: top;
   }
   thead th {
-    font-family: var(--sans); font-size: 11px; font-weight: 700;
+    font-family: var(--sans); font-size: var(--t-label); font-weight: 700;
     letter-spacing: .09em; text-transform: uppercase;
     color: var(--ink-faint);
     border-bottom: 1px solid var(--line);
   }
   tbody th {
-    font-family: var(--sans); font-weight: 600; font-size: 14px;
+    font-family: var(--sans); font-weight: 600; font-size: var(--t-sm);
     color: var(--ink); width: 30%;
   }
   td code, p code, li code, dd code {
-    font-family: var(--mono); font-size: 12.5px;
+    font-family: var(--mono); font-size: var(--t-xs);
     background: var(--sunk); border: 1px solid var(--line-soft);
     padding: 1px 5px; border-radius: 2px;
   }
@@ -272,13 +291,13 @@
   [data-ui] { font: inherit; color: inherit; }
   .scope {
     display: block; margin-top: 4px;
-    font-family: var(--mono); font-size: 11px; font-weight: 400;
+    font-family: var(--mono); font-size: var(--t-label); font-weight: 400;
     color: var(--ink-faint);
   }
   .sev {
     display: inline-block; font-family: var(--sans);
-    font-size: 10.5px; font-weight: 700; letter-spacing: .07em;
-    text-transform: uppercase; padding: 2px 8px; white-space: nowrap;
+    font-size: var(--t-label); font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; padding: 3px 9px; white-space: nowrap;
   }
   .sev.block { color: var(--red); background: var(--red-soft); }
   .sev.warn  { color: var(--amber); background: var(--amber-soft); }
@@ -290,16 +309,16 @@
     background: var(--sunk);
   }
   .lock h3 {
-    font-family: var(--sans); font-size: 15px; font-weight: 700;
+    font-family: var(--sans); font-size: var(--t-h4); font-weight: 700;
     margin: 0 0 8px; color: var(--ink);
   }
-  .lock p { margin: 0; font-size: 13.5px; color: var(--ink-soft); }
+  .lock p { margin: 0; font-size: var(--t-sm); color: var(--ink-soft); }
 
   .note {
     margin-top: 28px; padding: 18px 20px;
     border: 1px solid var(--line); border-left: 3px solid var(--blue);
     background: var(--navy-soft);
-    font-size: 13.5px; line-height: 1.75;
+    font-size: var(--t-sm); line-height: 1.75;
   }
   .note b { font-family: var(--sans); font-weight: 700; }
 
@@ -308,15 +327,146 @@
   footer {
     margin-top: 72px; padding-top: 22px;
     border-top: 1px solid var(--line);
-    font-size: 12.5px; color: var(--ink-faint);
+    font-size: var(--t-xs); color: var(--ink-faint);
     display: flex; flex-wrap: wrap; gap: 8px 22px;
   }
 
+  /* ── table of contents ────────────────────────────────────────
+     Sixteen sections. Without this the page is a scroll, and the sections
+     people need mid-task (卡住了 / 檢查清單) are the ones furthest down. */
+  .toc {
+    margin: 34px 0 0; padding: 20px 22px;
+    border: 1px solid var(--line); background: var(--sunk);
+  }
+  .toc h2 { margin-bottom: 12px; }
+  .toc ol {
+    margin: 0; padding: 0; list-style: none;
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px 22px;
+    counter-reset: toc;
+  }
+  .toc a {
+    display: block; padding: 3px 0;
+    font-size: var(--t-sm); color: var(--ink-soft); text-decoration: none;
+    border-bottom: 1px solid transparent;
+  }
+  .toc a::before {
+    counter-increment: toc; content: counter(toc, decimal-leading-zero) " ";
+    font-family: var(--mono); font-size: var(--t-label); color: var(--ink-faint);
+  }
+  .toc a:hover { color: var(--blue); }
+  section[id] { scroll-margin-top: 24px; }
+
+  /* ── screenshots of real output ───────────────────────────────
+     Only the PRINTED pages are captured. The app's own screens are drawn in
+     HTML below (.ui) because those strings are covered by
+     scripts/check-guide-labels — a screenshot of a renamed button goes stale
+     silently, which is exactly the failure that guard exists to stop. */
+  figure { margin: 22px 0 0; }
+  figure img {
+    display: block; width: 100%; height: auto;
+    border: 1px solid var(--line);
+    background: #fff;
+  }
+  figcaption {
+    margin-top: 9px; font-size: var(--t-xs); color: var(--ink-faint);
+    max-width: 68ch; line-height: 1.65;
+  }
+  figcaption b { font-family: var(--sans); font-weight: 600; color: var(--ink-soft); }
+  .shots { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; align-items: start; }
+
+  /* ── faux screenshots of the app ──────────────────────────────── */
+  .ui {
+    border: 1px solid var(--line); background: var(--paper);
+    border-radius: 6px; overflow: hidden; margin: 18px 0 0;
+  }
+  .ui-bar {
+    display: flex; align-items: center; gap: 7px;
+    padding: 8px 12px; background: var(--sunk);
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono); font-size: var(--t-label); color: var(--ink-faint);
+  }
+  .ui-body { padding: 16px 18px; display: grid; gap: 12px; }
+  .ui-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .ui-btn {
+    font-family: var(--sans); font-size: var(--t-xs); font-weight: 600;
+    padding: 6px 12px; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--paper); color: var(--ink);
+  }
+  .ui-btn.primary { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .ui-btn.link { border: 0; background: none; color: var(--blue); padding: 6px 0; }
+  .ui-label {
+    font-family: var(--sans); font-size: var(--t-xs); font-weight: 600; color: var(--ink);
+  }
+  .ui-hint { font-size: var(--t-xs); color: var(--ink-faint); }
+  .ui-input {
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px;
+    font-size: var(--t-xs); color: var(--ink-faint); background: var(--paper);
+  }
+  .ui-note {
+    border-left: 2px solid var(--amber); padding-left: 10px;
+    font-size: var(--t-xs); color: var(--amber);
+  }
+  .ui-basis { font-size: var(--t-xs); color: var(--ink-faint); }
+  .ui-basis.none { color: var(--amber); }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+  .dot.on { background: var(--green); }
+  .dot.off { border: 2px solid var(--line); }
+
+  /* ── layout swatches ──────────────────────────────────────────── */
+  .layouts { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+  .layout figure { margin: 0; }
+  .layout img { border-color: var(--line); }
+  .layout h3 {
+    font-family: var(--sans); font-size: var(--t-h5); font-weight: 700;
+    margin: 10px 0 4px; color: var(--ink);
+  }
+  .layout p { margin: 0; font-size: var(--t-xs); color: var(--ink-soft); }
+  .chip {
+    display: inline-block; width: 100%; height: 5px; margin-top: 8px;
+  }
+
+  /* ── checklist ────────────────────────────────────────────────── */
+  .check { list-style: none; margin: 0; padding: 0; display: grid; gap: 0; }
+  .check li {
+    display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 14px;
+    padding: 14px 0; border-bottom: 1px solid var(--line-soft);
+    font-size: var(--t-sm); line-height: 1.7;
+  }
+  .check li:first-child { border-top: 1px solid var(--line-soft); }
+  .check li::before {
+    content: ""; width: 15px; height: 15px; margin-top: 5px;
+    border: 1.5px solid var(--ink-faint); border-radius: 3px;
+  }
+  .check b { font-family: var(--sans); font-weight: 700; }
+
+  /* ── decision tree ────────────────────────────────────────────── */
+  .tree { display: grid; gap: 10px; }
+  .q {
+    border: 1px solid var(--line); background: var(--paper);
+    display: grid; grid-template-columns: minmax(0, 1fr) 210px 210px;
+  }
+  .q > div { padding: 14px 16px; }
+  .q .ask { font-family: var(--sans); font-weight: 600; font-size: var(--t-sm); }
+  .q .yes, .q .no { border-left: 1px solid var(--line-soft); font-size: var(--t-xs); }
+  .q .yes { background: var(--navy-soft); }
+  .q em {
+    display: block; font-style: normal; font-family: var(--mono);
+    font-size: var(--t-label); color: var(--ink-faint); margin-bottom: 3px;
+  }
+
+  @media (max-width: 1080px) {
+    .toc ol { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .layouts { grid-template-columns: repeat(3, 1fr); }
+  }
   @media (max-width: 900px) {
     .page { padding: 0 22px 64px; }
     .masthead { grid-template-columns: 1fr; gap: 26px; padding-top: 44px; }
     h1 { font-size: 34px; }
-    .cases, .locks, .fork { grid-template-columns: 1fr; }
+    .lede { font-size: 23px; }
+    .cases, .locks, .fork, .shots, .layouts { grid-template-columns: 1fr; }
+    .toc ol { grid-template-columns: 1fr; }
+    .q { grid-template-columns: 1fr; }
+    .q .yes, .q .no { border-left: 0; border-top: 1px solid var(--line-soft); }
     .step { grid-template-columns: 40px minmax(0, 1fr); gap: 14px; }
   }
 </style>
@@ -336,7 +486,57 @@
     </div>
   </header>
 
-  <section>
+
+  <nav class="toc">
+    <h2>目錄</h2>
+    <ol>
+      <li><a href="#route">我該走哪一條路</a></li>
+      <li><a href="#cases">三種情境</a></li>
+      <li><a href="#flow">流程</a></li>
+      <li><a href="#walkthrough">走一遍：EOR 那份</a></li>
+      <li><a href="#layouts">版型</a></li>
+      <li><a href="#pages">兩張圖在講不同的事</a></li>
+      <li><a href="#gaps">缺漏檢查</a></li>
+      <li><a href="#ai">AI 用在哪</a></li>
+      <li><a href="#axes">兩個容易搞混的軸</a></li>
+      <li><a href="#list">列表在說什麼</a></li>
+      <li><a href="#locked">關不掉的三件事</a></li>
+      <li><a href="#remove">不要的時候</a></li>
+      <li><a href="#stuck">卡住了</a></li>
+      <li><a href="#dont">不要做的事</a></li>
+      <li><a href="#preflight">送出去之前</a></li>
+      <li><a href="#limits">它做不到的事</a></li>
+      <li><a href="#glossary">名詞</a></li>
+    </ol>
+  </nav>
+
+  <section id="route">
+    <h2>我該走哪一條路</h2>
+    <p class="lede">第一分鐘就要決定，而且決定錯了要重來。</p>
+    <div class="tree">
+      <div class="q">
+        <div class="ask">規格是從 EnGenius 目錄以外的地方來的嗎？</div>
+        <div class="yes"><em>是</em>下一題 →</div>
+        <div class="no"><em>不是</em>「<span data-ui>從既有型號帶入</span>」。規格、文案、產品圖一起過來，不經過 AI。</div>
+      </div>
+      <div class="q">
+        <div class="ask">你手上有原廠的規格書（PDF / Excel / 一段可以貼的文字）嗎？</div>
+        <div class="yes"><em>有</em>「<span data-ui>從廠商規格書建立</span>」。AI 逐條抄成規格列，抄完先給你看過。</div>
+        <div class="no"><em>沒有</em>「<span data-ui>加空白型號</span>」，自己打。少見，通常代表你該先去要規格書。</div>
+      </div>
+      <div class="q">
+        <div class="ask">一份文件裡可以兩種混嗎？</div>
+        <div class="yes"><em>可以</em>自家型號和外購型號並排是真實情境，缺漏檢查會分開判斷。</div>
+        <div class="no"><em>但同一台不行</em>已經帶入的型號再套用抽取，會把判斷方向整個翻轉——覆蓋前會跳警告。</div>
+      </div>
+    </div>
+    <div class="note">
+      <b>為什麼這一題重要：</b>缺漏檢查對這兩條路的判斷是<b>相反的</b>。外購補一個沒來源的規格會擋你，
+      從既有型號補一個官方沒寫的規格則是正常的——那正是標案要的。詳見<a href="#gaps">缺漏檢查</a>。
+    </div>
+  </section>
+
+  <section id="cases">
     <h2>三種情境</h2>
     <p class="lede">差別只在「規格從哪裡來」，後面的流程是同一條。</p>
 
@@ -394,7 +594,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="flow">
     <h2>流程</h2>
     <p class="lede">從建檔到產生 PDF，八步。中間只有一個地方會分岔。</p>
 
@@ -488,7 +688,204 @@
     </div>
   </section>
 
-  <section>
+
+  <section id="walkthrough">
+    <h2>走一遍：EOR 那份</h2>
+    <p class="lede">同一份文件，從一疊原廠 PDF 到可以寄出去。</p>
+    <p>
+      這是站上真的存在的那份（<b>EOR100 / EOR200 — Cellular Routers</b>，馬來西亞連鎖便利店案）。
+      下面每一張圖都是它現在印出來的樣子。第一次用的話，照這個順序走一遍最快。
+    </p>
+
+    <div class="flow">
+      <div class="step">
+        <div class="num">01</div>
+        <div>
+          <h3>兩台機器，兩份原廠規格書</h3>
+          <p>
+            外購來的 4G 和 5G CPE。<span data-ui>從廠商規格書建立</span> 各建一欄，
+            AI 逐條抄成規格列——<b>抄完先給你逐列比對頁碼</b>，確認才寫進去。
+          </p>
+          <p class="where">Tender Datasheets → <span data-ui>新增標案 datasheet</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">02</div>
+        <div>
+          <h3>先讀原廠寫了什麼，不要憑印象改</h3>
+          <p>
+            這份最大的收穫發生在這一步：翻原廠 PDF 才發現<b>兩台的產品定位根本不同</b>——
+            5G 那份標題就是 Outdoor CPE、IP66、工作溫度 −40~+70 °C；
+            4G 那份自述是可攜式室內裝置，<b>整份沒有防護等級</b>、溫度只有 −20~+50 °C。
+            兩份 PDF 都沒有出現 "indoor" 這個字，那是我們自己加的。
+          </p>
+          <p>
+            文件因此改寫成「<b>一個系列、兩種放置</b>」：EOR100 室內 4G、EOR200 戶外 5G。
+            <b>而這個對比本來看不到</b>——我們自己下的一條規則把兩台的溫度都覆蓋成 −40~+70，
+            把 EOR100 的真值蓋掉了。移除那條規則之後，規格表自己就證明了室內／室外的分別。
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">03</div>
+        <div>
+          <h3>缺漏檢查跑出五個要問人的</h3>
+          <p>
+            其中一個是真的會出事的：<b>EOR100 標 18 W 卻掛 802.3af——af 上限只有 15.4 W</b>，
+            客戶接 af 的 switch 會供不上電。這種東西不是「文件不完整」，是「文件會害人買錯」。
+            把澄清訊息複製起來寄給 ODM，回覆再貼回系統。
+          </p>
+          <p class="where"><span data-ui>狀態與待辦</span> → <span data-ui>還缺什麼</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">04</div>
+        <div>
+          <h3>封面文案：先按 AI 起草，再自己改</h3>
+          <p>
+            從廠商規格書建的文件沒有 EnGenius 文案可以帶，所以這一步是空的。
+            <span data-ui>用 AI 起草封面文案</span> 會從規格表寫出主標、Overview、賣點和架構圖說明，
+            <b>一格一格填，不會自動存檔</b>。
+          </p>
+          <p>
+            <b>要看的是每一點後面標的依據。</b>寫「沒有規格依據，自己確認」的那幾句是說法不是規格。
+            這份文件曾經寫過「a second carrier stands by, protecting payment when one network degrades」——
+            通順、合理、而且描述的是原廠從沒宣稱過的自動切換。它撐過好幾輪校稿，最後是用手拔掉的。
+          </p>
+          <p class="where"><span data-ui>封面與文案</span></p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">05</div>
+        <div>
+          <h3>圖：先有文案，再去畫圖</h3>
+          <p>
+            順序是反過來的——<b>文案先寫，因為它告訴你要畫什麼</b>。
+            <span data-ui>用 AI 起草情境文案</span> 填一個產業（retail、港口物流…）產出四段，
+            複製其中一段的場景描述，貼進 <span data-ui>複製提示詞</span> 那個面板，
+            拿去自己的圖像工具產圖，再回來 <span data-ui>上傳圖片</span>。
+          </p>
+          <p>
+            圖上刻意<b>不畫任何文字</b>（圖像模型會把 802.3af/at 這種標籤畫成錯字），
+            所有標籤是點在圖上、由版型用真字型排的——所以改得動，之後也能翻譯。
+          </p>
+        </div>
+      </div>
+      <div class="step">
+        <div class="num">06</div>
+        <div>
+          <h3>出圖，然後標成可以送出</h3>
+          <p>
+            每按一次 <span data-ui>Print / Save as PDF</span> 就自動存一版當下的完整內容，
+            所以之後查得到「客戶手上那份寫了什麼」。<b>列印刻意不動狀態</b>——你必須能印草稿自己校對。
+            五個 blocking 都答完之後才標得了 <span data-ui>文件狀態</span> 的可以送出。
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="shots">
+      <figure>
+        <img src="img/page-cover.png" alt="EOR 標案 datasheet 的封面">
+        <figcaption>
+          <b>第 1 頁</b>：主標、副標、分類標籤、Overview、產品照，底下是關不掉的 PRELIMINARY 聲明。
+          這一整頁就是<span data-ui>封面與文案</span>那個頁籤填出來的。
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="img/page-specs.png" alt="規格表頁">
+        <figcaption>
+          <b>規格表</b>：一列一條規格、一欄一台機器。<b>這張表不存檔</b>，
+          是「原廠原文 ⊕ 你下的規則」每次算出來的——原廠出新版重抽一次，你改過的地方不會被洗掉。
+        </figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section id="layouts">
+    <h2>版型</h2>
+    <p class="lede">五種配色，同一套骨架。挑的是「這份文件看起來像哪一條產品線」。</p>
+    <p>
+      版型只換顏色，不換結構——頁數、欄位、規格表的排法都一樣。
+      預設是鋼藍，因為那是目錄裡唯一一份多機種比較文件（Broadband EOC 系列）的配色，
+      所以一份兩欄的標案表用鋼藍會讀起來像<b>對的那一類</b> EnGenius 文件，而不只是對的品牌。
+    </p>
+    <div class="layouts" data-layout-list>
+      <div class="layout" data-layout="steel">
+        <figure><img src="img/layout-steel.png" alt="鋼藍版型封面"></figure>
+        <span class="chip" data-hex="#1e6796" style="background:#1e6796"></span>
+        <h3>Steel Blue</h3>
+        <p>戶外／寬頻。<b>預設值</b>。</p>
+      </div>
+      <div class="layout" data-layout="cloud">
+        <figure><img src="img/layout-cloud.png" alt="EnGenius 藍版型封面"></figure>
+        <span class="chip" data-hex="#03a9f4" style="background:#03a9f4"></span>
+        <h3>EnGenius Blue</h3>
+        <p>雲端管理類。企業識別的那個藍。</p>
+      </div>
+      <div class="layout" data-layout="navy">
+        <figure><img src="img/layout-navy.png" alt="Station 深藍版型封面"></figure>
+        <span class="chip" data-hex="#3a4d78" style="background:#3a4d78"></span>
+        <h3>Station Navy</h3>
+        <p>戶外子品牌。EOR 那份用的就是這個。</p>
+      </div>
+      <div class="layout" data-layout="datacenter">
+        <figure><img src="img/layout-datacenter.png" alt="Data Center 深藍版型封面"></figure>
+        <span class="chip" data-hex="#16355c" style="background:#16355c"></span>
+        <h3>Data Center Navy</h3>
+        <p>機房／伺服器類。最深的那個藍。</p>
+      </div>
+      <div class="layout" data-layout="graphite">
+        <figure><img src="img/layout-graphite.png" alt="石墨灰版型封面"></figure>
+        <span class="chip" data-hex="#58595B" style="background:#58595B"></span>
+        <h3>Graphite</h3>
+        <p>非網管／中性。不想暗示產品線時用。</p>
+      </div>
+    </div>
+    <div class="note">
+      <b>這一節有護欄。</b>版型是程式裡的一張表，這頁的色票和名稱由
+      <code>npm run check:guide-layouts</code> 比對——新增版型或改了顏色卻沒更新這頁，CI 會擋下來。
+    </div>
+  </section>
+
+  <section id="pages">
+    <h2>兩張圖在講不同的事</h2>
+    <p class="lede">第 2 頁回答「跟什麼接在一起」，規格表後面那頁回答「裝在哪裡」。</p>
+    <p>
+      兩頁都放圖，但它們是兩種主張，所以欄位也是分開的。
+      <b>這兩頁曾經共用同一組欄位</b>，分家之後有一版把「System architecture」印在了場域頁上。
+    </p>
+
+    <div class="shots">
+      <figure>
+        <img src="img/page-features-diagram.png" alt="第 2 頁：賣點與架構圖">
+        <figcaption>
+          <b>第 2 頁 = 架構圖</b>，排在 Features &amp; Benefits 下面。畫的是<b>接線關係</b>：
+          基地台 → 無線鏈路 → 一片切開的牆（代表建築外殼但不說是什麼建築）→ 機器 →
+          穿牆 → PoE switch → 下游設備。<b>刻意不綁產業</b>，換案子不用重畫。
+          上面那行小標和說明來自 <span data-ui>架構圖的標題</span> 和
+          <span data-ui>架構圖的說明</span>——它們叫「架構圖」是因為印在這裡，不是印在下一頁。
+        </figcaption>
+      </figure>
+      <figure>
+        <img src="img/page-scenarios.png" alt="規格表後面的場域頁">
+        <figcaption>
+          <b>場域頁 = 一列一個場景</b>，排在規格表後面。畫的是<b>真實的地方</b>——
+          郊區、港口、店面、機房。每一列圖左文右，右邊那段小標／引言／列點是
+          <b>每張圖各自的</b>，在縮圖底下的 <span data-ui>改文字／標註</span> 裡改。
+          <b>這一頁的標題寫死是 Application scenarios</b>，不吃上面那個欄位。
+        </figcaption>
+      </figure>
+    </div>
+
+    <div class="note">
+      <b>圖上為什麼沒有字：</b>圖像模型會把 <code>802.3af/at</code> 這種標籤畫成看起來像字的亂碼，
+      印在客戶看的文件上就是我們的錯字。所以圖一律留白，
+      標籤是點在圖上、由版型用真字型排的——改得動、能翻譯、也不會糊。
+    </div>
+  </section>
+
+  <section id="gaps">
     <h2>缺漏檢查</h2>
     <p class="lede">同一個動作，在 A 和 B 兩條路上的嚴重程度是相反的。</p>
 
@@ -536,7 +933,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="ai">
     <h2>AI 用在哪</h2>
     <p class="lede">五個地方，而且每一個的責任邊界都不一樣。</p>
 
@@ -600,6 +997,37 @@
       </table>
     </div>
 
+    <div class="ui">
+      <div class="ui-bar">封面與文案 → <span data-ui>用 AI 起草封面文案</span></div>
+      <div class="ui-body">
+        <div class="ui-row">
+          <span class="ui-label">這個標案在意什麼</span>
+          <span class="ui-hint">選填</span>
+          <span class="ui-input" style="flex:1;min-width:220px">戶外、免施工、要能吃 PoE</span>
+          <span class="ui-btn primary"><span data-ui>產生草稿</span></span>
+        </div>
+        <div style="border:1px solid var(--line);border-radius:6px;padding:12px 14px">
+          <div class="ui-row" style="justify-content:space-between">
+            <span class="ui-label">Features &amp; Benefits <span class="ui-hint">3 個區塊</span></span>
+            <span class="ui-btn"><span data-ui>填進去</span></span>
+          </div>
+          <p style="margin:10px 0 0;font-size:var(--t-xs);font-family:var(--sans);font-weight:700">Deploy in Demanding Outdoor Conditions</p>
+          <p style="margin:4px 0 0;font-size:var(--t-xs);color:var(--ink-soft)">
+            ・The EOR200 carries an IP67 ingress rating and operates across −40 °C to +70 °C.
+            <span class="ui-basis">依規格：IP Rating (EOR200)</span>
+          </p>
+          <p style="margin:4px 0 0;font-size:var(--t-xs);color:var(--ink-soft)">
+            ・Mounts on the pole the site already has.
+            <span class="ui-basis none">沒有規格依據，自己確認</span>
+          </p>
+        </div>
+        <div class="ui-note">
+          這幾句這份規格表撐不起來，所以沒寫：<br>
+          SIM failover — two SIM slots are listed but no switching behaviour is described.
+        </div>
+      </div>
+    </div>
+
     <div class="note">
       <b>五個都是「它提案、你確認」。</b>沒有任何一步會自己把東西寫進文件——這是刻意的：這份文件會交到客戶手上，而模型不知道哪些數字是我們承諾得起的。
     </div>
@@ -609,7 +1037,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="axes">
     <h2>兩個容易搞混的軸</h2>
     <p class="lede">「已經出過 PDF」和「可以送出去」是兩件事。</p>
 
@@ -647,7 +1075,51 @@
     </div>
   </section>
 
-  <section>
+  <section id="list">
+    <h2>列表在說什麼</h2>
+    <p class="lede">一列一份文件，六個欄位各自回答一個問題。</p>
+    <div class="ui">
+      <div class="ui-bar">/projects</div>
+      <div class="ui-body" style="padding:0">
+        <div class="scroll">
+          <table style="min-width:760px">
+            <thead>
+              <tr>
+                <th scope="col">分公司</th><th scope="col">文件</th><th scope="col">狀態</th>
+                <th scope="col"><span data-ui>架構圖</span></th><th scope="col"><span data-ui>情境圖</span></th>
+                <th scope="col">最後產生的 PDF</th><th scope="col"><span data-ui>PDF 現況</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>APAC</td><td>EOR100 / EOR200 — Cellular Routers</td><td>可以送出</td>
+                <td><span class="dot on"></span></td><td>4</td>
+                <td>2026/08/21 第 2 版</td><td style="color:var(--amber)"><span data-ui>產生後又改過</span></td>
+              </tr>
+              <tr>
+                <td></td><td>新案（草稿）</td><td>草稿</td>
+                <td><span class="dot off"></span></td><td>—</td>
+                <td><span data-ui>還沒產生過</span></td><td>—</td>
+              </tr>
+              <tr>
+                <td>EMEA</td><td>某某標案</td><td>草稿</td>
+                <td><span class="dot on"></span></td><td>3</td>
+                <td>2026/08/20 第 1 版</td><td style="color:var(--green)"><span data-ui>已是最新</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="note">
+      <b>「<span data-ui>PDF 現況</span>」回答的是「客戶信箱裡那份，還等於現在這份嗎」。</b>
+      它跟左邊那個日期是兩件事：日期說<b>什麼時候印的</b>，現況說<b>那份還算不算數</b>。
+      沒印過的文件在這一欄是 <code>—</code>，因為沒有新舊可言。
+      「<span data-ui>架構圖</span>」是有或沒有（第 2 頁那張），「<span data-ui>情境圖</span>」是張數。
+    </div>
+  </section>
+
+  <section id="locked">
     <h2>關不掉的三件事</h2>
     <p class="lede">措辭可以改，存在與否不行。</p>
 
@@ -667,7 +1139,7 @@
     </div>
   </section>
 
-  <section>
+  <section id="remove">
     <h2>不要的時候</h2>
     <p class="lede">刪除和封存不是同一件事。</p>
     <p>
@@ -675,10 +1147,172 @@
     </p>
   </section>
 
+
+  <section id="stuck">
+    <h2>卡住了</h2>
+    <p class="lede">症狀 → 真正的原因。這幾條都是實際發生過的。</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th scope="col">看到的</th><th scope="col">為什麼</th><th scope="col">怎麼辦</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">帶入型號之後，封面那幾格還是空的</th>
+            <td>編輯頁在你按下去之前就載好了，那幾格只在載入那一次讀資料。</td>
+            <td><b>重新整理頁面。</b>而且<b>先不要按儲存</b>——那會把空值寫回去。已修，但開著的舊分頁還會遇到。</td>
+          </tr>
+          <tr>
+            <th scope="row">圖傳了，PDF 裡沒有</th>
+            <td>「要印哪些頁」裡的應用情境圖沒有勾。</td>
+            <td>編輯頁會直接跳出提示，按「幫我勾起來」。</td>
+          </tr>
+          <tr>
+            <th scope="row">標不了「可以送出」</th>
+            <td>還有 blocking 的問題沒有處理。<b>草稿印得出來，送出去要守門。</b></td>
+            <td><span data-ui>還缺什麼</span> 把紅色那幾項答掉或標成不適用。列印列會顯示還剩幾項。</td>
+          </tr>
+          <tr>
+            <th scope="row">情境圖旁邊那幾段文字找不到地方改</th>
+            <td>它在每張縮圖底下，屬於<b>那一張圖</b>，不是文件層級的欄位。</td>
+            <td>縮圖底下的 <span data-ui>改文字／標註</span>。縮圖上會顯示該圖的小標，沒寫的標成橘色。</td>
+          </tr>
+          <tr>
+            <th scope="row">改了規則，規格表沒有變</th>
+            <td>規則是綁在<b>規格的標籤</b>上的。標籤被改過或重抽過，那條規則就沒有對象了。</td>
+            <td>編輯頁會把這種規則列成「孤兒」。<b>它不會默默吃掉</b>——看到就是要處理。</td>
+          </tr>
+          <tr>
+            <th scope="row">新增的規格列永遠排在最後面</th>
+            <td>沒有指定位置。</td>
+            <td>用 <code>+ 標籤 @first = 值</code> 或 <code>+ 標籤 @after 某列 = 值</code>。
+              <b>位置寫在標籤後面，不要寫進值裡</b>——寫進值裡會印在客戶看的規格表上。</td>
+          </tr>
+          <tr>
+            <th scope="row">上傳原廠 PDF 之後什麼都沒抽到</th>
+            <td>那份是掃描的（整頁是圖，沒有文字層）。</td>
+            <td>系統會明講抽不到，不會假裝成功。跟原廠要可複製文字的版本，或貼文字進去。</td>
+          </tr>
+          <tr>
+            <th scope="row">列表上寫「產生後又改過」</th>
+            <td>不是錯誤。它在說<b>客戶信箱裡那份已經不等於現在這份</b>。</td>
+            <td>要嘛重新出一次 PDF，要嘛確認那次改動不影響已寄出的內容。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="dont">
+    <h2>不要做的事</h2>
+    <p class="lede">四件會在客戶端出事的。</p>
+    <div class="locks">
+      <div class="lock">
+        <h3>不要偷偷改自家型號的值</h3>
+        <p>
+          從既有型號帶入之後改動原本的規格值，會被標成最尖銳的那一類 finding——
+          <b>因為客戶可以把我們的公開 datasheet 拿來並排比對</b>。要改就要有理由，而且要說得出口。
+        </p>
+      </div>
+      <div class="lock">
+        <h3>不要把它當產品資料庫</h3>
+        <p>
+          這裡的東西不同步、不進知識庫、不會出現在目錄。<b>沒有升格成產品的路徑，而且永遠不會有</b>——
+          一台只報過價的型號進了產品表，EnGenie 就會開始跟客戶說我們有賣它。
+        </p>
+      </div>
+      <div class="lock">
+        <h3>不要用規格「隱含」的能力寫文案</h3>
+        <p>
+          兩張 SIM 卡就是兩張 SIM 卡，不是自動切換；DC 輸入不是電池備援；乙太網孔不是 PoE。
+          AI 起草會擋這個，<b>但你自己打字時不會有人擋你</b>。
+        </p>
+      </div>
+      <div class="lock">
+        <h3>不要在同一台上混兩種來源</h3>
+        <p>
+          已經從既有型號帶入的欄位再套用原廠抽取，缺漏檢查的判斷方向會<b>整個翻轉</b>。
+          覆蓋前會跳警告，那個警告不是形式。文件層級混著放沒問題，型號層級才互斥。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <section id="preflight">
+    <h2>送出去之前</h2>
+    <p class="lede">六條。花兩分鐘，比事後解釋便宜。</p>
+    <ul class="check">
+      <li><b>缺漏檢查沒有紅色的了。</b>黃色可以帶著出門，紅色不行——紅色的定義是「這份文件會寫錯」，不是「還沒填完」。</li>
+      <li><b>每一句 AI 寫的都讀過了</b>，特別是標成「沒有規格依據」的那幾句。它們不會被規格表反駁，所以只有你能擋。</li>
+      <li><b>規格表裡沒有 TBD 或空格</b>是印給客戶看的。留白可以，但要是刻意的。</li>
+      <li><b>照片是對的那一台。</b>借用別台的照片要在圖說講明，不要讓讀者自己發現。</li>
+      <li><b>PRELIMINARY 聲明還在</b>（本來就關不掉），而且如果這份不該外流，CONFIDENTIAL 也開著。</li>
+      <li><b>客戶欄位填了。</b>那不會印出去，但下次有人問「這份是給誰的」時只有它答得出來。</li>
+    </ul>
+  </section>
+
+  <section id="limits">
+    <h2>它做不到的事</h2>
+    <p class="lede">先寫出來，才不會被當成 bug。</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th scope="col">做不到</th><th scope="col">現在怎麼繞</th></tr></thead>
+        <tbody>
+          <tr>
+            <th scope="row">讀掃描版 PDF</th>
+            <td>沒有文字層就抽不到。會明講，不會靜靜失敗。跟原廠要電子版，或貼文字。</td>
+          </tr>
+          <tr>
+            <th scope="row">直接在規格表上改值</th>
+            <td>目前改值要打規則（<code>標籤 = 新值</code>）。表格會逐格標出來源／改過／新增，
+              但編輯本身還是文字語法。<b>已知不直覺，在排下一步。</b></td>
+          </tr>
+          <tr>
+            <th scope="row">把某一列拖到別的位置</th>
+            <td>順序是「合併各欄、各自保持相對順序」，再加 <code>@first</code> / <code>@after</code> 微調。沒有拖拉。</td>
+          </tr>
+          <tr>
+            <th scope="row">在後台直接產圖</th>
+            <td>後台只組提示詞，產圖在你自己的工具裡。一張要三到八分鐘，
+              而且看到結果才知道要改哪裡——那個來回在你手邊比在佇列裡快。</td>
+          </tr>
+          <tr>
+            <th scope="row">抓出所有殘留的規格</th>
+            <td>隱藏某項規格之後的殘留掃描，只比對<b>代碼型</b>的字眼（IP67、802.3at）。
+              溫度、天線數這類要更聰明的比對，目前靠人看。</td>
+          </tr>
+          <tr>
+            <th scope="row">多語言</th>
+            <td>標案 datasheet 只有英文。目錄那邊的四語系機制不套用在這裡。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="glossary">
+    <h2>名詞</h2>
+    <p class="lede">這頁用了一些只有這個工具在用的說法。</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th scope="col">說法</th><th scope="col">意思</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">原廠原文</th><td>從原廠規格書逐條抄下來、<b>一個字都沒改</b>的那份。它是不動的，你的修改是疊在上面的規則。</td></tr>
+          <tr><th scope="row">規則</th><td>你對某一列規格下的指令：隱藏、改值、標成不適用、新增一列。<b>規格表 = 原文 ⊕ 規則</b>，每次算出來，不存檔。</td></tr>
+          <tr><th scope="row">孤兒規則</th><td>找不到對象的規則（標籤被改過或重抽過）。會被列出來要你處理，不會默默失效。</td></tr>
+          <tr><th scope="row">blocking</th><td>缺漏檢查裡的紅色。分界是「<b>這份文件會不會寫錯</b>」，不是「缺多少」——十幾格 TBD 不擋，一個沒有來源的 IP67 會擋。</td></tr>
+          <tr><th scope="row">依據</th><td>AI 寫的每一點後面標的那條規格列名。標「沒有規格依據」的是說法不是規格，要人確認。</td></tr>
+          <tr><th scope="row">出圖版次</th><td>按過幾次列印。每按一次存一版當下的完整內容，之後查得到客戶手上那份寫了什麼。</td></tr>
+          <tr><th scope="row">文件狀態</th><td>草稿／可以送出／已封存。<b>跟出圖是兩個軸</b>——草稿也印得出來，那是刻意的。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
   <footer>
     <span><a href="/projects">← 回到 Tender Datasheets</a></span>
     <span>只有 admin 和 editor 看得到</span>
-    <span>2026-08-21</span>
+    <span>更新於 2026-08-24</span>
   </footer>
 
 </div>
