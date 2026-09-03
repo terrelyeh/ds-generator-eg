@@ -106,10 +106,17 @@ async function handle(request: Request) {
       .eq("source_type", "google_doc")) as {
       data: ({ source_id: string; source_url: string | null } & TaxRow)[] | null;
     };
+    // A google_doc source_id is `<driveFileId>/<tabSlug>` — one row per tab.
+    // Keying this map by the whole thing meant handing Drive a file id with a
+    // slug glued to it, so `files.get` 404'd, the public export 404'd, and
+    // the failure landed in a cron JSON that nobody reads. These documents
+    // have never once been refreshed since the tab split. The UI already
+    // knew to cut at the slash (knowledge-base.tsx).
     const docs = new Map<string, { url: string | null; tax: Partial<TaxonomyMeta> }>();
     for (const r of data ?? []) {
-      if (docs.has(r.source_id)) continue;
-      docs.set(r.source_id, { url: r.source_url, tax: taxFrom(r) });
+      const driveFileId = r.source_id.split("/")[0];
+      if (!driveFileId || docs.has(driveFileId)) continue;
+      docs.set(driveFileId, { url: r.source_url, tax: taxFrom(r) });
     }
     const results: unknown[] = [];
     for (const [docId, { url, tax }] of docs) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { logIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { normalizeKey } from "@/lib/project-datasheet/resolve";
 import type { ModelImage, RawSpecRow } from "@/lib/project-datasheet/types";
@@ -202,7 +203,12 @@ export async function POST(
   if (error) {
     // The source was written first and is useless without its column; leaving
     // it would put junk into `sourceText`, which the gap scanner reads.
-    await supabase.from("project_datasheet_sources").delete().eq("id", source.id);
+    // Reported, not thrown: we are already on the failure path and about to
+    // return the real error. A failed rollback should not replace it.
+    logIfDbError(
+      "seed source rollback",
+      await supabase.from("project_datasheet_sources").delete().eq("id", source.id),
+    );
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
   const seededCopy = await seedCoverCopy(supabase, id, product, modelName);

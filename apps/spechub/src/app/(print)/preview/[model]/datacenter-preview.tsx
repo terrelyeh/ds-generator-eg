@@ -527,12 +527,16 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
           <span className="solution-label">Data Center Solution</span>
         </div>
         <div className="hero">
-          <div className="hero-headline">{product.headline || product.full_name}</div>
+          {/* The resolved values, not the raw columns: `heroHeadline` and
+              `overview` above already fall back per field, and the size
+              ladder below is fitted to THEM. Reading product.* here printed
+              an English cover on a confirmed ja/zh-TW datasheet. */}
+          <div className="hero-headline">{heroHeadline}</div>
           <div className="hero-lower">
             <div className="hero-copy">
               <div className="hero-model">{product.model_name}</div>
               <div className="hero-overview" style={{ fontSize: `${overviewSize}pt` }}>
-              {product.overview}
+              {overview}
             </div>
             </div>
             <div className="hero-product-box">

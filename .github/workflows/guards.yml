@@ -12,6 +12,8 @@
 #
 #   check:feature-tags   an OpenRouter call with no `feature` still works;
 #                        its cost just lands in `unmapped` for ever
+#   check:db-writes      a Supabase write whose `error` nobody reads returns
+#                        200 and leaves no row; four separate bugs so far
 #   check:guide-labels   a renamed button leaves the guide describing a tool
 #                        that no longer exists
 #   check:guide-layouts  a retuned layout colour, or a sixth layout, leaves
@@ -76,6 +78,11 @@ jobs:
 
       - name: OpenRouter spend is attributed
         run: npm run check:feature-tags
+
+      # supabase-js never throws, so an unread `error` is a write that
+      # silently did not happen while the UI says it did.
+      - name: Every Supabase write result is read
+        run: npm run check:db-writes
 
       - name: The guide still describes the screen
         run: npm run check:guide-labels

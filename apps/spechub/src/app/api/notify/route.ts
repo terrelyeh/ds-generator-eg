@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { sendNotifications } from "@/lib/notifications";
 import { gateOrCron } from "@eg/auth/session";
 import type { ChangeEntry } from "@/lib/notifications";
@@ -76,10 +77,9 @@ export async function POST(request: Request) {
   // Mark logs as notified (only if at least one channel succeeded)
   if (result.sent.length > 0) {
     const logIds = logs.map((l) => l.id);
-    await supabase
-      .from("change_logs")
-      .update({ notified: true })
-      .in("id", logIds);
+    throwIfDbError("change_logs notified")(
+      await supabase.from("change_logs").update({ notified: true }).in("id", logIds),
+    );
   }
 
   return NextResponse.json({

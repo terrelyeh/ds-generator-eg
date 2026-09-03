@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate, getCurrentUser } from "@eg/auth/session";
 import { defaultDisclaimer } from "@/lib/project-datasheet/themes";
 import type {
@@ -120,7 +121,8 @@ export async function POST(
   const sources = (sourceRows ?? []) as { id: string; [k: string]: unknown }[];
   const sourceIdMap = new Map<string, string>();
   if (sources.length > 0) {
-    const { data: newSources } = await supabase
+    const { data: newSources } = throwIfDbError("duplicate sources insert")(
+      await supabase
       .from("project_datasheet_sources")
       .insert(
         sources.map((src) => ({
@@ -137,7 +139,8 @@ export async function POST(
           extracted_at: src.extracted_at,
         })) as never,
       )
-      .select("id, filename, kind, extracted_at");
+      .select("id, filename, kind, extracted_at"),
+    );
     // Matched on the tuple that identifies a source within one document;
     // insert order is not guaranteed to come back in order.
     const pool = [...((newSources ?? []) as { id: string; filename: string | null; kind: string; extracted_at: string | null }[])];
@@ -206,7 +209,9 @@ export async function POST(
     }));
 
   if (carried.length > 0) {
-    await supabase.from("project_datasheet_questions").insert(carried as never);
+    throwIfDbError("carried questions insert")(
+      await supabase.from("project_datasheet_questions").insert(carried as never),
+    );
   }
 
   return NextResponse.json({

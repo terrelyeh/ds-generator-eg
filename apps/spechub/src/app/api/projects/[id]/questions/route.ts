@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate, getCurrentUser } from "@eg/auth/session";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
 import {
@@ -112,23 +113,30 @@ export async function GET(
     )
     .map((q) => q.id);
 
-  await Promise.all([
-    inserts.length
-      ? supabase.from("project_datasheet_questions").insert(inserts as never)
-      : Promise.resolve(),
-    revivals.length
-      ? supabase
-          .from("project_datasheet_questions")
-          .update({ state: "open", updated_at: new Date().toISOString() })
-          .in("id", revivals)
-      : Promise.resolve(),
-    resolved.length
-      ? supabase
-          .from("project_datasheet_questions")
-          .update({ state: "resolved", updated_at: new Date().toISOString() })
-          .in("id", resolved)
-      : Promise.resolve(),
-  ]);
+  // Reconciliation is what keeps the list honest about the document. If one
+  // of these fails quietly the page shows a finding that is fixed, or hides
+  // one that is back.
+  if (inserts.length) {
+    throwIfDbError("questions insert")(
+      await supabase.from("project_datasheet_questions").insert(inserts as never),
+    );
+  }
+  if (revivals.length) {
+    throwIfDbError("questions revive")(
+      await supabase
+        .from("project_datasheet_questions")
+        .update({ state: "open", updated_at: new Date().toISOString() })
+        .in("id", revivals),
+    );
+  }
+  if (resolved.length) {
+    throwIfDbError("questions resolve")(
+      await supabase
+        .from("project_datasheet_questions")
+        .update({ state: "resolved", updated_at: new Date().toISOString() })
+        .in("id", resolved),
+    );
+  }
 
   const { data: finalRows } = await supabase
     .from("project_datasheet_questions")
@@ -279,17 +287,19 @@ async function merge(
   const result = await applyItems(supabase, id, doc, models, items);
 
   const user = await getCurrentUser();
-  await supabase
-    .from("project_datasheet_questions")
-    .update({
-      state: "answered",
-      answer: `合併成一列：「${fromRow.label}」→「${intoRow.label}」`,
-      answered_by: user?.id ?? null,
-      answered_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", question.id)
-    .eq("project_datasheet_id", id);
+  throwIfDbError("merge answer")(
+    await supabase
+      .from("project_datasheet_questions")
+      .update({
+        state: "answered",
+        answer: `合併成一列：「${fromRow.label}」→「${intoRow.label}」`,
+        answered_by: user?.id ?? null,
+        answered_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", question.id)
+      .eq("project_datasheet_id", id),
+  );
 
   return NextResponse.json({ ...result, into: intoRow.label, from: fromRow.label });
 }
@@ -453,17 +463,19 @@ export async function POST(
     // The answer is filed whether or not it produced an edit. Most answers to
     // a doubt-class question are confirmations, and "RD said the housing is
     // rated IP67" is exactly the sentence someone will want six months later.
-    await supabase
-      .from("project_datasheet_questions")
-      .update({
-        state: "answered",
-        answer,
-        answered_by: user?.id ?? null,
-        answered_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", body.questionId)
-      .eq("project_datasheet_id", id);
+    throwIfDbError("answer")(
+      await supabase
+        .from("project_datasheet_questions")
+        .update({
+          state: "answered",
+          answer,
+          answered_by: user?.id ?? null,
+          answered_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", body.questionId)
+        .eq("project_datasheet_id", id),
+    );
 
     const result = items.length
       ? await applyItems(supabase, id, doc, models, items)

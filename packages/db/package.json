@@ -2,13 +2,14 @@
   "name": "@eg/db",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared Supabase clients, app_settings accessor, DB types, and migrations (single source of truth)",
+  "description": "Shared Supabase clients, app_settings accessor, write-error checking (errors), DB types, and migrations (single source of truth)",
   "exports": {
     "./server": "./src/server.ts",
     "./client": "./src/client.ts",
     "./admin": "./src/admin.ts",
     "./settings": "./src/settings.ts",
-    "./types": "./src/types/database.ts"
+    "./types": "./src/types/database.ts",
+    "./errors": "./src/errors.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",

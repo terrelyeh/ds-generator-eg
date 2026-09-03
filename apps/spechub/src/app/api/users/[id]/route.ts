@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { requirePermission, AuthError, invalidateReviewerLocaleCache } from "@eg/auth/session";
 import { isRole } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
@@ -122,10 +123,9 @@ export async function PATCH(
       .maybeSingle();
     const email = (prof as { email?: string } | null)?.email;
     if (email) {
-      await admin
-        .from("email_whitelist")
-        .update({ role })
-        .eq("email", email.toLowerCase());
+      throwIfDbError("email_whitelist role")(
+        await admin.from("email_whitelist").update({ role }).eq("email", email.toLowerCase()),
+      );
     }
     }
 
@@ -182,10 +182,9 @@ export async function DELETE(
     if (authErr) throw authErr;
 
     if (targetRow.email) {
-      await admin
-        .from("email_whitelist")
-        .delete()
-        .eq("email", targetRow.email.toLowerCase());
+      throwIfDbError("email_whitelist delete")(
+        await admin.from("email_whitelist").delete().eq("email", targetRow.email.toLowerCase()),
+      );
     }
 
     return NextResponse.json({ ok: true });

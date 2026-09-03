@@ -12,6 +12,7 @@
  */
 
 import type { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { asRules, normalizeKey } from "./resolve";
 import type { IntakeItem } from "./intake";
 import type { SpecRules } from "./types";
@@ -108,15 +109,23 @@ export async function applyItems(
   docPatch.doc_rules = { ...docRules, hide: [...hide], override };
   docPatch.updated_at = new Date().toISOString();
 
-  const writes: PromiseLike<unknown>[] = [
-    supabase.from("project_datasheets").update(docPatch as never).eq("id", docId),
-    ...[...modelPatches].map(([modelId, rules]) =>
-      supabase
+  // One at a time, each checked where it happens. These used to be fired
+  // into a Promise.all and forgotten, so a rules update that failed still
+  // came back as `applied: N` — and the caller had already marked the
+  // question answered, which is what `openBlockers()` counts as settled.
+  // Serial costs a few milliseconds and buys knowing exactly how far it got.
+  throwIfDbError("project_datasheets update")(
+    await supabase.from("project_datasheets").update(docPatch as never).eq("id", docId),
+  );
+
+  for (const [modelId, rules] of modelPatches) {
+    throwIfDbError(`model ${modelId} rules update`)(
+      await supabase
         .from("project_datasheet_models")
         .update({ rules: rules as never, updated_at: new Date().toISOString() })
         .eq("id", modelId),
-    ),
-  ];
+    );
+  }
 
   let inserted = 0;
   if (questions.length) {
@@ -131,10 +140,11 @@ export async function applyItems(
     const fresh = questions.filter((q) => !seen.has(q.code as string));
     inserted = fresh.length;
     if (fresh.length) {
-      writes.push(supabase.from("project_datasheet_questions").insert(fresh as never));
+      throwIfDbError("project_datasheet_questions insert")(
+        await supabase.from("project_datasheet_questions").insert(fresh as never),
+      );
     }
   }
 
-  await Promise.all(writes);
   return { applied: items.length, questions: inserted };
 }

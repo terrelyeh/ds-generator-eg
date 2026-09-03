@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { invalidateApiKeyCache } from "@eg/db/settings";
 import { gate } from "@eg/auth/session";
 
@@ -86,12 +87,14 @@ export async function POST(request: Request) {
     // Skip if value is all dots (masked value sent back unchanged)
     if (/^•+/.test(s.value)) continue;
 
-    await supabase
-      .from("app_settings" as "products")
-      .upsert(
-        { key: s.key, value: s.value.trim(), updated_at: now },
-        { onConflict: "key" }
-      );
+    throwIfDbError(`app_settings ${s.key}`)(
+      await supabase
+        .from("app_settings" as "products")
+        .upsert(
+          { key: s.key, value: s.value.trim(), updated_at: now },
+          { onConflict: "key" },
+        ),
+    );
   }
 
   invalidateApiKeyCache();

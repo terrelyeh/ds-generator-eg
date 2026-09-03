@@ -1,4 +1,5 @@
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 
 export interface Persona {
   id: string;          // slug: 'default', 'sales', 'support', etc.
@@ -293,16 +294,18 @@ export async function listPersonas(): Promise<Persona[]> {
  */
 export async function savePersona(persona: Persona): Promise<void> {
   const supabase = createAdminClient();
-  await supabase
-    .from("app_settings" as "products")
-    .upsert(
-      {
-        key: `${PERSONA_KEY_PREFIX}${persona.id}`,
-        value: JSON.stringify(persona),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "key" }
-    );
+  throwIfDbError("persona save")(
+    await supabase
+      .from("app_settings" as "products")
+      .upsert(
+        {
+          key: `${PERSONA_KEY_PREFIX}${persona.id}`,
+          value: JSON.stringify(persona),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "key" },
+      ),
+  );
   invalidatePersonasCache();
 }
 
@@ -312,9 +315,11 @@ export async function savePersona(persona: Persona): Promise<void> {
  */
 export async function deletePersona(id: string): Promise<void> {
   const supabase = createAdminClient();
-  await supabase
-    .from("app_settings" as "products")
-    .delete()
-    .eq("key", `${PERSONA_KEY_PREFIX}${id}`);
+  throwIfDbError("persona delete")(
+    await supabase
+      .from("app_settings" as "products")
+      .delete()
+      .eq("key", `${PERSONA_KEY_PREFIX}${id}`),
+  );
   invalidatePersonasCache();
 }

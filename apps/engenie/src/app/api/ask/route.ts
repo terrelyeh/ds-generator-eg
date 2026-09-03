@@ -292,9 +292,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Workspace passcode required" }, { status: 401 });
     }
     // Per-minute / daily quota (atomic; protects shared key, harmless for BYOK).
-    const { data: touch } = (await createAdminClient().rpc("ask_workspace_touch", { p_slug: ws.slug })) as {
+    // The quota counter. When it errors, `touch` is null, every check below
+    // passes, and the workspace runs uncapped — so say so rather than let a
+    // broken counter read as "within limits".
+    const { data: touch, error: touchErr } = (await createAdminClient().rpc(
+      "ask_workspace_touch",
+      { p_slug: ws.slug },
+    )) as {
       data: { allowed: boolean; reason: string | null }[] | null;
+      error: { message?: string } | null;
     };
+    if (touchErr) {
+      console.error(`[ask] quota counter failed for ${ws.slug}: ${touchErr.message ?? "unknown"}`);
+    }
     const t = touch?.[0];
     if (t && !t.allowed) {
       const msg =

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { syncLocalizedHardwareImage, syncProductImages } from "@/lib/google/drive-images";
+import { throwIfDbError } from "@eg/db/errors";
+import { canClear, syncLocalizedHardwareImage, syncProductImages } from "@/lib/google/drive-images";
 import { gate } from "@eg/auth/session";
 
 /**
@@ -60,19 +61,25 @@ export async function POST(request: Request) {
     },
   });
 
-  const imageUpdate: Record<string, string | null> = {};
+  // `""`, never `null`: these columns are NOT NULL DEFAULT '' (pitfall #60).
+  // Writing null raised 23502, and because nothing read the error the WHOLE
+  // statement was dropped — including a perfectly good new URL for the other
+  // column in the same object — while the response reported it as cleared.
+  const imageUpdate: Record<string, string> = {};
   if (imgResult.product_image_url) {
     imageUpdate.product_image = imgResult.product_image_url;
-  } else if (imgResult.folder_listed && product.product_image) {
-    imageUpdate.product_image = null;
+  } else if (canClear(imgResult, "product_image") && product.product_image) {
+    imageUpdate.product_image = "";
   }
   if (imgResult.hardware_image_url) {
     imageUpdate.hardware_image = imgResult.hardware_image_url;
-  } else if (imgResult.folder_listed && product.hardware_image) {
-    imageUpdate.hardware_image = null;
+  } else if (canClear(imgResult, "hardware_image") && product.hardware_image) {
+    imageUpdate.hardware_image = "";
   }
   if (Object.keys(imageUpdate).length > 0) {
-    await supabase.from("products").update(imageUpdate).eq("id", product.id);
+    throwIfDbError(`${model} products image update`)(
+      await supabase.from("products").update(imageUpdate).eq("id", product.id),
+    );
   }
 
   // Per-locale hardware sync (updates product_translations.hardware_image
@@ -86,8 +93,7 @@ export async function POST(request: Request) {
     try {
       const res = await syncLocalizedHardwareImage({
         modelName: model,
-        productId: product.id,
-        locale,
+                locale,
         lineName: line.name,
         enDsImagesFolderId: line.ds_images_folder_id,
         supabase,

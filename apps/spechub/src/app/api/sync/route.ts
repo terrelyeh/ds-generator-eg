@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gateOrCron } from "@eg/auth/session";
+import { logIfDbError, throwIfDbError } from "@eg/db/errors";
 import {
   loadAllProductsFromSheet,
   loadProductFromSheets,
@@ -8,6 +9,7 @@ import {
 } from "@/lib/google/sheets";
 import {
   syncProductImages,
+  canClear,
   syncLocalizedHardwareImage,
   syncSeriesImages,
 } from "@/lib/google/drive-images";
@@ -273,7 +275,7 @@ export async function POST(request: Request) {
               });
               if (imgResult.product_image_url) {
                 updateFields.product_image = imgResult.product_image_url;
-              } else if (imgResult.folder_listed && existing.product_image) {
+              } else if (canClear(imgResult, "product_image") && existing.product_image) {
                 // Drive confirmed the file no longer exists → clear DB.
                 // The column is NOT NULL DEFAULT '' — writing null threw a
                 // 23502 that supabase-js returns rather than raises, so the
@@ -283,20 +285,19 @@ export async function POST(request: Request) {
               }
               if (imgResult.hardware_image_url) {
                 updateFields.hardware_image = imgResult.hardware_image_url;
-              } else if (imgResult.folder_listed && existing.hardware_image) {
+              } else if (canClear(imgResult, "hardware_image") && existing.hardware_image) {
                 updateFields.hardware_image = "";
               }
               if (imgResult.hardware_image_2_url) {
                 updateFields.hardware_image_2 = imgResult.hardware_image_2_url;
-              } else if (imgResult.folder_listed && existing.hardware_image_2) {
+              } else if (canClear(imgResult, "hardware_image_2") && existing.hardware_image_2) {
                 updateFields.hardware_image_2 = "";
               }
             } catch { /* image sync failure is non-fatal */ }
 
-            await supabase
-              .from("products")
-              .update(updateFields)
-              .eq("id", existing.id);
+            throwIfDbError(`${modelName} products update`)(
+              await supabase.from("products").update(updateFields).eq("id", existing.id),
+            );
 
             // Sync localized hardware images (one per enabled locale).
             // Reads each sibling "<ProductLine>_<locale>/DS Images" folder
@@ -309,8 +310,7 @@ export async function POST(request: Request) {
                 try {
                   await syncLocalizedHardwareImage({
                     modelName,
-                    productId: existing.id,
-                    locale,
+                                        locale,
                     lineName: pl.name,
                     enDsImagesFolderId: pl.ds_images_folder_id,
                     supabase,
@@ -371,24 +371,29 @@ export async function POST(request: Request) {
             const imageUpdate: Record<string, string> = {};
             if (images.product_image_url) {
               imageUpdate.product_image = images.product_image_url;
-            } else if (images.folder_listed && existing?.product_image) {
+            } else if (canClear(images, "product_image") && existing?.product_image) {
               imageUpdate.product_image = "";
             }
             if (images.hardware_image_url) {
               imageUpdate.hardware_image = images.hardware_image_url;
-            } else if (images.folder_listed && existing?.hardware_image) {
+            } else if (canClear(images, "hardware_image") && existing?.hardware_image) {
               imageUpdate.hardware_image = "";
             }
             if (images.hardware_image_2_url) {
               imageUpdate.hardware_image_2 = images.hardware_image_2_url;
-            } else if (images.folder_listed && existing?.hardware_image_2) {
+            } else if (canClear(images, "hardware_image_2") && existing?.hardware_image_2) {
               imageUpdate.hardware_image_2 = "";
             }
             if (Object.keys(imageUpdate).length > 0) {
-              await supabase
+              // Reported rather than thrown: the enclosing catch exists for
+              // Drive being unreachable, and it would swallow this too.
+              const res = await supabase
                 .from("products")
                 .update(imageUpdate)
                 .eq("id", product.id);
+              if (!logIfDbError(`${modelName} products image update`, res)) {
+                lineResult.errors.push(`${modelName}: image URLs not saved`);
+              }
             }
           } catch {
             // Image sync is optional — continue without images
@@ -404,8 +409,7 @@ export async function POST(request: Request) {
               for (const locale of enabledLocales) {
                 await syncLocalizedHardwareImage({
                   modelName,
-                  productId: product.id,
-                  locale,
+                                    locale,
                   lineName: pl.name,
                   enDsImagesFolderId: pl.ds_images_folder_id,
                   supabase,
@@ -417,22 +421,22 @@ export async function POST(request: Request) {
           }
 
           // Replace spec sections + items
-          await supabase
-            .from("spec_sections")
-            .delete()
-            .eq("product_id", product.id);
+          throwIfDbError(`${modelName} spec_sections delete`)(
+            await supabase.from("spec_sections").delete().eq("product_id", product.id),
+          );
 
           await syncSpecSections(supabase, product.id, sheetData.spec_sections);
 
           // Log the change (only when something actually changed)
-          await supabase.from("change_logs").insert({
+          throwIfDbError(`${modelName} change_logs insert`)(
+            await supabase.from("change_logs").insert({
             product_id: product.id,
             product_line_id: pl.id,
             edited_by: metadata.last_editor,
             edited_at: metadata.last_modified,
             changes_summary: changeSummary,
             changes_detail: isNew ? [{ field: "Product", from: null, to: modelName, type: "added" }] : details,
-          });
+          }));
 
           lineResult.synced.push(modelName);
           allChanges.push({
@@ -469,10 +473,9 @@ export async function POST(request: Request) {
           const revLogs = await loadRevisionLogs(pl.sheet_id, pl.revision_log_gid);
           if (revLogs.length > 0) {
             // Replace all revision logs for this product line
-            await supabase
-              .from("revision_logs")
-              .delete()
-              .eq("product_line_id", pl.id);
+            throwIfDbError("revision_logs delete")(
+              await supabase.from("revision_logs").delete().eq("product_line_id", pl.id),
+            );
             // Insert in batches of 50
             for (let b = 0; b < revLogs.length; b += 50) {
               const batch = revLogs.slice(b, b + 50).map((r) => ({
@@ -486,7 +489,9 @@ export async function POST(request: Request) {
                 description: r.description,
                 mkt_close_date: r.mkt_close_date || null,
               }));
-              await supabase.from("revision_logs").insert(batch);
+              throwIfDbError("revision_logs insert")(
+                await supabase.from("revision_logs").insert(batch),
+              );
             }
           }
         }
@@ -505,10 +510,9 @@ export async function POST(request: Request) {
             const compChanges = diffComparison(existingComp ?? [], comp.items);
 
             // Replace all comparison data
-            await supabase
-              .from("comparisons")
-              .delete()
-              .eq("product_line_id", pl.id);
+            throwIfDbError("comparisons delete")(
+              await supabase.from("comparisons").delete().eq("product_line_id", pl.id),
+            );
             for (let b = 0; b < comp.items.length; b += 50) {
               const batch = comp.items.slice(b, b + 50).map((item, idx) => ({
                 product_line_id: pl.id,
@@ -518,19 +522,22 @@ export async function POST(request: Request) {
                 value: item.value,
                 sort_order: b + idx,
               }));
-              await supabase.from("comparisons").insert(batch);
+              throwIfDbError("comparisons insert")(
+                await supabase.from("comparisons").insert(batch),
+              );
             }
 
             // Log comparison changes if any
             if (compChanges.details.length > 0) {
-              await supabase.from("change_logs").insert({
+              throwIfDbError("comparison change_logs insert")(
+                await supabase.from("change_logs").insert({
                 product_id: null,
                 product_line_id: pl.id,
                 edited_by: metadata.last_editor,
                 edited_at: metadata.last_modified,
                 changes_summary: `Comparison: ${compChanges.summary}`,
                 changes_detail: compChanges.details,
-              });
+              }));
 
               allChanges.push({
                 product_name: "[Comparison]",
@@ -550,10 +557,9 @@ export async function POST(request: Request) {
             pl.cloud_comparison_gid
           );
           if (cloud.length > 0) {
-            await supabase
-              .from("cloud_comparisons")
-              .delete()
-              .eq("product_line_id", pl.id);
+            throwIfDbError("cloud_comparisons delete")(
+              await supabase.from("cloud_comparisons").delete().eq("product_line_id", pl.id),
+            );
             const batch = cloud.map((c, idx) => ({
               product_line_id: pl.id,
               model_name: c.model_name,
@@ -561,7 +567,9 @@ export async function POST(request: Request) {
               specs: c.specs,
               sort_order: idx,
             }));
-            await supabase.from("cloud_comparisons").insert(batch);
+            throwIfDbError("cloud_comparisons insert")(
+              await supabase.from("cloud_comparisons").insert(batch),
+            );
           }
         }
 
@@ -642,10 +650,13 @@ export async function POST(request: Request) {
       }
 
     // Update last_synced_at for Smart Sync
-    await supabase
+    const stampRes = await supabase
       .from("product_lines")
       .update({ last_synced_at: new Date().toISOString() })
       .eq("id", pl.id);
+    if (!logIfDbError(`${pl.name} last_synced_at`, stampRes)) {
+      lineResult.errors.push("last_synced_at not updated — Smart Sync may re-run this line");
+    }
 
     results.push(lineResult);
   }
@@ -657,10 +668,9 @@ export async function POST(request: Request) {
       notifyResult = await sendNotifications(allChanges);
       // Mark change logs as notified if at least one channel succeeded
       if (notifyResult.sent.length > 0) {
-        await supabase
-          .from("change_logs")
-          .update({ notified: true })
-          .eq("notified", false);
+        throwIfDbError("change_logs notified")(
+          await supabase.from("change_logs").update({ notified: true }).eq("notified", false),
+        );
       }
     } catch {
       // Notification failure should not break the sync response
@@ -858,17 +868,24 @@ async function syncSpecSections(
   for (let i = 0; i < sections.length; i++) {
     const section = sections[i];
 
-    const { data: sectionRow } = await supabase
-      .from("spec_sections")
-      .insert({
-        product_id: productId,
-        category: section.category,
-        sort_order: i,
-      })
-      .select("id")
-      .single();
+    const { data: sectionRow } = throwIfDbError(`spec_sections insert (${section.category})`)(
+      await supabase
+        .from("spec_sections")
+        .insert({
+          product_id: productId,
+          category: section.category,
+          sort_order: i,
+        })
+        .select("id")
+        .single(),
+    );
 
-    if (!sectionRow) continue;
+    // Used to be `if (!sectionRow) continue;` — a section that failed to
+    // come back took its items with it and said nothing, so the product
+    // rendered with a category missing and the sync reported success.
+    if (!sectionRow) {
+      throw new Error(`spec_sections insert (${section.category}) returned no row`);
+    }
 
     const items = section.items.map((item, j) => ({
       section_id: sectionRow.id,
@@ -878,7 +895,9 @@ async function syncSpecSections(
     }));
 
     if (items.length > 0) {
-      await supabase.from("spec_items").insert(items);
+      throwIfDbError(`spec_items insert (${section.category})`)(
+        await supabase.from("spec_items").insert(items),
+      );
     }
   }
 }
