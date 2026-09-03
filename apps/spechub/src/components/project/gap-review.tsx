@@ -13,6 +13,8 @@ interface ReviewFinding {
   code: string;
   kind: FindingKind;
   severity: Severity;
+  /** present only on 「這兩列看起來是同一項」 — see spec-align.ts */
+  merge?: { intoLabel: string; fromLabel: string } | null;
   askedOf: AskedOf;
   title: string;
   detail: string;
@@ -120,6 +122,35 @@ export function GapReview({
       setAccepted(defaultAccepted(items));
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "解析失敗");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /**
+   * Fold one spec row into another.
+   *
+   * No proposal step, unlike every other action here. That step exists so a
+   * MODEL's reading of some prose gets reviewed before it rewrites anything;
+   * this plan came from a rule, the finding already spells out which rows and
+   * which values move, and the values move verbatim. A confirmation dialog
+   * over a deterministic, reversible edit is a click that teaches nothing.
+   */
+  async function mergeRows(questionId: string, swap: boolean) {
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/projects/${docId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "merge", questionId, swap }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "合併失敗");
+      toast.success(`已把「${json.from}」併進「${json.into}」`);
+      await load();
+      onChanged?.();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "合併失敗");
     } finally {
       setBusy(false);
     }
@@ -364,7 +395,31 @@ export function GapReview({
                   )}
                 </div>
               ) : (
-                <div className="flex gap-3 pl-8 text-xs">
+                <div className="flex flex-wrap gap-3 pl-8 text-xs">
+                  {/* Only this finding type carries a plan, and for it the
+                      merge IS the answer — asking someone to type "yes they
+                      are the same row" before the tool will act on its own
+                      conclusion is a step that teaches nothing. */}
+                  {f.merge && (
+                    <>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="font-medium text-engenius-blue hover:underline disabled:opacity-50"
+                        onClick={() => void mergeRows(f.id, false)}
+                      >
+                        合併成一列（留「{f.merge.intoLabel}」）
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy}
+                        className="text-muted-foreground hover:underline disabled:opacity-50"
+                        onClick={() => void mergeRows(f.id, true)}
+                      >
+                        換一邊（留「{f.merge.fromLabel}」）
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     className="text-engenius-blue hover:underline"

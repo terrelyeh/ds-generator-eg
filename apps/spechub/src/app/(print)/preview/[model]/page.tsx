@@ -175,8 +175,8 @@ export default async function PreviewPage({
   let localeHardwareImage: string | null = null;
   let customQrLabel: string | null = null;
   let customQrUrl: string | null = null;
-  let specLabelMap: Record<string, string> = {};
-  let sectionLabelMap: Record<string, string> = {};
+  const specLabelMap: Record<string, string> = {};
+  const sectionLabelMap: Record<string, string> = {};
 
   // Track whether the locale translation has been confirmed (for gating
   // PDF generation on Draft state). Default false → user has to Confirm

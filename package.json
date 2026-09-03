@@ -10,6 +10,7 @@
     "dev": "npm run dev -w spechub",
     "build": "npm run build -w spechub",
     "lint": "npm run lint -w spechub",
+    "test": "npm run test -w spechub",
     "check:feature-tags": "node scripts/check-feature-tags.mjs",
     "check:guide-labels": "node scripts/check-guide-labels.mjs",
     "check:guide-layouts": "node scripts/check-guide-layouts.mjs"

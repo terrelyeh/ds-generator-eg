@@ -4,6 +4,10 @@ import { checkProductLayout } from "../src/lib/datasheet/layout-check";
 import { estimateCoverLayout } from "../src/lib/datasheet/cover-layout";
 config({ path: ".env.local" });
 
+/** Shape of the `spec_sections` + nested `spec_items` select above. */
+type SpecItemRow = { label: string; value: string; sort_order: number };
+type SpecSectionRow = { category: string; spec_items: SpecItemRow[] | null };
+
 async function main() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,9 +46,11 @@ async function main() {
     .select("id, product_id, category, sort_order, spec_items (label, value, sort_order)")
     .eq("product_id", p.id);
 
-  const sections = (specRows ?? []).map((s: any) => ({
+  const sections = ((specRows ?? []) as SpecSectionRow[]).map((s) => ({
     category: s.category,
-    items: (s.spec_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => ({ label: it.label, value: it.value })),
+    items: (s.spec_items ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((it) => ({ label: it.label, value: it.value })),
   }));
 
   const report = checkProductLayout({

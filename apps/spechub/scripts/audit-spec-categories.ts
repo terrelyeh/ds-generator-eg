@@ -29,9 +29,14 @@ async function main() {
     .from("spec_sections")
     .select("id, product_id, category, sort_order");
 
-  const lineMap = new Map((lines ?? []).map((l: any) => [l.id, l.label]));
+  const lineMap = new Map(
+    ((lines ?? []) as { id: string; label: string }[]).map((l) => [l.id, l.label]),
+  );
   const productMap = new Map(
-    (products ?? []).map((p: any) => [p.id, { model: p.model_name, line: lineMap.get(p.product_line_id) ?? "?" }]),
+    ((products ?? []) as { id: string; model_name: string; product_line_id: string }[]).map((p) => [
+      p.id,
+      { model: p.model_name, line: lineMap.get(p.product_line_id) ?? "?" },
+    ]),
   );
 
   // Build: product_id -> categories list

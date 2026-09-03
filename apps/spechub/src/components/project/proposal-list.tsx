@@ -6,6 +6,7 @@ const TYPE_LABEL: Record<IntakeItem["type"], string> = {
   doc_hide: "隱藏",
   doc_override: "覆寫",
   model_add: "新增",
+  model_hide: "隱藏",
   model_override: "覆寫",
   model_blank: "留白",
   doc_field: "文案",

@@ -49,6 +49,18 @@ type IntakeItemBase =
   | { type: "model_override"; modelName: string; key: string; value: string; because: string }
   | {
       /**
+       * Hide a row on ONE model. `doc_hide` removes it everywhere, which is
+       * wrong when the row belongs to one supplier's wording and another
+       * column has the same fact under a different name — the merge folds
+       * one into the other and only the folded column should lose its row.
+       */
+      type: "model_hide";
+      modelName: string;
+      key: string;
+      because: string;
+    }
+  | {
+      /**
        * "This model doesn't have that." Distinct from an empty value: TBD
        * means an answer is still coming, — means there is nothing to come.
        * Only an answer can tell those apart, which is why this type exists.
@@ -212,6 +224,10 @@ export function sanitizeItems(rawItems: unknown, modelNames: string[]): IntakeIt
             because,
           });
         break;
+      case "model_hide":
+        if (key && known.has(str(e.modelName)))
+          items.push({ type: "model_hide", modelName: str(e.modelName), key, because });
+        break;
       case "model_override":
         if (key && known.has(str(e.modelName)) && str(e.value))
           items.push({
@@ -266,6 +282,8 @@ export function describeItem(item: IntakeItem): string {
       return `「${item.label}」設為「${item.value}」（整份文件）`;
     case "model_add":
       return `${item.modelName} 新增「${item.label}」= ${item.value}`;
+    case "model_hide":
+      return `${item.modelName} 隱藏「${item.key}」這一列`;
     case "model_override":
       return `${item.modelName} 的「${item.key}」改為「${item.value}」`;
     case "model_blank":

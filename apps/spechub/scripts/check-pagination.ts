@@ -3,6 +3,10 @@ import { createClient } from "@supabase/supabase-js";
 import { splitIntoPages, estimateItemHeight, AVAILABLE_HEIGHT, CATEGORY_HEADER_HEIGHT } from "../src/lib/datasheet/pagination";
 config({ path: ".env.local" });
 
+/** Shape of the `spec_sections` + nested `spec_items` select above. */
+type SpecItemRow = { label: string; value: string; sort_order: number };
+type SpecSectionRow = { category: string; spec_items: SpecItemRow[] | null };
+
 async function main() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -20,9 +24,11 @@ async function main() {
     .eq("product_id", p.id)
     .order("sort_order");
 
-  const sections = (specRows ?? []).map((s: any) => ({
+  const sections = ((specRows ?? []) as SpecSectionRow[]).map((s) => ({
     category: s.category,
-    items: (s.spec_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order).map((it: any) => ({ label: it.label, value: it.value })),
+    items: (s.spec_items ?? [])
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .map((it) => ({ label: it.label, value: it.value })),
   }));
 
   const pages = splitIntoPages(sections);
