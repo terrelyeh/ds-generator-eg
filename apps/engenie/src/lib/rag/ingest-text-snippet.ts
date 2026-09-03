@@ -12,6 +12,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
+import { throwIfDbError } from "@eg/db/errors";
 
 const EMBED_BATCH_SIZE = 20;
 const MAX_EMBED_CHARS = 21000;
@@ -36,11 +37,13 @@ export async function ingestTextSnippet(opts: IngestTextSnippetOptions): Promise
   const supabase = createAdminClient();
 
   // Clean replace (handles edits + body shrink).
-  await supabase
-    .from("documents" as "products")
-    .delete()
-    .eq("source_type", "text_snippet")
-    .eq("source_id", sourceId);
+  throwIfDbError("documents delete (text_snippet)")(
+    await supabase
+      .from("documents" as "products")
+      .delete()
+      .eq("source_type", "text_snippet")
+      .eq("source_id", sourceId),
+  );
 
   const chunks = chunkText(content, title, label);
   if (chunks.length === 0) {

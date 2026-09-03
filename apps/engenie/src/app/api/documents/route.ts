@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { logIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
@@ -431,7 +432,13 @@ export async function DELETE(request: Request) {
           .filter((p): p is string => !!p),
       ),
     ];
-    if (paths.length) await supabase.storage.from("knowledge-files").remove(paths);
+    // Orphaned objects are cheap; a delete that stops halfway is not.
+    if (paths.length) {
+      logIfDbError(
+        "knowledge-files remove",
+        await supabase.storage.from("knowledge-files").remove(paths),
+      );
+    }
   }
 
   let query = supabase

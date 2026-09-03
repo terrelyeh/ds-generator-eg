@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { chatComplete, openRouterEnabled } from "@eg/llm/openrouter";
 import { BATTLECARD_EXTRACT_MODEL } from "@/lib/llm/models";
@@ -173,10 +174,9 @@ export async function POST(request: Request) {
     if (!error) updated++;
   }
 
-  await supabase
-    .from("competitor_products")
-    .update({ captured_at: now })
-    .eq("id", cp.id);
+  throwIfDbError("competitor_products captured_at")(
+    await supabase.from("competitor_products").update({ captured_at: now }).eq("id", cp.id),
+  );
 
   return NextResponse.json({ ok: true, updated, skipped, notFound, total: extracted.length });
 }

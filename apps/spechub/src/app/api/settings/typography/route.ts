@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { TYPOGRAPHY_DEFAULTS, isCjkLocale } from "@/lib/datasheet/typography";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { gate } from "@eg/auth/session";
@@ -123,10 +124,12 @@ export async function DELETE(request: Request) {
 
   const supabase = createAdminClient();
 
-  await supabase
-    .from("app_settings" as "products")
-    .delete()
-    .eq("key", `typography_${locale}`);
+  throwIfDbError("typography reset")(
+    await supabase
+      .from("app_settings" as "products")
+      .delete()
+      .eq("key", `typography_${locale}`),
+  );
 
   return NextResponse.json({ ok: true });
 }

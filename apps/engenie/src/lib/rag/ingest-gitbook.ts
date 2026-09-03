@@ -10,6 +10,7 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
+import { logIfDbError } from "@eg/db/errors";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import {
   fetchGitbookSitemap,
@@ -569,12 +570,17 @@ export async function ingestGitbook(
         .reduce((max, c) => Math.max(max, c.chunkIndex), -1);
 
       if (doc.chunk_index > maxNewIndex) {
-        await supabase
-          .from("documents" as "products")
-          .delete()
-          .eq("source_type", "gitbook")
-          .eq("source_id", doc.source_id)
-          .eq("chunk_index", doc.chunk_index);
+        // Reported, not thrown: one stale chunk that refuses to go is not a
+        // reason to abandon a re-index that has already done the expensive part.
+        logIfDbError(
+          `gitbook stale chunk ${doc.source_id}#${doc.chunk_index}`,
+          await supabase
+            .from("documents" as "products")
+            .delete()
+            .eq("source_type", "gitbook")
+            .eq("source_id", doc.source_id)
+            .eq("chunk_index", doc.chunk_index),
+        );
       }
     }
   }

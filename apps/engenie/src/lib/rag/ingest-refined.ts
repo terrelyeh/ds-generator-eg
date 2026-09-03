@@ -19,6 +19,7 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
 
@@ -176,11 +177,13 @@ export async function ingestRefinedArticles(
     }
 
     // Clean replace: drop this article's existing chunks first.
-    await supabase!
-      .from("documents" as "products")
-      .delete()
-      .eq("source_type", sourceType)
-      .eq("source_id", sourceId);
+    throwIfDbError(`documents delete (${sourceType})`)(
+      await supabase!
+        .from("documents" as "products")
+        .delete()
+        .eq("source_type", sourceType)
+        .eq("source_id", sourceId),
+    );
 
     let processed = 0;
     for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { detectLocaleVersion } from "@/lib/google/drive-versions";
 import type { ProductLine } from "@eg/db/types";
@@ -60,10 +61,12 @@ export async function GET(request: Request) {
       const currentVersions = (product.current_versions ?? {}) as Record<string, string>;
       if (!currentVersions[lang] || currentVersions[lang] === "0.0") {
         currentVersions[lang] = driveVersion.version;
-        await supabase
-          .from("products")
-          .update({ current_versions: currentVersions })
-          .eq("id", product.id);
+        throwIfDbError(`${model} current_versions`)(
+          await supabase
+            .from("products")
+            .update({ current_versions: currentVersions })
+            .eq("id", product.id),
+        );
       }
 
       return NextResponse.json({

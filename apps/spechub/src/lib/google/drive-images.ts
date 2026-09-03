@@ -2,6 +2,7 @@ import { google } from "googleapis";
 import { Readable } from "stream";
 import { getGoogleAuth } from "./auth";
 import { getLocaleSuffix } from "./drive-versions";
+import { throwIfDbError } from "@eg/db/errors";
 
 const DS_IMAGES_FOLDER_NAME = "DS Images";
 
@@ -432,7 +433,41 @@ export interface ImageSyncResult {
    * failed for any reason), the caller must NOT treat nulls as deletes.
    */
   folder_listed: boolean;
+  /**
+   * DB columns whose sync ERRORED — a download that 429'd, a Storage upload
+   * that failed. `folder_listed` alone cannot express this: the listing
+   * worked, the file is there, and the URL is still null. Reading that as
+   * "deleted from Drive" is how a transient Google hiccup wiped a product's
+   * artwork until somebody noticed the datasheet had no picture in it.
+   * Callers must not clear a column named here.
+   */
+  failed: ("product_image" | "hardware_image" | "hardware_image_2")[];
+  /**
+   * The folder listed successfully and contained NOTHING. Almost always a
+   * misconfiguration rather than a mass deletion — `ds_images_folder_id`
+   * pointed at the product-line folder instead of its DS Images child is a
+   * documented recurring mistake, and it would otherwise clear every image
+   * on the line in one pass.
+   */
+  folder_empty: boolean;
 }
+
+/**
+ * May the caller clear the DB column for `field`?
+ *
+ * Only when Drive gave a straight answer: the folder listed, it was not
+ * empty, and this particular image did not error on the way through. Every
+ * other combination means "we do not know", and the safe reading of "we do
+ * not know" is to leave what is on record alone — a stale image is a much
+ * smaller problem than a datasheet with no picture in it.
+ */
+export function canClear(
+  result: Pick<ImageSyncResult, "folder_listed" | "folder_empty" | "failed">,
+  field: ImageSyncResult["failed"][number],
+): boolean {
+  return result.folder_listed && !result.folder_empty && !result.failed.includes(field);
+}
+
 
 /**
  * List every file in a Drive folder and return a map from lowercase
@@ -536,13 +571,20 @@ export interface LocalizedImageSyncResult {
  */
 export async function syncLocalizedHardwareImage(params: {
   modelName: string;
-  productId: string;
+  /**
+   * NOTE: there is no `productId` here on purpose. `product_translations`
+   * references `products(model_name)`, not `products(id)`, so the three call
+   * sites that passed a uuid produced a foreign-key violation on every
+   * insert — swallowed, because nothing read the error. Locale hardware
+   * images have therefore never once been recorded. Taking the parameter
+   * away is what stops it coming back.
+   */
   locale: string;
   lineName: string;
   enDsImagesFolderId: string;
   supabase: ReturnType<typeof import("@eg/db/admin").createAdminClient>;
 }): Promise<LocalizedImageSyncResult> {
-  const { modelName, productId, locale, lineName, enDsImagesFolderId, supabase } = params;
+  const { modelName, locale, lineName, enDsImagesFolderId, supabase } = params;
 
   const suffix = getLocaleSuffix(locale);
   if (!suffix || suffix === "en") return { url: null, folder_listed: false };
@@ -586,15 +628,17 @@ export async function syncLocalizedHardwareImage(params: {
     const { data: existingTranslation } = await supabase
       .from("product_translations" as "products")
       .select("id, hardware_image")
-      .eq("product_id", productId)
+      .eq("product_id", modelName)
       .eq("locale", locale)
       .single() as { data: { id: string; hardware_image: string | null } | null };
 
     if (existingTranslation?.hardware_image) {
-      await supabase
-        .from("product_translations" as "products")
-        .update({ hardware_image: null })
-        .eq("id", existingTranslation.id);
+      throwIfDbError(`${modelName} ${locale} hardware_image clear`)(
+        await supabase
+          .from("product_translations" as "products")
+          .update({ hardware_image: null })
+          .eq("id", existingTranslation.id),
+      );
     }
     return { url: null, folder_listed: true };
   }
@@ -622,19 +666,23 @@ export async function syncLocalizedHardwareImage(params: {
   const { data: existingTranslation } = await supabase
     .from("product_translations" as "products")
     .select("id")
-    .eq("product_id", productId)
+    .eq("product_id", modelName)
     .eq("locale", locale)
     .single() as { data: { id: string } | null };
 
   if (existingTranslation) {
-    await supabase
-      .from("product_translations" as "products")
-      .update({ hardware_image: publicUrl })
-      .eq("id", existingTranslation.id);
+    throwIfDbError(`${modelName} ${locale} hardware_image update`)(
+      await supabase
+        .from("product_translations" as "products")
+        .update({ hardware_image: publicUrl })
+        .eq("id", existingTranslation.id),
+    );
   } else {
-    await supabase
-      .from("product_translations" as "products")
-      .insert({ product_id: productId, locale, hardware_image: publicUrl });
+    throwIfDbError(`${modelName} ${locale} hardware_image insert`)(
+      await supabase
+        .from("product_translations" as "products")
+        .insert({ product_id: modelName, locale, hardware_image: publicUrl }),
+    );
   }
 
   return { url: publicUrl, folder_listed: true };
@@ -682,6 +730,8 @@ export async function syncProductImages(
     hardware_image_url: null,
     hardware_image_2_url: null,
     folder_listed: false,
+    failed: [],
+    folder_empty: false,
   };
 
   // No folder → nothing to sync, nothing to delete (caller should keep
@@ -696,6 +746,7 @@ export async function syncProductImages(
   const fileMap = await listFilesInFolder(dsImagesFolderId);
   if (!fileMap) return result;
   result.folder_listed = true;
+  result.folder_empty = fileMap.size === 0;
 
   const imageTypes = [
     { suffix: "product", key: "product_image_url" as const, dbField: "product_image" as const },
@@ -763,6 +814,7 @@ export async function syncProductImages(
 
       if (error) {
         console.error(`Failed to upload ${fileName}:`, error.message);
+        result.failed.push(dbField);
         continue;
       }
 
@@ -776,6 +828,7 @@ export async function syncProductImages(
         `Failed to sync ${fileName}:`,
         err instanceof Error ? err.message : String(err)
       );
+      result.failed.push(dbField);
     }
   }
 

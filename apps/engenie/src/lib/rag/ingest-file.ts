@@ -13,6 +13,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
+import { throwIfDbError } from "@eg/db/errors";
 
 const EMBED_BATCH_SIZE = 20;
 const MAX_EMBED_CHARS = 21000;
@@ -41,11 +42,13 @@ export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileRes
   const supabase = createAdminClient();
   const displayTitle = label?.trim() || fileName;
 
-  await supabase
-    .from("documents" as "products")
-    .delete()
-    .eq("source_type", "file")
-    .eq("source_id", sourceId);
+  throwIfDbError("documents delete (file)")(
+    await supabase
+      .from("documents" as "products")
+      .delete()
+      .eq("source_type", "file")
+      .eq("source_id", sourceId),
+  );
 
   const chunks = chunkText(text, displayTitle, label);
   if (chunks.length === 0) throw new Error("No text extracted from file");

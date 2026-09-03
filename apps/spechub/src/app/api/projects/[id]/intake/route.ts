@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
 import { getProjectIntakeModel } from "@/lib/llm/models";
@@ -144,10 +145,12 @@ async function apply(
 
   const result = await applyItems(supabase, id, doc, models, chosen);
 
-  await supabase
-    .from("project_datasheet_sources")
-    .update({ extraction: { ...stored, applied: accept } as never })
-    .eq("id", body.sourceId);
+  throwIfDbError("source extraction applied")(
+    await supabase
+      .from("project_datasheet_sources")
+      .update({ extraction: { ...stored, applied: accept } as never })
+      .eq("id", body.sourceId),
+  );
 
   return NextResponse.json(result);
 }

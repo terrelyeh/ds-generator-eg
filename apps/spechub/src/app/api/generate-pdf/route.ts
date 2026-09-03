@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
+import { logIfDbError, throwIfDbError } from "@eg/db/errors";
 import {
   detectLatestVersion,
   detectLocaleVersion,
@@ -201,12 +202,16 @@ export async function POST(request: Request) {
   }
 
   const lockValue: PdfLock = { locked_at: new Date().toISOString(), model, lang };
-  await supabase
-    .from("app_settings" as "products")
-    .upsert(
-      { key: lockKey, value: JSON.stringify(lockValue), updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
+  // Failing to take the lock has to fail the request: the alternative is two
+  // renders of the same model racing each other to a version number.
+  throwIfDbError("pdf lock acquire")(
+    await supabase
+      .from("app_settings" as "products")
+      .upsert(
+        { key: lockKey, value: JSON.stringify(lockValue), updated_at: new Date().toISOString() },
+        { onConflict: "key" }
+      ),
+  );
 
   // Get the product + product line info
   const { data: product, error: productError } = await supabase
@@ -237,10 +242,11 @@ export async function POST(request: Request) {
 
   // Helper to release the lock
   async function releaseLock() {
-    await supabase
-      .from("app_settings" as "products")
-      .delete()
-      .eq("key", lockKey);
+    // Best effort: a lock left behind expires on its own TTL.
+    logIfDbError(
+      "pdf lock release",
+      await supabase.from("app_settings" as "products").delete().eq("key", lockKey),
+    );
   }
 
   // Defense-in-depth: refuse to generate locale PDF when the translation
@@ -557,28 +563,36 @@ export async function POST(request: Request) {
 
     if (isLocalized) {
       const updatedVersions = { ...freshVersions, [lang]: newVersion };
-      await supabase
-        .from("products")
-        .update({ current_versions: updatedVersions })
-        .eq("id", product.id);
+      throwIfDbError("products current_versions")(
+        await supabase
+          .from("products")
+          .update({ current_versions: updatedVersions })
+          .eq("id", product.id),
+      );
     } else {
       const updatedVersions = { ...freshVersions, en: newVersion };
-      await supabase
-        .from("products")
-        .update({
-          current_version: newVersion,
-          current_versions: updatedVersions,
-        })
-        .eq("id", product.id);
+      // The toolbar reads these. Losing the write silently is how a product
+      // ends up offering "Regenerate v1.4" for a v1.5 that exists.
+      throwIfDbError("products current_version")(
+        await supabase
+          .from("products")
+          .update({
+            current_version: newVersion,
+            current_versions: updatedVersions,
+          })
+          .eq("id", product.id),
+      );
     }
 
-    await supabase.from("change_logs").insert({
-      product_id: product.id,
-      product_line_id: product.product_line_id,
-      changes_summary: isRegenerate
-        ? `Regenerated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`
-        : `Generated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`,
-    });
+    throwIfDbError("pdf change_logs insert")(
+      await supabase.from("change_logs").insert({
+        product_id: product.id,
+        product_line_id: product.product_line_id,
+        changes_summary: isRegenerate
+          ? `Regenerated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`
+          : `Generated PDF v${newVersion}${isLocalized ? ` (${lang})` : ""}`,
+      }),
+    );
 
     // --- Release lock ---
     await releaseLock();
@@ -713,23 +727,28 @@ async function generateSeriesPdf(lineName: string, mode: string) {
     } catch { /* stale lock — proceed */ }
   }
 
-  await supabase
-    .from("app_settings" as "products")
-    .upsert(
-      {
-        key: lockKey,
-        value: JSON.stringify({
-          locked_at: new Date().toISOString(),
-          model: `series:${lineName}`,
-          lang: "en",
-        } satisfies PdfLock),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "key" },
-    );
+  throwIfDbError("series pdf lock acquire")(
+    await supabase
+      .from("app_settings" as "products")
+      .upsert(
+        {
+          key: lockKey,
+          value: JSON.stringify({
+            locked_at: new Date().toISOString(),
+            model: `series:${lineName}`,
+            lang: "en",
+          } satisfies PdfLock),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "key" },
+      ),
+  );
 
   async function releaseLock() {
-    await supabase.from("app_settings" as "products").delete().eq("key", lockKey);
+    logIfDbError(
+      "series pdf lock release",
+      await supabase.from("app_settings" as "products").delete().eq("key", lockKey),
+    );
   }
 
   const { data: plData } = (await supabase
@@ -883,11 +902,13 @@ async function generateSeriesPdf(lineName: string, mode: string) {
       throw new Error(`line_datasheets version update failed: ${updateRes.error.message}`);
     }
 
-    await supabase.from("change_logs").insert({
-      product_id: null,
-      product_line_id: pl.id,
-      changes_summary: `${entry.changes} — series v${newVersion}`,
-    });
+    throwIfDbError("series change_logs insert")(
+      await supabase.from("change_logs").insert({
+        product_id: null,
+        product_line_id: pl.id,
+        changes_summary: `${entry.changes} — series v${newVersion}`,
+      }),
+    );
 
     await releaseLock();
 

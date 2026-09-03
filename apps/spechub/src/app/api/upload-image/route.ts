@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import {
   deleteDriveFilesByPrefix,
   resolveLocaleDsImagesFolder,
@@ -150,10 +151,9 @@ export async function POST(request: Request) {
         : imageType === "hardware"
           ? "hardware_image"
           : "hardware_image_2";
-    await supabase
-      .from("products")
-      .update({ [field]: publicUrl })
-      .eq("id", product.id);
+    throwIfDbError(`${model} ${field}`)(
+      await supabase.from("products").update({ [field]: publicUrl }).eq("id", product.id),
+    );
   } else if (imageType === "radio_pattern" && label) {
     // Upsert image_assets record
     const { data: existing } = await supabase
@@ -165,18 +165,22 @@ export async function POST(request: Request) {
       .single();
 
     if (existing) {
-      await supabase
-        .from("image_assets")
-        .update({ file_url: publicUrl, status: "uploaded" })
-        .eq("id", existing.id);
+      throwIfDbError("image_assets update")(
+        await supabase
+          .from("image_assets")
+          .update({ file_url: publicUrl, status: "uploaded" })
+          .eq("id", existing.id),
+      );
     } else {
-      await supabase.from("image_assets").insert({
-        product_id: product.id,
-        image_type: "radio_pattern",
-        label,
-        file_url: publicUrl,
-        status: "uploaded",
-      });
+      throwIfDbError("image_assets insert")(
+        await supabase.from("image_assets").insert({
+          product_id: product.id,
+          image_type: "radio_pattern",
+          label,
+          file_url: publicUrl,
+          status: "uploaded",
+        }),
+      );
     }
   }
 
@@ -347,33 +351,41 @@ export async function DELETE(request: Request) {
   // throws, so the clear silently did nothing (pitfall #60). Write "".
   // product_translations.hardware_image IS nullable, so null is right there.
   if (imageType === "product") {
-    await supabase
-      .from("products")
-      .update({ product_image: "" })
-      .eq("id", product.id);
+    throwIfDbError(`${model} product_image clear`)(
+      await supabase.from("products").update({ product_image: "" }).eq("id", product.id),
+    );
   } else if (imageType === "hardware" || imageType === "hardware_2") {
     if (locale) {
       // Clear product_translations.hardware_image for this locale only
-      await supabase
-        .from("product_translations" as "products")
-        .update({ hardware_image: null })
-        .eq("product_id", product.id)
-        .eq("locale", locale);
+      // `product_translations.product_id` references products(model_name),
+      // not products(id) — this matched nothing, so deleting a locale image
+      // cleared Storage and Drive and left the DB still pointing at it.
+      throwIfDbError(`${model} ${locale} hardware_image clear`)(
+        await supabase
+          .from("product_translations" as "products")
+          .update({ hardware_image: null })
+          .eq("product_id", model)
+          .eq("locale", locale),
+      );
     } else {
-      await supabase
-        .from("products")
-        .update(
-          imageType === "hardware" ? { hardware_image: "" } : { hardware_image_2: "" },
-        )
-        .eq("id", product.id);
+      throwIfDbError(`${model} ${imageType} clear`)(
+        await supabase
+          .from("products")
+          .update(
+            imageType === "hardware" ? { hardware_image: "" } : { hardware_image_2: "" },
+          )
+          .eq("id", product.id),
+      );
     }
   } else if (imageType === "radio_pattern" && label) {
-    await supabase
-      .from("image_assets")
-      .delete()
-      .eq("product_id", product.id)
-      .eq("image_type", "radio_pattern")
-      .eq("label", label);
+    throwIfDbError("image_assets delete")(
+      await supabase
+        .from("image_assets")
+        .delete()
+        .eq("product_id", product.id)
+        .eq("image_type", "radio_pattern")
+        .eq("label", label),
+    );
   }
 
   return NextResponse.json({

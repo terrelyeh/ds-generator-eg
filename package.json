@@ -12,6 +12,7 @@
     "lint": "npm run lint -w spechub",
     "test": "npm run test -w spechub",
     "check:feature-tags": "node scripts/check-feature-tags.mjs",
+    "check:db-writes": "node scripts/check-db-writes.mjs",
     "check:guide-labels": "node scripts/check-guide-labels.mjs",
     "check:guide-layouts": "node scripts/check-guide-layouts.mjs"
   }

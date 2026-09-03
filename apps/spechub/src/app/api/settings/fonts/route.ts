@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 
 /**
@@ -45,12 +46,14 @@ export async function POST(request: Request) {
   if (!locale) return NextResponse.json({ error: "Missing locale" }, { status: 400 });
 
   const supabase = createAdminClient();
-  await supabase
-    .from("app_settings" as "products")
-    .upsert(
-      { key: `custom_fonts_${locale}`, value: JSON.stringify(fonts), updated_at: new Date().toISOString() },
-      { onConflict: "key" }
-    );
+  throwIfDbError("custom_fonts save")(
+    await supabase
+      .from("app_settings" as "products")
+      .upsert(
+        { key: `custom_fonts_${locale}`, value: JSON.stringify(fonts), updated_at: new Date().toISOString() },
+        { onConflict: "key" },
+      ),
+  );
 
   return NextResponse.json({ ok: true });
 }

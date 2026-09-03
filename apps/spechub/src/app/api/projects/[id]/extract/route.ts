@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
 import { getProjectExtractModel } from "@/lib/llm/models";
@@ -140,9 +141,13 @@ export async function POST(
   // later, the question is always "where did this number come from", and a
   // transcript without the document it came from is only half an answer.
   const storagePath = `${id}/${crypto.randomUUID()}-${file.name}`;
-  await supabase.storage
-    .from("project-datasheets")
-    .upload(storagePath, buf, { contentType: file.type || "application/octet-stream" });
+  // The source row about to be written records this path. If the object is
+  // not there, the gap scanner reads a source that cannot be opened.
+  throwIfDbError("project-datasheets upload")(
+    await supabase.storage
+      .from("project-datasheets")
+      .upload(storagePath, buf, { contentType: file.type || "application/octet-stream" }),
+  );
 
   return preview(supabase, id, model, kind, file.name, storagePath, read);
 }
