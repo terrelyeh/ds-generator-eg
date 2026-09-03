@@ -219,7 +219,12 @@ async function merge(
     sourceText: await loadSourceText(supabase, id),
     catalogModels: await loadCatalogModels(supabase, id, models),
   });
-  const plan = findings.find((f) => f.code === question.code)?.merge;
+  // Identity is (code, modelId, rowKey), never code alone. One split produces
+  // a pair per target row, and all of them share `same_spec_split:<fromKey>` —
+  // so with three or more columns, matching on code folds the wrong pair and
+  // reports it under the card the user did not click.
+  const wanted = storedFindingId(question);
+  const plan = findings.find((f) => findingId(f) === wanted)?.merge;
   if (!plan) {
     return NextResponse.json(
       { error: "這兩列已經不成對了——按「重新檢查」看目前的狀況。" },
@@ -268,6 +273,11 @@ async function merge(
     return NextResponse.json({ error: "沒有值需要搬" }, { status: 409 });
   }
 
+  // Apply first, answer second. Marking the question answered before the write
+  // lands leaves `openBlockers()` counting a merge that never happened as
+  // settled, and the spec table is the thing the customer reads.
+  const result = await applyItems(supabase, id, doc, models, items);
+
   const user = await getCurrentUser();
   await supabase
     .from("project_datasheet_questions")
@@ -281,7 +291,6 @@ async function merge(
     .eq("id", question.id)
     .eq("project_datasheet_id", id);
 
-  const result = await applyItems(supabase, id, doc, models, items);
   return NextResponse.json({ ...result, into: intoRow.label, from: fromRow.label });
 }
 

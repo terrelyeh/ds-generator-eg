@@ -37,6 +37,15 @@ const SYNONYMS: Record<string, string[]> = {
     "environment", "environmental", "operating_temperature", "operating_temp",
     "temperature", "working_temperature", "ambient_temperature", "temp",
   ],
+  // Its own group so the table REFUSES to pair it with the operating range.
+  // Both are written `-40 ~ +70 °C`, so the shape test alone folds them and
+  // relabels a storage limit as the operating one on a customer document.
+  // Bare "storage" is deliberately absent: in a spec sheet that word is
+  // nearly always flash, and it already belongs to `memory`.
+  storage_temperature: [
+    "storage_temperature", "storage_temp", "non_operating_temperature",
+    "non_operating_temp",
+  ],
   humidity: ["humidity", "operating_humidity", "relative_humidity"],
   dimensions: [
     "dimensions", "dimension", "product_size", "size", "physical_dimensions",

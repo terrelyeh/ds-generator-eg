@@ -75,6 +75,15 @@ function findModelColumn(rows: unknown[][], modelNumber: string): number | null 
   return null;
 }
 
+/** Shape of the `product_lines` select above. */
+type ProductLineRow = {
+  id: string;
+  name: string;
+  label: string;
+  sheet_id: string | null;
+  detail_specs_gid: number | null;
+};
+
 async function main() {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -106,7 +115,7 @@ async function main() {
   ];
 
   for (const { line, model } of testCases) {
-    const productLine = (lines ?? []).find((l: any) => l.label === line);
+    const productLine = ((lines ?? []) as ProductLineRow[]).find((l) => l.label === line);
     if (!productLine) {
       console.log(`\n⚠ Product line "${line}" not found`);
       continue;
@@ -114,8 +123,8 @@ async function main() {
 
     console.log(`\n━━━ ${line}: ${model} ━━━`);
 
-    const sheetId = (productLine as any).sheet_id;
-    const gid = (productLine as any).detail_specs_gid;
+    const sheetId = productLine.sheet_id;
+    const gid = productLine.detail_specs_gid;
     if (!sheetId || gid == null) {
       console.log(`  ⚠ Missing sheet_id (${sheetId}) or detail_specs_gid (${gid})`);
       continue;

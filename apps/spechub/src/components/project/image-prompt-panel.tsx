@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,9 +33,13 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
   const [scene, setScene] = useState("");
   const [equipment, setEquipment] = useState("");
   const [modelName, setModelName] = useState(models[0]?.modelName ?? "");
-  const [text, setText] = useState("");
-  /** true once the author has typed in the box — fields stop overwriting it */
-  const [edited, setEdited] = useState(false);
+  /**
+   * What the author typed, or null while the box is still following the
+   * fields above. Deriving the text rather than mirroring it into state is
+   * what keeps the two from disagreeing: a copy kept in sync by an effect is
+   * one render behind whenever the fields change.
+   */
+  const [draft, setDraft] = useState<string | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
 
   const composed = useMemo(
@@ -43,9 +47,8 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
     [kind, scene, modelName, equipment],
   );
 
-  useEffect(() => {
-    if (!edited) setText(composed);
-  }, [composed, edited]);
+  const edited = draft !== null;
+  const text = draft ?? composed;
 
   const photo = models.find((m) => m.modelName === modelName)?.url ?? null;
   /* Copying a prompt with 「（還沒填場景）」 in it wastes a three-to-eight
@@ -178,8 +181,7 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
             <button
               type="button"
               onClick={() => {
-                setEdited(false);
-                setText(composed);
+                setDraft(null);
               }}
               className="text-xs text-muted-foreground hover:underline"
             >
@@ -192,8 +194,7 @@ export function ImagePromptPanel({ models }: { models: ModelPhoto[] }) {
           rows={12}
           value={text}
           onChange={(e) => {
-            setText(e.target.value);
-            setEdited(true);
+            setDraft(e.target.value);
           }}
           className="font-mono text-[11px] leading-relaxed"
         />

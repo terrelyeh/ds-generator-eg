@@ -1,4 +1,11 @@
-# The three checks that catch things nothing else does.
+# Everything CI knows how to check, in two categories.
+#
+# `checks` is the ordinary floor — types, lint, unit tests. It was missing for
+# a long time and the cost showed: `next build` stopped running ESLint in
+# Next 16, so a red lint blocked nothing and stayed red.
+#
+# `guards` is the interesting half: three checks that catch things nothing
+# else does.
 #
 # All three guard against drift that produces NO symptom — the build stays green,
 # the screen looks right, and the damage shows up weeks later:
@@ -12,7 +19,7 @@
 #
 # Running them locally was already possible and that was the problem: a guard
 # somebody has to remember to run is a guard for the person who already knew.
-name: Guards
+name: CI
 
 on:
   pull_request:
@@ -20,6 +27,37 @@ on:
     branches: [main]
 
 jobs:
+  # Types, lint and the pure-module unit tests. Nothing here needs secrets or
+  # a database, so it runs on every PR from anywhere.
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Types (spechub)
+        run: npx tsc --noEmit -p apps/spechub/tsconfig.json
+
+      - name: Types (engenie)
+        run: npx tsc --noEmit -p apps/engenie/tsconfig.json
+
+      - name: Lint (spechub)
+        run: npm run lint -w spechub
+
+      - name: Lint (engenie)
+        run: npm run lint -w engenie
+
+      # Only the pure modules — layout maths, the gap scanner, the spec
+      # pairer. See apps/spechub/vitest.config.mts for why the rest is out.
+      - name: Unit tests
+        run: npm test
+
   guards:
     runs-on: ubuntu-latest
     steps:
