@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@eg/db/client";
+import { safeNextPath } from "@eg/auth/safe-next";
 
 const NEXT_KEY = "specHub.auth.next";
 
@@ -10,7 +11,10 @@ export function SignInForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") ?? "/";
+  // Validated here as well as on the way out: two cheap checks are worth
+  // less than one, but a value that is never allowed to be unsafe is easier
+  // to reason about than one that is only sanitised at the last step.
+  const next = safeNextPath(searchParams.get("next"));
   const oauthError = searchParams.get("error");
 
   async function handleSignIn() {

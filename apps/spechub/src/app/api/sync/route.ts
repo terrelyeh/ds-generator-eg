@@ -721,10 +721,10 @@ export async function POST(request: Request) {
   });
 }
 
-// Also allow GET for easy testing via browser
-export async function GET(request: Request) {
-  return POST(request);
-}
+// No GET alias. It existed for browser testing, and a browser is exactly the
+// problem: session cookies ride along on a top-level navigation, so a link to
+// /api/sync?force=true was a one-click full resync for anyone with the
+// permission. Use POST (the Sync button, or curl with the cron bearer).
 
 // ---------------------------------------------------------------------------
 // Helpers

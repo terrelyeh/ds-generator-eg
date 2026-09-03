@@ -88,7 +88,10 @@ folder rules, PDF Generation locale handling).
 
 36. **Next.js 16 用 `proxy.ts` 不是 `middleware.ts`** — Next.js 16 把 middleware 改名為 proxy（功能一樣）。檔案在 `src/proxy.ts`，export `async function proxy(request)` 不是 `middleware`。如果同時有 `middleware.ts` 和 `proxy.ts` build 會直接 fail
 
-37. **Vercel cron 用 `x-vercel-cron` header 區分** — `CRON_SECRET` env var 沒設（也不需要設）。Vercel cron 觸發 `/api/sync` 時自動帶 `x-vercel-cron: 1` header，這個 header 不能從外部 spoof。`gateOrCron()` 先檢查這個 header 再 fallback 到 `CRON_SECRET` bearer 再 fallback 到 user permission
+37. **Vercel cron 認的是 `CRON_SECRET` bearer,不是 `x-vercel-cron` header**（2026-09-04 更正）—— 這一條原本寫著「header 不能從外部 spoof」,而且說 `CRON_SECRET` 沒設也不需要設。兩句都是錯的。
+    對 prod 打 `curl -H 'x-vercel-cron: 1' -X POST .../api/cron/reindex-products` 會回 200,同一個請求不帶 header 回 401 —— 那個 header 是任何人都能自己加的字串,Vercel 沒有承諾會把它從外來請求裡剝掉。
+    實際狀況是 **兩個 Vercel 專案都有設 `CRON_SECRET`（且同值）**,Vercel Cron 觸發時自己會送 `Authorization: Bearer $CRON_SECRET`,spechub sync 完打 engenie 也是送這個。所以 header 分支從頭到尾沒有在承擔任何工作,只是多開了一扇門。
+    `gateOrCron()` 現在只有兩條路:**bearer（constant-time 比對）→ user permission**。
 
 ---
 

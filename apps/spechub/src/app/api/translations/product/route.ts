@@ -148,6 +148,9 @@ export async function POST(request: Request) {
  * Body: { product_id: string, locale: string }
  */
 export async function DELETE(request: Request) {
+  const denied = await gate("translation.edit");
+  if (denied) return denied;
+
   const body = await request.json();
   const { product_id, locale } = body as { product_id: string; locale: string };
 

@@ -89,7 +89,5 @@ export async function POST(request: Request) {
   });
 }
 
-// Allow GET for easy testing
-export async function GET(request: Request) {
-  return POST(request);
-}
+// No GET alias — see /api/sync for why a side-effecting GET is a link away
+// from being triggered by anyone who is already signed in.

@@ -24,8 +24,11 @@ Three-layer enforcement:
    whitelist), signs them out and redirects to `/auth/no-access`.
 3. **Per-route gates**:
    - API routes: `gate("permission")` returns 401/403 NextResponse on
-     failure. `gateOrCron()` variant lets Vercel cron through via the
-     `x-vercel-cron` header.
+     failure. `gateOrCron()` variant additionally accepts
+     `Authorization: Bearer $CRON_SECRET`, compared in constant time —
+     which is what Vercel Cron sends. It used to accept a bare
+     `x-vercel-cron` header too; that header is attacker-settable and was
+     removed (pitfall #37).
    - Server pages: `adminOnly()` / `requirePagePermission()` redirect
      non-authorised users to `/dashboard` before render.
    - Client UI: `can(role, "permission")` controls conditional rendering

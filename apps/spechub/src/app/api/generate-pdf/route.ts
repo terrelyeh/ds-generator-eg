@@ -81,6 +81,44 @@ export async function GET(request: Request) {
  * 7. Releases lock
  */
 /**
+ * Send the deployment-protection bypass to our own origin and nowhere else.
+ *
+ * `page.setExtraHTTPHeaders` — what this used to do — applies the header to
+ * EVERY request the page makes, and a datasheet pulls webfonts from Google,
+ * a QR image from api.qrserver.com and artwork from Supabase Storage. So
+ * each render handed three outside hosts the secret that `proxy.ts` accepts
+ * as full application auth, and it landed in their logs.
+ *
+ * Returns whether a secret was configured, for the diagnostics below.
+ */
+async function sendBypassOnlyTo(page: Page, baseUrl: string): Promise<boolean> {
+  const secret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+  if (!secret) return false;
+
+  await page.setRequestInterception(true);
+  page.on("request", (req) => {
+    // Every intercepted request must be continued or the page hangs and
+    // `networkidle0` never fires, so this can't be allowed to throw.
+    try {
+      if (req.url().startsWith(baseUrl)) {
+        void req.continue({
+          headers: {
+            ...req.headers(),
+            "x-vercel-protection-bypass": secret,
+            "x-vercel-set-bypass-cookie": "true",
+          },
+        });
+      } else {
+        void req.continue();
+      }
+    } catch {
+      // Already handled by another listener — nothing to do.
+    }
+  });
+  return true;
+}
+
+/**
  * Block until every glyph on the page has its webfont.
  *
  * `networkidle0` only means the network went quiet, and `document.fonts.ready`
@@ -333,17 +371,6 @@ export async function POST(request: Request) {
 
     const page = await browser.newPage();
 
-    // Attach Vercel Deployment Protection bypass header if configured.
-    // Without this, Puppeteer fetching our own URL may hit the "Log in to
-    // Vercel" gate and print that page instead of the datasheet.
-    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    if (bypassSecret) {
-      await page.setExtraHTTPHeaders({
-        "x-vercel-protection-bypass": bypassSecret,
-        "x-vercel-set-bypass-cookie": "true",
-      });
-    }
-
     // Resolve the base URL for the preview page.
     //
     // Priority:
@@ -362,6 +389,11 @@ export async function POST(request: Request) {
         : process.env.VERCEL_URL
           ? `https://${process.env.VERCEL_URL}`
           : `http://localhost:${process.env.PORT || 3000}`);
+
+    // Bypass header goes on now that we know which origin is ours. Without
+    // it, Puppeteer fetching our own URL hits the "Log in to Vercel" gate
+    // and prints that page as the datasheet.
+    const bypassSecret = await sendBypassOnlyTo(page, baseUrl);
 
     // Pass lang and mode to the preview page
     // Pass the resolved version to the preview page so the footer renders
@@ -389,7 +421,7 @@ export async function POST(request: Request) {
     if (/log in to vercel|authentication required/i.test(pageTitle)) {
       await browser.close();
       throw new Error(
-        `Preview page hit Vercel auth gate. pageTitle="${pageTitle}" finalUrl="${finalUrl}" baseUrl="${baseUrl}" previewUrl="${previewUrl}" hasBypassSecret=${!!bypassSecret}`
+        `Preview page hit Vercel auth gate. pageTitle="${pageTitle}" finalUrl="${finalUrl}" baseUrl="${baseUrl}" previewUrl="${previewUrl}" hasBypassSecret=${bypassSecret}`
       );
     }
 
@@ -604,14 +636,6 @@ async function printPreviewPdf(previewPath: string): Promise<Buffer> {
   try {
     const page = await browser.newPage();
 
-    const bypassSecret = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
-    if (bypassSecret) {
-      await page.setExtraHTTPHeaders({
-        "x-vercel-protection-bypass": bypassSecret,
-        "x-vercel-set-bypass-cookie": "true",
-      });
-    }
-
     // Preview deployments print their OWN URL — the prod alias may not have
     // the route being tested yet (see the per-model flow for the same rule).
     const baseUrl =
@@ -624,6 +648,8 @@ async function printPreviewPdf(previewPath: string): Promise<Buffer> {
               ? `https://${process.env.VERCEL_URL}`
               : `http://localhost:${process.env.PORT || 3000}`);
 
+    const bypassSecret = await sendBypassOnlyTo(page, baseUrl);
+
     const previewUrl = `${baseUrl}${previewPath}`;
     await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 30000 });
     await waitForFonts(page);
@@ -631,7 +657,7 @@ async function printPreviewPdf(previewPath: string): Promise<Buffer> {
     const pageTitle = await page.title();
     if (/log in to vercel|authentication required|404/i.test(pageTitle)) {
       throw new Error(
-        `Preview page not reachable. pageTitle="${pageTitle}" previewUrl="${previewUrl}" hasBypassSecret=${!!bypassSecret}`,
+        `Preview page not reachable. pageTitle="${pageTitle}" previewUrl="${previewUrl}" hasBypassSecret=${bypassSecret}`,
       );
     }
 
