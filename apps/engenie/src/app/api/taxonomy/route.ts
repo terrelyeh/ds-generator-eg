@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
 
 /**
  * GET /api/taxonomy
@@ -15,6 +16,12 @@ import { createAdminClient } from "@eg/db/admin";
  * }
  */
 export async function GET() {
+  // The proxy only proves a Supabase session exists; the whitelist is checked
+  // in `(main)/layout.tsx`, which an API route never renders. Without this,
+  // any Google account reads every model name and status, unreleased included.
+  const denied = await gate("knowledge.view");
+  if (denied) return denied;
+
   const supabase = createAdminClient();
 
   const [solutionsRes, productLinesRes, productsRes] = await Promise.all([

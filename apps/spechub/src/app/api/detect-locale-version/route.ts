@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { gate } from "@eg/auth/session";
 import { detectLocaleVersion } from "@/lib/google/drive-versions";
 import type { ProductLine } from "@eg/db/types";
 
@@ -11,6 +12,11 @@ import type { ProductLine } from "@eg/db/types";
  * Returns the detected version.
  */
 export async function GET(request: Request) {
+  // It reads Drive on the service account's quota and writes
+  // `products.current_versions`, so it is an editor action wearing a GET.
+  const denied = await gate("translation.edit");
+  if (denied) return denied;
+
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
   const lang = searchParams.get("lang");

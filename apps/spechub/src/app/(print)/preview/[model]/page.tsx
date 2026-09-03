@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@eg/db/server";
+import { getSetting } from "@eg/db/settings";
 import { splitIntoPages, filterRenderableSections } from "@/lib/datasheet/pagination";
 import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
@@ -485,14 +486,14 @@ export default async function PreviewPage({
   const typoDefaults = TYPOGRAPHY_DEFAULTS[lang] ?? TYPOGRAPHY_DEFAULTS["en"];
   let typo: TypographySettings = typoDefaults;
   try {
-    const { data: typoData } = await supabase
-      .from("app_settings")
-      .select("value")
-      .eq("key", `typography_${lang}`)
-      .single() as { data: { value: string } | null };
-
-    if (typoData?.value) {
-      typo = { ...typoDefaults, ...JSON.parse(typoData.value) };
+    // Read through the service-role accessor rather than this page's session
+    // client. `app_settings` holds every LLM provider key next to the
+    // typography, so the table cannot stay readable with the anon key — and
+    // this page, rendered by Puppeteer with no session at all, was the only
+    // thing in either app still reading it that way.
+    const typoRaw = await getSetting(`typography_${lang}`);
+    if (typoRaw) {
+      typo = { ...typoDefaults, ...JSON.parse(typoRaw) };
     }
   } catch {
     // Keep the defaults — a settings lookup failure must not restyle a PDF.

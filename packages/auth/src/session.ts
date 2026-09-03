@@ -12,6 +12,7 @@
  * Auth state in this codebase is always cookie-based via @supabase/ssr.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@eg/db/server";
 import { isRole, can, type Permission, type Role } from "./permissions";
@@ -160,35 +161,50 @@ export async function gateOrCron(
   }
 }
 
+/** Compare two secrets without leaking their common prefix through timing. */
+function secretsMatch(a: string, b: string): boolean {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  // timingSafeEqual throws on a length mismatch, which would itself be a
+  // length oracle; compare a fixed-size digest-shaped pair instead by
+  // rejecting early only on length, which the attacker already controls.
+  if (x.length !== y.length) return false;
+  return timingSafeEqual(x, y);
+}
+
 /**
  * Allow a request through if EITHER:
- *   - it's a Vercel cron invocation (carries `x-vercel-cron: 1`), OR
  *   - it includes the configured `CRON_SECRET` as a Bearer token, OR
  *   - the requesting user has the given permission.
  *
  * Use on routes that are normally user-driven but also called by cron
- * (currently `/api/sync` and `/api/notify`). Returns the user when the
- * caller is authenticated, or `null` when the caller is cron — most
- * route code only uses it for the side-effect of throwing on failure.
+ * (currently `/api/sync`, `/api/notify` and EnGenie's two re-index jobs).
+ * Returns the user when the caller is authenticated, or `null` when the
+ * caller is cron — most route code only uses it for the side-effect of
+ * throwing on failure.
+ *
+ * ⚠️ There used to be a third way in: any request carrying an
+ * `x-vercel-cron` header was let straight through, on the belief that only
+ * Vercel's infrastructure could set it. It is not documented as a header
+ * Vercel strips from inbound requests, and a probe against production
+ * confirmed it: `curl -H 'x-vercel-cron: 1'` ran a re-index that the same
+ * request without the header was refused. Vercel sends
+ * `Authorization: Bearer $CRON_SECRET` itself, so the bearer branch below is
+ * the whole mechanism and the header branch bought nothing.
  */
 export async function requirePermissionOrCron(
   request: Request,
   permission: Permission
 ): Promise<AuthUser | null> {
-  // 1. Vercel cron — header is added by Vercel infra, can't be spoofed
-  //    from outside the project.
-  if (request.headers.get("x-vercel-cron")) {
-    return null;
-  }
-
-  // 2. Manual cron-secret bearer (legacy / external triggers).
+  // 1. Cron secret bearer — what Vercel Cron sends, and what an external
+  //    trigger has to present.
   const auth = request.headers.get("authorization");
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && auth === `Bearer ${cronSecret}`) {
+  if (cronSecret && auth && secretsMatch(auth, `Bearer ${cronSecret}`)) {
     return null;
   }
 
-  // 3. Otherwise, fall back to per-user permission check.
+  // 2. Otherwise, fall back to per-user permission check.
   return requirePermission(permission);
 }
 

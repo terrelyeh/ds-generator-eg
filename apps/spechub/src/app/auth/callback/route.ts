@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@eg/db/server";
+import { getCurrentUser } from "@eg/auth/session";
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
@@ -59,6 +60,20 @@ export async function GET(request: NextRequest) {
     const url = new URL("/auth/sign-in", origin);
     url.searchParams.set("error", error.message);
     return NextResponse.redirect(url);
+  }
+
+  // Whitelist check, here rather than only in `(main)/layout.tsx`.
+  //
+  // Google will hand a session to any account that completes consent, and
+  // `handle_new_user` deliberately creates no profile row for an email that
+  // is not on the whitelist. The layout catches that — but a layout only
+  // runs for a page, so between this redirect and the first page render the
+  // holder of that session can talk to `/api/*` and to PostgREST as the
+  // `authenticated` role. Ending it here closes that window at its source.
+  const user = await getCurrentUser();
+  if (!user) {
+    await supabase.auth.signOut();
+    return NextResponse.redirect(new URL("/auth/no-access", origin));
   }
 
   // Hand off to the client-side redirector which reads sessionStorage.

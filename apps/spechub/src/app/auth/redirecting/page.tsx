@@ -8,6 +8,7 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { safeNextPath } from "@eg/auth/safe-next";
 
 const NEXT_KEY = "specHub.auth.next";
 
@@ -17,10 +18,8 @@ export default function RedirectingPage() {
   useEffect(() => {
     let next = "/";
     try {
-      const stored = sessionStorage.getItem(NEXT_KEY);
-      if (stored && stored.startsWith("/")) {
-        next = stored;
-      }
+      // startsWith("/") is not enough — see safeNextPath.
+      next = safeNextPath(sessionStorage.getItem(NEXT_KEY));
     } catch {
       /* ignore */
     } finally {

@@ -13,6 +13,11 @@ import { gate } from "@eg/auth/session";
  * List all personas (built-in defaults + custom).
  */
 export async function GET() {
+  // Same reasoning as /api/taxonomy: a session is not a whitelist, and a
+  // persona carries its system prompt.
+  const denied = await gate("settings.edit_personas");
+  if (denied) return denied;
+
   const personas = await listPersonas();
   const defaultIds = new Set(DEFAULT_PERSONAS.map((p) => p.id));
 

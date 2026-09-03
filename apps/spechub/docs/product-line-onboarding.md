@@ -23,7 +23,7 @@ the datasheet output varies by product-line `category`.
    (`kind='product'`); several placeholder solutions already exist.
 3. **Sync**: dashboard **Sync** button, or `POST /api/sync?line=<name>`
    (`gateOrCron` — admin/editor session OR `Authorization: Bearer
-   $CRON_SECRET`; locally the `x-vercel-cron: 1` header also works).
+   $CRON_SECRET`).
 
 Sidebar: a solution with ≥1 product line becomes clickable; empty
 `kind='product'` solutions render as disabled "soon" placeholders.

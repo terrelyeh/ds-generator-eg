@@ -31,15 +31,25 @@ function redactSecrets(input: string): string {
     .replace(/(x-(?:goog-)?api-key"?\s*[:=]\s*"?)[^\s",}]+/gi, "$1***"); // header echoes
 }
 
+/** Who got through the non-workspace door. */
+type AskCaller = "user" | "demo";
+
 /**
  * Ask is reachable two ways: a logged-in user with the `ask.use` permission,
- * OR a passcode demo session (EnGenie public entry). Returns a denial
- * NextResponse, or null if allowed.
+ * OR a passcode demo session (the EnGenie public entry).
+ *
+ * It returns WHICH of the two, not just yes/no, because they must not see the
+ * same corpus. A demo visitor holds a passcode that is shared by construction
+ * — handed out for a booth, a call, a customer trial — which makes them the
+ * most public caller this app has, more public than an API-key integrator
+ * (`/api/v1/search` already passes `knowledgeAreasAllowed: []`). Retrieval
+ * has to be able to tell them apart.
  */
-async function gateAskOrDemo(): Promise<NextResponse | null> {
+async function gateAskOrDemo(): Promise<{ denied: NextResponse } | { caller: AskCaller }> {
   const c = await cookies();
-  if (await isValidDemoToken(c.get(DEMO_COOKIE)?.value)) return null;
-  return gate("ask.use");
+  if (await isValidDemoToken(c.get(DEMO_COOKIE)?.value)) return { caller: "demo" };
+  const denied = await gate("ask.use");
+  return denied ? { denied } : { caller: "user" };
 }
 
 /**
@@ -181,8 +191,8 @@ export async function GET(request: Request) {
       return NextResponse.json({ ok: false, error: "Workspace passcode required" }, { status: 401 });
     }
   } else {
-    const denied = await gateAskOrDemo();
-    if (denied) return denied;
+    const gated = await gateAskOrDemo();
+    if ("denied" in gated) return gated.denied;
   }
 
   const personas = await listPersonas();
@@ -268,6 +278,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
   }
 
+  // Defaults to "user": the workspace branch never reaches gateAskOrDemo,
+  // and a workspace already carries its own scope.
+  let caller: AskCaller = "user";
+
   // ── Auth + per-request config: workspace mode (/ask/<slug>) vs standard ──
   const ws = body.workspace ? await loadWorkspaceBySlug(body.workspace) : null;
   if (body.workspace) {
@@ -290,8 +304,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: msg }, { status: 429 });
     }
   } else {
-    const denied = await gateAskOrDemo();
-    if (denied) return denied;
+    const gated = await gateAskOrDemo();
+    if ("denied" in gated) return gated.denied;
+    caller = gated.caller;
   }
 
   // Effective persona / profile / provider — a workspace can fix these when
@@ -394,7 +409,22 @@ export async function POST(request: Request) {
                     ...(ws.scope?.solution ? [ws.scope.solution] : []),
                   ],
                 }
-              : { question, history, sourceType: source_type, productLine: product_line, taxonomy, finalLimit: 12 },
+              : {
+                  question,
+                  history,
+                  sourceType: source_type,
+                  productLine: product_line,
+                  taxonomy,
+                  finalLimit: 12,
+                  // Internal staff see everything. A demo visitor does not:
+                  // knowledge areas are department material (SOPs, onboarding,
+                  // support history marked internal), and the demo passcode is
+                  // shared by design. Without this they were the one caller
+                  // reading those with no account at all.
+                  ...(caller === "demo"
+                    ? { strictScope: true, knowledgeAreasAllowed: [] as string[] }
+                    : {}),
+                },
           );
         } catch (searchError) {
           const safe = redactSecrets(String(searchError));

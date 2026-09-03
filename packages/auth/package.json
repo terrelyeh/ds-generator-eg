@@ -2,11 +2,12 @@
   "name": "@eg/auth",
   "version": "0.1.0",
   "private": true,
-  "description": "Shared auth: session/RBAC gates (session), permission matrix (permissions), server-page guards (page-guards)",
+  "description": "Shared auth: session/RBAC gates (session), permission matrix (permissions), server-page guards (page-guards), post-login redirect validation (safe-next)",
   "exports": {
     "./session": "./src/session.ts",
     "./permissions": "./src/permissions.ts",
-    "./page-guards": "./src/page-guards.ts"
+    "./page-guards": "./src/page-guards.ts",
+    "./safe-next": "./src/safe-next.ts"
   },
   "dependencies": {
     "@eg/db": "*"
