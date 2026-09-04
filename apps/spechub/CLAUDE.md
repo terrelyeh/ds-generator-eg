@@ -338,7 +338,13 @@ auth.users → profiles ← email_whitelist.invited_by
    **2026-09-04 已完成**：分頁的兩套量法、B/C/D 圖片框、feature 行數核對、
    sync 的產品並行 + 每個 Drive 資料夾一次 run 只列一次、前端十項小修
    （語系選單權限、Preview 看回應、battlecard 確認與 in-flight、dashboard 只撈最新一筆、
-   Tender 時區、page guard 導向、對外 API 錯誤、embed CSP、配額 RPC 列鎖 00053）。
+   Tender 時區、page guard 導向、對外 API 錯誤、embed CSP、配額 RPC 列鎖 00053）、
+   **正確性一批**（審核 approve 看狀態/存在/內容、websearch 不碰已確認格、鎖狀態需登入、
+   審核者須有 `review.approve`、**drafter 的 `basis` 對規格表核對**（`groundBullets`,
+   查無此列就清空依據並列出）、**翻譯行數預算伺服器端驗證**（`lineParityCheck`, 超出重試一次再回報）、
+   **Ready 文件在任何寫入後重驗 blocker**（`demoteIfBlocked`, 六個寫入點）、
+   **版號取 Drive 與 DB 較高者**（`resolveNextVersion`, 半失敗的前一次不會讓這次重發同號）、
+   B/C 版型印語系自己的版號）。
 
 **產品線 / 版型**：
 1. **待補素材 / 待 PM 處理的項目**（缺圖、EOC 日文待 Confirm、EOC sheet 的

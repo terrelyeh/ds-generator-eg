@@ -23,6 +23,8 @@ async function safeJson(res: Response): Promise<{
   error?: string;
   /** Set when a feature list came back with the wrong number of lines. */
   line_mismatch?: { expected: number; got: number };
+  /** Items that came back longer than the cover has room for. */
+  over_budget?: { index: number; sourceLines: number; gotLines: number }[];
 }> {
   const text = await res.text();
   try {
@@ -305,6 +307,13 @@ export function ProductTranslationEditor({
         setDirty(true);
         if (data.model) setLastModel(data.model);
         toast.success(`Overview translated by ${data.provider}`);
+        if (data.over_budget?.length) {
+          const o = data.over_budget[0];
+          toast.warning(`Overview 比原文多 ${o.gotLines - o.sourceLines} 行，封面可能放不下`, {
+            description: "已填入，請縮短再存。",
+            duration: 8000,
+          });
+        }
       } else {
         toast.error(`Translation failed: ${data.error}`);
       }
@@ -350,6 +359,12 @@ export function ProductTranslationEditor({
         setDirty(true);
         if (data.model) setLastModel(data.model);
         toast.success(`${lines.length} features translated by ${data.provider}`);
+        if (data.over_budget?.length) {
+          toast.warning(
+            `第 ${data.over_budget.map((o) => o.index).join("、")} 條比原文多一行，封面可能放不下`,
+            { description: "已填入，請把那幾條縮短再存。", duration: 8000 },
+          );
+        }
       } else {
         toast.error(`Translation failed: ${data.error}`);
       }

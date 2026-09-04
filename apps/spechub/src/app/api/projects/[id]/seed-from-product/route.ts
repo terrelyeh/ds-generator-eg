@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { logIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { normalizeKey } from "@/lib/project-datasheet/resolve";
@@ -213,6 +214,7 @@ export async function POST(
   }
   const seededCopy = await seedCoverCopy(supabase, id, product, modelName);
   return NextResponse.json({
+    ...(await demoteIfBlocked(createAdminClient(), id)),
     id: created.id,
     rows: rows.length,
     images: images.length,

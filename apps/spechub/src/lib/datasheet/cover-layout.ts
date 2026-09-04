@@ -328,6 +328,41 @@ export interface LineParityBudget {
  * their own zone and spec labels feed a table that auto-paginates, so
  * neither gets a budget.
  */
+/** One translated item measured against its source. */
+export interface LineParityResult {
+  index: number;
+  sourceLines: number;
+  /** Wrapped lines the translation occupies at the target locale's width. */
+  gotLines: number;
+  over: boolean;
+}
+
+/**
+ * The budget, checked.
+ *
+ * `lineParityBudget` tells the model how long it may be; nothing then looked
+ * at what came back, so the constraint was a wish with a number on it. This
+ * measures each translated item with the same metrics the budget was built
+ * from — the only way the two can never disagree — and says which ones cost
+ * a line the source did not.
+ */
+export function lineParityCheck(params: {
+  texts: string[];
+  translated: string[];
+  block: "overview" | "features";
+  targetLocale?: string;
+}): LineParityResult[] {
+  const field =
+    params.block === "overview" ? "overviewCharsPerLine" : "featureCharsPerLine";
+  const sourceWidth = LOCALE_METRICS.default[field];
+  const targetWidth = metricsFor(params.targetLocale)[field];
+  return params.texts.map((text, i) => {
+    const sourceLines = countLines(text, sourceWidth);
+    const gotLines = countLines(params.translated[i] ?? "", targetWidth);
+    return { index: i + 1, sourceLines, gotLines, over: gotLines > sourceLines };
+  });
+}
+
 export function lineParityBudget(params: {
   texts: string[];
   block: "overview" | "features";

@@ -261,7 +261,13 @@ export function DataCenterPreview({
     HERO_HEIGHT - HERO_PAD_TOP - HERO_PAD_BOTTOM - headlineHeight - LOWER_GAP - MODEL_BLOCK,
   );
 
-  const version = versionOverride || product.current_version || "1.0";
+  // Locale versions are independent of English (see page.tsx for layout A):
+  // a never-generated ja preview used to print the EN version and offer
+  // "Regenerate" for a PDF that had never existed.
+  const localeCurrent = isTranslated
+    ? ((product.current_versions as Record<string, string> | null)?.[locale] ?? "0.0")
+    : product.current_version || "0.0";
+  const version = versionOverride || (localeCurrent !== "0.0" ? localeCurrent : "1.0");
   const today = new Date().toLocaleDateString(dict.dateLocale, {
     month: "2-digit",
     day: "2-digit",
@@ -284,7 +290,7 @@ export function DataCenterPreview({
       {showToolbar && (
         <PrintToolbar
           model={product.model_name}
-          currentVersion={product.current_version || "0.0"}
+          currentVersion={localeCurrent}
           canGenerate={canGenerate}
           locale={locale}
           userRole={userRole}

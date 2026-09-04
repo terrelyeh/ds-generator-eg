@@ -15,7 +15,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { createClient } from "@eg/db/server";
-import { isRole, can, type Permission, type Role } from "./permissions";
+import { isRole, can, ROLES, type Permission, type Role } from "./permissions";
 
 export type AuthUser = {
   id: string;
@@ -266,6 +266,11 @@ export async function localeHasDesignatedReviewer(locale: string): Promise<boole
       .select("id")
       .not("review_locales", "is", null)
       .contains("review_locales", [locale])
+      // A locale is "reviewed" only if someone who can actually approve is
+      // scoped to it. An editor or viewer with `['es']` on their profile
+      // used to count, which parked every Spanish save in pending_review
+      // with nobody able to move it on.
+      .in("role", ROLES.filter((r) => can(r, "review.approve")))
       .limit(1);
     has = (data?.length ?? 0) > 0;
   } catch {

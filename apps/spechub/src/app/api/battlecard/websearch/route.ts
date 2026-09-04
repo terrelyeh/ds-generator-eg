@@ -126,19 +126,22 @@ export async function POST(request: Request) {
     }>,
     supabase
       .from("battlecard_values")
-      .select("id, dimension_id, value")
+      .select("id, dimension_id, value, confirmed")
       .eq("competitor_product_id", cp.id) as unknown as Promise<{
-      data: { id: string; dimension_id: string; value: string }[] | null;
+      data: { id: string; dimension_id: string; value: string; confirmed: boolean }[] | null;
     }>,
   ]);
 
   const dimensions = dims ?? [];
   const existingByDim = new Map((existing ?? []).map((v) => [v.dimension_id, v]));
 
-  // Only the cells that are currently empty (no row, or blank value).
+  // Only the cells that are currently empty (no row, or blank value) AND not
+  // confirmed. A PM confirming a blank is saying "this competitor has no such
+  // spec" — the one cell a web search must not write into, and the one it
+  // used to, because "empty" was read off the value alone.
   const missing = dimensions.filter((d) => {
     const e = existingByDim.get(d.id);
-    return !e || !e.value?.trim();
+    return !e || (!e.confirmed && !e.value?.trim());
   });
   if (missing.length === 0) {
     return NextResponse.json({ ok: true, filled: 0, notFound: 0, message: "No empty cells to fill." });
@@ -175,7 +178,7 @@ export async function POST(request: Request) {
     if (!dim) continue;
     // Re-check it's still an empty target (don't clobber a value we didn't intend to).
     const prior = existingByDim.get(dim.id);
-    if (prior && prior.value?.trim()) continue;
+    if (prior && (prior.confirmed || prior.value?.trim())) continue;
     if (!item.found || !item.value?.trim()) {
       notFound++;
       continue;

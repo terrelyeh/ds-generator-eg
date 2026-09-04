@@ -276,9 +276,13 @@ export function BroadbandPreview({
   );
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrTarget)}`;
 
+  // Series datasheets stay English; a per-model one prints the locale's own
+  // version, which is independent of the EN one (see page.tsx).
   const currentVersion = isSeries
     ? lineContent?.current_version ?? "0.0"
-    : focusModel?.current_version ?? "0.0";
+    : locale !== "en"
+      ? ((focusModel?.current_versions as Record<string, string> | null)?.[locale] ?? "0.0")
+      : focusModel?.current_version ?? "0.0";
   const version = versionOverride || (currentVersion !== "0.0" ? currentVersion : "1.0");
   const today = new Date().toLocaleDateString(dict.dateLocale, {
     month: "2-digit",

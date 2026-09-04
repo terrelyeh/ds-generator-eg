@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { PROJECT_LAYOUTS } from "@/lib/project-datasheet/themes";
-import { openBlockers } from "@/lib/project-datasheet/blockers";
+import { demoteIfBlocked, openBlockers } from "@/lib/project-datasheet/blockers";
 
 /** Document fields the editor may write. Anything else is ignored. */
 const DOC_FIELDS = [
@@ -100,7 +100,10 @@ export async function PATCH(
   }
   const { error } = await supabase.from("project_datasheets").update(patch).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  // A rule or policy change can create a blocker on a Ready document. When
+  // the patch sets status itself, the check above (or the user) decided.
+  const readiness = "status" in patch ? { demoted: false, blockers: [] } : await demoteIfBlocked(supabase, id);
+  return NextResponse.json({ ok: true, ...readiness });
 }
 
 /**

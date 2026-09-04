@@ -5,6 +5,7 @@ import {
   str,
   type Grounded,
 } from "./grounding";
+import { groundBullets } from "./grounding";
 
 export { specLines } from "./grounding";
 
@@ -63,6 +64,13 @@ export interface ScenarioProposal {
    * EOR200 in the first place.
    */
   declined: string[];
+  /**
+   * Basis labels the model wrote that name no row of the table. The bullets
+   * stay (their words may be true); their basis is blanked so they read as
+   * what they are — a claim resting on nobody — and the invented labels are
+   * listed here so the reviewer sees which rows were made up.
+   */
+  unverifiedBasis: string[];
 }
 
 export const SCENARIOS_SYSTEM = `You write the "Application scenarios" copy for an EnGenius PROJECT datasheet
@@ -152,11 +160,12 @@ export function buildScenarioPrompt(input: ScenarioPromptInput): string {
  * A scenario missing its lede is dropped rather than shown with a blank —
  * because a blank would be filled in by whoever is in a hurry.
  */
-export function parseScenarios(raw: string): ScenarioProposal {
+export function parseScenarios(raw: string, labels?: string[]): ScenarioProposal {
   const json = extractJson(raw);
-  if (!json) return { scenarios: [], declined: [] };
+  if (!json) return { scenarios: [], declined: [], unverifiedBasis: [] };
 
   const scenarios: ScenarioDraft[] = [];
+  const unverifiedBasis: string[] = [];
   for (const entry of Array.isArray(json.scenarios) ? json.scenarios : []) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
@@ -176,14 +185,18 @@ export function parseScenarios(raw: string): ScenarioProposal {
       if (bullets.length === 6) break;
     }
 
-    scenarios.push({ heading, lede, bullets });
+    // Only when the caller has the table: the parser is also used where no
+    // rows exist yet, and "no labels" must not read as "every basis is wrong".
+    const grounded = labels ? groundBullets(bullets, labels) : { bullets, unverified: [] };
+    unverifiedBasis.push(...grounded.unverified);
+    scenarios.push({ heading, lede, bullets: grounded.bullets });
   }
 
   const declined = (Array.isArray(json.declined) ? json.declined : [])
     .map((v) => str(v, 200))
     .filter(Boolean);
 
-  return { scenarios, declined };
+  return { scenarios, declined, unverifiedBasis };
 }
 
 /** The stored caption is one field; the layout splits it on the em dash. */

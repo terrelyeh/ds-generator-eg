@@ -49,6 +49,7 @@ export function ScenarioCopyPanel({
   const [busy, setBusy] = useState(false);
   const [drafts, setDrafts] = useState<ScenarioDraft[]>([]);
   const [declined, setDeclined] = useState<string[]>([]);
+  const [unverifiedBasis, setUnverifiedBasis] = useState<string[]>([]);
 
   async function generate() {
     if (!term.trim()) return;
@@ -63,6 +64,7 @@ export function ScenarioCopyPanel({
       if (!res.ok) throw new Error(json.error ?? "產生失敗");
       setDrafts(json.scenarios);
       setDeclined(json.declined ?? []);
+      setUnverifiedBasis(json.unverifiedBasis ?? []);
       toast.success(`草稿 ${json.scenarios.length} 段，引用了 ${json.specRows} 條規格`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "產生失敗");
@@ -150,6 +152,18 @@ export function ScenarioCopyPanel({
         <p className="text-[11px] text-muted-foreground">
           再按一次會換一批——已經寫在圖上的小標會被跳過，不會重複。
         </p>
+      )}
+
+      {unverifiedBasis.length > 0 && (
+
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+
+          模型引用了規格表裡不存在的列，那些句子的依據已清空、句子保留，請人工確認：
+
+          {unverifiedBasis.join("、")}
+
+        </p>
+
       )}
 
       {declined.length > 0 && (
