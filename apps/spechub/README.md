@@ -19,7 +19,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **Sticky header** — 下拉時 Model 名稱、版本、按鈕固定在頂部
 - Overview & Key Features（從 Google Sheets 同步）
 - 完整規格表（分類 header + zebra striping）
-- **圖片雙向管理** — 上傳到 Supabase + 自動同步到 Google Drive，自動重新命名
+- **圖片雙向管理** — 上傳到 Supabase + 自動同步到 Google Drive，自動重新命名。
+  只收 PNG / JPEG / WebP（單檔上限 20 MB）
 - **Radio Pattern**（AP 專用）— 2.4G/5G/6G H-plane & E-plane 圖片 placeholder + 上傳
 - **圖片自動去白邊** — 上傳/同步的 PNG 會自動裁掉透明畫布，避免產品在 datasheet 上顯得過小
 - **QR URL 預覽** — Detail 頁顯示這個 model 印在 PDF 上的 QR Code 將指向哪個連結，含 Copy / Test
@@ -166,6 +167,9 @@ SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base�
 - 每日 09:00（台灣時間）自動同步 Google Sheets → Supabase
 - Smart Sync：比對 Google Drive `modifiedTime`，未變動則跳過
 - 自動偵測並補齊缺失的產品圖片
+- **從 sheet 移除的產品會被點名** — 同步完成後，若某台產品仍在 SpecHub 上架但已不在
+  sheet 上，會列在同步結果與 Telegram 通知裡。**只提醒、不自動下架**，由人決定是要
+  退役還是把它加回 sheet
 - 變更偵測：field-level + spec-level + status + comparison table deep diff
 - **Auto Re-index RAG**：sync 完成後自動重建有變動 product 的向量索引，讓 Ask SpecHub 馬上能回答新內容
 - **Resync versions from Drive**（Dashboard `Sync ▾` 選項）— 一鍵重新掃 Drive 把 DB 版號拉到跟實際 PDF 一致，PM 手動動 Drive 後可修正

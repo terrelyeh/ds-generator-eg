@@ -13,8 +13,8 @@
 │   ├── spechub/        # Product SpecHub — datasheet/文件生成（Vercel: ds-generator-eg, port 3000）
 │   └── engenie/        # EnGenie — Knowledge RAG + Ask（Vercel: engenie-eg, port 3100）
 ├── packages/
-│   ├── db/             # @eg/db — supabase server/client/admin + settings accessor + DB types + supabase/migrations（唯一來源）
-│   ├── auth/           # @eg/auth — session.ts(gate/RBAC) + permissions.ts + page-guards.ts
+│   ├── db/             # @eg/db — supabase server/client/admin + settings accessor + **errors（throwIfDbError/logIfDbError）** + DB types + supabase/migrations（唯一來源）
+│   ├── auth/           # @eg/auth — session.ts(gate/RBAC/requireCron) + permissions.ts + page-guards.ts + **safe-next.ts（登入後導向驗證）**
 │   └── llm/            # @eg/llm — OpenRouter chat client（chat completions 統一入口；**embedding 不走這裡**）
 │                       #   + features.ts = 花費歸戶的功能標籤對照表（OpenRouter `user` 欄位）
 └── package.json        # npm workspaces：apps/*, packages/*
@@ -23,7 +23,7 @@
 跨 app 接點（sync→reindex 觸發、spechub widget、LLM keys 歸 engenie、
 產品表唯讀約定）詳見兩個 app 的 CLAUDE.md「Monorepo 接點 / 跨 app 接點」章節。
 
-- packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|types`、`@eg/auth/session|permissions|page-guards`
+- packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|errors|types`、`@eg/auth/session|permissions|page-guards|safe-next`
 - **新增任何 OpenRouter 呼叫點時必須帶 `feature`**（`chatComplete`/`streamComplete` 的必填選項，
   查 `packages/llm/src/features.ts` 的對照表 → 送進 OpenRouter 的 `user` 欄位做花費歸戶）。
   漏標不會有任何症狀——畫面正常、測試全過，花費只是靜靜落進 `unmapped`。
@@ -52,6 +52,12 @@
   `PROJECT_LAYOUTS` 與頁面上的 `data-layout` / `data-hex`——改個顏色是一行，
   而那一節連截圖都會過期。
 - migrations 在 `packages/db/supabase/migrations/`（supabase CLI 的 link 狀態 `.temp` 也在旁邊，`supabase db push` 從 `packages/db` 跑）
+- ⚠️ **套 migration 的順序取決於依賴方向,不是編號**：拿掉 DB 依賴的（例如 00048 收掉
+  RLS policy）要**先部署程式再套**;新增 DB 依賴的（00050 的 RPC、00051 的
+  `match_documents_scoped`）要**先套再部署**。搞反的那一半會是靜默的
+- **2026-09-03~04 的全專案 code review 與五波修正**（PR #49–#56, migrations 00048–00052）
+  —— 三個 Critical 全在 RLS。動 RLS / auth / cron / sync / ingest 之前,
+  先讀那幾支 migration 的註解和兩個 app 的 CLAUDE.md 開頭
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）
 - 兩個 app 共用同一個 Supabase（project `xzolvtlqafwkxfuaryec`）；Vercel 各自一個專案、Root Directory 指到 `apps/<name>`，region 都釘 `hnd1`

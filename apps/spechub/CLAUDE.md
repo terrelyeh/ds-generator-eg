@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-08-24。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
+> Last updated: 2026-09-04。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
 > 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
 > [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
 > **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
@@ -9,20 +9,22 @@
 > + 花費帳本 + 翻譯審核流程。這四塊互相咬合，動之前先讀
 > [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)** ——
 > 裡面有三個「看起來多餘、其實不能拆」的設計，以及行數預算為何不能用字數比例。
-> **2026-08-12~13：四種版型的字型/字級系統整併**（Manrope 標題 + Roboto 內文 + CSS
-> 條列圓點 + 共用 `scale.ts` 刻度 + 規格頁分區間距/分頁 guard + logo 換新 ®）——
-> 細節在下方 Brand & Visual System 與 pitfall #50。
-> **2026-08-23~24：Tender Datasheets 第二輪**——**兩支 AI drafter**（情境文案、封面文案,
-> 共用 `grounding.ts` 的否定契約）、**從既有型號帶入會一起帶封面文案**（只填空的）、
-> 列表改用目錄那張表的元件並拆出 `PDF 現況` / `架構圖` / `情境圖` 三欄。
-> 兩個新 pitfall：**#70**（props 當 state 初值 + 表單外的伺服器寫入 = 畫面不更新**且**
-> 下次存檔會蓋掉）、**#71**（`(main)` 的 UI 拆成元件 + 臨時 `/auth/probe` 才驗得了）。
-> **2026-08-20~21：新模組 Tender Datasheets**（標案用的暫時性 datasheet, `/projects`;
-> 舊名 Project Datasheet Builder,**只有畫面上的字改了**——網址／權限 key／表名沒動）
-> ——**它是刻意跟目錄平行的孤島**,migrations 00038–00047,
-> 動之前先讀 [`docs/project-datasheets.md`](docs/project-datasheets.md)。
-> **2026-08-20：規格頁的「值續段」不再重複印規格名稱**（原本掛 `「原標籤 (cont.)」`）——
-> 四個語系一致,pagination 與 renderer 兩邊都要動,見 pitfall #50。
+> 🔴 **2026-09-03~04：全專案 code review + 五波修正（PR #49–#56, migrations 00048–00052）。**
+> 最重要的一件事:**資料庫曾經是最弱的一層。** `app_settings`（六把 LLM 金鑰明文）
+> 和三張翻譯表對 **anon** 可讀可寫,任何 Google 帳號拿到 session 就能寫產品目錄,
+> `x-vercel-cron` header 可偽造。全部已關（00048–00049,已套 prod,**金鑰仍待輪替**）。
+> 動 RLS / auth / cron 之前先讀 memory 或那幾支 migration 的註解。
+> 其餘四波:靜默寫入（**67 處**未讀 `error`,現由 `npm run check:db-writes` 擋）、
+> 正確性（規格表改為原子重寫、PDF 不再發布 404、Tender 編輯器不再蓋掉抽取結果）、
+> 硬化（SSRF、demo cookie 過期、Google auth 快取）、以及剩下的 High。
+> **三條路徑經查從來沒生效過**:語系 hardware 圖同步、每週 Google Doc 重抓、
+> DC 封面的翻譯值。**每日 09:00 排程當時已連續 504**（`maxDuration` 60→300 + auth 快取後修復）。
+> **2026-08-06~07：西文 es-MX + 行數預算 + 全面 OpenRouter + 花費帳本 + 翻譯審核**——
+> 四塊互相咬合,動之前先讀 [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)。
+> **2026-08-20~24：Tender Datasheets**（標案用暫時性 datasheet, `/projects`;
+> **刻意跟目錄平行的孤島**, migrations 00038–00047）——動之前先讀
+> [`docs/project-datasheets.md`](docs/project-datasheets.md)。
+> **2026-08-12~13：四種版型的字型/字級整併**（細節在下方 Brand & Visual System 與 pitfall #50）。
 
 ## Project Overview
 
@@ -281,7 +283,14 @@ auth.users → profiles ← email_whitelist.invited_by
   （cron-callable 用 `gateOrCron(request, ...)`）— 皆來自 `@eg/auth/session`
 - **Page guard pattern**: server component 開頭 `await adminOnly()` / `await requirePagePermission("xxx")`
 - **UI hide pattern**: layout/page 拿 role → client component 用 `can(role, "permission")` 包按鈕。三層 gate 都要做
-- **Supabase write error checking**: 所有 write 都要看 `error`，用 `throwIfDbError(label)(res)`（pitfall #45）
+- **Supabase write error checking**: 所有 write 都要看 `error`。
+  `throwIfDbError(label)(res)` / `logIfDbError(label, res)` 在 **`@eg/db/errors`**
+  （2026-09-04 之前它只是 generate-pdf 裡的一個區域閉包,所以「慣例」只有那個檔案在遵守）。
+  **`npm run check:db-writes` 會擋**——真的不需要知道結果的寫入,用
+  `// db-write-unchecked: <理由>` 明講。throw 還是記錄是逐處決定:
+  在 per-product try 裡 throw 會記進那台產品、其他繼續;迴圈裡的清理用 log
+- **Sync 一次只能跑一支**: `/api/sync` 用 `app_settings.sync_lock` 取鎖（INSERT 決勝負,
+  10 分鐘 TTL）。cron 和 Sync 按鈕本來會重疊,交錯的 delete/insert 會留下重複列
 - **PDF gen UX**: 兩條路徑都用 `toast.loading` → `toast.success` + `Open PDF` action button（pitfall #47）
 
 ### UI Layout Conventions
@@ -309,6 +318,18 @@ auth.users → profiles ← email_whitelist.invited_by
 功能清單詳見 [README.md](README.md)。
 
 ### 🔜 Next Steps
+
+**🔴 Code review 的收尾（2026-09-04,詳見 memory `project-code-review-2026-09`）**：
+0a. **輪替 `app_settings` 的六把金鑰 + 重新產生 `VERCEL_AUTOMATION_BYPASS_SECRET`**
+   —— 門關了但鑰匙沒換。金鑰在 EnGenie `/settings/api-keys` 改。
+0b. **手動按一次 Generate PDF、問 Ask 一題** —— 這兩條 headless 驗不了
+   （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
+0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
+   Telegram 可能一次比較多則。那是正常的。
+0d. **還沒做的**（約 35 項,以 Medium 為主）：sync 的圖片工作仍是一張一張做
+   （每條線只列一次資料夾 + 迴圈並行還沒做）、分頁有兩套不一致的量法（#50 那塊）、
+   B/C/D 版型仍用 max-only 圖片（#66）、花錢的端點沒有限流、
+   兩個 app 之間 2,200 行重複程式碼。
 
 **產品線 / 版型**：
 1. **待補素材 / 待 PM 處理的項目**（缺圖、EOC 日文待 Confirm、EOC sheet 的
@@ -375,67 +396,46 @@ npm run lint
 
 ## Common Pitfalls
 
-> **這裡只留「改任何東西都可能踩到」的三條。** 其餘全文在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md) ——
-> 那些是「只有動到特定東西時才需要」的（分頁常數、category 判斷、圖片欄位、
-> 新版型的多語系、加語系）,每條在下面留一行摘要,真要動那塊時再點進去。
-> #54–#58（RAG/聊天）在 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
+> **這裡只留「改任何東西都可能踩到」的七條。** 其餘只有動到特定東西才需要,
+> 全文在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 
-45. **Supabase silent insert/update 是這個系統最久的雷** — supabase-js 的 write 不 throw on
-    error，回 `{ data, error }`。歷史教訓：`versions` unique constraint 漏 locale → INSERT 撞
-    dup key → silent fail → UI 顯示假狀態。慣例：所有 write 一律 `throwIfDbError(label)(res)`。
+45. **Supabase 的 write 不 throw** — 回 `{ data, error }`，沒人讀 `error` 的寫入是隱形的：
+    路由回 200、toast 說已儲存、資料列不存在。踩過至少四次。**2026-09-04 起這是護欄
+    不是記憶**：`npm run check:db-writes`（CI）會擋，helper 在 `@eg/db/errors`。
+    第一版護欄報 32 處、修掉自己的誤判後報 **67 處**。
 
-50. **分頁常數必須對齊實際 CSS,而且不要用 CSS 加總去「精算」** —— 那些數字是量真實 PDF 得到的。
-    續段列不印標籤、force-fit 會塞爆欄位、pagination 與 renderer 只改一邊會靜靜錯位。
-    **改 preview CSS 或分頁前先讀** [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+62. **`(main)` 群組的頁面 headless 驗不了** — 受白名單 gate（`(main)/layout.tsx` 的
+    `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過 proxy、仍會 307 到
+    `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。所以動到
+    dashboard/內頁時：typecheck+build 之外，要推 branch preview 請使用者點過再 merge。
+    本機解法見 #71。
 
-60. **`products.product_image` / `hardware_image` 是 `NOT NULL DEFAULT ''`,清空要寫 `""` 不是 `null`** ——
-    寫 `null` 觸發 23502,但 supabase-js 不 throw,整句 update 靜默失效（同 #45）。
-    推論法則:**空字串 = 從沒填過**。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-61. **「依 category 而異」的判斷集中在 `lib/datasheet/qr.ts`,不要各元件各寫一份** ——
-    而且**一律精確比對**:`"Edge Network Appliances"` 的 Appli-**ap**-ances 曾命中 `includes("ap")`。
-    三次事故全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-62. **`(main)` 群組的頁面 headless 驗不了** — dashboard / product 內頁受白名單 gate
-    （`(main)/layout.tsx` 的 `getCurrentUser()`），帶 `x-vercel-protection-bypass` 也只過
-    proxy、仍會 307 到 `/auth/no-access`。**只有 `(print)/preview/*` 能用 bypass 直接抓**。
-    所以動到 dashboard/內頁時：typecheck+build 之外，要推 branch preview 請使用者點過再 merge。
-    **本機有解法：把要驗的部分拆成元件 + 一個臨時的 `/auth/probe` 頁（`/auth/` 是公開前綴）**
-    —— 見 #71。**probe 頁 commit 前一定要刪。**
-
-63. **新做版型組件必收 `locale` + `translation` 兩個 prop** —— Broadband/DC 曾寫死 `getDict("en")`,
-    而 page.tsx 的翻譯載入在版型分派之後,那兩個分支根本跑不到。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-64. **CJK 字型要在 CSS 指名、產 PDF 前用 `waitForFonts()` 主動載入** ——
-    `document.fonts.ready` 不夠,**本機有 PingFang TC 會 fallback 所以本地永遠重現不了**。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-66. **圖片尺寸由「框」決定,不是由檔案的像素數決定** —— `max-width/height` 只封頂不放大,
-    留白會在無意間變成縮放控制。修法是 `width/height:100% + object-fit:contain`。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-67. **陣列長度跟著另一個陣列走的欄位,讀取端和寫入端都要對齊** ——
-    多出來的尾巴 UI 看不見卻會印進 PDF。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-68. **「是不是 CJK」用明確的 `CJK_LOCALES` set,不要從「有沒有 TYPOGRAPHY_DEFAULTS」推導** ——
-    同一類錯誤的第三次（#61 子字串、#63 寫死 locale）。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
-
-69. **版面驗證最容易「假綠」—— 檢查器要先證明自己看得到東西**（2026-08-12 型級收斂時
-    連踩兩次）。兩個獨立的成因,都讓 109 份文件回報「0 溢版」而其實什麼都沒驗到:
-    ① **`.page` 是 `overflow: hidden`,所以 `scrollHeight` 永遠等於 `clientHeight`** ——
-    用它判斷溢版永遠回 false。要比對子元素的 `getBoundingClientRect().bottom` 有沒有
-    超過 page 的 bottom。
-    ② **`rm -rf .next` 之後 dev server 被「reused」會吐出 0 頁的空白頁面** ——
-    而「0 頁」當然不會溢版,檢查器一片綠。跑批次驗證前先確認伺服器真的在吐頁面
-    （`curl ... | grep -c 'class="page"'`）,並且把「after 頁數 = 0」本身當成失敗條件。
-    **通則:任何「沒發現問題」的檢查,要先能證明它在有問題時會叫。** 今天兩支
-    guard（off-scale、CJK 漂移）都是先故意種一個錯、看它報錯,才算數。
+69. **任何「沒發現問題」的檢查,要先能證明它在有問題時會叫。** 版面檢查器曾兩次「假綠」
+    （`.page` 是 `overflow:hidden` 所以 `scrollHeight` 永遠等於 `clientHeight`；
+    reused 的 dev server 吐 0 頁而 0 頁當然不溢版）。這條在 2026-09-04 又付了一次錢：
+    `check:db-writes` 第一版把外層的 `if (x.length > 0)` 當成「有人在檢查」,報 32 處；
+    修掉之後報 67 處。**這一波每一支新護欄和新測試都先在壞掉的程式上跑紅過。**
 
 70. **Client component 的 state 用 props 當初值,而伺服器在表單外面寫了同一批欄位** ——
     畫面不更新是輕的那一半,**未存變更的判斷會把表單標成 dirty,下一次存檔就把空值蓋回去**。
-    seed／AI 套用／批次工具都要問一次「表單會不會知道」。全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+    2026-09-04 在 Tender 編輯器的另一半又出現一次（model 的 `raw_doc`/`rules` 從不被認領,
+    所以「寫入 N 列」之後 Save 會送 `raw_doc: []` 蓋掉抽取結果）。
+    修法是**逐欄位**協調：欄位還等於伺服器上次的值才認領新值,人打過字的活下來。
 
-71. **`(main)` 的東西要驗,就拆成元件 + 臨時的 `/auth/probe` 頁**（#62 的解法）——
-    `/auth/` 是公開前綴,不需要 session;**probe 頁 commit 前一定要刪**。
-    全文 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+72. **「收緊」一個設定也是一種改動,要問「我剛拿掉的東西有誰在依賴」**（2026-09-04）——
+    把函式釘成 `search_path = public` 讓 pgvector 的 `<=>` 消失,**Ask 檢索壞了一整天
+    沒有任何監控叫**；拿掉 `/api/sync` 的 GET 讓隔天的排程回 405。
+
+73. **分不清「沒有」和「失敗」時不要動資料；能降級就不要中斷** —— `canClear()`（圖片）、
+    `allowedKnowledgeAreas()`（workspace 私有領域）、產品下架只回報不動作。
+
+74. **先寫再刪,不要先刪再寫** —— ingest 四條 pipeline 的 embedding 失敗曾能刪掉整個來源。
+
+> 以上每條的全文、以及只有動到特定東西才需要的
+> #50（分頁常數）/ #60（NOT NULL 圖片欄位）/ #61（category 精確比對）/ #63（版型 locale prop）/
+> #64（CJK 字型）/ #66（圖片用框不用像素）/ #67（陣列長度對齊）/ #68（CJK_LOCALES）/
+> #71（`/auth/probe`）,全在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> #54–#58（RAG/聊天）在 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 ## 詳細文件
 

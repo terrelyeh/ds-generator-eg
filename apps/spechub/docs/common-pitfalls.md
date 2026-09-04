@@ -379,3 +379,60 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     ⚠️ **probe 頁一定要在 commit 前刪掉**,它在 `/auth/` 底下就是免登入的。
     stub `window.fetch` 可以連 API 都不用碰。**這也是把 UI 從 page 拆出來的第二個理由**
     （第一個是 page 太長）。
+
+## 從 code review 移入（2026-09-04）
+
+72. **「收緊」一個設定也是一種改動,要問「我剛拿掉的東西有誰在依賴」。**
+    為了消掉 Supabase linter 的 `function_search_path_mutable` 警告,migration 00048
+    把每一支被標記的函式釘成 `set search_path = public`。對 `match_documents` 來說
+    那不是「比較嚴」而是**錯的**:`<=>` 是 pgvector 的距離運算子,而 pgvector 裝在
+    **`extensions`** schema。把路徑釘成只有 `public`,等於把整個查詢賴以存在的運算子
+    拿掉,每一次呼叫都噴:
+
+    ```
+    operator does not exist: extensions.vector <=> extensions.vector
+    ```
+
+    也就是 **Ask 的檢索、以及每一則 Ask 回答,從那支 migration 上 prod 起就壞了**。
+    ⚠️ **沒有任何東西叫。** 路由自己的 catch 把它當成一則訊息回給前端;唯一的線索是
+    `llm_usage_events` 不再長出新列（就是 pitfall #68 講的那個健康檢查）。
+    它是後來為了別的事手動呼叫函式才撞見的,而剛好那三天沒有人用 Ask,所以沒有實害。
+    修法是 `set search_path = public, extensions`（migration 00052）——
+    釘住 search_path 仍然是對的,只是要包含函式真正依賴的 schema。
+
+    **同一波裡的第二次**:拿掉 `/api/sync` 的 `export async function GET`,理由完全正確
+    （GET 會在點連結時帶 cookie,所以 `/api/sync?force=true` 貼進聊天室就是一鍵全量同步）。
+    漏掉的是 **Vercel Cron 就是用 GET 呼叫的** —— 隔天早上的排程回 405,而
+    `last_synced_at` 停住看起來就跟 Smart Sync 判定沒變更一模一樣。
+    修法是 `requireCron()`（`@eg/auth/session`）:方法留著,但只收 `CRON_SECRET` bearer、
+    不收 session。**驗證方式不是查文件而是查紀錄** —— 看 engenie 的 09:30 排程
+    在 header 分支被拿掉之後仍然回 200,才確定 Vercel 真的有送 bearer。
+
+    **通則:安全性的收緊和功能改動一樣會壞事,而且更難發現,因為它的失敗形狀是
+    「少了什麼」而不是「多了什麼」。每一次收緊都要問一次:我剛拿掉的東西,有誰在用?**
+
+73. **分不清「沒有」和「失敗」的時候,不要動資料;能降級就不要中斷。**
+    這一條有三個現場,形狀一樣:
+    - **圖片同步**:`folder_listed` 只說「資料夾列得出來」,所以下載 429、Storage 上傳失敗、
+      或 `ds_images_folder_id` 指高了一層(列出 0 個檔案),全都被讀成「這張圖被刪了」
+      而清掉 `products.product_image`。資料夾指錯的話是**整條產品線**。
+      修法 `canClear()`:要求資料夾列得出來、不是空的、而且**這一張**沒有出錯。
+    - **Ask workspace**:五個裡四個沒有 passcode,其中 `mkt` / `sales` 掛著部門知識領域,
+      而 `/ask/mkt` 不難猜。選項是「全部關掉」「等人決定」或「繼續運作但拿掉私有的那一半」。
+      `allowedKnowledgeAreas()` 走第三條:workspace 照常運作、保留產品 scope,
+      在有人給它 passcode 之前不從私有那一半回答,並記錄擋掉了哪些。
+    - **從 sheet 消失的產品**:偵測並回報（回應 + Telegram）,但**不自動改 status**。
+      看到不在就下架,會讓整理 sheet、改型號名、或一次只讀了一半,
+      都悄悄把一台在賣的產品從網站上拿掉。
+
+    **通則:破壞性的動作需要一個明確的肯定訊號,不能只靠「沒有看到相反的證據」。**
+
+74. **先寫再刪,不要先刪再寫（ingest 四條 pipeline）。**
+    `text_snippet` / `file` / `vertical_guide` / `refined` 都是先 `delete` 掉該來源的
+    chunk、再去 embed,而中間隔著一次會 429 的網路呼叫。失敗的時候來源就沒了 ——
+    對 text snippet 來說,被刪掉的 chunk 0 上存著原始 markdown,那是**某人打的字唯一的一份**;
+    對檔案上傳更糟,檔案已經在 storage 裡而指向它的列不見了,連刪都刪不掉。
+    修法在 `lib/rag/replace-chunks.ts`:upsert 的 key 是
+    `(source_type, source_id, chunk_index)`,所以 0..n-1 會就地覆蓋,
+    **寫完之後才 `trimStaleChunks()` 砍掉變短時多出來的尾巴**。
+    失敗的 embed 於是只是「這次沒更新」,而不是「這個來源沒了」。

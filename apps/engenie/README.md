@@ -27,6 +27,9 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 
 其他特性：
 - **共用知識庫、各自範圍** — 用 taxonomy（Solution / Product Line）+ 來源類型 scope 限定每個 workspace 看得到的內容
+- ⚠️ **沒有設 passcode 的 workspace 讀不到部門知識領域** — `/ask/<slug>` 的網址本身不難猜，
+  所以「免登入」和「看得到部門私有內容」不能同時成立。沒有 passcode 的 workspace 照常運作、
+  保留產品範圍，只是不會從私有領域回答；設一組 passcode 就會恢復
 - **LLM 三種模式** — `共用 key + 配額`（公司出錢、可設每分 / 每日上限）、`Workspace BYOK`（整個 workspace 一把 key）、`User BYOK`（使用者自己在前台輸入、只存在他的瀏覽器）
 - **可自訂歡迎畫面** — 每個 workspace 自己的 persona / 對話對象 / 歡迎語 / **範例問題（最多 6 個，按產品線、設定、比較、法規等不同意圖設計）**
 - **嵌入安全** — 每個 workspace 可設「允許嵌入的網域」白名單；可一鍵「撤銷連線」讓所有已發出的 token 立即失效
@@ -70,6 +73,7 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 - **Google OAuth 登入** + Email 白名單 + 4 種角色（Admin / Editor / PM / Viewer），與 SpecHub 共用同一套 RBAC（`@eg/auth`）
 - 公開區（demo / workspace / widget / 設計文件）走各自的 passcode / token gate，不需公司登入
 - **暴力猜測防護** — demo / workspace passcode 端點依 IP 限流（每 5 分鐘 10 次）
+- **Demo 連線 12 小時後到期** — 需要重新輸入 passcode（先前發出的 cookie 永久有效）
 - **對話隱私** — Ask 歷史綁定登入者，各自只看得到自己的對話
 
 ### Design Docs（公開、可分享）

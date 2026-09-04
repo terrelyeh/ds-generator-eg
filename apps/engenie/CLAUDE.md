@@ -1,8 +1,19 @@
 # CLAUDE.md — EnGenie (apps/engenie)
 
-> Last updated: 2026-07-05（monorepo 拆分**全部完成（Phase 1–5）**；prod `engenie-eg`
+> Last updated: 2026-09-04（monorepo 拆分**全部完成（Phase 1–5）**；prod `engenie-eg`
 > 在拆分後架構。本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge 全部 context。
-> 2026-07-05 完成 Ask 效能 + 資安 hardening 三批，全上 prod — 見「Ask 效能路徑」與 Pitfalls 61–65。）
+> 2026-07-05 完成 Ask 效能 + 資安 hardening 三批 — 見「Ask 效能路徑」與 Pitfalls 61–65。）
+>
+> 🔴 **2026-09-03~04：全專案 code review + 五波修正（PR #49–#56）。** 這個 app 的重點：
+> ① **`match_documents` 曾經整整壞掉一天** —— migration 00048 為了消 linter 警告把它釘成
+> `search_path = public`,而 `<=>` 在 `extensions` schema,於是每一次檢索都噴
+> `operator does not exist`。**沒有任何監控叫**,是手動呼叫函式才發現的（00052 已修,
+> 見 pitfall #69）。② **scope 改在 SQL 裡過濾**（`match_documents_scoped`, 00051）——
+> 之前 40 筆候選會被產品內容擠爆,窄 scope 回「找不到」。③ **沒有 passcode 的 workspace
+> 拿不到私有知識領域**（`allowedKnowledgeAreas`,見 pitfall #70）—— 當時五個裡四個沒
+> passcode,而 `mkt`/`sales` 掛著部門領域。④ ingest 改成**先寫再刪**
+> （`lib/rag/replace-chunks.ts`）。⑤ SSRF guard 抽成 `lib/rag/safe-url.ts` 並套到
+> 每一個抓取點。⑥ demo cookie 現在會過期。
 
 ## Project Overview
 
@@ -121,9 +132,24 @@ src/
 [`docs/ask-workspaces-phase2-plan.md`](docs/ask-workspaces-phase2-plan.md)。
 
 速記（細節都在上述文件）：
-- **檢索核心只有一份** `lib/rag/retrieve.ts`（`retrieveDocuments`）— `/api/ask` 與 `/api/v1/search` 共用；統一 `inScope` scope resolver；知識領域（`kind='knowledge'`）私有/opt-in；`/api/v1/search` 一律傳 `knowledgeAreasAllowed: []`（不外洩部門知識）
+- **檢索核心只有一份** `lib/rag/retrieve.ts`（`retrieveDocuments`）— `/api/ask` 與 `/api/v1/search` 共用；統一 `inScope` scope resolver；知識領域（`kind='knowledge'`）私有/opt-in；`/api/v1/search` 一律傳 `knowledgeAreasAllowed: []`（不外洩部門知識）。
+  **2026-09-04 起排除是在 SQL 做的**（`match_documents_scoped`, migration 00051,
+  參數 `exclude_solutions` / `filter_source_types`）—— JS 的 `inScope` 留著當權威檢查,
+  但候選池不再被呼叫端看不到的內容佔滿。實測:某向量最近 40 筆有 33 筆是知識領域內容,
+  所以窄 scope 的呼叫端只剩 7 筆然後回「找不到相關產品資訊」,讀起來像知識庫很薄
+- **workspace 能看到哪些私有領域,由 `allowedKnowledgeAreas()` 決定**（`lib/ask/workspaces.ts`）
+  —— **沒有 passcode 就沒有私有領域**。`/ask/<slug>` 的網址不難猜,而 `ws-auth` 對沒有
+  passcode 的 workspace 會直接發七天 token 給任何人
 - **串流核心只有一份** `hooks/use-chat-stream.ts` — ask-chat（內部）與 engenie-chat（demo/workspace）共用；新增聊天 surface 一律複用，不要複製串流邏輯
-- **8 條 ingest pipeline**（`lib/rag/ingest-*`）：product_spec, gitbook, helpcenter, google_doc, wifi_regulation, web, text_snippet, file(PDF→Gemini 抽取)
+- **10 種 source type / 11 支 `lib/rag/ingest-*`**：product_spec, gitbook, helpcenter,
+  google_doc, wifi_regulation, web, text_snippet, file(PDF→Gemini 抽取), vertical_guide,
+  support（後兩者共用 `ingest-refined`）。
+  **會替換整個來源的那幾條一律先寫再刪** —— `trimStaleChunks()`（`lib/rag/replace-chunks.ts`）
+  在 upsert 完成之後才砍變短的尾巴。先刪再 embed 曾經能讓一次 429 刪掉整個來源
+- **所有對外抓取走 `lib/rag/safe-url.ts`** —— `isSafePublicUrl()` + `safeFetch()`
+  （手動跟隨 redirect 並**重驗每一個 `Location`**、20s 逾時、8MB 上限）。
+  guard 以前私藏在 `ingest-web.ts` 且只在一個呼叫點跑,gitbook / helpcenter / sitemap
+  完全沒有檢查;而且 `::ffff:169.254.169.254` 這種寫法會直接通過
 - **Knowledge 的 Product Specs 清單**用 `knowledge/product-spec-list.tsx` 依 Solution ▸ Product Line 折疊分組 + 搜尋 + 每條產品線各自 re-index（走 `product_line_id`；`/api/taxonomy` 有回 product line `id`）。其餘來源類型維持平鋪表。
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（fail-open）
 - Gemini 一律 `x-goog-api-key` header；錯誤回前端先 `redactSecrets()`
@@ -170,6 +196,22 @@ src/
     `/demo`、`/ask/<slug>`、`/embed/<slug>`（那些帶 workspace cookie、不是 Supabase session）。
     只吐 enabled 模型的 slug/label/tier/default_for，就是選單本來就給那些人看的東西；
     **無 surface 參數的完整清單仍是 admin-only**。別順手把整條 route 收回 session 後面。
+69. **釘 `search_path` 之前先問「這支函式依賴哪個 schema」**（2026-09-04）—— 00048 為了消
+    linter 警告把 `match_documents` 釘成 `public`,而 pgvector 的 `<=>` 在 `extensions`,
+    **Ask 檢索整整壞了一天、沒有任何東西叫**。修法 `set search_path = public, extensions`
+    （00052）。這一條和 #68 是同一個家族:失敗形狀是「少了什麼」,不是「多了什麼」。
+    ⚠️ 判斷 Ask 是否活著,一律看 `llm_usage_events` 有沒有新列。
+
+70. **`ws-auth` 對沒有 passcode 的 workspace 會發 token 給任何人** —— 這是刻意的（widget、
+    展場），但它跟「這個 workspace 掛著部門知識領域」不能同時成立。`allowedKnowledgeAreas()`
+    的規則是**沒有 passcode 就沒有私有領域**:workspace 照常運作、保留產品 scope,
+    只是不從私有那一半回答,並在 log 記下擋掉了哪些。**新增 workspace 時要決定的是
+    passcode,不是 scope。**
+
+71. **ingest 一律先寫再刪** —— 見上方 `trimStaleChunks()`。先刪再 embed 時,
+    一次 OpenAI 429 就會刪掉整個來源;text snippet 的 chunk 0 上存著原始 markdown,
+    那是使用者打的字唯一的一份。
+
 68. **上游 LLM 失敗要送 `type:"error"` 不要送 `type:"chunk"`** — 送成 chunk 會被前端當成
     答案文字接上去，整段 outage 讀起來像正常輸出（2026-08-08 就是這樣讓 Ask 壞了好幾天沒人發現：
     帳本 `llm_usage_events` 一筆 `surface='ask'` 都沒有 = 根本沒成功呼叫過）。
