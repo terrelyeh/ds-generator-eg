@@ -20,7 +20,12 @@ const CHROMIUM_URL =
   "https://github.com/Sparticuz/chromium/releases/download/v143.0.4/chromium-v143.0.4-pack.x64.tar";
 
 // Allow up to 60s for PDF generation
-export const maxDuration = 60;
+/**
+ * Chromium cold start (which downloads the binary), a 30s navigation budget,
+ * the webfont wait, then Drive and Storage uploads. The pieces are each
+ * bounded now, but their sum does not fit in 60s on a cold instance.
+ */
+export const maxDuration = 300;
 
 // PDF generation lock: auto-expires after 5 minutes
 const LOCK_TTL_MS = 5 * 60 * 1000;

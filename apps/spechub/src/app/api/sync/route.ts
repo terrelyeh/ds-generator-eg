@@ -28,7 +28,14 @@ import type { ProductLine } from "@eg/db/types";
 // Hobby plan limit: 60s. Pro plan: up to 300s. Setting to plan-safe 60s.
 // The locale folder resolution cache (below) keeps per-product-line sync
 // well within this budget by eliminating redundant Drive API lookups.
-export const maxDuration = 60;
+/**
+ * A forced full-line sync re-downloads and re-trims every image for every
+ * product, and the Data Center lines carry three large renders each. Measured
+ * on production: two products took 61s and were killed at the old 60s ceiling.
+ * EnGenie's ingest routes have run at 300 for months, so the platform allows
+ * it — 60 was a default nobody revisited, not a decision.
+ */
+export const maxDuration = 300;
 
 /**
  * POST /api/sync
