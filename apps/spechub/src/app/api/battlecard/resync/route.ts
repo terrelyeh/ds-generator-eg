@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { throwIfDbError } from "@eg/db/errors";
-import { gate } from "@eg/auth/session";
+import { gateWithRateLimit } from "@eg/auth/session";
 import { chatComplete, openRouterEnabled } from "@eg/llm/openrouter";
 import { BATTLECARD_EXTRACT_MODEL } from "@/lib/llm/models";
 
@@ -69,7 +69,7 @@ async function extractSpecs(
 }
 
 export async function POST(request: Request) {
-  const denied = await gate("battlecard.edit");
+  const denied = await gateWithRateLimit("battlecard.edit", { key: "battlecard-resync", max: 10, windowSeconds: 60 });
   if (denied) return denied;
 
   const { competitorProductId } = (await request.json()) as { competitorProductId?: string };

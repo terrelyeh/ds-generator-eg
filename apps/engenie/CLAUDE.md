@@ -172,6 +172,9 @@ src/
   所以 workspace 裡的拓撲圖沒有圖示）。
   ⑨ `parseFollowUps` 只在最後一條 `---` 之後**全部都像追問**時才切；Stop / 斷線路徑不切。
   以前答案裡的水平線（拓撲 prompt 還要求要有）會把後面整段當成追問然後丟掉。
+- **`/api/ask` 對內部使用者每人每分鐘 30 題、passcode demo 每 IP 20 題**（PR #63；#62 只進了
+  helper 檔沒接線）—— `gateWithRateLimit` / `rateLimitAllowed`，底層同 `auth_rate_check`；
+  workspace 走自己的配額（`ask_workspace_touch`）不受此影響。
 
 ## Ask 效能路徑（`/api/ask` — 2026-07-05 hardening 後）
 

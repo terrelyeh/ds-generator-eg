@@ -281,6 +281,10 @@ auth.users → profiles ← email_whitelist.invited_by
 - Drive 資料夾結構與命名規則詳見 [`docs/drive-folder-and-naming-rules.md`](docs/drive-folder-and-naming-rules.md)
 - **API gate pattern**: 寫入 API 開頭 `const denied = await gate("permission"); if (denied) return denied;`
   （cron-callable 用 `gateOrCron(request, ...)`）— 皆來自 `@eg/auth/session`
+- **會花錢的 API 用 `gateWithRateLimit(permission, { key, max, windowSeconds })`**（2026-09-04 起）——
+  LLM、抓取、embedding 的端點一律：translate 30/分、spec-labels 10、battlecard websearch/resync 10、
+  Tender 五支 AI 10–20。key 是「端點:使用者 id」，一個人的迴圈只會卡到自己。底層是
+  `auth_rate_check` RPC（固定視窗，`@eg/db/rate-limit`），fail-open 但會大聲記錄
 - **Page guard pattern**: server component 開頭 `await adminOnly()` / `await requirePagePermission("xxx")`
 - **UI hide pattern**: layout/page 拿 role → client component 用 `can(role, "permission")` 包按鈕。三層 gate 都要做
 - **Supabase write error checking**: 所有 write 都要看 `error`。
@@ -330,8 +334,7 @@ auth.users → profiles ← email_whitelist.invited_by
    （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
 0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
    Telegram 可能一次比較多則。那是正常的。
-0d. **還沒做的**（剩 3 項）：花錢的端點沒有限流（translate / battlecard websearch / Tender 的
-   五個 AI 呼叫點）、Ask 那邊「整頁被刪掉的來源會留著 chunk」（google-doc / helpcenter / web
+0d. **還沒做的**（剩 2 項）：Ask 那邊「整頁被刪掉的來源會留著 chunk」（google-doc / helpcenter / web
    只修剪變短的尾巴，沒處理消失的來源；gitbook 有 producedKeys 清理可以照抄）、
    兩個 app 之間 23 個完全相同的檔案（**那是拆分的殘留**——
    EnGenie 本來是 DS Generator 裡的一個功能,長大後拆出去;`ui/` 是刻意各留一份讓品牌分道,

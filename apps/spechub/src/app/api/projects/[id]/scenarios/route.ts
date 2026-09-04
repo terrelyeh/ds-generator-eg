@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gate } from "@eg/auth/session";
+import { gateWithRateLimit } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
 import { getProjectScenariosModel } from "@/lib/llm/models";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
@@ -31,7 +31,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const denied = await gate("project_datasheet.edit");
+  const denied = await gateWithRateLimit("project_datasheet.edit", { key: "tender-scenarios", max: 10, windowSeconds: 60 });
   if (denied) return denied;
 
   const { id } = await params;

@@ -9,7 +9,8 @@
     "./admin": "./src/admin.ts",
     "./settings": "./src/settings.ts",
     "./types": "./src/types/database.ts",
-    "./errors": "./src/errors.ts"
+    "./errors": "./src/errors.ts",
+    "./rate-limit": "./src/rate-limit.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",
