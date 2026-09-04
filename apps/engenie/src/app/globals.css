@@ -1,4 +1,8 @@
 @import "tailwindcss";
+/* Workspace packages are symlinked under node_modules, which Tailwind's
+   automatic source detection skips — so classes used only by the shared
+   auth pages (@eg/auth/pages) would never be generated. Point at them. */
+@source "../../../../packages/auth/src";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 /* highlight.js token colours for chat code blocks (CodeBlock component).

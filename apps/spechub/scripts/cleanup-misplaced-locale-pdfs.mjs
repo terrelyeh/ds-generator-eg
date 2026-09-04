@@ -61,7 +61,7 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !GOOGLE_KEY) {
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
-// Google service account auth — mirrors lib/google/auth.ts
+// Google service account auth — mirrors packages/google/src/auth.ts (@eg/google)
 const sa = JSON.parse(
   Buffer.from(GOOGLE_KEY, "base64").toString("utf-8"),
 );

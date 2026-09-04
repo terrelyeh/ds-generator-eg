@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { getGoogleAuth } from "./auth";
+import { getGoogleAuth } from "@eg/google/auth";
 
 // ---------------------------------------------------------------------------
 // Helpers

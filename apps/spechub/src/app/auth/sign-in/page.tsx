@@ -1,16 +1,5 @@
-import { Suspense } from "react";
-import { SignInForm } from "./sign-in-form";
+import { SignInPage } from "@eg/auth/pages";
 
-export default function SignInPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50">
-          <div className="text-sm text-engenius-gray">Loading…</div>
-        </div>
-      }
-    >
-      <SignInForm />
-    </Suspense>
-  );
+export default function Page() {
+  return <SignInPage appName="Product SpecHub" tagline="EnGenius datasheet management system" />;
 }

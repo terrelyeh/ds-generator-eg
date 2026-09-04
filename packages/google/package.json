@@ -1,0 +1,12 @@
+{
+  "name": "@eg/google",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared Google service-account client (auth). Sheets/Drive/Docs helpers stay per app; only the credential + token cache is shared.",
+  "exports": {
+    "./auth": "./src/auth.ts"
+  },
+  "dependencies": {
+    "googleapis": "^171.4.0"
+  }
+}

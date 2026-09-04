@@ -6,7 +6,7 @@
 import { config } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import { google } from "googleapis";
-import { getGoogleAuth } from "../src/lib/google/auth";
+import { getGoogleAuth } from "@eg/google/auth";
 config({ path: ".env.local" });
 
 // Reproduce parseSpecSections + isRowOnlyLabel here so we can run standalone

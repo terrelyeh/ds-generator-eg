@@ -4,7 +4,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   serverExternalPackages: ["@sparticuz/chromium-min", "puppeteer-core"],
   // Workspace packages ship raw .ts — Next transpiles them in-place.
-  transpilePackages: ["@eg/db", "@eg/auth", "@eg/llm"],
+  transpilePackages: ["@eg/db", "@eg/auth", "@eg/llm", "@eg/google"],
   // Monorepo: deps hoist to the repo-root node_modules; point file tracing
   // at the workspace root so serverless bundles still pick them up.
   outputFileTracingRoot: path.join(__dirname, "../.."),

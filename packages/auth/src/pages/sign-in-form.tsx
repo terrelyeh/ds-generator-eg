@@ -3,11 +3,22 @@
 import { useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@eg/db/client";
-import { safeNextPath } from "@eg/auth/safe-next";
+import { safeNextPath } from "../safe-next";
 
-const NEXT_KEY = "specHub.auth.next";
+/**
+ * Where the post-login destination is stashed between sign-in and callback.
+ * One key for both apps: they never share an origin, so they never share a
+ * sessionStorage either.
+ */
+export const NEXT_KEY = "specHub.auth.next";
 
-export function SignInForm() {
+/** The only two things that differ between the apps' sign-in pages. */
+export interface SignInBranding {
+  appName: string;
+  tagline: string;
+}
+
+export function SignInForm({ appName, tagline }: SignInBranding) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
@@ -66,12 +77,8 @@ export function SignInForm() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
         <div className="mb-8 text-center">
-          <h1 className="font-heading text-2xl font-bold text-engenius-dark">
-            EnGenie
-          </h1>
-          <p className="mt-2 text-sm text-engenius-gray">
-            EnGenius company knowledge platform
-          </p>
+          <h1 className="font-heading text-2xl font-bold text-engenius-dark">{appName}</h1>
+          <p className="mt-2 text-sm text-engenius-gray">{tagline}</p>
         </div>
 
         <button

@@ -57,7 +57,7 @@ src/
       ask/[slug]/page.tsx            # 部門 workspace 聊天入口
       demo/ask/page.tsx              # EnGenie demo（passcode + iOS PWA）
       embed/[slug]/page.tsx          # widget iframe 內容
-    auth/                            # 自己一份 sign-in/callback/no-access（邏輯同 spechub）
+    auth/                            # 一行 re-export 自 @eg/auth/pages|routes（只傳 app 名與 tagline）
     api/
       ask/route.ts                   # RAG SSE stream（**經 OpenRouter，單一 streamComplete**）+ workspace 模式 + persona/profile
       v1/search/route.ts             # 對外 Search API（Bearer sk_live_、JSON、scoped、限流）
@@ -80,7 +80,7 @@ src/
     ask/workspaces.ts                # workspace 載入/驗證
     demo/                            # byok/history/ws-token（localStorage helpers）
     auth/{workspace-session,demo-session,api-key}.ts  # engenie 專屬 auth（RBAC 在 @eg/auth）
-    google/{auth,docs}.ts            # service account（auth.ts 與 spechub 各持一份）
+    google/docs.ts                   # Google Docs 讀取；service account 在 @eg/google/auth
   proxy.ts                           # session refresh + 公開路由 + demo/ws cookie/bearer 放行 + embed CSP
 ```
 
