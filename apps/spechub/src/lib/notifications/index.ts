@@ -213,3 +213,54 @@ export async function sendNotifications(
 
   return result;
 }
+
+/**
+ * Send one plain message to the ops channels.
+ *
+ * `sendNotifications` above is shaped for product changes; this is for the
+ * health check, which has nothing to do with a product. Same channels, same
+ * credentials, no formatting of its own — the caller writes the message.
+ *
+ * Returns which channels took it, so a health check can say in its own
+ * response whether the alert actually left the building.
+ */
+export async function sendOpsMessage(text: string): Promise<NotifyResult> {
+  const result: NotifyResult = { sent: [], errors: [] };
+  const body = text.length > 4000 ? text.slice(0, 3950) + "\n\n… (truncated)" : text;
+
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (token && chatId) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chat_id: chatId, text: body }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      result.sent.push("Telegram");
+    } catch (err) {
+      result.errors.push(`Telegram: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  const discord = process.env.DISCORD_WEBHOOK_URL;
+  if (discord) {
+    try {
+      const res = await fetch(discord, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: body }),
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      result.sent.push("Discord");
+    } catch (err) {
+      result.errors.push(`Discord: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  if (result.sent.length === 0 && result.errors.length === 0) {
+    result.errors.push("No notification channels configured");
+  }
+  return result;
+}

@@ -255,7 +255,11 @@ npm run build -w engenie
 ```
 
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，region **hnd1**（不要改）
-- Crons：`/api/cron/reindex-web` 週日、`/api/cron/reindex-products` 每日 09:30 TW
+- Crons：`/api/cron/reindex-web` 週日、`/api/cron/reindex-products` 每日 09:30 TW。
+  **兩支都會在跑完時寫 `job_heartbeats`**（`recordHeartbeat` from `@eg/db/heartbeat`）——
+  SpecHub 的 `/api/cron/health` 靠它判斷排程有沒有跑，而不是靠副作用（沒變更的 chunk
+  不會被重寫，「沒事做」和「沒跑」在資料上一模一樣）。**新增排程時記得補一行心跳，
+  並在 `lib/monitoring/health.ts` 的 `EXPECTED_JOBS` 登記**，否則它不會被監控
 - Env vars 見 [.env.example](.env.example)。⚠️ `API_KEY_ENC_SECRET` **必須與
   spechub prod 同一把**（DB 內已有用它加密的 api_keys/byok keys）
 - LLM keys 在 `/settings/api-keys` 設定（存共用 app_settings），env 可覆蓋

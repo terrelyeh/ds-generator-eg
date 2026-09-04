@@ -10,7 +10,8 @@
     "./settings": "./src/settings.ts",
     "./types": "./src/types/database.ts",
     "./errors": "./src/errors.ts",
-    "./rate-limit": "./src/rate-limit.ts"
+    "./rate-limit": "./src/rate-limit.ts",
+    "./heartbeat": "./src/heartbeat.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.0",
