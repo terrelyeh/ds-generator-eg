@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gate } from "@eg/auth/session";
+import { gateWithRateLimit } from "@eg/auth/session";
 
 /**
  * POST /api/translations/spec-labels
@@ -13,7 +13,7 @@ import { gate } from "@eg/auth/session";
  * }
  */
 export async function POST(request: Request) {
-  const denied = await gate("translation.edit");
+  const denied = await gateWithRateLimit("translation.edit", { key: "translate-spec-labels", max: 10, windowSeconds: 60 });
   if (denied) return denied;
   const body = await request.json();
   const { product_line_id, locale, translations } = body as {

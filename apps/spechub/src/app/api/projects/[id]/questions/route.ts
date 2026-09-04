@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { throwIfDbError } from "@eg/db/errors";
-import { gate, getCurrentUser } from "@eg/auth/session";
+import { gate, getCurrentUser, gateWithRateLimit } from "@eg/auth/session";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
 import {
   findingId,
@@ -411,7 +411,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const denied = await gate("project_datasheet.edit");
+  const denied = await gateWithRateLimit("project_datasheet.edit", { key: "tender-questions", max: 20, windowSeconds: 60 });
   if (denied) return denied;
 
   const { id } = await params;

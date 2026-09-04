@@ -5,8 +5,9 @@ import { resolveModel } from "@eg/llm/models";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
 import { retrieveDocuments } from "@/lib/rag/retrieve";
-import { gate } from "@eg/auth/session";
-import { cookies } from "next/headers";
+import { gateWithRateLimit } from "@eg/auth/session";
+import { cookies, headers } from "next/headers";
+import { rateLimitAllowed } from "@eg/db/rate-limit";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 import { allowedKnowledgeAreas, loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
 import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
@@ -50,10 +51,27 @@ type AskCaller = "user" | "demo";
  * (`/api/v1/search` already passes `knowledgeAreasAllowed: []`). Retrieval
  * has to be able to tell them apart.
  */
+/** Questions a signed-in person may ask per minute; workspaces have their own quota. */
+const ASK_USER_PER_MIN = 30;
+/** The passcode demo has no user, so it is keyed on the caller's IP. */
+const ASK_DEMO_PER_MIN = 20;
+
 async function gateAskOrDemo(): Promise<{ denied: NextResponse } | { caller: AskCaller }> {
   const c = await cookies();
-  if (await isValidDemoToken(c.get(DEMO_COOKIE)?.value)) return { caller: "demo" };
-  const denied = await gate("ask.use");
+  if (await isValidDemoToken(c.get(DEMO_COOKIE)?.value)) {
+    const h = await headers();
+    const ip = (h.get("x-forwarded-for")?.split(",")[0] ?? h.get("x-real-ip") ?? "unknown").trim().slice(0, 45);
+    if (!(await rateLimitAllowed(`ask:demo:${ip}`, ASK_DEMO_PER_MIN, 60))) {
+      return {
+        denied: NextResponse.json(
+          { error: `Too many questions — the demo allows ${ASK_DEMO_PER_MIN} per minute. Try again shortly.` },
+          { status: 429 },
+        ),
+      };
+    }
+    return { caller: "demo" };
+  }
+  const denied = await gateWithRateLimit("ask.use", { key: "ask", max: ASK_USER_PER_MIN, windowSeconds: 60 });
   return denied ? { denied } : { caller: "user" };
 }
 

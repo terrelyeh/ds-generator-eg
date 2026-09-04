@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { throwIfDbError } from "@eg/db/errors";
-import { gate } from "@eg/auth/session";
+import { gateWithRateLimit } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
 import { getProjectExtractModel } from "@/lib/llm/models";
 import { asRawDoc, asRules } from "@/lib/project-datasheet/resolve";
@@ -40,7 +40,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const denied = await gate("project_datasheet.edit");
+  const denied = await gateWithRateLimit("project_datasheet.edit", { key: "tender-extract", max: 20, windowSeconds: 60 });
   if (denied) return denied;
 
   const { id } = await params;

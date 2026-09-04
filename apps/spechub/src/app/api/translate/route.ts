@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { translate } from "@/lib/translate";
 import { lineParityCheck } from "@/lib/datasheet/cover-layout";
 import { getModel } from "@eg/llm/models";
-import { gate } from "@eg/auth/session";
+import { gateWithRateLimit } from "@eg/auth/session";
 
 export const maxDuration = 30;
 
@@ -20,7 +20,7 @@ export const maxDuration = 30;
  * Returns: { ok: true, translated: string, provider: string }
  */
 export async function POST(request: Request) {
-  const denied = await gate("translation.edit");
+  const denied = await gateWithRateLimit("translation.edit", { key: "translate", max: 30, windowSeconds: 60 });
   if (denied) return denied;
   const body = await request.json();
   const {

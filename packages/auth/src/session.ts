@@ -142,6 +142,44 @@ export async function gate(
 }
 
 /**
+ * {@link gate}, then a per-user rate limit.
+ *
+ * For endpoints that spend money on every call — an LLM completion, a
+ * scrape, an embedding. The key is `<name>:<user id>`, so one person's
+ * runaway loop caps that person and nobody else. Returns 429 with a plain
+ * message once the window is full. Fixed window, so the cap is "per
+ * minute" in the loose sense; that is enough to turn an unbounded bill
+ * into a bounded one.
+ *
+ *   const denied = await gateWithRateLimit("translation.edit", { key: "translate", max: 30, windowSeconds: 60 });
+ *   if (denied) return denied;
+ */
+export async function gateWithRateLimit(
+  permission: Permission,
+  limit: { key: string; max: number; windowSeconds: number },
+): Promise<NextResponse | null> {
+  let user: Awaited<ReturnType<typeof requirePermission>>;
+  try {
+    user = await requirePermission(permission);
+  } catch (e) {
+    if (e instanceof AuthError) {
+      return NextResponse.json({ error: e.message }, { status: e.status });
+    }
+    throw e;
+  }
+  const { rateLimitAllowed } = await import("@eg/db/rate-limit");
+  if (!(await rateLimitAllowed(`${limit.key}:${user.id}`, limit.max, limit.windowSeconds))) {
+    return NextResponse.json(
+      {
+        error: `Too many requests — this action is limited to ${limit.max} per ${limit.windowSeconds === 60 ? "minute" : `${limit.windowSeconds}s`}. Try again shortly.`,
+      },
+      { status: 429 },
+    );
+  }
+  return null;
+}
+
+/**
  * Cron-aware variant of {@link gate}. Returns null if the request is from
  * Vercel cron (or carries the CRON_SECRET bearer) OR the user has the
  * permission; returns a 401/403 NextResponse otherwise.

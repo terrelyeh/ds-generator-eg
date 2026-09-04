@@ -23,7 +23,7 @@
 跨 app 接點（sync→reindex 觸發、spechub widget、LLM keys 歸 engenie、
 產品表唯讀約定）詳見兩個 app 的 CLAUDE.md「Monorepo 接點 / 跨 app 接點」章節。
 
-- packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|errors|types`、`@eg/auth/session|permissions|page-guards|safe-next`
+- packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|errors|rate-limit|types`、`@eg/auth/session|permissions|page-guards|safe-next`
 - **新增任何 OpenRouter 呼叫點時必須帶 `feature`**（`chatComplete`/`streamComplete` 的必填選項，
   查 `packages/llm/src/features.ts` 的對照表 → 送進 OpenRouter 的 `user` 欄位做花費歸戶）。
   漏標不會有任何症狀——畫面正常、測試全過，花費只是靜靜落進 `unmapped`。
