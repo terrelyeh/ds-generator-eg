@@ -436,3 +436,13 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     `(source_type, source_id, chunk_index)`,所以 0..n-1 會就地覆蓋,
     **寫完之後才 `trimStaleChunks()` 砍掉變短時多出來的尾巴**。
     失敗的 embed 於是只是「這次沒更新」,而不是「這個來源沒了」。
+
+75. **只記「值」的快取在並行下等於沒有快取,而且會把副作用做好幾次**（2026-09-04）。
+    `resolveLocaleDsImagesFolder` / `resolveLocaleLineFolder` 在查完之後才把資料夾 ID
+    放進模組級 Map。產品一台一台跑時沒問題;改成四台並行之後,前四台**同時** miss、
+    同時走 Drive —— 而這兩支函式找不到資料夾會**自動建一個**,所以會建出四個 `DS Images`。
+    修法是記 **promise** 不記值（`memoInFlight`）:第二個呼叫者等第一個的結果,而不是
+    自己再做一次。**失敗的 promise 要踢掉**,否則一次暫時的 Drive 錯誤會變成這個 warm
+    instance 往後每一次的固定答案。每次 run 的 `DriveListingCache` 也是同一個形狀。
+    **通則:把串行改成並行時,每一個「先查快取、沒有就做」都要重看一次,
+    特別是「做」有副作用的那些。**

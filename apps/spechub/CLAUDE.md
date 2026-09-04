@@ -291,6 +291,10 @@ auth.users → profiles ← email_whitelist.invited_by
   在 per-product try 裡 throw 會記進那台產品、其他繼續;迴圈裡的清理用 log
 - **Sync 一次只能跑一支**: `/api/sync` 用 `app_settings.sync_lock` 取鎖（INSERT 決勝負,
   10 分鐘 TTL）。cron 和 Sync 按鈕本來會重疊,交錯的 delete/insert 會留下重複列
+- **一條線裡的產品是並行跑的**（`PRODUCT_CONCURRENCY = 4`,`lib/concurrency.ts` 的
+  `mapConcurrent`）,Drive 資料夾清單一次 run 只列一次（`DriveListingCache`,**run-scoped**,
+  不是模組級——模組級會讓下一次 run 看到 PM 上傳之前的清單）。產品之間不共用任何列所以
+  可以重疊;**新增會跨產品共用的狀態時要問「並行下會不會做兩次」**（pitfall #75）
 - **PDF gen UX**: 兩條路徑都用 `toast.loading` → `toast.success` + `Open PDF` action button（pitfall #47）
 
 ### UI Layout Conventions
@@ -326,10 +330,12 @@ auth.users → profiles ← email_whitelist.invited_by
    （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
 0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
    Telegram 可能一次比較多則。那是正常的。
-0d. **還沒做的**（約 35 項,以 Medium 為主）：sync 的圖片工作仍是一張一張做
-   （每條線只列一次資料夾 + 迴圈並行還沒做）、分頁有兩套不一致的量法（#50 那塊）、
-   B/C/D 版型仍用 max-only 圖片（#66）、花錢的端點沒有限流、
-   兩個 app 之間 2,200 行重複程式碼。
+0d. **還沒做的**（約 25 項,以 Medium 為主）：花錢的端點沒有限流、翻譯審核 approve
+   不看狀態、grounding 的 `basis` 不驗證、Ask 的 `resolveModel` 收停用的 slug、
+   prompt 沒有資料/指令邊界、前端十來個小項（`(main)` 要人點過才能驗）、
+   兩個 app 之間 23 個完全相同的檔案。
+   **2026-09-04 已完成**：分頁的兩套量法、B/C/D 圖片框、feature 行數核對、
+   sync 的產品並行 + 每個 Drive 資料夾一次 run 只列一次。
 
 **產品線 / 版型**：
 1. **待補素材 / 待 PM 處理的項目**（缺圖、EOC 日文待 Confirm、EOC sheet 的
@@ -430,6 +436,9 @@ npm run lint
     `allowedKnowledgeAreas()`（workspace 私有領域）、產品下架只回報不動作。
 
 74. **先寫再刪,不要先刪再寫** —— ingest 四條 pipeline 的 embedding 失敗曾能刪掉整個來源。
+
+75. **只記「值」的快取在並行下會把副作用做兩次** —— 串行改並行時,每個「先查快取、
+    沒有就做」都要重看;記 promise 不記值,失敗的要踢掉。
 
 > 以上每條的全文、以及只有動到特定東西才需要的
 > #50（分頁常數）/ #60（NOT NULL 圖片欄位）/ #61（category 精確比對）/ #63（版型 locale prop）/
