@@ -16,7 +16,7 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { trimStaleChunks } from "./replace-chunks";
+import { trimStaleChunks, deleteVanishedSources } from "./replace-chunks";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { hasSubstantialContent } from "./gitbook-fetcher";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
@@ -321,6 +321,17 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
 
   /** Chunks each source has NOW, so a source that shrank can lose its tail. */
   const chunkCounts = new Map<string, number>();
+  // Only a labelled crawl has a universe ("every page under this label");
+  // and only a clean one may delete — a page that timed out is still live.
+  const fetchFailures = errors.length;
+  const cleanupSkipReason = !label ? "no label (universe undefined)" : fetchFailures > 0 ? `${fetchFailures} fetch failure(s)` : "no pages produced";
+  const labelUniverse = label
+    ? ((await supabase
+        .from("documents" as "products")
+        .select("source_id")
+        .eq("source_type", "web")
+        .eq("metadata->>web_label", label)) as { data: { source_id: string }[] | null }).data ?? []
+    : [];
   for (const [url, page] of fetched) {
     if (!hasSubstantialContent(page.content)) {
       pagesSkipped++;
@@ -407,6 +418,15 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
   // this run's timestamp on the rest. Written first, trimmed after (#74).
   for (const [sourceId, count] of chunkCounts) {
     await trimStaleChunks(supabase, "web", sourceId, count);
+  }
+
+  // A source that disappeared entirely — a tab deleted, an article
+  // unpublished, a page removed — kept every chunk it ever had, and those
+  // chunks stayed retrievable with nothing to say they were gone. A crawl is scoped by its label, so the universe is every web chunk carrying it — and only a labelled, failure-free run may delete.
+  if (!!label && fetchFailures === 0 && chunkCounts.size > 0) {
+    await deleteVanishedSources(supabase, "web", labelUniverse.map((d) => d.source_id), new Set(chunkCounts.keys()));
+  } else {
+    console.warn(`[web] skipping vanished-source cleanup: ${cleanupSkipReason}`);
   }
 
   return { processed, skipped, pages_fetched: fetched.size, pages_skipped: pagesSkipped, errors, methods };

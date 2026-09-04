@@ -8,7 +8,7 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { trimStaleChunks } from "./replace-chunks";
+import { trimStaleChunks, deleteVanishedSources } from "./replace-chunks";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import {
   urlToBreadcrumb,
@@ -437,6 +437,10 @@ export async function ingestHelpcenter(
 
   /** Chunks each source has NOW, so a source that shrank can lose its tail. */
   const chunkCounts = new Map<string, number>();
+  // Any fetch failure and the universe is unknown: an article that timed out
+  // is not an article that was unpublished.
+  const fetchFailures = errors.filter((e) => e.startsWith("Article fetch failed") || e.startsWith("Collection parse failed")).length;
+  const cleanupSkipReason = fetchFailures > 0 ? `${fetchFailures} fetch failure(s)` : "no articles produced";
   for (const [url, article] of fetchedArticles) {
     if (!hasSubstantialContent(article.content)) {
       articlesSkipped++;
@@ -538,6 +542,15 @@ export async function ingestHelpcenter(
   // this run's timestamp on the rest. Written first, trimmed after (#74).
   for (const [sourceId, count] of chunkCounts) {
     await trimStaleChunks(createAdminClient(), "helpcenter", sourceId, count);
+  }
+
+  // A source that disappeared entirely — a tab deleted, an article
+  // unpublished, a page removed — kept every chunk it ever had, and those
+  // chunks stayed retrievable with nothing to say they were gone. The whole help centre is one run, so the universe is every helpcenter chunk — but only when every article fetched.
+  if (fetchFailures === 0 && chunkCounts.size > 0) {
+    await deleteVanishedSources(createAdminClient(), "helpcenter", (existingDocs ?? []).map((d) => d.source_id), new Set(chunkCounts.keys()));
+  } else {
+    console.warn(`[helpcenter] skipping vanished-source cleanup: ${cleanupSkipReason}`);
   }
 
   return {

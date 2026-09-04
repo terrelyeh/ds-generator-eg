@@ -8,7 +8,7 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { trimStaleChunks } from "./replace-chunks";
+import { trimStaleChunks, deleteVanishedSources } from "./replace-chunks";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 
@@ -252,6 +252,7 @@ export async function ingestGoogleDoc(
 
   /** Chunks each source has NOW, so a source that shrank can lose its tail. */
   const chunkCounts = new Map<string, number>();
+  const cleanupSkipReason = "the document produced no tabs";
   for (const tab of tabs) {
     const chunks = chunkByHeadings(tab.content, tab.name);
     const sourceId = `${docId}/${tab.slug}`;
@@ -343,6 +344,15 @@ export async function ingestGoogleDoc(
   // this run's timestamp on the rest. Written first, trimmed after (#74).
   for (const [sourceId, count] of chunkCounts) {
     await trimStaleChunks(createAdminClient(), "google_doc", sourceId, count);
+  }
+
+  // A source that disappeared entirely — a tab deleted, an article
+  // unpublished, a page removed — kept every chunk it ever had, and those
+  // chunks stayed retrievable with nothing to say they were gone. One document per run, so the universe is its own `docId/` prefix; the fetch succeeded or we would not be here.
+  if (chunkCounts.size > 0) {
+    await deleteVanishedSources(createAdminClient(), "google_doc", (existingDocs ?? []).map((d) => d.source_id).filter((id) => id.startsWith(`${docId}/`)), new Set(chunkCounts.keys()));
+  } else {
+    console.warn(`[google_doc] skipping vanished-source cleanup: ${cleanupSkipReason}`);
   }
 
   return {
