@@ -30,6 +30,7 @@ import {
   str,
   type Grounded,
 } from "./grounding";
+import { groundBullets } from "./grounding";
 
 export interface CoverFeatureBlock {
   title: string;
@@ -47,6 +48,8 @@ export interface CoverDraft {
   diagramNote: string;
   /** claims the sector expects that the table cannot support */
   declined: string[];
+  /** basis labels that name no row — see ScenarioProposal.unverifiedBasis */
+  unverifiedBasis: string[];
 }
 
 export const COVER_SYSTEM = `You write the COVER copy for an EnGenius PROJECT datasheet — a preliminary
@@ -157,11 +160,12 @@ export function buildCoverPrompt({
  * overview, because these are applied one at a time and a person who wanted
  * the overview should get it.
  */
-export function parseCover(raw: string): CoverDraft | null {
+export function parseCover(raw: string, labels?: string[]): CoverDraft | null {
   const json = extractJson(raw);
   if (!json) return null;
 
   const features: CoverFeatureBlock[] = [];
+  const unverifiedBasis: string[] = [];
   for (const entry of Array.isArray(json.features) ? json.features : []) {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
@@ -176,7 +180,9 @@ export function parseCover(raw: string): CoverDraft | null {
       bullets.push({ text, basis });
       if (bullets.length === 3) break;
     }
-    features.push({ title, bullets });
+    const grounded = labels ? groundBullets(bullets, labels) : { bullets, unverified: [] };
+    unverifiedBasis.push(...grounded.unverified);
+    features.push({ title, bullets: grounded.bullets });
     if (features.length === 6) break;
   }
 
@@ -194,6 +200,7 @@ export function parseCover(raw: string): CoverDraft | null {
     declined: (Array.isArray(json.declined) ? json.declined : [])
       .map((v) => str(v, 200))
       .filter(Boolean),
+    unverifiedBasis,
   };
 
   const empty =

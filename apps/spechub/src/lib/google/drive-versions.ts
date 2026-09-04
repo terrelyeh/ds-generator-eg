@@ -207,6 +207,40 @@ export async function detectLatestVersion(
   return best;
 }
 
+/** "1.4" → { major: 1, minor: 4 }; "0.0", blank and junk → null (never generated). */
+export function parseVersionString(s: string | null | undefined): { major: number; minor: number } | null {
+  const m = (s ?? "").trim().match(/^(\d+)\.(\d+)$/);
+  if (!m) return null;
+  const v = { major: parseInt(m[1]), minor: parseInt(m[2]) };
+  return v.major === 0 && v.minor === 0 ? null : v;
+}
+
+/**
+ * The version a generation should carry, given what Drive and the DB each
+ * believe the latest is.
+ *
+ * They disagree exactly when a previous run half-succeeded: the Drive upload
+ * failed after Storage and the DB recorded 1.1, or the DB write failed after
+ * Drive received 1.3. "Drive first, DB as fallback" then read the LOWER
+ * number and issued it again — a v1.1 that overwrote a v1.1 already sent to
+ * a customer. The base is whichever is higher; a new version bumps it and a
+ * regenerate reuses it. Neither can produce a number below one that exists.
+ */
+export function resolveNextVersion(params: {
+  drive: { major: number; minor: number } | null;
+  db: string | null | undefined;
+  mode: "regenerate" | "new";
+}): string {
+  const candidates = [params.drive, parseVersionString(params.db)].filter(
+    (v): v is { major: number; minor: number } => v !== null,
+  );
+  if (candidates.length === 0) return "1.0";
+  const base = candidates.reduce((a, b) => (compareVersions(b, a) > 0 ? b : a));
+  return params.mode === "regenerate"
+    ? `${base.major}.${base.minor}`
+    : `${base.major}.${base.minor + 1}`;
+}
+
 /**
  * Calculate the next version number.
  * Increments the minor version by 1 (e.g. 1.4 → 1.5).

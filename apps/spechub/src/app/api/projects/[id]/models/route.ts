@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { gate } from "@eg/auth/session";
 
 /** Column fields the editor may write. */
@@ -47,7 +48,7 @@ export async function POST(
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ id: data.id });
+  return NextResponse.json({ id: data.id, ...(await demoteIfBlocked(supabase, id)) });
 }
 
 /** PATCH /api/projects/[id]/models — update one column (`id` in the body). */
@@ -82,7 +83,7 @@ export async function PATCH(
     .eq("project_datasheet_id", docId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(await demoteIfBlocked(supabase, docId)) });
 }
 
 /** DELETE /api/projects/[id]/models — remove one column (`id` in the body). */
@@ -105,5 +106,5 @@ export async function DELETE(
     .eq("project_datasheet_id", docId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(await demoteIfBlocked(supabase, docId)) });
 }

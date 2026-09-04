@@ -105,6 +105,53 @@ export function bulletText(v: unknown, max = 200): string {
   return str(v, max).replace(/^[-•*・]\s*/, "").replace(/\s+/g, " ").trim();
 }
 
+/**
+ * Does this basis name a row of the spec table?
+ *
+ * The contract asks for the row's label copied verbatim, optionally followed
+ * by the models it holds for — `Environment (EOR200)`. The comparison is
+ * case-insensitive and ignores that parenthetical, and nothing looser: a
+ * fuzzy match would let "Operating Temp" pass for "Storage Temperature",
+ * which is the stretched citation the contract exists to expose.
+ */
+export function basisMatches(basis: string, labels: Iterable<string>): boolean {
+  const key = normalizeLabel(basis);
+  if (!key) return false;
+  for (const label of labels) if (normalizeLabel(label) === key) return true;
+  return false;
+}
+
+function normalizeLabel(s: string): string {
+  return s
+    .replace(/\s*\([^)]*\)\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Hold every bullet to the table.
+ *
+ * A basis that names no row is not a citation, it is a sentence wearing one.
+ * The bullet is kept — the words may be perfectly true — but its basis is
+ * blanked so it reads as what it is, a claim resting on nobody, and the
+ * label the model made up is returned so the reviewer can see exactly which
+ * rows were invented. Dropping the bullet instead would hide the one thing
+ * the reviewer most needs to know.
+ */
+export function groundBullets<T extends Grounded>(
+  bullets: T[],
+  labels: string[],
+): { bullets: T[]; unverified: string[] } {
+  const unverified: string[] = [];
+  const out = bullets.map((b) => {
+    if (!b.basis || basisMatches(b.basis, labels)) return b;
+    unverified.push(b.basis);
+    return { ...b, basis: "" };
+  });
+  return { bullets: out, unverified };
+}
+
 /** Models wrap JSON in prose or fences often enough to be worth handling. */
 export function extractJson(raw: string): Record<string, unknown> | null {
   const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);

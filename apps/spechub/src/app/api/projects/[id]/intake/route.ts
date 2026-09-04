@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
@@ -152,7 +153,7 @@ async function apply(
       .eq("id", body.sourceId),
   );
 
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, ...(await demoteIfBlocked(createAdminClient(), id)) });
 }
 
 /**

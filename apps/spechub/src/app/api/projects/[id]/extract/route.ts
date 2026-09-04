@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { throwIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { chatComplete } from "@eg/llm/openrouter";
@@ -91,7 +92,9 @@ export async function POST(
         .eq("project_datasheet_id", id);
       if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-      return NextResponse.json({ rows: rows.length });
+      // Applying replaces raw_doc wholesale — the write most likely to hand a
+      // Ready document a new blocker.
+      return NextResponse.json({ rows: rows.length, ...(await demoteIfBlocked(createAdminClient(), id)) });
     }
 
     const text = body.text?.trim();
@@ -220,6 +223,7 @@ async function preview(
   const fromCatalog = await isCatalogSeeded(supabase, docId, model);
 
   return NextResponse.json({
+    ...(await demoteIfBlocked(supabase, docId)),
     sourceId: source.id,
     rows,
     notes,

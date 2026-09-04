@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { demoteIfBlocked } from "@/lib/project-datasheet/blockers";
 import { throwIfDbError } from "@eg/db/errors";
 import { gate, getCurrentUser } from "@eg/auth/session";
 import { resolveMatrix } from "@/lib/project-datasheet/resolve";
@@ -391,7 +392,7 @@ export async function PATCH(
     .eq("project_datasheet_id", id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...(await demoteIfBlocked(createAdminClient(), id)) });
 }
 
 /**
@@ -480,7 +481,7 @@ export async function POST(
     const result = items.length
       ? await applyItems(supabase, id, doc, models, items)
       : { applied: 0, questions: 0 };
-    return NextResponse.json(result);
+    return NextResponse.json({ ...result, ...(await demoteIfBlocked(createAdminClient(), id)) });
   }
 
   // ── propose ────────────────────────────────────────────────────────────

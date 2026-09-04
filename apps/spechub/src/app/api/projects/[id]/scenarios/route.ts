@@ -113,7 +113,9 @@ export async function POST(
     );
   }
 
-  const proposal = parseScenarios(reply);
+  // The table's labels, so a basis that names no row is caught here rather
+  // than trusted onto a customer's document.
+  const proposal = parseScenarios(reply, rows.map((r) => r.label));
   if (proposal.scenarios.length === 0) {
     return NextResponse.json(
       { error: "模型沒有回傳可用的內容，再按一次試試。" },

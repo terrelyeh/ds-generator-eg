@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gate } from "@eg/auth/session";
+import { gate, getCurrentUser } from "@eg/auth/session";
 import { logIfDbError, throwIfDbError } from "@eg/db/errors";
 import {
   detectLatestVersion,
   detectLocaleVersion,
   bumpVersion,
+  resolveNextVersion,
   uploadPdfToDrive,
   getLocaleSuffix,
 } from "@/lib/google/drive-versions";
@@ -45,6 +46,11 @@ function getLockKey(model: string, lang: string) {
  * Check if a PDF generation lock is active for a model+locale.
  */
 export async function GET(request: Request) {
+  // Lock state names who is generating what, right now. The product page
+  // polls it and has a session; nothing else needs it.
+  if (!(await getCurrentUser())) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   const { searchParams } = new URL(request.url);
   const model = searchParams.get("model");
   const lang = searchParams.get("lang") ?? "en";
@@ -341,23 +347,13 @@ export async function POST(request: Request) {
         }
       }
 
-      const currentLocaleVer = driveLocaleVersion?.version || currentVersions[lang] || "0.0";
-      const isRegenerate = mode === "regenerate";
-      const hasExistingVersion = currentLocaleVer !== "0.0";
-
-      if (isRegenerate && hasExistingVersion) {
-        newVersion = currentLocaleVer;
-      } else {
-        newVersion = driveLocaleVersion
-          ? bumpVersion(driveLocaleVersion)
-          : (() => {
-              if (currentLocaleVer === "0.0") return "1.0";
-              const parts = currentLocaleVer.split(".");
-              const major = parseInt(parts[0]) || 1;
-              const minor = (parseInt(parts[1]) || 0) + 1;
-              return `${major}.${minor}`;
-            })();
-      }
+      // Higher of Drive and DB, so a half-failed previous run cannot make
+      // this one reissue a number that already went out (resolveNextVersion).
+      newVersion = resolveNextVersion({
+        drive: driveLocaleVersion,
+        db: currentVersions[lang],
+        mode: mode === "regenerate" ? "regenerate" : "new",
+      });
     } else {
       // English version — existing logic with Drive detection
       let driveVersion = null;
@@ -376,24 +372,11 @@ export async function POST(request: Request) {
         }
       }
 
-      const isRegenerate = mode === "regenerate";
-      const currentVer = product.current_version || "0.0";
-      const hasExistingVersion = currentVer !== "0.0";
-
-      if (isRegenerate && hasExistingVersion) {
-        newVersion = currentVer;
-      } else {
-        newVersion = driveVersion
-          ? bumpVersion(driveVersion)
-          : currentVer === "0.0"
-            ? "1.0"  // Brand-new product, first version ever
-            : (() => {
-                const parts = currentVer.split(".");
-                const major = parseInt(parts[0]) || 1;
-                const minor = (parseInt(parts[1]) || 0) + 1;
-                return `${major}.${minor}`;
-              })();
-      }
+      newVersion = resolveNextVersion({
+        drive: driveVersion,
+        db: product.current_version,
+        mode: mode === "regenerate" ? "regenerate" : "new",
+      });
     }
 
     // Step 2: Generate PDF with headless Chromium

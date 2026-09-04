@@ -202,6 +202,18 @@ export function CoverCopyPanel({
             </div>
           )}
 
+          {draft.unverifiedBasis.length > 0 && (
+
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+
+              模型引用了規格表裡不存在的列，那些句子的依據已清空、句子保留，請人工確認：
+
+              {draft.unverifiedBasis.join("、")}
+
+            </p>
+
+          )}
+
           {draft.declined.length > 0 && (
             <div className="rounded border border-amber-300 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-900">
               {/* The useful half. A tender document usually wants these

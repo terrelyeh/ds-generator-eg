@@ -98,7 +98,7 @@ export async function POST(
     );
   }
 
-  const draft = parseCover(reply);
+  const draft = parseCover(reply, rows.map((r) => r.label));
   if (!draft) {
     return NextResponse.json({ error: "模型沒有回傳可用的內容，再按一次試試。" }, { status: 502 });
   }

@@ -1,4 +1,5 @@
 import { createAdminClient } from "@eg/db/admin";
+import { logIfDbError } from "@eg/db/errors";
 import { resolveMatrix } from "./resolve";
 import { scanDocument, storedFindingId } from "./gap-scan";
 import type { BlankMode, DocRules } from "./types";
@@ -7,6 +8,40 @@ import type {
   ProjectDatasheetModel,
   ProjectDatasheetQuestion,
 } from "@eg/db/types";
+
+/**
+ * Send a Ready document back to Draft if a write has given it a blocker.
+ *
+ * "Ready" was checked once, at the moment of the transition, and never again:
+ * add a model, apply an extraction, dismiss then un-dismiss a question, and
+ * the document kept its Ready badge with a finding open that would make it
+ * wrong. Every route that changes what the gap review sees calls this on
+ * its way out and returns the result, so the client can say why the badge
+ * moved. A document that is not Ready is left alone.
+ */
+export async function demoteIfBlocked(
+  supabase: ReturnType<typeof createAdminClient>,
+  id: string,
+): Promise<{ demoted: boolean; blockers: string[] }> {
+  const { data } = await supabase
+    .from("project_datasheets")
+    .select("status")
+    .eq("id", id)
+    .maybeSingle();
+  if ((data as { status?: string } | null)?.status !== "ready") {
+    return { demoted: false, blockers: [] };
+  }
+  const blockers = await openBlockers(supabase, id);
+  if (blockers.length === 0) return { demoted: false, blockers: [] };
+  const ok = logIfDbError(
+    `project ${id} demote ready→draft`,
+    await supabase
+      .from("project_datasheets")
+      .update({ status: "draft", updated_at: new Date().toISOString() })
+      .eq("id", id),
+  );
+  return { demoted: ok, blockers };
+}
 
 /**
  * Titles of the blocking findings still open on this document.

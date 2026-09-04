@@ -126,6 +126,43 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  // A verdict needs something to be a verdict ON. Without this, approving a
+  // locale nobody had saved wrote `approved` to zero rows and returned 200;
+  // approving one still in `draft` (never submitted) or one that was empty
+  // (three nulls and an empty list) went through the same way, and the
+  // datasheet then generated from nothing.
+  const { data: rowData } = await supabase
+    .from("product_translations" as "products")
+    .select("id, review_status, headline, overview, features")
+    .eq("product_id", product_id)
+    .eq("locale", locale)
+    .maybeSingle();
+  const row = rowData as unknown as {
+    id: string;
+    review_status: string | null;
+    headline: string | null;
+    overview: string | null;
+    features: string[] | null;
+  } | null;
+  if (!row) {
+    return NextResponse.json({ error: `${locale} 還沒有翻譯可以審核` }, { status: 404 });
+  }
+  if (action !== "commented") {
+    if ((row.review_status ?? "draft") === "draft") {
+      return NextResponse.json(
+        { error: "這個語系還沒送審，要等 MKT 按「儲存並送審」之後才能給結果" },
+        { status: 409 },
+      );
+    }
+    const hasContent =
+      !!row.headline?.trim() ||
+      !!row.overview?.trim() ||
+      (row.features ?? []).some((f) => !!f?.trim());
+    if (action === "approved" && !hasContent) {
+      return NextResponse.json({ error: "譯文是空的，不能核准" }, { status: 400 });
+    }
+  }
+
   // The log is append-only; a new round adds a row rather than editing one.
   const { error: logErr } = await supabase.from("translation_reviews" as "products").insert({
     product_id,
@@ -156,8 +193,7 @@ export async function POST(request: Request) {
       reviewed_by: user.id,
       reviewed_at: new Date().toISOString(),
     } as never)
-    .eq("product_id", product_id)
-    .eq("locale", locale);
+    .eq("id", row.id);
 
   if (stErr) {
     return NextResponse.json({ error: stErr.message }, { status: 500 });
