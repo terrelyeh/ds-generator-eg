@@ -4,15 +4,16 @@
  * (source_type "text_snippet"). The raw markdown is stored on chunk 0's
  * metadata (`raw`) so the editor can reload it for editing.
  *
- * Edits are a clean replace: existing chunks for the source_id are deleted
- * first, so shrinking the body never leaves orphan chunks behind.
+ * Edits replace in place: chunks are written over their previous versions and
+ * any leftover tail is trimmed AFTERWARDS, so a failed embed cannot leave the
+ * snippet deleted (see the note on deleteStaleChunks).
  */
 
 import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
-import { throwIfDbError } from "@eg/db/errors";
+import { trimStaleChunks } from "./replace-chunks";
 
 const EMBED_BATCH_SIZE = 20;
 const MAX_EMBED_CHARS = 21000;
@@ -35,15 +36,6 @@ export async function ingestTextSnippet(opts: IngestTextSnippetOptions): Promise
   const { sourceId, title, content, label } = opts;
   const tax = normalizeTaxonomy(opts.taxonomy);
   const supabase = createAdminClient();
-
-  // Clean replace (handles edits + body shrink).
-  throwIfDbError("documents delete (text_snippet)")(
-    await supabase
-      .from("documents" as "products")
-      .delete()
-      .eq("source_type", "text_snippet")
-      .eq("source_id", sourceId),
-  );
 
   const chunks = chunkText(content, title, label);
   if (chunks.length === 0) {
@@ -88,6 +80,8 @@ export async function ingestTextSnippet(opts: IngestTextSnippetOptions): Promise
       processed++;
     }
   }
+
+  await trimStaleChunks(supabase, "text_snippet", sourceId, chunks.length);
 
   return { processed, chunks: chunks.length };
 }

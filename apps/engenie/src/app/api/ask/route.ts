@@ -8,7 +8,7 @@ import { retrieveDocuments } from "@/lib/rag/retrieve";
 import { gate } from "@eg/auth/session";
 import { cookies } from "next/headers";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
-import { loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
+import { allowedKnowledgeAreas, loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
 import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
 import { decryptKey } from "@/lib/auth/api-key";
 
@@ -433,13 +433,10 @@ export async function POST(request: Request) {
                     models: ws.scope?.models ?? [],
                   },
                   sourceTypes: ws.scope?.source_types ?? null,
-                  // Knowledge areas are private by default; include the ones this
-                  // workspace selected (plus its own solution if it IS an area,
-                  // e.g. an onboarding bot scoped directly to a department).
-                  knowledgeAreasAllowed: [
-                    ...(Array.isArray(ws.scope?.knowledge_areas) ? ws.scope.knowledge_areas : []),
-                    ...(ws.scope?.solution ? [ws.scope.solution] : []),
-                  ],
+                  // Knowledge areas are private by default. What this
+                  // workspace may actually see depends on whether it is
+                  // behind a passcode at all — see allowedKnowledgeAreas.
+                  knowledgeAreasAllowed: allowedKnowledgeAreas(ws),
                 }
               : {
                   question,
