@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
-import { getGoogleAuth } from "./auth";
+import { getGoogleAuth } from "@eg/google/auth";
 
 /**
  * Google Drive version detection & PDF upload for datasheets.

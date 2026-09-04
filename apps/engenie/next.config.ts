@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // at the workspace root so serverless bundles still pick them up.
   outputFileTracingRoot: path.join(__dirname, "../.."),
   // Workspace packages ship raw .ts — Next transpiles them in-place.
-  transpilePackages: ["@eg/db", "@eg/auth", "@eg/llm"],
+  transpilePackages: ["@eg/db", "@eg/auth", "@eg/llm", "@eg/google"],
   env: {
     BUILD_TIME: new Date().toISOString(),
   },

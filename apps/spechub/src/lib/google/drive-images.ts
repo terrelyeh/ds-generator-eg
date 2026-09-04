@@ -1,6 +1,6 @@
 import { google } from "googleapis";
 import { Readable } from "stream";
-import { getGoogleAuth } from "./auth";
+import { getGoogleAuth } from "@eg/google/auth";
 import { getLocaleSuffix } from "./drive-versions";
 import { throwIfDbError } from "@eg/db/errors";
 

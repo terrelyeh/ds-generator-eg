@@ -13,6 +13,7 @@
     "@base-ui/react": "^1.3.0",
     "@eg/auth": "*",
     "@eg/db": "*",
+    "@eg/google": "*",
     "@eg/llm": "*",
     "@sparticuz/chromium-min": "^143.0.4",
     "@supabase/ssr": "^0.10.0",
