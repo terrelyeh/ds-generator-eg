@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createHash } from "crypto";
+import { hashPasscode } from "@/lib/auth/passcode";
 import { createAdminClient } from "@eg/db/admin";
 import { gate, getCurrentUser } from "@eg/auth/session";
 import { encryptKey } from "@/lib/auth/api-key";
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     allowed_origins: normalizeOrigins(body.allowed_origins),
     created_by: user?.id ?? null,
   };
-  if (body.passcode) row.passcode_hash = createHash("sha256").update(body.passcode).digest("hex");
+  if (body.passcode) row.passcode_hash = hashPasscode(body.passcode);
   if (llm_mode === "byok" && body.byok_key) row.byok_key_encrypted = encryptKey(body.byok_key);
 
   const supabase = createAdminClient();
@@ -195,7 +195,7 @@ export async function PATCH(request: Request) {
   if (body.note !== undefined) update.note = body.note?.trim() || null;
   if (body.allowed_origins !== undefined) update.allowed_origins = normalizeOrigins(body.allowed_origins);
   // Secrets: only when a non-empty value is provided.
-  if (body.passcode) update.passcode_hash = createHash("sha256").update(body.passcode).digest("hex");
+  if (body.passcode) update.passcode_hash = hashPasscode(body.passcode);
   if (body.byok_key) update.byok_key_encrypted = encryptKey(body.byok_key);
 
   if (Object.keys(update).length === 0) {

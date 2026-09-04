@@ -43,7 +43,8 @@ async function reindex(models?: string[]) {
   if (errors.length > 0) {
     console.warn("[reindex-products] errors:", errors);
   }
-  return { ok: true, processed, skipped, errors: errors.length };
+  // A count of errors told the reader something failed and not what.
+  return { ok: true, processed, skipped, error_count: errors.length, errors: errors.slice(0, 20) };
 }
 
 export async function POST(request: Request) {

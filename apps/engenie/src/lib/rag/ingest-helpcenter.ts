@@ -8,7 +8,8 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { trimStaleChunks } from "./replace-chunks";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import {
   urlToBreadcrumb,
   hasSubstantialContent,
@@ -23,7 +24,6 @@ const MIN_CHUNK_CHARS = 50;
 /** Embedding batch size */
 const EMBED_BATCH_SIZE = 20;
 /** Max chars for embedding API */
-const MAX_EMBED_CHARS = 21000;
 /** Concurrency for page fetching */
 const FETCH_CONCURRENCY = 5;
 
@@ -435,6 +435,8 @@ export async function ingestHelpcenter(
     metadata: Record<string, unknown>;
   }[] = [];
 
+  /** Chunks each source has NOW, so a source that shrank can lose its tail. */
+  const chunkCounts = new Map<string, number>();
   for (const [url, article] of fetchedArticles) {
     if (!hasSubstantialContent(article.content)) {
       articlesSkipped++;
@@ -446,6 +448,7 @@ export async function ingestHelpcenter(
     // Use article slug as source_id
     const urlPath = new URL(url).pathname.replace(/^\/en\/articles\//, "").replace(/\/$/, "");
     const sourceId = urlPath || "index";
+    chunkCounts.set(sourceId, chunks.length);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -488,7 +491,7 @@ export async function ingestHelpcenter(
   for (let i = 0; i < allChunks.length; i += EMBED_BATCH_SIZE) {
     const batch = allChunks.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((c) =>
-      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content
+      capForEmbedding(c.content)
     );
 
     let embeddings: number[][];
@@ -528,6 +531,13 @@ export async function ingestHelpcenter(
         processed++;
       }
     }
+  }
+
+  // Upserts are by (source_id, chunk_index), so a page that came back with
+  // fewer sections kept its old tail — stale text, still retrievable, with
+  // this run's timestamp on the rest. Written first, trimmed after (#74).
+  for (const [sourceId, count] of chunkCounts) {
+    await trimStaleChunks(createAdminClient(), "helpcenter", sourceId, count);
   }
 
   return {

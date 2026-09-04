@@ -11,7 +11,7 @@
 
 import { createAdminClient } from "@eg/db/admin";
 import { logIfDbError } from "@eg/db/errors";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import {
   fetchGitbookSitemap,
   fetchGitbookPage,
@@ -27,7 +27,6 @@ const MIN_CHUNK_CHARS = 50;
 /** Embedding batch size */
 const EMBED_BATCH_SIZE = 20;
 /** Max chars for embedding API */
-const MAX_EMBED_CHARS = 21000;
 /** Concurrency for page fetching */
 const FETCH_CONCURRENCY = 5;
 
@@ -524,7 +523,7 @@ export async function ingestGitbook(
   for (let i = 0; i < allChunks.length; i += EMBED_BATCH_SIZE) {
     const batch = allChunks.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((c) =>
-      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content
+      capForEmbedding(c.content)
     );
 
     let embeddings: number[][];

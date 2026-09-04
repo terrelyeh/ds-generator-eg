@@ -10,13 +10,12 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { chunkText } from "./chunk";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 import { trimStaleChunks } from "./replace-chunks";
 
 const EMBED_BATCH_SIZE = 20;
-const MAX_EMBED_CHARS = 21000;
 
 export interface IngestFileOptions {
   sourceId: string;
@@ -60,7 +59,7 @@ export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileRes
   let processed = 0;
   for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
     const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
-    const texts = batch.map((c) => (c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content));
+    const texts = batch.map((c) => (capForEmbedding(c.content)));
     const embeddings = await generateEmbeddings(texts);
 
     for (let j = 0; j < batch.length; j++) {

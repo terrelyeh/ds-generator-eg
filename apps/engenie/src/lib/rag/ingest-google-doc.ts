@@ -8,7 +8,8 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { trimStaleChunks } from "./replace-chunks";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 
 /** Max characters per chunk — keep well under 8192 token limit */
@@ -19,7 +20,6 @@ const MIN_CHUNK_CHARS = 80;
 const EMBED_BATCH_SIZE = 20;
 /** Max chars for embedding API — OpenAI text-embedding-3-small has 8192 token limit.
  *  Tables/structured content has higher token-per-char ratio, so use conservative limit. */
-const MAX_EMBED_CHARS = 10000;
 
 export interface IngestGoogleDocOptions {
   /** Google Doc ID (from URL) */
@@ -250,9 +250,12 @@ export async function ingestGoogleDoc(
     metadata: Record<string, unknown>;
   }[] = [];
 
+  /** Chunks each source has NOW, so a source that shrank can lose its tail. */
+  const chunkCounts = new Map<string, number>();
   for (const tab of tabs) {
     const chunks = chunkByHeadings(tab.content, tab.name);
     const sourceId = `${docId}/${tab.slug}`;
+    chunkCounts.set(sourceId, chunks.length);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -293,7 +296,7 @@ export async function ingestGoogleDoc(
   for (let i = 0; i < allChunks.length; i += EMBED_BATCH_SIZE) {
     const batch = allChunks.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((c) =>
-      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content
+      capForEmbedding(c.content)
     );
 
     let embeddings: number[][];
@@ -333,6 +336,13 @@ export async function ingestGoogleDoc(
         processed++;
       }
     }
+  }
+
+  // Upserts are by (source_id, chunk_index), so a page that came back with
+  // fewer sections kept its old tail — stale text, still retrievable, with
+  // this run's timestamp on the rest. Written first, trimmed after (#74).
+  for (const [sourceId, count] of chunkCounts) {
+    await trimStaleChunks(createAdminClient(), "google_doc", sourceId, count);
   }
 
   return {

@@ -3,6 +3,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { cookies } from "next/headers";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
+import { hasAnyValidWorkspaceCookie, isValidWorkspaceBearer } from "@/lib/auth/workspace-session";
 
 /**
  * GET /api/topology-icons
@@ -12,14 +13,21 @@ import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
  * that's the topology angle; falls back to a/default. Reachable by logged-in
  * Ask users OR a passcode demo session (same gate as /api/ask).
  */
-async function gateAskOrDemo(): Promise<NextResponse | null> {
+async function gateAskOrDemo(request: Request): Promise<NextResponse | null> {
   const c = await cookies();
   if (await isValidDemoToken(c.get(DEMO_COOKIE)?.value)) return null;
+  // Workspace visitors (/ask/<slug>, the widget) reach this route: the proxy
+  // lists it beside /api/ask as demo-permitted. The handler then refused
+  // them — it checked only the demo cookie and a session — so every
+  // topology diagram in a workspace rendered with no icons. Same coarse
+  // check the proxy uses; the catalogue is public product imagery.
+  if (await hasAnyValidWorkspaceCookie(c.getAll())) return null;
+  if (await isValidWorkspaceBearer(request.headers.get("authorization"))) return null;
   return gate("ask.use");
 }
 
-export async function GET() {
-  const denied = await gateAskOrDemo();
+export async function GET(request: Request) {
+  const denied = await gateAskOrDemo(request);
   if (denied) return denied;
 
   const supabase = createAdminClient();

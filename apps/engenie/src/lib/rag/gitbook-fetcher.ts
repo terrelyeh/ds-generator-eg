@@ -7,6 +7,7 @@
  */
 
 import { safeFetch } from "./safe-url";
+import { stripHiddenHtml } from "./html-clean";
 
 export interface GitbookPage {
   url: string;
@@ -256,7 +257,7 @@ function stripHtmlTags(html: string): string {
  */
 function htmlToText(html: string): string {
   // Remove script and style tags entirely
-  let text = html.replace(/<script[\s\S]*?<\/script>/gi, "");
+  let text = stripHiddenHtml(html).replace(/<script[\s\S]*?<\/script>/gi, "");
   text = text.replace(/<style[\s\S]*?<\/style>/gi, "");
   text = text.replace(/<nav[\s\S]*?<\/nav>/gi, "");
   text = text.replace(/<header[\s\S]*?<\/header>/gi, "");

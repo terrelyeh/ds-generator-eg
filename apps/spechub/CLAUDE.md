@@ -330,9 +330,10 @@ auth.users → profiles ← email_whitelist.invited_by
    （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
 0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
    Telegram 可能一次比較多則。那是正常的。
-0d. **還沒做的**（約 25 項,以 Medium 為主）：花錢的端點沒有限流、翻譯審核 approve
-   不看狀態、grounding 的 `basis` 不驗證、Ask 的 `resolveModel` 收停用的 slug、
-   prompt 沒有資料/指令邊界、兩個 app 之間 23 個完全相同的檔案（**那是拆分的殘留**——
+0d. **還沒做的**（剩 3 項）：花錢的端點沒有限流（translate / battlecard websearch / Tender 的
+   五個 AI 呼叫點）、Ask 那邊「整頁被刪掉的來源會留著 chunk」（google-doc / helpcenter / web
+   只修剪變短的尾巴，沒處理消失的來源；gitbook 有 producedKeys 清理可以照抄）、
+   兩個 app 之間 23 個完全相同的檔案（**那是拆分的殘留**——
    EnGenie 本來是 DS Generator 裡的一個功能,長大後拆出去;`ui/` 是刻意各留一份讓品牌分道,
    去重只該碰 auth 頁面 / `google/auth.ts` / `utils.ts`）。
    **2026-09-04 已完成**：分頁的兩套量法、B/C/D 圖片框、feature 行數核對、
@@ -344,7 +345,9 @@ auth.users → profiles ← email_whitelist.invited_by
    查無此列就清空依據並列出）、**翻譯行數預算伺服器端驗證**（`lineParityCheck`, 超出重試一次再回報）、
    **Ready 文件在任何寫入後重驗 blocker**（`demoteIfBlocked`, 六個寫入點）、
    **版號取 Drive 與 DB 較高者**（`resolveNextVersion`, 半失敗的前一次不會讓這次重發同號）、
-   B/C 版型印語系自己的版號）。
+   B/C 版型印語系自己的版號）、**EnGenie 硬化一批**（PR #61：`<source>` 邊界、隱藏 HTML、
+   請求上限、`pickModel`、scrypt passcode、token 制 embedding 上限、hash 預讀報錯、
+   topology-icons 收 workspace、追問切法、三條 pipeline 修剪殘尾）。
 
 **產品線 / 版型**：
 1. **待補素材 / 待 PM 處理的項目**（缺圖、EOC 日文待 Confirm、EOC sheet 的

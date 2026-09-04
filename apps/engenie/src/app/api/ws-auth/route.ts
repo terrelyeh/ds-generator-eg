@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
-import { createHash } from "crypto";
+import { logIfDbError } from "@eg/db/errors";
+import { hashPasscode, isLegacyHash, verifyPasscode } from "@/lib/auth/passcode";
+import { createAdminClient } from "@eg/db/admin";
 import { loadWorkspaceBySlug } from "@/lib/ask/workspaces";
 import { workspaceCookieName, computeWorkspaceToken } from "@/lib/auth/workspace-session";
 import { passcodeAttemptAllowed, RATE_LIMIT_MSG } from "@/lib/auth/rate-limit";
@@ -31,11 +33,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Workspace not found" }, { status: 404 });
   }
 
-  // If a passcode is set, it must match (sha256). No passcode = open workspace.
+  // If a passcode is set, it must match. No passcode = open workspace.
   if (ws.passcode_hash) {
-    const h = createHash("sha256").update(String(body.key ?? "")).digest("hex");
-    if (h !== ws.passcode_hash) {
+    const key = String(body.key ?? "");
+    if (!verifyPasscode(key, ws.passcode_hash)) {
       return NextResponse.json({ ok: false, error: "Invalid passcode" }, { status: 401 });
+    }
+    // A bare sha256 hash that just verified is upgraded on the spot, so the
+    // table migrates itself as people sign in (see lib/auth/passcode.ts).
+    if (isLegacyHash(ws.passcode_hash)) {
+      logIfDbError(
+        `ws-auth ${slug} passcode rehash`,
+        await createAdminClient()
+          .from("ask_workspaces" as "products")
+          .update({ passcode_hash: hashPasscode(key) } as never)
+          .eq("slug", slug),
+      );
     }
   }
 

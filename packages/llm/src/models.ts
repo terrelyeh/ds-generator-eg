@@ -117,9 +117,26 @@ export async function resolveModel(
   slug: string | null | undefined,
   surface: Surface | "translate",
 ): Promise<ModelRow | null> {
+  return pickModel(await loadAll(), slug, surface);
+}
+
+/**
+ * The rule behind resolveModel, without the database.
+ *
+ * A named model is honoured only if it is enabled AND offered on this
+ * surface. It used to be returned whenever the row existed, so disabling a
+ * model in the catalogue did nothing for a widget that kept sending its
+ * slug, and a translate-only model could be asked to run Ask.
+ */
+export function pickModel(
+  rows: ModelRow[],
+  slug: string | null | undefined,
+  surface: Surface | "translate",
+): ModelRow | null {
+  const offered = rows.filter((m) => m.enabled && m.surfaces.includes(surface));
   if (slug) {
-    const found = await getModel(slug);
-    if (found) return found;
+    const named = offered.find((m) => m.slug === slug);
+    if (named) return named;
   }
-  return getDefaultModel(surface);
+  return offered.find((m) => m.default_for.includes(surface)) ?? offered[0] ?? null;
 }
