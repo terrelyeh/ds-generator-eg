@@ -1,6 +1,21 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { throwIfDbError } from "@eg/db/errors";
+
+/**
+ * What may land in the public `datasheets` bucket.
+ *
+ * SVG is deliberately absent even though the tender uploader takes it: these
+ * files are served from a public origin and rendered into datasheets, and an
+ * SVG is a document that can carry script.
+ */
+const ALLOWED_IMAGE_TYPES = new Map([
+  ["image/png", "png"],
+  ["image/jpeg", "jpg"],
+  ["image/webp", "webp"],
+]);
+const EXT_FOR_TYPE: Record<string, string> = Object.fromEntries(ALLOWED_IMAGE_TYPES);
+const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
 import {
   deleteDriveFilesByPrefix,
   resolveLocaleDsImagesFolder,
@@ -82,8 +97,25 @@ export async function POST(request: Request) {
     .eq("id", product.product_line_id)
     .single();
 
+  // The extension used to be taken from the uploaded filename and the
+  // content type straight from the browser, into a PUBLIC bucket. Deriving
+  // both from a checked MIME type means the name cannot decide what the
+  // object is served as. Same list as the tender image upload.
+  if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+    return NextResponse.json(
+      { error: "只收 PNG / JPEG / WebP 圖片。" },
+      { status: 415 },
+    );
+  }
+  if (file.size > MAX_IMAGE_BYTES) {
+    return NextResponse.json(
+      { error: `圖片太大（${Math.round(file.size / 1024 / 1024)} MB），上限 20 MB。` },
+      { status: 413 },
+    );
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
-  const ext = file.name.split(".").pop() || "png";
+  const ext = EXT_FOR_TYPE[file.type];
 
   // Build file name based on type and optional locale suffix.
   // English (no locale):

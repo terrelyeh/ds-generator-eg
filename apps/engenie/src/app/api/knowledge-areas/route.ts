@@ -58,6 +58,31 @@ export async function DELETE(request: Request) {
   const { slug } = (await request.json()) as { slug?: string };
   if (!slug) return NextResponse.json({ error: "Missing slug" }, { status: 400 });
   const supabase = createAdminClient();
+
+  // Refuse while documents still point at it.
+  //
+  // Privacy here is derived, not stored: `retrieve.ts` treats a solution as
+  // private by looking it up in the set of `kind='knowledge'` rows. Delete
+  // the row and its documents stop being recognised as an area at all — so
+  // within one cache TTL they start coming back for `/api/v1/search` and for
+  // every workspace, which is the exact opposite of what deleting a private
+  // area is supposed to mean. One click, no warning, no way to notice.
+  const { count } = (await supabase
+    .from("documents" as "products")
+    .select("id", { count: "exact", head: true })
+    .eq("metadata->>solution", slug)) as { count: number | null };
+
+  if ((count ?? 0) > 0) {
+    return NextResponse.json(
+      {
+        error:
+          `這個知識領域還有 ${count} 個文件片段。先把來源移到別的領域或刪掉，` +
+          `再刪這個領域 —— 直接刪掉會讓那些內容變成對外可見。`,
+      },
+      { status: 409 },
+    );
+  }
+
   // Only knowledge areas can be deleted here (never a product solution).
   const { error } = await supabase.from("solutions").delete().eq("slug", slug).eq("kind", "knowledge");
   if (error) return NextResponse.json({ error: "Delete failed" }, { status: 500 });
