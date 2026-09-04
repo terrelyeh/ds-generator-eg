@@ -10,7 +10,7 @@ const DS_IMAGES_FOLDER_NAME = "DS Images";
  * Find a file by exact name within a specific Google Drive folder.
  * Returns the Drive file ID and mimeType, or null if not found.
  */
-interface DriveFileInfo {
+export interface DriveFileInfo {
   id: string;
   mimeType: string;
   modifiedTime?: string;
@@ -131,11 +131,38 @@ export async function deleteDriveFilesByPrefix(
 // invocation (one sync run) and is discarded after. This eliminates
 // redundant Drive API lookups when syncing multiple products that share
 // the same product line + locale.
-const _localeFolderCache = new Map<string, string>();
+const _localeFolderCache = new Map<string, Promise<string>>();
 
 // Same idea, but for the locale product-line folder itself (e.g.
 // "Cloud Camera_zh"). Keyed by `${enLineFolderId}:${locale}`.
-const _localeLineFolderCache = new Map<string, string>();
+const _localeLineFolderCache = new Map<string, Promise<string>>();
+
+/**
+ * Memoise the PROMISE, not the value.
+ *
+ * Both caches above used to be filled only once a lookup had finished. With
+ * products syncing one at a time that was fine; with several in flight, the
+ * first N callers all miss together, all walk Drive, and — because the
+ * lookups auto-create a missing folder — all create one. Sharing the pending
+ * promise means the second caller waits on the first instead.
+ *
+ * A failed lookup is evicted so a transient Drive error does not become the
+ * answer for the rest of a warm instance's life.
+ */
+function memoInFlight(
+  cache: Map<string, Promise<string>>,
+  key: string,
+  run: () => Promise<string>,
+): Promise<string> {
+  const hit = cache.get(key);
+  if (hit) return hit;
+  const pending = run();
+  cache.set(key, pending);
+  pending.catch(() => {
+    if (cache.get(key) === pending) cache.delete(key);
+  });
+  return pending;
+}
 
 /**
  * Look up the locale-sibling product line folder (e.g. "Cloud Camera_zh")
@@ -161,10 +188,17 @@ export async function resolveLocaleLineFolder(params: {
   const suffix = getLocaleSuffix(locale);
   if (!suffix || suffix === "en") return enLineFolderId;
 
-  const cacheKey = `${enLineFolderId}:${locale}`;
-  const cached = _localeLineFolderCache.get(cacheKey);
-  if (cached) return cached;
+  return memoInFlight(_localeLineFolderCache, `${enLineFolderId}:${locale}`, () =>
+    lookupLocaleLineFolder(enLineFolderId, lineName, suffix, locale),
+  );
+}
 
+async function lookupLocaleLineFolder(
+  enLineFolderId: string,
+  lineName: string,
+  suffix: string,
+  locale: string,
+): Promise<string> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
@@ -210,7 +244,6 @@ export async function resolveLocaleLineFolder(params: {
             `Using it for now; consider renaming in Drive for consistency.`,
         );
       }
-      _localeLineFolderCache.set(cacheKey, found);
       return found;
     }
   }
@@ -233,7 +266,6 @@ export async function resolveLocaleLineFolder(params: {
   if (!newId) {
     throw new Error(`Failed to create locale line folder "${canonicalName}"`);
   }
-  _localeLineFolderCache.set(cacheKey, newId);
   return newId;
 }
 
@@ -249,10 +281,17 @@ export async function resolveLocaleDsImagesFolder(params: {
   const suffix = getLocaleSuffix(locale);
   if (!suffix || suffix === "en") return enDsImagesFolderId;
 
-  const cacheKey = `${enDsImagesFolderId}:${locale}`;
-  const cached = _localeFolderCache.get(cacheKey);
-  if (cached) return cached;
+  return memoInFlight(_localeFolderCache, `${enDsImagesFolderId}:${locale}`, () =>
+    lookupLocaleDsImagesFolder(enDsImagesFolderId, lineName, suffix, locale),
+  );
+}
 
+async function lookupLocaleDsImagesFolder(
+  enDsImagesFolderId: string,
+  lineName: string,
+  suffix: string,
+  locale: string,
+): Promise<string> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
@@ -287,7 +326,6 @@ export async function resolveLocaleDsImagesFolder(params: {
 
   const existingDsImagesId = imagesSearchRes.data.files?.[0]?.id;
   if (existingDsImagesId) {
-    _localeFolderCache.set(cacheKey, existingDsImagesId);
     return existingDsImagesId;
   }
 
@@ -306,7 +344,6 @@ export async function resolveLocaleDsImagesFolder(params: {
   if (!newId) {
     throw new Error(`Failed to create DS Images folder in ${lineName}_${suffix}`);
   }
-  _localeFolderCache.set(cacheKey, newId);
   return newId;
 }
 
@@ -526,6 +563,11 @@ async function listFilesInFolder(
  * Pass existingImages to enable smart sync — only re-download if Drive file is newer.
  */
 export interface ImageSyncOptions {
+  /**
+   * Share one folder listing across every product of a run. Omit and this
+   * call lists the folder itself, exactly as before.
+   */
+  listing?: DriveListingCache;
   /** Existing image URLs from DB — used to check Storage timestamps */
   existingImages?: {
     product_image?: string;
@@ -541,6 +583,53 @@ export interface ImageSyncOptions {
    * the check so "Force full re-sync" actually re-pulls every image.
    */
   force?: boolean;
+}
+
+/**
+ * One Drive listing per folder per sync run.
+ *
+ * Every product on a line shares the line's DS Images folder, and every
+ * locale image shares the locale folder — yet each product listed them
+ * again: two Drive calls per product for the EN folder (is it trashed? what
+ * is in it?) and one more per locale. Cloud AP is 27 products, 17 with a
+ * locale, so one run made roughly 70 identical listings of three folders.
+ *
+ * Memoises the PROMISE so that products syncing concurrently share one
+ * in-flight request instead of all missing at once. Scoped to a run on
+ * purpose: a module-level cache would survive on a warm instance and show
+ * the next sync a listing from before the PM uploaded the file they are
+ * waiting on. The two fetchers are injectable for the tests only.
+ */
+export class DriveListingCache {
+  private readonly listings = new Map<string, Promise<Map<string, DriveFileInfo> | null>>();
+  private readonly availability = new Map<string, Promise<boolean>>();
+
+  constructor(
+    private readonly listFolder: (
+      folderId: string,
+    ) => Promise<Map<string, DriveFileInfo> | null> = listFilesInFolder,
+    private readonly folderIsUnavailable: (folderId: string) => Promise<boolean> = folderUnavailable,
+  ) {}
+
+  /** `listFilesInFolder`, once per folder. */
+  list(folderId: string): Promise<Map<string, DriveFileInfo> | null> {
+    let pending = this.listings.get(folderId);
+    if (!pending) {
+      pending = this.listFolder(folderId);
+      this.listings.set(folderId, pending);
+    }
+    return pending;
+  }
+
+  /** `folderUnavailable`, once per folder. */
+  unavailable(folderId: string): Promise<boolean> {
+    let pending = this.availability.get(folderId);
+    if (!pending) {
+      pending = this.folderIsUnavailable(folderId);
+      this.availability.set(folderId, pending);
+    }
+    return pending;
+  }
 }
 
 export interface LocalizedImageSyncResult {
@@ -583,8 +672,10 @@ export async function syncLocalizedHardwareImage(params: {
   lineName: string;
   enDsImagesFolderId: string;
   supabase: ReturnType<typeof import("@eg/db/admin").createAdminClient>;
+  /** See ImageSyncOptions.listing. */
+  listing?: DriveListingCache;
 }): Promise<LocalizedImageSyncResult> {
-  const { modelName, locale, lineName, enDsImagesFolderId, supabase } = params;
+  const { modelName, locale, lineName, enDsImagesFolderId, supabase, listing } = params;
 
   const suffix = getLocaleSuffix(locale);
   if (!suffix || suffix === "en") return { url: null, folder_listed: false };
@@ -605,8 +696,9 @@ export async function syncLocalizedHardwareImage(params: {
     return { url: null, folder_listed: false };
   }
 
-  // List folder once so we have authoritative view
-  const fileMap = await listFilesInFolder(localeFolderId);
+  // One authoritative view of the folder — shared across the run when the
+  // caller passed a cache, listed here otherwise.
+  const fileMap = await (listing ?? new DriveListingCache()).list(localeFolderId);
   if (!fileMap) {
     return { url: null, folder_listed: false };
   }
@@ -738,12 +830,14 @@ export async function syncProductImages(
   // whatever it already has). Same for a trashed one: it lists as empty,
   // which would otherwise read as "every image was deleted".
   if (!dsImagesFolderId) return result;
-  if (await folderUnavailable(dsImagesFolderId)) return result;
+  // A throwaway cache is exactly the old behaviour: one listing per call.
+  const listing = options?.listing ?? new DriveListingCache();
+  if (await listing.unavailable(dsImagesFolderId)) return result;
 
   // One list call gives us a complete view of what's in the folder. If
   // this fails we leave folder_listed = false so the caller doesn't
   // misinterpret missing files as deletions.
-  const fileMap = await listFilesInFolder(dsImagesFolderId);
+  const fileMap = await listing.list(dsImagesFolderId);
   if (!fileMap) return result;
   result.folder_listed = true;
   result.folder_empty = fileMap.size === 0;

@@ -12,7 +12,9 @@ import {
   canClear,
   syncLocalizedHardwareImage,
   syncSeriesImages,
+  DriveListingCache,
 } from "@/lib/google/drive-images";
+import { mapConcurrent } from "@/lib/concurrency";
 import { sendNotifications } from "@/lib/notifications";
 import {
   loadRevisionLogs,
@@ -36,6 +38,17 @@ import type { ProductLine } from "@eg/db/types";
  * it — 60 was a default nobody revisited, not a decision.
  */
 export const maxDuration = 300;
+
+/**
+ * Products of one line in flight at once.
+ *
+ * A product's work is dominated by Drive downloads, sharp trims and Storage
+ * uploads — network waits that overlap well — and products on a line share
+ * no rows, so they can run side by side. Four keeps peak memory (sharp on
+ * multi-MB PNGs) modest and is nowhere near the Drive quota; it is a
+ * comfortable setting, not the ceiling.
+ */
+const PRODUCT_CONCURRENCY = 4;
 
 /**
  * POST /api/sync
@@ -183,6 +196,8 @@ export async function POST(request: Request) {
 
   // Collect changes for notifications
   const allChanges: ChangeEntry[] = [];
+  // One Drive listing per folder for the whole run — see DriveListingCache.
+  const listing = new DriveListingCache();
 
   for (const pl of linesToSync) {
     if (!pl.sheet_id || !pl.detail_specs_gid) continue;
@@ -246,7 +261,19 @@ export async function POST(request: Request) {
 
       sheetModelNames = new Set(allProducts.keys());
 
-      for (const [modelName, sheetData] of allProducts) {
+      const modelNames = [...allProducts.keys()];
+      const changesStart = allChanges.length;
+
+      /**
+       * One product, start to finish. Products on a line share no rows —
+       * each reads and writes only its own products / spec_sections /
+       * change_logs — so they can overlap. What they DO share is the line's
+       * Drive folders, which is what `listing` is for.
+       */
+      const syncOneProduct = async (
+        modelName: string,
+        sheetData: import("@/lib/google/sheets").SheetProduct,
+      ): Promise<void> => {
         try {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
@@ -368,6 +395,7 @@ export async function POST(request: Request) {
                   hardware_image_2: existing.hardware_image_2 || undefined,
                 },
                 force: forceSync,
+                listing,
               });
               if (imgResult.product_image_url) {
                 updateFields.product_image = imgResult.product_image_url;
@@ -410,13 +438,14 @@ export async function POST(request: Request) {
                     lineName: pl.name,
                     enDsImagesFolderId: pl.ds_images_folder_id,
                     supabase,
+                    listing,
                   });
                 } catch { /* non-fatal */ }
               }
             }
 
             lineResult.synced.push(modelName);
-            continue;
+            return;
           }
 
           // Upsert product
@@ -445,7 +474,7 @@ export async function POST(request: Request) {
             lineResult.errors.push(
               `${modelName}: product upsert failed — ${productError?.message}`
             );
-            continue;
+            return;
           }
 
           // Build change summary (compact one-liner for notifications)
@@ -462,6 +491,7 @@ export async function POST(request: Request) {
                 hardware_image_2: existing.hardware_image_2 || undefined,
               } : undefined,
               force: forceSync,
+              listing,
             });
             // "" (not null) — the columns are NOT NULL DEFAULT ''.
             const imageUpdate: Record<string, string> = {};
@@ -509,6 +539,7 @@ export async function POST(request: Request) {
                   lineName: pl.name,
                   enDsImagesFolderId: pl.ds_images_folder_id,
                   supabase,
+                  listing,
                 });
               }
             }
@@ -543,7 +574,30 @@ export async function POST(request: Request) {
             `${modelName}: ${err instanceof Error ? err.message : String(err)}`
           );
         }
-      }
+      };
+
+      const settled = await mapConcurrent(
+        [...allProducts],
+        PRODUCT_CONCURRENCY,
+        ([modelName, sheetData]) => syncOneProduct(modelName, sheetData),
+      );
+      // The body catches its own errors, so this only matters if something
+      // ever throws past that catch: the product is then reported, not lost.
+      settled.forEach((outcome, i) => {
+        if (outcome.status === "rejected") {
+          const reason = outcome.reason;
+          lineResult.errors.push(
+            `${modelNames[i]}: ${reason instanceof Error ? reason.message : String(reason)}`,
+          );
+        }
+      });
+      // Completion order is arbitrary; keep reporting in sheet order.
+      const sheetOrder = new Map(modelNames.map((m, i) => [m, i]));
+      const byOrder = (a: string, b: string) => (sheetOrder.get(a) ?? 0) - (sheetOrder.get(b) ?? 0);
+      lineResult.synced.sort(byOrder);
+      allChanges.push(
+        ...allChanges.splice(changesStart).sort((a, b) => byOrder(a.product_name, b.product_name)),
+      );
 
       fullLineRead = true;
     } catch (err) {

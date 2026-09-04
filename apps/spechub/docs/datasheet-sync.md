@@ -57,3 +57,24 @@ MKT web upload (任一語言) ──write-through──▶ Supabase + 對應語�
 - **同步路徑**：`syncLocalizedHardwareImage()` 在 sync cron 針對每個啟用的 locale 各跑一次，寫入 `product_translations.hardware_image`
 - **Locale 代碼**：`ja` 和 `zh`（zh-TW 簡寫），統一用 ISO 639-1 語言代碼。舊的 `_jp` / `_JP` 已在 2026-04-15 透過 `scripts/rename-jp-to-ja.mjs` 全面改名
 - Drive 上傳失敗不影響 Supabase（non-blocking）
+
+
+### 2026-09-04：一條線裡的產品並行、Drive 資料夾清單只列一次
+
+以前每一台產品都自己對**同一個** `DS Images` 資料夾做兩次 Drive 呼叫（在垃圾桶嗎？
+裡面有什麼？），語系圖再對語系資料夾各列一次，而且全部串行。Cloud AP 是 27 台、17 台有
+語系，一次 run 大約做 70 次一模一樣的清單呼叫。
+
+現在：
+- `/api/sync` 每次 run 建一個 `DriveListingCache`（`lib/google/drive-images.ts`），
+  傳給 `syncProductImages` / `syncLocalizedHardwareImage`。**同一個資料夾一次 run 只列一次。**
+  它是 run-scoped 不是模組級 —— 模組級會在 warm instance 上讓下一次 run 看到 PM 上傳之前的清單。
+  不傳的呼叫端（upload-image 等）行為完全不變。
+- 一條線的產品用 `mapConcurrent`（`lib/concurrency.ts`）以 `PRODUCT_CONCURRENCY = 4` 並行。
+  產品之間不共用任何列（各自的 products / spec_sections / change_logs / product_translations），
+  所以可以重疊；回報順序仍照 sheet 的順序。
+- 兩個模組級的語系資料夾快取改成記 **promise**（`memoInFlight`）——不然並行下前幾台會
+  同時 miss、同時自動建資料夾（pitfall #75）。
+
+`PRODUCT_CONCURRENCY` 是舒適值不是上限：主要成本是 Drive 下載、sharp 裁邊、Storage 上傳，
+都是等網路；4 讓 sharp 的尖峰記憶體保持在幾百 MB 內。
