@@ -54,6 +54,40 @@ export async function loadWorkspaceBySlug(slug: string): Promise<AskWorkspace | 
   return data ?? null;
 }
 
+/**
+ * The knowledge areas this workspace may actually read.
+ *
+ * Not the same as the ones it is configured with. A workspace without a
+ * passcode is open to anyone who can guess its slug — `/ask/mkt` and
+ * `/ask/sales` are not hard to guess — and `ws-auth` hands those callers a
+ * seven-day token with no questions asked. Department areas (SOPs,
+ * onboarding, support history marked internal) are exactly what
+ * `/api/v1/search` refuses to serve even to an authenticated API key, so
+ * serving them to an anonymous visitor is the wrong way round.
+ *
+ * The rule: no passcode, no private areas. The workspace keeps working and
+ * keeps its product scope; it just stops answering from the private half
+ * until somebody gives it a passcode. Degrading beats going dark, and it
+ * beats leaving it open while we decide.
+ */
+export function allowedKnowledgeAreas(w: AskWorkspace): string[] {
+  const configured = [
+    ...(Array.isArray(w.scope?.knowledge_areas) ? w.scope.knowledge_areas : []),
+    // A workspace can be scoped directly AT an area, e.g. an onboarding bot.
+    ...(w.scope?.solution ? [w.scope.solution] : []),
+  ];
+
+  if (w.passcode_hash) return configured;
+
+  if (configured.length > 0) {
+    console.warn(
+      `[ask] workspace "${w.slug}" has no passcode — withholding ${configured.length} ` +
+        `knowledge area(s): ${configured.join(", ")}. Set a passcode to restore them.`,
+    );
+  }
+  return [];
+}
+
 /** Public-safe view of a workspace config (no secrets) for the chat UI. */
 export function publicWorkspace(w: AskWorkspace) {
   return {

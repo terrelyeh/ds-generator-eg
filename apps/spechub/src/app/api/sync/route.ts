@@ -47,6 +47,62 @@ export const maxDuration = 300;
  *   ?line=Cloud Camera    — sync only one product line
  *   ?model=ECC100         — sync only one model
  */
+/**
+ * One sync at a time.
+ *
+ * The 09:00 cron and the dashboard's Sync button reach the same code, and
+ * nothing stopped them overlapping. Two runs interleaving `delete` and
+ * `insert` on `revision_logs` / `comparisons` leaves duplicated rows that the
+ * next diff collapses into a Map and therefore never reports, while the
+ * change_logs and the Telegram message go out twice.
+ *
+ * Taken with an INSERT rather than read-then-write: the unique key on
+ * `app_settings.key` decides the winner in one statement, so two callers
+ * arriving together cannot both believe they won (which is the flaw in the
+ * PDF lock this is otherwise modelled on).
+ */
+const SYNC_LOCK_KEY = "sync_lock";
+const SYNC_LOCK_TTL_MS = 10 * 60 * 1000;
+
+async function acquireSyncLock(
+  supabase: ReturnType<typeof createAdminClient>,
+): Promise<{ ok: true } | { ok: false; heldSince: string | null }> {
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("app_settings" as "products")
+    .insert({ key: SYNC_LOCK_KEY, value: now, updated_at: now } as never);
+
+  if (!error) return { ok: true };
+
+  // Someone holds it. Steal only a lock old enough to be from a run that was
+  // killed — a sync that outlives the TTL is not coming back.
+  const { data: held } = (await supabase
+    .from("app_settings" as "products")
+    .select("value")
+    .eq("key", SYNC_LOCK_KEY)
+    .maybeSingle()) as { data: { value: string } | null };
+
+  const heldSince = held?.value ?? null;
+  const age = heldSince ? Date.now() - new Date(heldSince).getTime() : Infinity;
+  if (age < SYNC_LOCK_TTL_MS) return { ok: false, heldSince };
+
+  logIfDbError(
+    "sync lock steal",
+    await supabase
+      .from("app_settings" as "products")
+      .update({ value: now, updated_at: now } as never)
+      .eq("key", SYNC_LOCK_KEY),
+  );
+  return { ok: true };
+}
+
+async function releaseSyncLock(supabase: ReturnType<typeof createAdminClient>) {
+  logIfDbError(
+    "sync lock release",
+    await supabase.from("app_settings" as "products").delete().eq("key", SYNC_LOCK_KEY),
+  );
+}
+
 export async function POST(request: Request) {
   // Vercel cron / CRON_SECRET bearer / signed-in editor+admin users only.
   const denied = await gateOrCron(request, "sync.run");
@@ -59,12 +115,24 @@ export async function POST(request: Request) {
 
   const supabase = createAdminClient();
 
+  const lock = await acquireSyncLock(supabase);
+  if (!lock.ok) {
+    return NextResponse.json(
+      {
+        error: "A sync is already running. Wait for it to finish and try again.",
+        started_at: lock.heldSince,
+      },
+      { status: 409 },
+    );
+  }
+
   // Get all product lines from DB
   const { data: productLines, error: plError } = (await supabase
     .from("product_lines")
     .select("*")) as { data: ProductLine[] | null; error: { message: string } | null };
 
   if (plError || !productLines) {
+    await releaseSyncLock(supabase);
     return NextResponse.json(
       { error: "Failed to fetch product lines", details: plError?.message },
       { status: 500 }
@@ -98,6 +166,19 @@ export async function POST(request: Request) {
     synced: string[];
     errors: string[];
     skipped?: boolean;
+    /**
+     * Models this line still has in the database that the sheet no longer
+     * lists — almost always an EOL product whose column was removed.
+     *
+     * Reported, not acted on. Sync only ever iterates what the sheet
+     * contains, so these have been sitting at `status='active'` since the day
+     * they were dropped, and EnGenie has gone on recommending them. But
+     * auto-deactivating on absence is the wrong reflex: a PM tidying a sheet,
+     * a renamed model, or a partial read would all quietly take a live
+     * product off the site. So the sync says what it noticed and a person
+     * decides — which is also the only way anyone finds out at all.
+     */
+    orphaned?: string[];
   }[] = [];
 
   // Collect changes for notifications
@@ -122,6 +203,8 @@ export async function POST(request: Request) {
     // Did the whole line actually come back from Sheets this run? Only then
     // is it honest to say the line is synced.
     let fullLineRead = false;
+    /** Model names the sheet listed this run, for the orphan check below. */
+    let sheetModelNames: Set<string> | null = null;
 
     try {
       // Smart Sync: skip if sheet hasn't changed since last sync
@@ -160,6 +243,8 @@ export async function POST(request: Request) {
           pl.overview_gid ?? "0"
         );
       }
+
+      sheetModelNames = new Set(allProducts.keys());
 
       for (const [modelName, sheetData] of allProducts) {
         try {
@@ -667,6 +752,40 @@ export async function POST(request: Request) {
     // button — stamped the LINE, so an editor resyncing one model at 10:05
     // silently cancelled tomorrow's sync of every edit anyone else had made
     // to that sheet.
+    // Which of this line's products the sheet no longer lists. Only ever
+    // asked after a full, successful read — a partial one would name every
+    // model it never got to.
+    if (fullLineRead && !filterModel && sheetModelNames) {
+      const { data: dbProducts } = (await supabase
+        .from("products")
+        .select("model_name, status")
+        .eq("product_line_id", pl.id)) as {
+        data: { model_name: string; status: string | null }[] | null;
+      };
+      const orphaned = (dbProducts ?? [])
+        .filter((p) => (p.status ?? "active") === "active" && !sheetModelNames!.has(p.model_name))
+        .map((p) => p.model_name);
+      if (orphaned.length > 0) {
+        lineResult.orphaned = orphaned;
+        console.warn(
+          `[sync] ${pl.name}: ${orphaned.length} active product(s) no longer on the sheet: ${orphaned.join(", ")}`,
+        );
+        // Into the same Telegram message the sync already sends. A line in
+        // the API response is a line nobody reads; the team sees this one.
+        // Notification only — no change_log row, because nothing changed.
+        allChanges.push({
+          product_name: orphaned.join(", "),
+          product_line: pl.label ?? pl.name,
+          changes_summary:
+            orphaned.length === 1
+              ? "still active in SpecHub but no longer on the sheet — retire it or put it back"
+              : `${orphaned.length} products still active in SpecHub but no longer on the sheet — retire them or put them back`,
+          edited_by: null,
+          edited_at: null,
+        });
+      }
+    }
+
     if (fullLineRead && !filterModel) {
       const stampRes = await supabase
         .from("product_lines")
@@ -745,6 +864,8 @@ export async function POST(request: Request) {
       console.warn("EnGenie re-index trigger failed:", err);
     }
   }
+
+  await releaseSyncLock(supabase);
 
   return NextResponse.json({
     ok: true,

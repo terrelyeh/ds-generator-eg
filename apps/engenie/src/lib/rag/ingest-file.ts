@@ -13,7 +13,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
-import { throwIfDbError } from "@eg/db/errors";
+import { trimStaleChunks } from "./replace-chunks";
 
 const EMBED_BATCH_SIZE = 20;
 const MAX_EMBED_CHARS = 21000;
@@ -41,14 +41,6 @@ export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileRes
   const tax = normalizeTaxonomy(opts.taxonomy);
   const supabase = createAdminClient();
   const displayTitle = label?.trim() || fileName;
-
-  throwIfDbError("documents delete (file)")(
-    await supabase
-      .from("documents" as "products")
-      .delete()
-      .eq("source_type", "file")
-      .eq("source_id", sourceId),
-  );
 
   const chunks = chunkText(text, displayTitle, label);
   if (chunks.length === 0) throw new Error("No text extracted from file");
@@ -94,6 +86,11 @@ export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileRes
       processed++;
     }
   }
+
+  // After the writes, never before — the uploaded file is already in storage
+  // by this point, so a failed embed used to leave the object with no row
+  // pointing at it and nothing to delete it by.
+  await trimStaleChunks(supabase, "file", sourceId, chunks.length);
 
   return { processed, chunks: chunks.length };
 }

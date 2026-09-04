@@ -171,12 +171,31 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
 
   const filterMetadata = productLine ? JSON.stringify({ product_line: productLine }) : null;
 
-  const { data: matches, error } = (await supabase.rpc("match_documents", {
+  // Which knowledge areas this caller may NOT read, resolved before the
+  // query rather than after it.
+  //
+  // The scope filter below is unchanged and still authoritative. What this
+  // changes is the candidate pool: a workspace scoped to one area used to
+  // compete for its 40 nearest chunks against the whole product corpus, so a
+  // question whose neighbours happened to be datasheets filtered down to
+  // nothing and answered "I couldn't find relevant product information" —
+  // with the answer sitting in the area it was scoped to. Excluding them in
+  // SQL means the 40 are 40 the caller can actually use.
+  const scoped = knowledgeAreasAllowed != null;
+  const knowledgeSlugs = scoped ? await getKnowledgeSlugs(supabase) : null;
+  const excludeSolutions =
+    scoped && knowledgeSlugs
+      ? [...knowledgeSlugs].filter((slug) => !knowledgeAreasAllowed!.includes(slug))
+      : null;
+
+  const { data: matches, error } = (await supabase.rpc("match_documents_scoped", {
     query_embedding: JSON.stringify(queryEmbedding),
     match_count: matchCount,
     match_threshold: matchThreshold,
     filter_source_type: sourceType || null,
     filter_metadata: filterMetadata,
+    exclude_solutions: excludeSolutions && excludeSolutions.length > 0 ? excludeSolutions : null,
+    filter_source_types: allowTypes ? [...allowTypes] : null,
   })) as { data: RetrievedDoc[] | null; error: unknown };
 
   if (error) throw new Error(`Vector search failed: ${String(error)}`);
@@ -191,8 +210,6 @@ export async function retrieveDocuments(opts: RetrieveOptions): Promise<Retrieve
   // `knowledgeAreasAllowed` defined (workspace / Search API) ⇒ scoped mode:
   // knowledge areas are private unless allow-listed (empty array = none).
   // `null` (internal Ask) ⇒ not scoped: areas pass via the taxonomy path as before.
-  const scoped = knowledgeAreasAllowed != null;
-  const knowledgeSlugs = scoped ? await getKnowledgeSlugs(supabase) : null;
   const inScope = (meta: Partial<TaxonomyMeta>): boolean => {
     const sol = meta.solution ?? null;
     if (scoped && knowledgeSlugs && sol && knowledgeSlugs.has(sol)) {

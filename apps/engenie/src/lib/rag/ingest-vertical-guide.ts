@@ -22,7 +22,7 @@
 import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { chunkText } from "./chunk";
-import { throwIfDbError } from "@eg/db/errors";
+import { trimStaleChunks } from "./replace-chunks";
 
 const SOURCE_TYPE = "vertical_guide";
 const EMBED_BATCH_SIZE = 20;
@@ -182,14 +182,6 @@ export async function ingestVerticalGuide(
   const supabase = createAdminClient();
 
   // Clean replace (S6 re-gen): drop this guide's existing chunks first.
-  throwIfDbError("documents delete (vertical_guide)")(
-    await supabase
-      .from("documents" as "products")
-      .delete()
-      .eq("source_type", SOURCE_TYPE)
-      .eq("source_id", sourceId),
-  );
-
   let processed = 0;
   for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
     const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
@@ -222,6 +214,8 @@ export async function ingestVerticalGuide(
       processed++;
     }
   }
+
+  await trimStaleChunks(supabase, SOURCE_TYPE, sourceId, chunks.length);
 
   return {
     sourceId,

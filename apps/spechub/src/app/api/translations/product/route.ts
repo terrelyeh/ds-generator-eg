@@ -108,8 +108,6 @@ export async function POST(request: Request) {
   // "not submitted", or the editor cannot show that pressing the button
   // did anything, and rows that default to draft on insert look submitted.
   //
-  // Auto-saves for Preview (confirm falsy) still touch nothing — they're
-  // scratch writes, and they must not un-approve on every keystroke.
   const reviewed = await localeHasDesignatedReviewer(locale);
   const selfApproved = !!confirm && can(user?.role, "review.self_approve") && !reviewed;
   if (selfApproved) {
@@ -119,6 +117,44 @@ export async function POST(request: Request) {
     // The pending verdict is about this save, so any earlier one is stale.
     upsertData.reviewed_by = null;
     upsertData.reviewed_at = null;
+  } else if (reviewed) {
+    // A scratch write (Preview) is not a submission, but it is not nothing
+    // either: it replaces the text. Leaving `review_status` alone meant an
+    // approved row kept its approval while its words changed underneath —
+    // and `generate-pdf` gates on `confirmed`, which derives from exactly
+    // that column. So the reviewed locale could ship a PDF of text nobody
+    // had read.
+    //
+    // Only when the content genuinely differs. A Preview click that changed
+    // nothing must not knock a translation out of approval, which is what
+    // the old comment about keystrokes was protecting against.
+    const { data: current } = (await supabase
+      .from("product_translations" as "products")
+      .select("review_status, headline, subtitle, overview, features")
+      .eq("product_id", product_id)
+      .eq("locale", locale)
+      .maybeSingle()) as {
+      data: {
+        review_status: string | null;
+        headline: string | null;
+        subtitle: string | null;
+        overview: string | null;
+        features: string[] | null;
+      } | null;
+    };
+
+    const sameText =
+      current !== null &&
+      current.headline === upsertData.headline &&
+      current.subtitle === upsertData.subtitle &&
+      current.overview === upsertData.overview &&
+      JSON.stringify(current.features ?? null) === JSON.stringify(upsertData.features ?? null);
+
+    if (current?.review_status === "approved" && !sameText) {
+      upsertData.review_status = "draft";
+      upsertData.reviewed_by = null;
+      upsertData.reviewed_at = null;
+    }
   }
 
   const { error } = await supabase
