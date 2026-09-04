@@ -133,6 +133,34 @@ async function sendBypassOnlyTo(page: Page, baseUrl: string): Promise<boolean> {
  * So: ask explicitly for the page's own text in the page's own fonts, which
  * forces every shard it needs, then wait out the resulting fetches.
  */
+/**
+ * As above, but it cannot hang.
+ *
+ * `document.fonts.load` on a CJK family pulls hundreds of unicode-range
+ * shards, and a slow or flaky Google Fonts is enough to leave this awaiting
+ * forever. That used to burn the route's whole 60-second budget and get the
+ * function killed — which also skipped `releaseLock()`, so the model was 409
+ * for the next five minutes. Timing out and printing is the better failure:
+ * a datasheet with a fallback face is visible and fixable, a lock nobody can
+ * clear is neither.
+ */
+async function waitForFontsOrGiveUp(page: Page, ms = 20_000): Promise<void> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      waitForFonts(page),
+      new Promise<void>((resolve) => {
+        timer = setTimeout(() => {
+          console.warn(`[generate-pdf] webfonts still loading after ${ms}ms — printing anyway`);
+          resolve();
+        }, ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 async function waitForFonts(page: Page): Promise<void> {
   await page.evaluate(async () => {
     await document.fonts.ready;
@@ -213,6 +241,18 @@ export async function POST(request: Request) {
       ),
   );
 
+  // Defined here, above the lookups: two early returns below used to fire
+  // between taking the lock and defining this, so a request for a model that
+  // does not exist held the lock for its full five-minute TTL and answered
+  // every retry with 409.
+  async function releaseLock() {
+    // Best effort: a lock left behind expires on its own TTL.
+    logIfDbError(
+      "pdf lock release",
+      await supabase.from("app_settings" as "products").delete().eq("key", lockKey),
+    );
+  }
+
   // Get the product + product line info
   const { data: product, error: productError } = await supabase
     .from("products")
@@ -221,6 +261,7 @@ export async function POST(request: Request) {
     .single();
 
   if (productError || !product) {
+    await releaseLock();
     return NextResponse.json(
       { error: `Product "${model}" not found` },
       { status: 404 }
@@ -234,18 +275,10 @@ export async function POST(request: Request) {
     .single()) as { data: ProductLine | null };
 
   if (!productLine) {
+    await releaseLock();
     return NextResponse.json(
       { error: "Product line not found" },
       { status: 404 }
-    );
-  }
-
-  // Helper to release the lock
-  async function releaseLock() {
-    // Best effort: a lock left behind expires on its own TTL.
-    logIfDbError(
-      "pdf lock release",
-      await supabase.from("app_settings" as "products").delete().eq("key", lockKey),
     );
   }
 
@@ -375,6 +408,8 @@ export async function POST(request: Request) {
       headless: true,
     });
 
+    let pdfBuffer: Buffer;
+    try {
     const page = await browser.newPage();
 
     // Resolve the base URL for the preview page.
@@ -412,12 +447,24 @@ export async function POST(request: Request) {
       ? `${baseUrl}/preview/${model}?lang=${lang}&mode=${translationMode}${versionParam}`
       : `${baseUrl}/preview/${model}?toolbar=false${versionParam}`;
 
-    await page.goto(previewUrl, {
+    const response = await page.goto(previewUrl, {
       waitUntil: "networkidle0",
       timeout: 30000,
     });
 
-    await waitForFonts(page);
+    // `goto` resolves on ANY status. Without this, a transient DB error that
+    // sends page.tsx into `notFound()` produced a 404 page, and the 404 page
+    // was printed, uploaded over the current version's object (`upsert:
+    // true`), pushed over the same-named file on Drive, and stamped into
+    // `versions` — a published datasheet that says "This page could not be
+    // found".
+    if (!response || !response.ok()) {
+      throw new Error(
+        `Preview page returned HTTP ${response?.status() ?? "no response"} for ${previewUrl}`,
+      );
+    }
+
+    await waitForFontsOrGiveUp(page);
 
     // Guard: if Vercel Deployment Protection (or any other gate) intercepted
     // the request, the page will be Vercel's OAuth login. Detect by title
@@ -425,21 +472,37 @@ export async function POST(request: Request) {
     const pageTitle = await page.title();
     const finalUrl = page.url();
     if (/log in to vercel|authentication required/i.test(pageTitle)) {
-      await browser.close();
       throw new Error(
         `Preview page hit Vercel auth gate. pageTitle="${pageTitle}" finalUrl="${finalUrl}" baseUrl="${baseUrl}" previewUrl="${previewUrl}" hasBypassSecret=${bypassSecret}`
       );
     }
 
-    const pdfBuffer = Buffer.from(
+    // A 200 that rendered nothing is still nothing. Pitfall #69 is the same
+    // lesson from the other side: a checker that cannot see the pages will
+    // happily report no overflow across a hundred blank documents.
+    const renderedPages = await page.evaluate(
+      () => document.querySelectorAll(".page").length,
+    );
+    if (renderedPages < 1) {
+      throw new Error(
+        `Preview rendered no pages for ${previewUrl} (title="${pageTitle}")`,
+      );
+    }
+
+    pdfBuffer = Buffer.from(
       await page.pdf({
         format: "Letter",
         printBackground: true,
         margin: { top: 0, right: 0, bottom: 0, left: 0 },
       })
     );
-
-    await browser.close();
+    } finally {
+      // Every exit path, including the throws above and a goto timeout.
+      // Chromium used to be left running in the warm container whenever this
+      // block threw, which on a reused instance is a process leak that ends
+      // in the function being killed for memory.
+      await browser.close().catch(() => {});
+    }
 
     // Step 3: Upload to Supabase Storage
     const langSuffix = isLocalized ? `_${getLocaleSuffix(lang)}` : "";
@@ -454,6 +517,7 @@ export async function POST(request: Request) {
       });
 
     if (uploadError) {
+      await releaseLock();
       return NextResponse.json(
         { error: "PDF upload to Supabase failed", details: uploadError.message },
         { status: 500 }
@@ -665,14 +729,28 @@ async function printPreviewPdf(previewPath: string): Promise<Buffer> {
     const bypassSecret = await sendBypassOnlyTo(page, baseUrl);
 
     const previewUrl = `${baseUrl}${previewPath}`;
-    await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 30000 });
-    await waitForFonts(page);
+    const response = await page.goto(previewUrl, { waitUntil: "networkidle0", timeout: 30000 });
+    // Same reason as the per-model path: `goto` resolves on any status, and
+    // a 404 printed as a series datasheet overwrites the real one.
+    if (!response || !response.ok()) {
+      throw new Error(
+        `Preview page returned HTTP ${response?.status() ?? "no response"} for ${previewUrl}`,
+      );
+    }
+    await waitForFontsOrGiveUp(page);
 
     const pageTitle = await page.title();
     if (/log in to vercel|authentication required|404/i.test(pageTitle)) {
       throw new Error(
         `Preview page not reachable. pageTitle="${pageTitle}" previewUrl="${previewUrl}" hasBypassSecret=${bypassSecret}`,
       );
+    }
+
+    const renderedPages = await page.evaluate(
+      () => document.querySelectorAll(".page").length,
+    );
+    if (renderedPages < 1) {
+      throw new Error(`Preview rendered no pages for ${previewUrl} (title="${pageTitle}")`);
     }
 
     return Buffer.from(

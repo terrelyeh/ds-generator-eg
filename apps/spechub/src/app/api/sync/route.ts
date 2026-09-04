@@ -112,6 +112,10 @@ export async function POST(request: Request) {
       // Drive API not available — Smart Sync won't work, fall through to full sync
     }
 
+    // Did the whole line actually come back from Sheets this run? Only then
+    // is it honest to say the line is synced.
+    let fullLineRead = false;
+
     try {
       // Smart Sync: skip if sheet hasn't changed since last sync
       const sheetModified = metadata.last_modified ? new Date(metadata.last_modified).getTime() : null;
@@ -421,11 +425,7 @@ export async function POST(request: Request) {
           }
 
           // Replace spec sections + items
-          throwIfDbError(`${modelName} spec_sections delete`)(
-            await supabase.from("spec_sections").delete().eq("product_id", product.id),
-          );
-
-          await syncSpecSections(supabase, product.id, sheetData.spec_sections);
+          await syncSpecSections(supabase, product.id, sheetData.spec_sections, modelName);
 
           // Log the change (only when something actually changed)
           throwIfDbError(`${modelName} change_logs insert`)(
@@ -452,6 +452,8 @@ export async function POST(request: Request) {
           );
         }
       }
+
+      fullLineRead = true;
     } catch (err) {
       lineResult.errors.push(
         `Sheet error: ${err instanceof Error ? err.message : String(err)}`
@@ -650,12 +652,22 @@ export async function POST(request: Request) {
       }
 
     // Update last_synced_at for Smart Sync
-    const stampRes = await supabase
-      .from("product_lines")
-      .update({ last_synced_at: new Date().toISOString() })
-      .eq("id", pl.id);
-    if (!logIfDbError(`${pl.name} last_synced_at`, stampRes)) {
-      lineResult.errors.push("last_synced_at not updated — Smart Sync may re-run this line");
+    // Stamp only when this run really read the whole line.
+    //
+    // It used to stamp unconditionally, which made the timestamp a lie in two
+    // ways. A Sheets 429 recorded the error and then marked the line synced,
+    // so the next cron skipped it. And `?model=X` — the per-product Resync
+    // button — stamped the LINE, so an editor resyncing one model at 10:05
+    // silently cancelled tomorrow's sync of every edit anyone else had made
+    // to that sheet.
+    if (fullLineRead && !filterModel) {
+      const stampRes = await supabase
+        .from("product_lines")
+        .update({ last_synced_at: new Date().toISOString() })
+        .eq("id", pl.id);
+      if (!logIfDbError(`${pl.name} last_synced_at`, stampRes)) {
+        lineResult.errors.push("last_synced_at not updated — Smart Sync may re-run this line");
+      }
     }
 
     results.push(lineResult);
@@ -694,6 +706,11 @@ export async function POST(request: Request) {
       } else {
         const changedModels = [...new Set(allChanges.map((c) => c.product_name))];
         const r = await fetch(`${base.replace(/\/$/, "")}/api/cron/reindex-products`, {
+          // EnGenie embeds synchronously, so a large batch can outlast this
+          // function and turn a finished sync into a 504 that reads as the
+          // sync having failed. The daily 09:30 backstop covers everything
+          // anyway, which is the whole reason this call is allowed to fail.
+          signal: AbortSignal.timeout(10_000),
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -860,44 +877,35 @@ function diffComparison(
   return { summary: parts.join(", "), details };
 }
 
+/**
+ * Replace a product's whole spec table.
+ *
+ * One RPC, so one transaction (migration 00050). It used to be a `delete`
+ * followed by a loop of inserts with nothing around them: between the two the
+ * product had no specs, and that window sat inside the slowest part of the
+ * slowest line, minutes into a route capped at 60 seconds. A kill in the
+ * middle left a product with four categories out of fifteen and reported
+ * success — and because `last_synced_at` never got stamped, the NEXT run
+ * diffed against the wreckage and logged every section as newly added.
+ */
 async function syncSpecSections(
   supabase: ReturnType<typeof createAdminClient>,
   productId: string,
-  sections: SheetSpecSection[]
+  sections: SheetSpecSection[],
+  modelName: string,
 ) {
-  for (let i = 0; i < sections.length; i++) {
-    const section = sections[i];
-
-    const { data: sectionRow } = throwIfDbError(`spec_sections insert (${section.category})`)(
-      await supabase
-        .from("spec_sections")
-        .insert({
-          product_id: productId,
-          category: section.category,
-          sort_order: i,
-        })
-        .select("id")
-        .single(),
-    );
-
-    // Used to be `if (!sectionRow) continue;` — a section that failed to
-    // come back took its items with it and said nothing, so the product
-    // rendered with a category missing and the sync reported success.
-    if (!sectionRow) {
-      throw new Error(`spec_sections insert (${section.category}) returned no row`);
-    }
-
-    const items = section.items.map((item, j) => ({
-      section_id: sectionRow.id,
-      label: item.label,
-      value: item.value,
-      sort_order: j,
-    }));
-
-    if (items.length > 0) {
-      throwIfDbError(`spec_items insert (${section.category})`)(
-        await supabase.from("spec_items").insert(items),
-      );
-    }
-  }
+  throwIfDbError(`${modelName} spec table rewrite`)(
+    await supabase.rpc("replace_spec_sections" as never, {
+      p_product_id: productId,
+      p_sections: sections.map((section, i) => ({
+        category: section.category,
+        sort_order: i,
+        items: section.items.map((item, j) => ({
+          label: item.label,
+          value: item.value,
+          sort_order: j,
+        })),
+      })),
+    } as never),
+  );
 }

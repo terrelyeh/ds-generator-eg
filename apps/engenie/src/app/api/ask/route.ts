@@ -363,10 +363,27 @@ export async function POST(request: Request) {
 
   // Create SSE stream
   const encoder = new TextEncoder();
+  // Pressing Stop aborts the browser's fetch, which aborts `request.signal`.
+  // Nothing used to be listening: the upstream generation ran to completion
+  // and was billed in full, and the function stayed alive waiting for it.
+  // This is the handle that reaches OpenRouter.
+  const upstream = new AbortController();
+  const abortUpstream = () => upstream.abort();
+  request.signal.addEventListener("abort", abortUpstream, { once: true });
+
+  let closed = false;
   const stream = new ReadableStream({
     async start(controller) {
       function sendEvent(data: string) {
-        controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        // Once the reader is gone every enqueue throws, and those throws used
+        // to be swallowed inside the OpenRouter chunk loop — so an aborted
+        // request looked like a healthy one all the way down.
+        if (closed || request.signal.aborted) return;
+        try {
+          controller.enqueue(encoder.encode(`data: ${data}\n\n`));
+        } catch {
+          closed = true;
+        }
       }
 
       try {
@@ -439,10 +456,15 @@ export async function POST(request: Request) {
         } catch (searchError) {
           const safe = redactSecrets(String(searchError));
           console.error("Vector search error:", safe);
-          sendEvent(JSON.stringify({ type: "chunk", content: "Error: Search failed. " + safe }));
+          // `type: "error"`, not a chunk. A chunk is answer text: the client
+          // appends it, saves it to history and to localStorage, and the
+          // whole outage reads as EnGenie calmly explaining that search
+          // failed. That is exactly how Ask stayed broken for days in
+          // August with nobody noticing (pitfall #68) — the tell was an
+          // empty `llm_usage_events`, not anything on screen.
+          sendEvent(JSON.stringify({ type: "error", content: `Search failed. ${safe}` }));
           sendEvent("[DONE]");
-          controller.close();
-          return;
+          return; // `finally` closes the controller.
         }
 
         if (docs.length === 0 && recentHistory.length === 0) {
@@ -558,6 +580,7 @@ IMPORTANT formatting rules:
           surface: "ask",
           feature: "ask",
           ref: ws?.slug ?? "internal",
+          signal: upstream.signal,
           onChunk: (text) =>
             sendEvent(JSON.stringify({ type: "chunk", content: text })),
         });
@@ -574,6 +597,12 @@ IMPORTANT formatting rules:
         }));
         sendEvent("[DONE]");
       } catch (err) {
+        // An abort is the user pressing Stop, not a fault. Reporting it as
+        // an error would paint the partial answer they chose to keep as a
+        // failure.
+        if (request.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+          return;
+        }
         const safe = redactSecrets(err instanceof Error ? err.message : String(err));
         console.error("Ask SSE error:", safe);
         // Structured "error", not a content chunk — an upstream failure
@@ -582,8 +611,19 @@ IMPORTANT formatting rules:
         sendEvent(JSON.stringify({ type: "error", content: `\n\nError: ${safe}` }));
         sendEvent("[DONE]");
       } finally {
-        controller.close();
+        request.signal.removeEventListener("abort", abortUpstream);
+        closed = true;
+        try {
+          controller.close();
+        } catch {
+          // Already closed by the runtime when the client went away.
+        }
       }
+    },
+    cancel() {
+      // The reader let go — stop paying for tokens nobody will read.
+      closed = true;
+      upstream.abort();
     },
   });
 

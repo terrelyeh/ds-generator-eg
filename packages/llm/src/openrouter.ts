@@ -167,9 +167,14 @@ export async function chatComplete(opts: ChatOptions): Promise<string> {
   }
 
   if (!opts.skipRecord) {
-    // Deliberately not awaited: a ledger write must never delay or fail a
-    // translation. Errors are logged and dropped.
-    void recordUsage(data, opts).catch((e) =>
+    // Awaited, not fired and forgotten. The old comment said a ledger write
+    // must never delay a translation, which is true — but the request has
+    // already come back from OpenRouter, so this costs one small insert
+    // against a call that took seconds. What it buys is the row actually
+    // existing: a serverless instance can be frozen the moment the handler
+    // returns, and an un-awaited promise is not a reason to keep it alive.
+    // Errors are still swallowed; the answer is worth more than the record.
+    await recordUsage(data, opts).catch((e) =>
       console.warn("[openrouter] usage not recorded:", e?.message ?? e),
     );
   }
@@ -275,6 +280,10 @@ export async function streamComplete(
   }
   if (!res.body) throw new Error(`OpenRouter returned no stream (${opts.model})`);
 
+  // An aborted stream never delivers the final usage chunk, so a cancelled
+  // answer costs whatever OpenRouter generated before it stopped and is not
+  // in our ledger. Nothing can be done about the amount from here; it is
+  // noted so the gap is a known one rather than a surprise in the totals.
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -319,7 +328,11 @@ export async function streamComplete(
   }
 
   if (usagePayload && !opts.skipRecord) {
-    void recordUsage(usagePayload, opts).catch((e) =>
+    // Same as chatComplete: awaited so the row survives the function ending.
+    // This matters more here than anywhere — checking whether Ask is alive
+    // means checking whether `llm_usage_events` has new rows, so a ledger
+    // that quietly drops writes takes the health signal with it.
+    await recordUsage(usagePayload, opts).catch((e) =>
       console.warn("[openrouter] usage not recorded:", e?.message ?? e),
     );
   }
