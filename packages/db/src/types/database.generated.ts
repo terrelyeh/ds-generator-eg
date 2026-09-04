@@ -1533,26 +1533,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      match_documents: {
-        Args: {
-          filter_metadata?: Json
-          filter_source_type?: string
-          match_count?: number
-          match_threshold?: number
-          query_embedding: string
-        }
-        Returns: {
-          chunk_index: number
-          content: string
-          id: string
-          metadata: Json
-          similarity: number
-          source_id: string
-          source_type: string
-          source_url: string
-          title: string
-        }[]
-      }
+      // match_documents was dropped in 00055; match_documents_scoped
+      // replaced it in 00051 and was never added here, which is why the
+      // rpc() call sites cast. Left empty rather than hand-writing a
+      // signature: a wrong type is worse than an absent one.
+      [_ in never]: never
     }
     Enums: {
       image_status: "missing" | "uploaded" | "approved"

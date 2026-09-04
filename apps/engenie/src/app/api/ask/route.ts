@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { trimHistory, type ChatMessage } from "@/lib/ask/history";
 import { createAdminClient } from "@eg/db/admin";
 import { streamComplete, getOpenRouterKey } from "@eg/llm/openrouter";
 import { resolveModel } from "@eg/llm/models";
@@ -154,33 +155,6 @@ Then, DIRECTLY BELOW the topology block, ALSO draw a richer ASCII box diagram in
         辦公筆電/手機     工業平板/掃碼槍
 \`\`\`
 ASCII rules: use box-drawing chars (┌┐└┘│─┬┴├┤); each box = 型號 + 產品類別 + 關鍵規格; label EVERY link with its purpose/speed (WAN, LAN / Trunk, WiFi, 1G/10G); show end devices at the leaves; align columns with spaces (monospace). Put the final "---" AFTER both blocks.`;
-}
-
-interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-}
-
-// History goes into the LLM prompt verbatim, so a long conversation inflates
-// the prefill (slower first token + cost) every single turn. Cap each message
-// and the whole block; answers lead with the conclusion (prompt contract), so
-// truncating the tail keeps the informative part.
-const HISTORY_MSG_CHAR_CAP = 1500;
-const HISTORY_TOTAL_CHAR_BUDGET = 12000;
-
-function trimHistory(history: ChatMessage[]): ChatMessage[] {
-  const out: ChatMessage[] = [];
-  let budget = HISTORY_TOTAL_CHAR_BUDGET;
-  for (let i = history.length - 1; i >= 0; i--) {
-    let content = history[i].content;
-    if (content.length > HISTORY_MSG_CHAR_CAP) {
-      content = content.slice(0, HISTORY_MSG_CHAR_CAP) + " …(truncated)";
-    }
-    if (content.length > budget) break;
-    budget -= content.length;
-    out.unshift({ role: history[i].role, content });
-  }
-  return out;
 }
 
 const MAX_QUESTION_CHARS = 4000;

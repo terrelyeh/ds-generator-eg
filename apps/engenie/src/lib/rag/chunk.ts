@@ -7,7 +7,6 @@
  */
 
 export const MAX_CHUNK_CHARS = 5000;
-export const MIN_CHUNK_CHARS = 50;
 
 /**
  * Sections shorter than this are merged into the following section instead of
@@ -53,10 +52,18 @@ export function chunkText(content: string, title: string, label?: string): TextC
 
   // Pass 1 — drop empties and merge undersized sections forward, so a heading
   // with two sentences under it doesn't become a standalone chunk.
+  //
+  // ⚠️ Only EMPTY sections are dropped. There used to be a 50-character floor
+  // here as well, which silently deleted content this function's whole
+  // purpose is to keep: a refined support article opens
+  // `## Symptom` / `The AP reboots.` — twenty-seven characters, and the one
+  // sentence a person searches for. It never reached the index at all, and
+  // the merge machinery below never saw it either. Short sections are
+  // undersized, not worthless; that is what merging is for.
   const merged: { title: string; body: string }[] = [];
   for (const section of sections) {
     const trimmed = section.trim();
-    if (!trimmed || trimmed.length < MIN_CHUNK_CHARS) continue;
+    if (!trimmed) continue;
 
     const headingMatch = trimmed.match(/^#{1,3}\s+(.+)/);
     const sectionTitle = headingMatch ? headingMatch[1].replace(/[#*`]/g, "").trim() : title;

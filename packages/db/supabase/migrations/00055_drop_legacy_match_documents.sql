@@ -1,0 +1,21 @@
+-- Drop the original match_documents.
+--
+-- 00051 added match_documents_scoped, which does the same search and also
+-- applies the caller's scope in SQL rather than after the fact. Every caller
+-- moved to it that day; retrieve.ts is the only consumer there has ever
+-- been, and nothing in the codebase names the old function outside comments.
+--
+-- Two reasons to remove it rather than leave it lying there:
+--
+--  1. It still carried EXECUTE for `anon` and `authenticated`, which 00048's
+--     sweep did not take away — the same thing that happened to
+--     current_user_is_whitelisted and needed 00049. Not exploitable: the
+--     function is SECURITY INVOKER and `documents` has RLS on with no
+--     policies, so an anon caller reaches it and gets zero rows. It was
+--     surface with no purpose, not a leak.
+--  2. A second, unscoped vector search sitting beside the scoped one is an
+--     invitation to call the wrong one. The whole point of 00051 was that
+--     scope belongs inside the query.
+--
+-- Reversible: the definition is in 00009 (last amended by 00052).
+drop function if exists public.match_documents(extensions.vector, integer, double precision, text, jsonb);

@@ -6,7 +6,7 @@
  * Search API (`/api/v1/search`). Keeping one implementation avoids the two
  * surfaces drifting apart (same reasoning as the shared chat engine).
  *
- * Pipeline: embed query → match_documents (pgvector) → taxonomy filter →
+ * Pipeline: embed query → match_documents_scoped (pgvector) → taxonomy filter →
  * cross-lingual literal-match supplements (model / country) → re-rank →
  * (optional strict scope enforcement) → trim.
  */
@@ -39,7 +39,7 @@ export interface RetrieveOptions {
   taxonomy?: Partial<TaxonomyMeta> | null;
   /** Final number of chunks to return (default 12). */
   finalLimit?: number;
-  /** match_documents similarity floor (default 0.3). */
+  /** match_documents_scoped similarity floor (default 0.3). */
   matchThreshold?: number;
   /**
    * When true, re-apply taxonomy + sourceTypes filters at the VERY END so the
