@@ -147,7 +147,7 @@ Body(JSON):
 | `401` | `Missing 'Authorization: Bearer <key>' header` / `Invalid API key` | 沒帶 key 或 key 錯誤 |
 | `403` | `API key disabled` | key 已被停用,聯絡管理員 |
 | `429` | `Rate limit exceeded — try again shortly` | 超過速率上限,稍候重試 |
-| `500` | `Search failed: …` | 伺服器端錯誤,可重試;持續發生請回報 |
+| `500` | `Search failed. Try again shortly; if it persists, contact EnGenius.` | 伺服器端錯誤,可重試;持續發生請回報（細節只在伺服器 log,不回給呼叫端） |
 
 所有錯誤都回 JSON:`{ "ok": false, "error": "…" }`。
 

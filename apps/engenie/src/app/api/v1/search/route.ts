@@ -72,8 +72,11 @@ export async function POST(request: Request) {
       knowledgeAreasAllowed: [],
     });
   } catch (err) {
+    // The message goes to the log. This is the external API: a Supabase or
+    // OpenAI error string is ours to read, not the integrator's.
+    console.error("[v1/search] retrieval failed:", err);
     return NextResponse.json(
-      { ok: false, error: `Search failed: ${err instanceof Error ? err.message : String(err)}` },
+      { ok: false, error: "Search failed. Try again shortly; if it persists, contact EnGenius." },
       { status: 500 },
     );
   }

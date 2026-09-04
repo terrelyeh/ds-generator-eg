@@ -441,7 +441,7 @@ export function ProductTranslationEditor({
     setPreviewing(true);
     const wasDraft = !confirmedLocales.has(activeLocale);
     try {
-      await fetch("/api/translations/product", {
+      const res = await fetch("/api/translations/product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -457,6 +457,16 @@ export function ProductTranslationEditor({
           qr_url: qrUrl || null,
         }),
       });
+      if (!res.ok) {
+        // The preview renders what is SAVED. Opening it after a failed save
+        // showed the previous text with nothing to say so, and clearing
+        // `dirty` let the tab close without its unsaved-changes warning.
+        const detail = await res.text().catch(() => "");
+        toast.error(`儲存失敗（${res.status}），未開啟預覽`, {
+          description: detail.slice(0, 200) || undefined,
+        });
+        return;
+      }
       setDirty(false);
       // 防呆：還沒定案就開 Preview，提醒要按哪個鈕才能生 PDF。已 Confirmed
       // 或已送審的 locale 不跳，避免雜訊 —— 那兩種情況都不需要再動作。
@@ -474,8 +484,10 @@ export function ProductTranslationEditor({
         );
       }
       window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
-    } catch {
-      window.open(`/preview/${modelName}?lang=${activeLocale}&mode=${mode}`, "_blank");
+    } catch (err) {
+      toast.error("儲存失敗，未開啟預覽", {
+        description: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setPreviewing(false);
     }

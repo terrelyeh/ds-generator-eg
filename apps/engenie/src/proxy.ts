@@ -67,15 +67,24 @@ function isDemoApi(pathname: string): boolean {
 
 /**
  * ① Widget origin allow-list. Look up a workspace's allowed_origins via a
- * lightweight PostgREST GET (service key). Kept tiny and fail-open: any error /
- * timeout returns null → no CSP set → unrestricted (the prior behaviour), never
- * a blocked widget. Only runs for /embed/<slug> (rare traffic).
+ * lightweight PostgREST GET (service key). Only runs for /embed/<slug>.
+ *
+ * Two answers that used to be one `null`: "this workspace has no allow-list"
+ * (a product default — embeddable anywhere) and "the lookup failed" (a
+ * timeout, a 5xx). Folding them together meant any two-second Supabase blip
+ * was the one moment a restricted widget was unrestricted. The caller now
+ * closes the frame on the second answer; the widget cannot answer without
+ * the database either, so that costs nothing real.
  */
-async function embedAllowedOrigins(slug: string): Promise<string[] | null> {
+type EmbedOrigins = { status: "ok"; origins: string[] } | { status: "unavailable" };
+
+async function embedAllowedOrigins(slug: string): Promise<EmbedOrigins> {
   try {
     const base = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!base || !key || !/^[a-z0-9-]+$/.test(slug)) return null;
+    if (!base || !key) return { status: "unavailable" };
+    // A slug that cannot name a workspace has nothing to enforce.
+    if (!/^[a-z0-9-]+$/.test(slug)) return { status: "ok", origins: [] };
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), 2000);
     const r = await fetch(
@@ -83,12 +92,15 @@ async function embedAllowedOrigins(slug: string): Promise<string[] | null> {
       { headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: ctrl.signal },
     );
     clearTimeout(t);
-    if (!r.ok) return null;
+    if (!r.ok) return { status: "unavailable" };
     const rows = (await r.json()) as { allowed_origins?: unknown }[];
     const ao = rows?.[0]?.allowed_origins;
-    return Array.isArray(ao) ? ao.filter((s): s is string => typeof s === "string" && !!s) : null;
+    return {
+      status: "ok",
+      origins: Array.isArray(ao) ? ao.filter((s): s is string => typeof s === "string" && !!s) : [],
+    };
   } catch {
-    return null;
+    return { status: "unavailable" };
   }
 }
 
@@ -131,9 +143,19 @@ export async function proxy(request: NextRequest) {
     // no header → unrestricted (v1 default).
     if (pathname.startsWith("/embed/")) {
       const slug = pathname.slice("/embed/".length).split("/")[0];
-      const origins = slug ? await embedAllowedOrigins(slug) : null;
-      if (origins && origins.length > 0) {
-        response.headers.set("Content-Security-Policy", `frame-ancestors 'self' ${origins.join(" ")}`);
+      const lookup: EmbedOrigins = slug
+        ? await embedAllowedOrigins(slug)
+        : { status: "ok", origins: [] };
+      if (lookup.status === "unavailable") {
+        console.error(
+          `[proxy] allowed_origins lookup failed for /embed/${slug}; sending frame-ancestors 'self'`,
+        );
+        response.headers.set("Content-Security-Policy", "frame-ancestors 'self'");
+      } else if (lookup.origins.length > 0) {
+        response.headers.set(
+          "Content-Security-Policy",
+          `frame-ancestors 'self' ${lookup.origins.join(" ")}`,
+        );
       }
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -169,11 +169,14 @@ function GroupTable({
   onResync,
   onWebfill,
   onConfirmAll,
+  busyCompetitor,
 }: {
   group: BattlecardGroup;
   query: string;
   cells: Map<string, CellState>;
   canEdit: boolean;
+  /** Competitor whose ↻ sync / 🔍 web is in flight — every such button waits. */
+  busyCompetitor: string | null;
   onSave: (
     args: { dimensionId: string; column: BattlecardColumn; value: string; sourceUrl: string | null; confirm: boolean }
   ) => Promise<boolean>;
@@ -276,17 +279,22 @@ function GroupTable({
                         <TierBadge tier={col.tier} />
                         {canEdit && (
                           <span className="ml-1.5 inline-flex gap-1.5 align-middle text-[10px] font-normal">
+                            {/* Both kick off a 10–30s server job and reload the
+                                page when it lands; a second click meanwhile
+                                started a second scrape of the same page. */}
                             <button
                               onClick={() => onResync(col.key)}
+                              disabled={busyCompetitor !== null}
                               title="Re-scrape this competitor's official datasheet and refresh draft values (keeps confirmed cells)"
-                              className="text-engenius-blue hover:underline"
+                              className="text-engenius-blue hover:underline disabled:cursor-wait disabled:opacity-40 disabled:no-underline"
                             >
                               ↻ sync
                             </button>
                             <button
                               onClick={() => onWebfill(col.key)}
+                              disabled={busyCompetitor !== null}
                               title="Web search to fill this competitor's EMPTY cells (low-confidence drafts with source links)"
-                              className="text-engenius-blue hover:underline"
+                              className="text-engenius-blue hover:underline disabled:cursor-wait disabled:opacity-40 disabled:no-underline"
                             >
                               🔍 web
                             </button>
@@ -474,9 +482,14 @@ function ManagePanel({
               </select>
               <button
                 className="text-red-600 hover:underline"
-                onClick={() =>
-                  mutate("DELETE", { anchorModelName: activeGroup.anchorModel, competitorProductId: c.key }).then(reloadIf)
-                }
+                onClick={() => {
+                  // Deletes the matchup AND every confirmed cell under it,
+                  // one click, no undo — the only destructive control on the
+                  // page, and it sat beside a tier dropdown.
+                  const name = `${c.brand ? `${c.brand} ` : ""}${c.label}`;
+                  if (!confirm(`Remove ${name} from this battlecard?\n\nIts spec values, including confirmed ones, are deleted with it.`)) return;
+                  mutate("DELETE", { anchorModelName: activeGroup.anchorModel, competitorProductId: c.key }).then(reloadIf);
+                }}
               >
                 Remove
               </button>
@@ -556,6 +569,21 @@ export function BattlecardView({
   const [query, setQuery] = useState("");
   const [activeAnchor, setActiveAnchor] = useState(groups[0]?.anchorModel ?? "");
   const [managing, setManaging] = useState(false);
+  // Which competitor's ↻ sync / 🔍 web is running. The ref answers the
+  // click synchronously (two clicks can land before a state update paints);
+  // the state is what disables the buttons.
+  const [busyCompetitor, setBusyCompetitor] = useState<string | null>(null);
+  const busyRef = useRef<string | null>(null);
+  const beginBusy = (key: string): boolean => {
+    if (busyRef.current) return false;
+    busyRef.current = key;
+    setBusyCompetitor(key);
+    return true;
+  };
+  const endBusy = () => {
+    busyRef.current = null;
+    setBusyCompetitor(null);
+  };
 
   // Existing brands across the board → datalist suggestions in the add form.
   const knownBrands = useMemo(() => {
@@ -661,6 +689,9 @@ export function BattlecardView({
 
   // Re-scrape one competitor's datasheet → fresh drafts (server side).
   const resync = useCallback(async (competitorProductId: string) => {
+    if (!beginBusy(competitorProductId)) return;
+    // Stays busy through the reload on success; released only on failure.
+    let reloading = false;
     const t = toast.loading("Re-syncing competitor…");
     try {
       const res = await fetch("/api/battlecard/resync", {
@@ -677,15 +708,21 @@ export function BattlecardView({
         `Re-synced: ${json.updated} updated · ${json.skipped} kept (confirmed) · ${json.notFound} not found`,
         { id: t }
       );
+      reloading = true;
       setTimeout(() => window.location.reload(), 900);
     } catch (e) {
       toast.error("Re-sync failed", { id: t, description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      if (!reloading) endBusy();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- beginBusy/endBusy close over a ref and a setter, both stable
   }, []);
 
   // Fill a competitor's EMPTY cells from a general web search (low-confidence
   // drafts, each tagged with the source page). Complements ↻ sync (datasheet).
   const webfill = useCallback(async (competitorProductId: string) => {
+    if (!beginBusy(competitorProductId)) return;
+    let reloading = false;
     const t = toast.loading("Searching the web for missing specs…");
     try {
       const res = await fetch("/api/battlecard/websearch", {
@@ -703,10 +740,14 @@ export function BattlecardView({
         return;
       }
       toast.success(`Filled ${json.filled} cell(s) from web · ${json.notFound} not found — review drafts`, { id: t });
+      reloading = true;
       setTimeout(() => window.location.reload(), 1000);
     } catch (e) {
       toast.error("Web search failed", { id: t, description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      if (!reloading) endBusy();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- beginBusy/endBusy close over a ref and a setter, both stable
   }, []);
 
   // Bulk "Save & Confirm" — mark every filled, unconfirmed competitor cell in
@@ -837,6 +878,7 @@ export function BattlecardView({
             onSave={onSave}
             onResync={resync}
             onWebfill={webfill}
+            busyCompetitor={busyCompetitor}
             onConfirmAll={() => confirmAllForGroup(group)}
           />
         ))}
