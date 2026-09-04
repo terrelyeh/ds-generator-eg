@@ -136,7 +136,11 @@ src/
   **2026-09-04 起排除是在 SQL 做的**（`match_documents_scoped`, migration 00051,
   參數 `exclude_solutions` / `filter_source_types`）—— JS 的 `inScope` 留著當權威檢查,
   但候選池不再被呼叫端看不到的內容佔滿。實測:某向量最近 40 筆有 33 筆是知識領域內容,
-  所以窄 scope 的呼叫端只剩 7 筆然後回「找不到相關產品資訊」,讀起來像知識庫很薄
+  所以窄 scope 的呼叫端只剩 7 筆然後回「找不到相關產品資訊」,讀起來像知識庫很薄。
+  **舊的 `match_documents` 已於 2026-09-04 刪除（00055）** —— 它還對 anon/authenticated
+  開著 EXECUTE（00048 那次沒掃到，同 00049 的模式）。不是外洩：函式是 SECURITY INVOKER、
+  `documents` 開 RLS 且零 policy，anon 呼叫拿到零列。刪掉是因為**一支沒有 scope 的向量搜尋
+  擺在有 scope 的旁邊，就是在邀請人叫錯那一支**
 - **workspace 能看到哪些私有領域,由 `allowedKnowledgeAreas()` 決定**（`lib/ask/workspaces.ts`）
   —— **沒有 passcode 就沒有私有領域**。`/ask/<slug>` 的網址不難猜,而 `ws-auth` 對沒有
   passcode 的 workspace 會直接發七天 token 給任何人
@@ -194,6 +198,12 @@ src/
 55. **Postgres RPC 的 `bigint` 經 PostgREST 回來是字串** — `knowledge_sources()` 的 chunks/total_tokens 要 `Number(x) || 0` 再用。
 56. **Gemini key 永遠放 header 不放 URL**；錯誤訊息回前端前先 redact。
 57. **`knowledge-base.tsx` 是 orchestrator** — 對話框在 `knowledge/dialogs/`、共用邏輯在 `knowledge/shared.ts`；新增來源類型照這結構，別把 state 塞回 parent。
+73. **`lib/rag/chunk.ts` 只丟掉「空的」段落,不丟「短的」**（2026-09-04 發現）——
+    原本有一道 50 字元的地板,把 `## Symptom` / `The AP reboots.` 這種二十七個字的段落
+    整段刪掉,而那正是支援文章裡最多人搜的一句。它連向前合併的機制都沒走到。
+    **短不等於沒價值,那就是合併存在的理由。** 其他幾支 chunker(web/gitbook/helpcenter/
+    google-doc)沒有合併機制,地板留著;真要改要先想清楚重嵌成本。
+
 58. **Workspace token 撤銷機制** — `verifyWorkspaceToken()` 只驗簽章+到期（Edge 粗篩）；版本撤銷的權威檢查在 route handler（`workspaceAuthorized`）。改 token 格式/換 signing secret = 所有現存 token 失效（widget 自動重發、passcode 重輸一次）。
 59. **RAG 檢索 embedding 只用「當前問題」，不要串對話歷史** — 串歷史會讓前一題主題污染這題的向量搜尋（換主題被當成「知識庫只有前一題的內容」）。歷史只進 `/api/ask` 的 LLM prompt；建議追問也要求 LLM 產生「自包問句」（`api/ask/route.ts` 的 follow-up 指示）。
 60. **`product_spec` ingest：`content_hash` 只 gate「重新 embed」，metadata 一律刷新** — 內容沒變但 metadata（taxonomy）漂移時，`ingest-products.ts` 做 metadata-only update（不重 embed）。別把兩者重新耦合，否則新加的 metadata 欄位不會回填舊 chunk（症狀：taxonomy badge 時有時無）。
