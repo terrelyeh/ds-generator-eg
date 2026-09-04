@@ -338,9 +338,17 @@ body {
   position: absolute; left: 36pt; top: 161pt; z-index: 2;
   font-weight: ${WT.regular}; font-size: ${PT.lead}pt; color: white;
 }
+/* pitfall #66: max-width / max-height only CAP, they never scale up — so the
+   rendered size was whatever the FILE happened to be (pixels x 0.75), and
+   sync's sharp.trim() rewrites those pixel counts on every pass. Pinning the
+   width (or the box) makes the size a property of the design instead.
+   height:auto rather than 100% where the container is in normal flow —
+   pinning height there opens a gap under a short image. Same shape as
+   layout A's .hardware-image-container.
+   NOTE: no backticks in here — this CSS lives inside a template literal. */
 .hero-product {
   position: absolute; right: 24pt; top: 130pt; z-index: 1;
-  max-width: 240pt; max-height: 150pt; object-fit: contain;
+  width: 240pt; height: auto; max-height: 150pt; object-fit: contain;
 }
 .hero-product-ph {
   position: absolute; right: 24pt; top: 130pt; width: 240pt; height: 150pt;
@@ -383,7 +391,7 @@ ${bulletDotCss(".feature-bullet .dot")}
 .arch-image-container {
   display: flex; align-items: flex-start; justify-content: center;
 }
-.arch-image-container img { max-width: 430pt; max-height: 430pt; object-fit: contain; }
+.arch-image-container img { width: 430pt; height: auto; max-height: 430pt; object-fit: contain; }
 .arch-ph { width: 430pt; height: 300pt; margin: 0 auto; }
 
 /* ── Page 3: technical specifications (series comparison) ──────────── */
@@ -402,7 +410,8 @@ ${bulletDotCss(".feature-bullet .dot")}
   padding: 4.5pt 5pt; border-color: ${TEAL};
 }
 .specs-photo-row td { border-bottom: none; padding: 6pt 4pt 2pt; height: 64pt; }
-.specs-photo-row img { max-height: 56pt; max-width: 100%; object-fit: contain; }
+/* A row of thumbnails that has to line up, so height is the pinned side. */
+.specs-photo-row img { height: 56pt; width: auto; max-width: 100%; object-fit: contain; }
 .specs-photo-ph { height: 52pt; margin: 0 auto; width: 80%; }
 .model-name-row td {
   background: #6e6e6e; color: white; font-weight: ${WT.regular}; font-size: ${PT.tableSm}pt;
@@ -423,7 +432,7 @@ ${bulletDotCss(".feature-bullet .dot")}
   display: flex; flex-direction: column; align-items: center; gap: 22pt;
   margin-top: 8pt;
 }
-.hw-images img { max-width: 470pt; max-height: 262pt; object-fit: contain; }
+.hw-images img { width: 470pt; height: auto; max-height: 262pt; object-fit: contain; }
 .hw-ph { width: 420pt; height: 220pt; }
 /* last hardware page shares space with the footer */
 .hw-images.with-footer img { max-height: 225pt; }

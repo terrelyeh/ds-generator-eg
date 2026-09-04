@@ -14,7 +14,16 @@ import { can } from "@eg/auth/permissions";
 import type { Role } from "@eg/auth/permissions";
 
 /** Safe JSON parse for API responses — handles non-JSON error pages */
-async function safeJson(res: Response): Promise<{ ok?: boolean; translated?: string; notes?: string; provider?: string; model?: string; error?: string }> {
+async function safeJson(res: Response): Promise<{
+  ok?: boolean;
+  translated?: string;
+  notes?: string;
+  provider?: string;
+  model?: string;
+  error?: string;
+  /** Set when a feature list came back with the wrong number of lines. */
+  line_mismatch?: { expected: number; got: number };
+}> {
   const text = await res.text();
   try {
     return JSON.parse(text);
@@ -323,7 +332,17 @@ export function ProductTranslationEditor({
         }),
       });
       const data = await safeJson(res);
-      if (data.ok) {
+      if (data.ok && data.line_mismatch) {
+        // Deliberately NOT written into the form. The list is matched to the
+        // English one by index, so a list of the wrong length is not "mostly
+        // right" — every bullet after the merge is against the wrong feature,
+        // and the padding on save makes it look well-formed.
+        const { expected, got } = data.line_mismatch;
+        toast.error(
+          `翻譯回來 ${got} 條，原文有 ${expected} 條 —— 沒有填進表單。` +
+            `模型把某兩條併在一起了，再按一次或改用別的模型。`,
+        );
+      } else if (data.ok) {
         const lines = (data.translated as string).split("\n").filter((l: string) => l.trim());
         const result = englishFeatures.map((_, i) => lines[i] ?? "");
         setFeatures(result);

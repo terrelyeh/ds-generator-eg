@@ -406,7 +406,15 @@ body {
   flex: 0 0 ${PRODUCT_COL}pt;
   display: flex; align-items: center; justify-content: center;
 }
-.hero-product-box img { max-width: 100%; max-height: 180pt; object-fit: contain; }
+/* pitfall #66: max-width / max-height only CAP, they never scale up — so the
+   rendered size was whatever the FILE happened to be (pixels x 0.75), and
+   sync's sharp.trim() rewrites those pixel counts on every pass. Pinning the
+   width (or the box) makes the size a property of the design instead.
+   height:auto rather than 100% where the container is in normal flow —
+   pinning height there opens a gap under a short image. Same shape as
+   layout A's .hardware-image-container.
+   NOTE: no backticks in here — this CSS lives inside a template literal. */
+.hero-product-box img { width: 100%; height: auto; max-height: 180pt; object-fit: contain; }
 .hero-product-ph {
   width: 100%; height: 130pt;
   background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.45);
