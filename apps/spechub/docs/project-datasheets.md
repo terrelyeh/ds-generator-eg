@@ -612,3 +612,49 @@ scripts/seed-project-eor.ts             EOR100/EOR200 pilot（--reset 重建）
   （不同調整頁就散）。自動帶產品照當參考、一次產 2–3 張候選、**人選一張才掛上去**。
   三個前置：① API 要支援 reference image；② **不要用 `openai_api_key`**（那是 embedding 專用），
   要自己的 key + 自己的 `feature` 標籤；③ 3–8 分鐘的生成要走背景工作 + 輪詢
+
+## 從 CLAUDE.md 移入（2026-09-04）
+
+CLAUDE.md 原本在 Architecture 段落列了十三條雷，其中九條在本檔上面已經有完整說明。
+剩下這四條當時只存在於 CLAUDE.md，一併搬過來，那邊只留摘要。
+
+### 配色是抄的，不是共用的
+
+`project-preview.tsx` 是**獨立元件**，不是 broadband-preview 加一個參數。配色也刻意
+用複製的，不是引用 `getTheme()`。
+
+理由是方向性的：標案是一次性的，業務可能為了某個客戶挑一組顏色；如果它跟目錄共用
+一份配色，**那次調色會回頭改到正在出貨的 EOC datasheet**。反過來則無所謂——目錄改色
+不影響已經送出去的標案 PDF。所以重複的那份程式碼是刻意的，不要「順手」合併。
+
+### 套用抽取會反轉整個 gap review 的方向
+
+`extract` 的 apply 會把該欄的 `source_id` 指向廠商的規格表。那一欄因此**掉出
+`catalogModels`**，而 gap review 的判斷跟著整個翻面：
+
+| | 套用之前（自家型號帶入） | 套用之後（廠商來源） |
+|---|---|---|
+| 補一個官方沒寫的規格 | advisory（那正是標案要的） | **blocking**（要請 ODM 做，先確認做得到） |
+| 改動一個官方寫過的值 | **blocking**（`catalog_deviation`，客戶可以拿公開 datasheet 並排比對） | 不再觸發 |
+
+**兩件事在文件層級不衝突**（自家型號和 sourcing 型號並排是真實情境），**型號層級才互斥**。
+所以覆蓋前會跳警告——這不是防呆，是因為使用者按下去之後那一欄的判斷規則整組換掉了。
+
+### `status` 和「出過幾份 PDF」是兩個軸
+
+- `status`：能不能送出去（`draft` → `ready`，有守門）
+- issue：實際出過幾份 PDF（`project_datasheet_issues`）
+
+**列印刻意不動 `status`** —— 要能印草稿校對。但列印列會顯示「還有 N 項未確認」。
+
+⚠️ **要講還剩幾項一律用 `openBlockers()`**（`lib/project-datasheet/blockers.ts`）。它會扣掉
+人已經 answered／dismissed 的，跟 `scanDocument()` 的原始結果**是兩回事**。Ready 守門、
+列印列、預設落地頁籤三處共用同一支；2026-09-04 起 `demoteIfBlocked()` 也用它，在每一支
+會改變 gap review 所見的寫入路由出口重驗。
+
+### 凡是把 `images` 讀成「手寫欄位清單」的 parser 都會靜靜吃掉資料
+
+`caption`、`labels`、`body` 各中過一次，形狀一模一樣：載入時漏掉某個 key → 面板狀態是
+空的 → 下次存檔把空的寫回去，**而且不報錯**。
+
+一律用 spread 帶整包，不要逐欄位列舉。

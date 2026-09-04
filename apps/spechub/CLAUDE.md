@@ -1,30 +1,30 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-04。Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩
-> 藍圖 §6 登入驗收、repo rename 兩件手動收尾,見
-> [`docs/monorepo-split-plan.md`](docs/monorepo-split-plan.md)）。RAG/Ask/Knowledge 全在
-> **apps/engenie**;共用碼在 packages `@eg/db` / `@eg/auth` / **`@eg/llm`**。
-> RAG/Ask 的事去看 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
-> **近期（2026-08-06~07）：西文 es-MX 上線 + 翻譯行數預算 + LLM 全面走 OpenRouter
-> + 花費帳本 + 翻譯審核流程。這四塊互相咬合，動之前先讀
-> [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)** ——
-> 裡面有三個「看起來多餘、其實不能拆」的設計，以及行數預算為何不能用字數比例。
-> 🔴 **2026-09-03~04：全專案 code review + 五波修正（PR #49–#56, migrations 00048–00052）。**
-> 最重要的一件事:**資料庫曾經是最弱的一層。** `app_settings`（六把 LLM 金鑰明文）
-> 和三張翻譯表對 **anon** 可讀可寫,任何 Google 帳號拿到 session 就能寫產品目錄,
-> `x-vercel-cron` header 可偽造。全部已關（00048–00049,已套 prod,**金鑰仍待輪替**）。
-> 動 RLS / auth / cron 之前先讀 memory 或那幾支 migration 的註解。
-> 其餘四波:靜默寫入（**67 處**未讀 `error`,現由 `npm run check:db-writes` 擋）、
-> 正確性（規格表改為原子重寫、PDF 不再發布 404、Tender 編輯器不再蓋掉抽取結果）、
-> 硬化（SSRF、demo cookie 過期、Google auth 快取）、以及剩下的 High。
-> **三條路徑經查從來沒生效過**:語系 hardware 圖同步、每週 Google Doc 重抓、
-> DC 封面的翻譯值。**每日 09:00 排程當時已連續 504**（`maxDuration` 60→300 + auth 快取後修復）。
-> **2026-08-06~07：西文 es-MX + 行數預算 + 全面 OpenRouter + 花費帳本 + 翻譯審核**——
-> 四塊互相咬合,動之前先讀 [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)。
-> **2026-08-20~24：Tender Datasheets**（標案用暫時性 datasheet, `/projects`;
-> **刻意跟目錄平行的孤島**, migrations 00038–00047）——動之前先讀
-> [`docs/project-datasheets.md`](docs/project-datasheets.md)。
-> **2026-08-12~13：四種版型的字型/字級整併**（細節在下方 Brand & Visual System 與 pitfall #50）。
+> Last updated: 2026-09-04。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
+>
+> Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
+> 兩件手動收尾）。**RAG / Ask / Knowledge 全在 apps/engenie**,共用碼在 `@eg/db` /
+> `@eg/auth` / `@eg/llm` / `@eg/google`。那邊的事去看
+> [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
+>
+> 🔴 **2026-09-03~04：全專案 code review,75 項全部關閉（PR #49–#67, migrations
+> 00048–00055）。** 最重要的一件事:**資料庫曾經是最弱的一層** —— `app_settings`
+> （六把 LLM 金鑰明文）和三張翻譯表對 **anon** 可讀可寫,`x-vercel-cron` 可偽造。
+> 全部已關,但**金鑰仍待輪替**（門關了鑰匙沒換）。動 RLS / auth / cron 之前先讀 memory
+> `project-code-review-2026-09` 或那幾支 migration 的註解。
+> **三條路徑經查從來沒生效過**（語系 hardware 圖同步、每週 Google Doc 重抓、DC 封面的
+> 翻譯值）,**每日排程當時已連續 504 好幾天沒人發現** —— 後者現在有
+> `/api/cron/health` 在看（見 Deployment）。
+>
+> **動這四塊之前一定要先讀對應的 doc**：
+> 西文／OpenRouter／花費帳本／翻譯審核 →
+> [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md)（裡面有三個
+> 「看起來多餘、其實不能拆」的設計,以及行數預算為何不能用字數比例）;
+> Tender Datasheets（`/projects`,**刻意跟目錄平行的孤島**）→
+> [`docs/project-datasheets.md`](docs/project-datasheets.md);
+> datasheet 的字型/字級/logo → [`docs/brand-and-visual.md`](docs/brand-and-visual.md);
+> 各領域待辦 → [`docs/next-steps.md`](docs/next-steps.md)。
 
 ## Project Overview
 
@@ -140,50 +140,15 @@ path `/api/sync`、以及 `PUBLIC_EXACT_PATHS` **精確比對**的單頁白名�
 Project business 用的暫時性 datasheet：拿 ODM／他牌規格表 → 換 EnGenius 命名/照片/版型
 → 出一份談 tender 的 PDF。`/projects`（gate `project_datasheet.*`，**只有 admin/editor**）、
 渲染在 `/preview/project/[id]`、表是 `project_datasheet*`（migrations 00038–00047）。
-**改這塊前必讀該檔。** 關鍵雷:
-① **這是平行孤島,沒有升格成 products 的路徑**——一台只報過價的型號進了 `products`,
+**改這塊前必讀該檔。** 最容易踩的三條，其餘（含配色為何是抄的、套用抽取如何反轉
+gap review 的方向、`status` 與出圖是兩個軸、`images` 的 parser）全在該檔:
+① **這是平行孤島,沒有升格成 products 的路徑** —— 一台只報過價的型號進了 `products`,
 EnGenie 就會開始跟人說我們有賣它;
-② **最終規格表不存**,是 `raw_doc ⊕ rules` 每次 render 算出來的（換模型重抽/原廠出新版
-才不會洗掉人為修改）;規則 key 是 label 正規化字串,**重抽後失效的規則要當孤兒列出來,不能默默吃掉**;
-③ **PRELIMINARY 聲明關不掉**（DB not null + check）、圖片註記同理——文字可編、存在與否不可編;
-④ **`project-preview.tsx` 是獨立元件**,不是 broadband-preview 加參數;配色是**抄的不是共用的**,
-否則一次性標案的調色會回頭改到出貨中的 EOC datasheet;
-⑤ 出 PDF 走**瀏覽器列印**不走 `/api/generate-pdf`（後者會寫 version、進 datasheets bucket、開 Drive 資料夾）;
-⑥ 這支元件**不在** type-spec 產生器的 COMPONENTS 清單裡,**不要加**——那頁是免登入的;
-⑦ **gap review 是這個模組的核心不是打磨**（`gap-scan.ts`,缺／疑／險三類,**deterministic 無 LLM**）——
-blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 14 格 TBD 不擋、一個沒來源的 IP67 擋;
-finding 是算出來的,`project_datasheet_questions` 只存人做了什麼,**severity 不存**;
-真正的產出是**可以貼給業務/RD/ODM 的澄清訊息**（`brief.ts`,模板不是 LLM）——能回答的人都不在站內;
-⑧ **兩種起點**:ODM 規格表,或**從既有型號帶入**（`seed-from-product`,目錄→專案**單向**,
-反向永遠不開）。兩者的 gap review 判斷**方向相反**——ODM 補一個沒來源的規格是 blocking,
-既有型號補一個官方沒寫的規格是 advisory（那正是標案要的）;反過來,改動既有型號的值是
-最尖銳的 finding（`catalog_deviation`),因為客戶可以把公開 datasheet 拿來並排比對。
-**在文件層級兩者不衝突**（自家型號 + sourcing 型號並排是真實情境）,**型號層級才互斥**——
-套用抽取會改 `source_id`,那一欄就掉出 `catalogModels`、判斷方向整個反轉,所以覆蓋前會跳警告;
-⑨ **`status` 和「出圖」是兩個軸**:`status` 是「能不能送出去」（draft→ready 有守門）,
-issue 是「實際出過幾份 PDF」。**列印刻意不動 status**(要能印草稿校對),但列印列會顯示
-「還有 N 項未確認」。⚠️ **要講還剩幾項一律用 `openBlockers()`**（`lib/project-datasheet/blockers.ts`）
-——它會扣掉人已 answered/dismissed 的,跟 `scanDocument()` 的原始結果是兩回事;
-Ready 守門、列印列、預設落地頁籤三處共用同一支;
-⑩ **編輯器和列印共用的幾何要放共用模組**——標籤的位移和字級各寫一份,連續兩次
-「編輯器看起來對、PDF 不對」,現在集中在 `label-geometry.ts`;
-⑪ **凡是把 `images` 讀成「手寫欄位清單」的 parser 都會靜靜吃掉資料**——
-caption、labels、body 各中一次:載入時漏掉 → 面板狀態是空的 → 下次存檔寫回空的,**且不報錯**。
-一律用 spread 帶整包;
-⑬ **兩家廠商把同一項規格叫成不同名字 → 兩列各半空**（列是用標籤合併的）。
-`spec-align.ts` 用「有值欄位互補 + 同義詞表 + 值的形狀」配對，**同義詞表同時當拒絕條件**
-（兩邊都在表裡但不同組就不配）；缺漏檢查給一顆一鍵合併，走 `model_hide` + `model_add`、
-**值逐字搬不改**，plan 在伺服器重算不收前端的。⚠️ `blank_cell` 對這種列會給錯建議
-（「跟 ODM 要」——值沒缺，在另一列），所以兩條刻意排在一起;
-⑫ **AI 有四個步驟／五個呼叫點**（`extract` / `intake` / `questions` 的 propose /
-**`scenarios`** / **`cover`**）,模型在
-**SpecHub `Settings ▸ Tender Datasheets 的 AI 模型`** 改（存 `app_settings`,改完立刻生效）。
-兩支 drafter（情境文案、封面文案）**共用 `grounding.ts` 的否定契約**——只准引用算好的規格表、
-規格隱含的能力不算、每點標依據、撐不起來的進 `declined`;**兩支路由都唯讀**,
-草稿是填進表單欄位不存檔。**封面 drafter 刻意不給來源原文**（那是 gap-scan 的工作,
-餵給起草等於把廠商話術洗成我們的）。**從既有型號帶入不用 AI**——直接帶我們自己的文案,
-只填空的欄位（`catalog-copy.ts`）。
-`lib/llm/models.ts` 的常數是 **DEFAULT 不是值**;目錄（有哪些模型）仍是 EnGenie 的 `llm_models`。
+② **最終規格表不存**,是 `raw_doc ⊕ rules` 每次 render 算出來的,規則 key 是 label 正規化字串,
+**重抽後失效的規則要當孤兒列出來,不能默默吃掉**;
+③ **gap review 是這個模組的核心不是打磨**（`gap-scan.ts`,deterministic 無 LLM）——
+blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 14 格 TBD 不擋、
+一個沒來源的 IP67 擋。真正的產出是可以貼給業務／RD／ODM 的澄清訊息（`brief.ts`）。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 
@@ -222,37 +187,10 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
   ⚠️ **`font_family` 是「內文字體」,不是全部** —— 四種版型的標題（封面主標/副標/型號、
   頁首分類、所有段落標）一律 **Manrope**,寫死在元件裡（`displayFontStack()`）;
   設定頁改的是內文 Roboto。CJK 語系兩條 stack 都會把語系字型放最前面（pitfall #64）。
-- **PDF 版型與字級規範**（四種版型的字型／字級／顏色／logo 對照，字級以真實 pt 排出）：
-  站內 `/design/datasheet-type-spec.html`，Settings 有卡片連過去。
-  ⚠️ **這一頁是全站唯一免登入的頁面**（`proxy.ts` 的 `PUBLIC_EXACT_PATHS`，精確比對不是前綴），
-  給沒有 SpecHub 帳號的外部設計師看。裡面有產品線名稱與機種數量，改內容時要意識到它是公開的；
-  已加 `noindex` 不進搜尋引擎。往 `public/design/` 丟新檔案**不會**自動變公開，要另外加進白名單。
-  **那份 HTML 是產生出來的，不要手改** —— 改 `scripts/design/type-spec.template.html`
-  或 `build-type-spec.py`，然後跑 `python3 apps/spechub/scripts/design/build-type-spec.py`
-  重新產生（會同時輸出站內版與 Artifact 版）。Roboto／Manrope 字檔已存在 script 旁邊，
-  建置不需要網路。
-  ⚠️ **頁面上的字級/字重不是手打的,是 build 時解析出來的**（`read_type_system.py`）:
-  `scale.ts` 給刻度、四個版型元件給「哪個角色用哪一階」、`typography.ts` 給版型 A 的
-  en 預設。**元件用了刻度外的字級,產生器會拒絕產出並指名是誰。**
-  改完刻度只要重跑產生器,不用去改任何數字。
-  ⚠️ **唯一的例外是 CJK 那張表** —— ja/zh-TW 的值在 `app_settings`,由設定頁編輯,
-  程式碼裡沒有東西可讀。作法是「簽入快照 + 漂移偵測」:
-  `python3 apps/spechub/scripts/design/check-cjk-typography.py`(比對快照與線上 DB,
-  不一致 exit 1),`--update` 重抓快照後要再跑一次產生器。
-  **設定頁改值不會經過任何發版,所以這張表是全頁最容易悄悄過期的地方。**
-  （產生器本身在重生時也會非阻斷地跑這個比對,漂移就印警告、連不到 DB 就跳過。）
-- **Datasheet logo**（2026-08-13 換新 ®）：`public/logo/` 的 `EnGenius-Logo-white.png`（封面）
-  與 `-gray.png`（頁尾,現為近黑 #363333）是從 checked-in 的來源 SVG（`-white`/`-black`/`-blue.svg`）
-  **高解析轉出**的。**不要手改 PNG，要改 logo 就改 SVG 再轉**。
-  ⚠️ Chrome 會擋 `file://` 的 `<img src>`（轉出來會是破圖 icon）——轉檔要把 SVG markup **內嵌**進頁面,
-  不能走 `<img src=file://…>`。這兩個 PNG 被四種版型的封面+頁尾、兩個 app 標頭、規範頁共用,
-  **換檔即全站生效**。
-- **Cloud 封面標題以雲朵 logo 為基準垂直置中**（2026-08-13）：副標+主標包在一個
-  `.cloud-title` 容器,`top: 177.8pt; translateY(-50%)` 置中在 `.cloud-icon` 中心,
-  所以主標 1/2/3 行與 CJK 都一致置中（舊版寫死 top 138/160 只對 2 行）。
-  ⚠️ **177.8pt = cloud-icon top(142) + 渲染高(85pt 寬 →71.6pt)/2,綁死 `engenius_cloud_icon.png`**
-  —— 換那顆圖示要重量。只作用在 `isCloud` 封面;非 Cloud（Transceiver/Unmanaged/Station）
-  標題整排靠左、無 logo,不受影響。
+- **datasheet 的版型／字級規範頁、logo 換檔、Cloud 封面置中的機制** →
+  [`docs/brand-and-visual.md`](docs/brand-and-visual.md)。要動 PDF 的視覺之前先讀，
+  裡面有三件會靜靜過期的事：規範頁是**產生**的不能手改、CJK 那張表的值在 DB 所以要跑
+  漂移偵測、以及封面置中的數字綁死某一顆圖示的尺寸。
 
 ## Database Tables
 
@@ -334,64 +272,19 @@ auth.users → profiles ← email_whitelist.invited_by
    （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
 0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
    Telegram 可能一次比較多則。那是正常的。
-0d. **審查清單全部關閉（2026-09-04）。** 去重只做了 auth 頁面/路由（`@eg/auth/pages|routes`）和 `getGoogleAuth()`（`@eg/google`）；`ui/` 與 `user-menu` 刻意各留一份（**拆分的殘留**——
-   EnGenie 本來是 DS Generator 裡的一個功能,長大後拆出去;`ui/` 是刻意各留一份讓品牌分道,
-   去重只該碰 auth 頁面 / `google/auth.ts` / `utils.ts`）。
-   **2026-09-04 已完成**：分頁的兩套量法、B/C/D 圖片框、feature 行數核對、
-   sync 的產品並行 + 每個 Drive 資料夾一次 run 只列一次、前端十項小修
-   （語系選單權限、Preview 看回應、battlecard 確認與 in-flight、dashboard 只撈最新一筆、
-   Tender 時區、page guard 導向、對外 API 錯誤、embed CSP、配額 RPC 列鎖 00053）、
-   **正確性一批**（審核 approve 看狀態/存在/內容、websearch 不碰已確認格、鎖狀態需登入、
-   審核者須有 `review.approve`、**drafter 的 `basis` 對規格表核對**（`groundBullets`,
-   查無此列就清空依據並列出）、**翻譯行數預算伺服器端驗證**（`lineParityCheck`, 超出重試一次再回報）、
-   **Ready 文件在任何寫入後重驗 blocker**（`demoteIfBlocked`, 六個寫入點）、
-   **版號取 Drive 與 DB 較高者**（`resolveNextVersion`, 半失敗的前一次不會讓這次重發同號）、
-   B/C 版型印語系自己的版號）、**EnGenie 硬化一批**（PR #61：`<source>` 邊界、隱藏 HTML、
-   請求上限、`pickModel`、scrypt passcode、token 制 embedding 上限、hash 預讀報錯、
-   topology-icons 收 workspace、追問切法、三條 pipeline 修剪殘尾）。
+0d. **審查的 75 項全部關閉（PR #49–#67, migrations 00048–00055）。**
+   哪一項在哪一支 PR、以及每一個決定的理由，看 memory `project-code-review-2026-09`
+   或 `git log`。**這裡不留已完成清單** —— 它不影響下一個 session 怎麼寫程式。
+   刻意只做一半的三件事:去重只碰 auth 頁面與 `getGoogleAuth()`（`ui/` 各留一份是
+   拆分時的決定,品牌可分道）、passcode 是登入時才就地升級成 scrypt（沒人登入的
+   workspace 留著舊雜湊）、限流只有每分鐘沒有每日上限。
 
-**產品線 / 版型**：
-1. **待補素材 / 待 PM 處理的項目**（缺圖、EOC 日文待 Confirm、EOC sheet 的
-   「16 devices」錯誤、Cloud AP 素材缺口）→ 見
-   [`docs/pending-assets.md`](docs/pending-assets.md)。
-   ⚠️ 圖檔名是**單底線**（`S41__product.png` 雙底線曾靜默同步不到）。
-
-**Datasheet 系統**：
-5. **多國語言擴展到其他產品線** — 需為 AP/Switch/NVS/VPN FW 建立 product-line prompt
-   （`translate/prompts/product-lines/`,目前只有 Cloud Camera 有）
-6. **翻譯 feedback 偵測** — Save 時偵測使用者修改，建議加入詞庫
-7. **第 3 張 Hardware 圖** — `hardware_image_2` 已上線（DC 線用）,若要 front/rear/bottom
-   三張需再加一欄 + upload API 型別
-7b. **渲染端改動需重產 PDF 才生效** — 2026-08-12~13 的字型/字級/分區間距/logo 全是渲染端,
-   已產出的 ~90 份 PDF 仍是舊版,挑產品線 Regenerate 才會套用。**CJK 字級收斂尚未做**
-   （`scale.ts` 只涵蓋 en/es;ja/zh-TW 在 `app_settings`、刻意較大,要不要一起收斂是獨立決定）。
-**系統**：
-8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
-
-**多語言（2026-08-07 現況）**：
-9. **日文規格標籤只翻了 Cloud AP** — `spec_label_translations` 是**產品線層級**;
-   Cloud Camera / L3 Switch / VPN Firewall / AI-NVS 有日文產品但標籤是英文,
-   Broadband EOC 連繁中都沒有（那條線從沒開過標籤編輯器）。
-   補法:`/translations/[line]` → Japanese → AI Translate Empty Fields,每條線約 $0.006。
-   **產 PDF 寫死 `mode=full`,所以沒翻就是印英文。**
-10. **`product_translations.translation_mode` 欄位沒有人讀** — 編輯器的 Light/Full
-   下拉已於 2026-08-07 移除（它什麼都沒改變）,存檔固定寫 `full`。欄位本身還在,
-   要清掉是另一個 migration。
-11. 🔴 **審核流程目前休眠（2026-08-12 Terrel 主動關掉,說是「先」移除）** —— 程式全在,
-   但**沒有任何語系被指定**,所以每個語系都是 MKT 一鍵 Confirm。
-   **看到 review 相關程式碼不要以為它在跑**;要重開就回 `/settings/users` 點語言旗標。
-   ⚠️ **`review_locales` 三種值語意不同**:`NULL` = 可審全部但不指定任何語系（admin 正確預設）;
-   `['es']` = 指定 es 需審核且此人只能審 es;`[]` = 不指定任何語系**且此人什麼都不能審**。
-   關流程時只清掉「被指定的語系」,**不要把 admin 也設成 `[]`** —— 曾因此讓 ECS1528FP/es
-   卡在 `pending_review` 而全公司沒人能核准。
-   ⚠️ 決定不做第五個角色（editor+review.approve）:分公司維持只審不改。
-
-**Battlecard**（MVP 已上線,功能詳見 README）：
-12. **競品資料補完** — Meraki(CW9164/MR46)行銷頁規格稀疏,待 ↻sync/🔍web 或 PM 補;
-   5 維度(MLO/Recommended Users/BSS Coloring/Warranty/MSRP)刻意留白給 PM
-13. **擴到其他產品線** — 目前只有 Cloud AP 有 dimension 模板 + matchup;Switch/NVS/VPN FW 待建
-   （dashboard toolbar 的 Battlecard 連結目前也只在 Cloud AP 顯示）
-（註:使用者 2026-06-16 決定 ↻sync 與 🔍web 維持兩顆手動按鈕,不自動串接）
+其餘待辦（產品線素材、多語言擴展、翻譯 feedback、Battlecard 競品資料、自動邀請信）
+按領域列在 [`docs/next-steps.md`](docs/next-steps.md)。**只有下面這幾條需要現在知道**：
+⚠️ 圖檔名是**單底線**（`S41__product.png` 雙底線曾靜默同步不到）；
+🔴 **翻譯審核流程目前休眠**（2026-08-12 主動關掉,程式全在但沒有任何語系被指定,
+所以每個語系都是一鍵 Confirm）——看到 review 相關程式碼不要以為它在跑;
+⚠️ **渲染端改動要重產 PDF 才生效**,已產出的 ~90 份仍是舊版。
 
 ## Deployment
 
@@ -474,6 +367,8 @@ npm run lint
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步
 - [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md) — PDF 生成、版面、多語言 + AI 翻譯
 - [`docs/auth-rbac.md`](docs/auth-rbac.md) — 認證/proxy/RBAC 三層、權限矩陣、RLS
+- [`docs/next-steps.md`](docs/next-steps.md) — 各領域的待辦清單（做完就刪，不留歷史）
+- [`docs/brand-and-visual.md`](docs/brand-and-visual.md) — datasheet 的版型/字級規範頁、CJK 漂移偵測、logo、封面置中
 - [`docs/battlecard.md`](docs/battlecard.md) — 競品 battlecard:資料模型、抽取流程、關鍵雷
 - [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md) — 新增產品線、sheet 契約、各 category datasheet 變體
 - [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md) — **西文上線 / OpenRouter 遷移 / 花費帳本 / 翻譯審核**（2026-08-06~07）。
