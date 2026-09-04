@@ -166,13 +166,22 @@ export default async function SolutionDashboardPage({
           .eq("image_type", "radio_pattern")
           .in("product_id", productIds) as unknown as Promise<{ data: RadioPatternAsset[] | null }>)
       : Promise.resolve({ data: [] as RadioPatternAsset[] }),
+    // Only the LATEST change per product is used (see latestChangeMap), yet
+    // this fetched every change_log row for every product on the solution and
+    // kept the first of each in JS — a table that grows with every sync,
+    // read in full on every dashboard load. Embedding with a per-parent
+    // limit asks the database for exactly the one row per product.
     productIds.length
       ? (supabase
-          .from("change_logs")
-          .select("product_id, edited_at, edited_by, changes_summary")
-          .not("product_id", "is", null)
-          .in("product_id", productIds)
-          .order("created_at", { ascending: false }) as unknown as Promise<{ data: ChangeLogRow[] | null }>)
+          .from("products")
+          .select("id, change_logs (product_id, edited_at, edited_by, changes_summary)")
+          .in("id", productIds)
+          .order("created_at", { referencedTable: "change_logs", ascending: false })
+          .limit(1, { referencedTable: "change_logs" }) as unknown as Promise<{
+          data: { id: string; change_logs: ChangeLogRow[] | null }[] | null;
+        }>).then(({ data }) => ({
+          data: (data ?? []).flatMap((p) => p.change_logs ?? []),
+        }))
       : Promise.resolve({ data: [] as ChangeLogRow[] }),
     productIds.length
       ? (supabase

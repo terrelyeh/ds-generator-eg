@@ -14,9 +14,17 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "./session";
 import { can, type Permission, type Role } from "./permissions";
 
-const DEFAULT_FALLBACK = "/dashboard";
+/**
+ * Where a guard sends someone who may not see the page.
+ *
+ * Was "/dashboard", which only one of the two apps has: EnGenie's settings
+ * pages sent a non-admin to a 404. Each app's root already redirects to its
+ * own home (SpecHub → /dashboard, EnGenie → /ask), so "/" is the one
+ * destination that is right in both.
+ */
+const DEFAULT_FALLBACK = "/";
 
-/** Redirects to /dashboard if the user isn't an admin. */
+/** Redirects home if the user isn't an admin. */
 export async function adminOnly(redirectTo = DEFAULT_FALLBACK) {
   const user = await getCurrentUser();
   if (!user || user.role !== "admin") {

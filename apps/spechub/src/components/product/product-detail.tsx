@@ -1308,7 +1308,10 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                           <div className="flex flex-col gap-1.5">
                             {confirmedLocales.has(l.value) ? (
                               <div className="flex gap-1.5">
-                                {localeVer ? (
+                                {/* Same gate as the English buttons above: the
+                                    API refuses without pdf.generate, so a
+                                    viewer used to get three buttons that 403. */}
+                                {roleCanGenerate && (localeVer ? (
                                   <>
                                     <button
                                       className="rounded px-2 py-1 text-xs font-medium text-engenius-blue hover:bg-engenius-blue/10 transition-colors"
@@ -1330,7 +1333,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                                   >
                                     Generate v1.0
                                   </button>
-                                )}
+                                ))}
                                 <Link
                                   href={`/preview/${product.model_name}?lang=${l.value}&mode=full`}
                                   target="_blank"

@@ -33,6 +33,7 @@ import {
 import { DEFAULT_SECTIONS } from "@/lib/project-datasheet/types";
 import type { SectionToggles } from "@/lib/project-datasheet/types";
 import type { ProjectDatasheet, ProjectDatasheetModel } from "@eg/db/types";
+import { LocalTime } from "@/components/changelog/local-time";
 
 const SECTION_LABELS: { key: keyof SectionToggles; label: string; hint: string }[] = [
   { key: "features", label: "Features & Benefits", hint: "賣點頁" },
@@ -688,10 +689,9 @@ export function ProjectEditor({
             </Field>
             <p className="text-xs text-slate-500">
               最後更新：
-              <span className="tabular-nums">
-                {" "}
-                {new Date(doc.updated_at).toISOString().slice(0, 16).replace("T", " ")}
-              </span>
+              {/* toISOString() is UTC — the editor showed Taipei users a time
+                  eight hours behind the one they had just saved at. */}
+              <LocalTime iso={doc.updated_at} format="datetime" className="tabular-nums" />
             </p>
           </section>
         </TabsContent>
