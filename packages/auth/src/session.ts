@@ -161,6 +161,28 @@ export async function gateOrCron(
   }
 }
 
+/**
+ * Cron-only entry: the shared secret, and nothing else.
+ *
+ * Separate from {@link gateOrCron} because Vercel Cron issues a **GET**, and
+ * a GET is also what a browser sends when somebody clicks a link — with
+ * cookies attached. So a cron-reachable GET must not also accept a user
+ * session, or a link to `/api/sync?force=true` is a one-click full resync for
+ * anyone already signed in. This accepts the bearer and refuses everything
+ * else; people use the POST.
+ */
+export async function requireCron(request: Request): Promise<NextResponse | null> {
+  const auth = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret && auth && secretsMatch(auth, `Bearer ${cronSecret}`)) {
+    return null;
+  }
+  return NextResponse.json(
+    { error: "Unauthorized — this endpoint is invoked by cron" },
+    { status: 401 },
+  );
+}
+
 /** Compare two secrets without leaking their common prefix through timing. */
 function secretsMatch(a: string, b: string): boolean {
   const x = Buffer.from(a);

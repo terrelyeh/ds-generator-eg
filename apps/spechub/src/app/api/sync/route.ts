@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
-import { gateOrCron } from "@eg/auth/session";
+import { gateOrCron, requireCron } from "@eg/auth/session";
 import { logIfDbError, throwIfDbError } from "@eg/db/errors";
 import {
   loadAllProductsFromSheet,
@@ -755,10 +755,25 @@ export async function POST(request: Request) {
   });
 }
 
-// No GET alias. It existed for browser testing, and a browser is exactly the
-// problem: session cookies ride along on a top-level navigation, so a link to
-// /api/sync?force=true was a one-click full resync for anyone with the
-// permission. Use POST (the Sync button, or curl with the cron bearer).
+/**
+ * GET — this is how Vercel Cron invokes the daily 09:00 TW sync.
+ *
+ * There used to be a plain `return POST(request)` here for browser testing,
+ * and it was removed on the reasoning that a GET carries cookies on a link
+ * click, so `/api/sync?force=true` in a chat message was a one-click full
+ * resync for anyone signed in. That reasoning stands. What it missed is that
+ * the scheduler uses GET too — the next morning's run answered 405 and the
+ * sync did not happen, which nothing would have reported.
+ *
+ * So the method comes back and the session does not: only the cron bearer
+ * gets through here. A person clicking a link has cookies and no secret, and
+ * the Sync button posts.
+ */
+export async function GET(request: Request) {
+  const denied = await requireCron(request);
+  if (denied) return denied;
+  return POST(request);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
