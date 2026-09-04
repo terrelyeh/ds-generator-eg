@@ -14,7 +14,10 @@ import { gate } from "@eg/auth/session";
  *
  * Does NOT re-read Google Sheets or touch spec data — use /api/sync for that.
  */
-export const maxDuration = 60;
+/**
+ * Same image work as a line sync, for one product. Raised with it.
+ */
+export const maxDuration = 300;
 
 export async function POST(request: Request) {
   const denied = await gate("sync.run");

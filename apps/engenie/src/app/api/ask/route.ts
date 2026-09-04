@@ -13,7 +13,12 @@ import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from 
 import { decryptKey } from "@/lib/auth/api-key";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
-export const maxDuration = 60;
+/**
+ * A Pro model answering a long comparison at `maxTokens: 16384` can outrun
+ * 60s, and being killed mid-stream sends no `[DONE]` and no error event —
+ * the client just shows a dead connection and the ledger records nothing.
+ */
+export const maxDuration = 300;
 
 /**
  * Strip anything that looks like a credential before it's logged or streamed to
