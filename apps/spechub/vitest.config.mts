@@ -20,7 +20,11 @@ export default defineConfig({
     // The shared packages are covered from here rather than getting their own
     // runner: they are plain TypeScript with relative imports, and one test
     // command is one thing to remember.
-    include: ["src/**/*.test.ts", "../../packages/*/src/**/*.test.ts"],
+    include: [
+      "src/**/*.test.ts",
+      "../engenie/src/**/*.test.ts",
+      "../../packages/*/src/**/*.test.ts",
+    ],
     environment: "node",
   },
 });

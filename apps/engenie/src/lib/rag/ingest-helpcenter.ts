@@ -14,6 +14,7 @@ import {
   hasSubstantialContent,
 } from "./gitbook-fetcher";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
+import { safeFetch } from "./safe-url";
 
 /** Max characters per chunk */
 const MAX_CHUNK_CHARS = 5000;
@@ -110,12 +111,9 @@ interface ArticleLink {
  * Parse a collection page to extract article URLs and titles.
  */
 async function parseCollectionPage(collectionUrl: string): Promise<ArticleLink[]> {
-  const res = await fetch(collectionUrl, {
+  const { text: html } = await safeFetch(collectionUrl, {
     headers: { "User-Agent": "SpecHub-Indexer/1.0", Accept: "text/html" },
   });
-  if (!res.ok) throw new Error(`Failed to fetch collection ${collectionUrl}: ${res.status}`);
-
-  const html = await res.text();
   const articles: ArticleLink[] = [];
 
   // Extract collection name from the page
@@ -151,12 +149,9 @@ async function fetchArticle(url: string): Promise<{
   imageUrls: string[];
   sectionImages: Map<string, string[]>;
 }> {
-  const res = await fetch(url, {
+  const { text: html } = await safeFetch(url, {
     headers: { "User-Agent": "SpecHub-Indexer/1.0", Accept: "text/html" },
   });
-  if (!res.ok) throw new Error(`Failed to fetch article ${url}: ${res.status}`);
-
-  const html = await res.text();
 
   // Extract article body — Intercom wraps content in <article> or specific class
   const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i) ||

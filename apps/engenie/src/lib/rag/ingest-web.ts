@@ -19,6 +19,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
 import { hasSubstantialContent } from "./gitbook-fetcher";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
+import { isSafePublicUrl, safeFetch, UnsafeUrlError } from "./safe-url";
 
 const MAX_CHUNK_CHARS = 5000;
 const MIN_CHUNK_CHARS = 50;
@@ -62,39 +63,6 @@ function normalizeUrl(input: string): string {
   return /^https?:\/\//i.test(u) ? u : `https://${u}`;
 }
 
-/**
- * SSRF guard for admin-supplied URLs. The plain-fetch fallback runs from our
- * own serverless runtime, so internal targets (cloud metadata, loopback,
- * RFC1918) must never be fetchable — even by a knowledge.edit admin.
- * Hostname-based only: DNS-rebinding (public name → private A record) is out
- * of scope for this internal, admin-gated feature.
- */
-function isSafePublicUrl(url: string): boolean {
-  let u: URL;
-  try { u = new URL(url); } catch { return false; }
-  if (u.protocol !== "http:" && u.protocol !== "https:") return false;
-  const host = u.hostname.toLowerCase().replace(/^\[|\]$/g, "");
-  if (!host) return false;
-  if (host === "localhost" || host.endsWith(".localhost") || host.endsWith(".local") || host.endsWith(".internal")) return false;
-  // IPv6: loopback / unspecified / link-local / unique-local
-  if (host.includes(":")) {
-    return !(host === "::" || host === "::1" || /^(fe80|fc|fd)/i.test(host));
-  }
-  // Whole-number or hex IPv4 forms (http://2130706433/, http://0x7f000001/)
-  if (/^\d+$/.test(host) || /^0x/i.test(host)) return false;
-  const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (m) {
-    const a = Number(m[1]);
-    const b = Number(m[2]);
-    if (
-      a === 0 || a === 10 || a === 127 ||
-      (a === 169 && b === 254) ||
-      (a === 172 && b >= 16 && b <= 31) ||
-      (a === 192 && b === 168)
-    ) return false;
-  }
-  return true;
-}
 
 /**
  * Colon-free, stable source_id (the GET /api/documents list splits
@@ -213,14 +181,15 @@ function htmlToText(html: string): string {
 
 async function extractWithFetch(url: string): Promise<ExtractResult | null> {
   try {
-    const res = await fetch(url, {
+    // safeFetch, not fetch: the URL was checked once when it went into the
+    // list, and following a redirect blind puts a host nobody checked at the
+    // other end of the same request.
+    const { text: html } = await safeFetch(url, {
       headers: {
         "User-Agent": "Mozilla/5.0 (compatible; SpecHub-Indexer/1.0)",
         Accept: "text/html",
       },
     });
-    if (!res.ok) return null;
-    const html = await res.text();
     const title = (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "")
       .replace(/<[^>]+>/g, "")
       .trim();
@@ -233,7 +202,11 @@ async function extractWithFetch(url: string): Promise<ExtractResult | null> {
     const content = htmlToText(main);
     if (content.length < MIN_CHUNK_CHARS) return null;
     return { title: title || titleFromMarkdown(content) || url, content, method: "fetch" };
-  } catch {
+  } catch (err) {
+    // A URL the guard refused is not "this method did not work" — falling
+    // through to Firecrawl or Jina would just ask somebody else to fetch it.
+    // Let it out so the crawl records it and moves to the next page.
+    if (err instanceof UnsafeUrlError) throw err;
     return null;
   }
 }

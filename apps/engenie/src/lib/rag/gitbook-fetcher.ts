@@ -6,6 +6,8 @@
  * 2. Direct URL fetch for page content (Gitbook renders server-side for crawlers)
  */
 
+import { safeFetch } from "./safe-url";
+
 export interface GitbookPage {
   url: string;
   lastModified?: string;
@@ -76,15 +78,11 @@ export async function fetchGitbookSitemap(
   // Try space-specific sitemap first: {baseUrl}/sitemap-pages.xml
   const sitemapUrl = `${baseUrl}/sitemap-pages.xml`;
 
-  const res = await fetch(sitemapUrl, {
+  // The space URL comes from a dialog, so this is as attacker-adjacent as the
+  // Web pipeline — and it had none of the Web pipeline's checks.
+  const { text: xml } = await safeFetch(sitemapUrl, {
     headers: { "User-Agent": "SpecHub-Indexer/1.0" },
   });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch sitemap at ${sitemapUrl}: ${res.status}`);
-  }
-
-  const xml = await res.text();
   const entries = parseSitemap(xml);
 
   if (entries.length === 0) {
@@ -148,18 +146,12 @@ export async function fetchGitbookPage(url: string): Promise<{
   sectionImages: Map<string, string[]>;
   title: string;
 }> {
-  const res = await fetch(url, {
+  const { text: html } = await safeFetch(url, {
     headers: {
       "User-Agent": "SpecHub-Indexer/1.0",
       Accept: "text/html",
     },
   });
-
-  if (!res.ok) {
-    throw new Error(`Failed to fetch page ${url}: ${res.status}`);
-  }
-
-  const html = await res.text();
 
   // Extract image URLs from the HTML
   const imageUrls: string[] = [];
