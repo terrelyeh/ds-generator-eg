@@ -401,7 +401,10 @@ npm run build
 npm run lint
 ```
 
-- Vercel 自動部署 main branch；Cron: `/api/sync` 每天 09:00 台灣時間
+- Vercel 自動部署 main branch；Cron: `/api/sync` 每天 09:00 台灣時間、
+  **`/api/cron/health` 每天 10:00**（讀 `job_heartbeats` + 探測向量檢索 + 比對 chunk 數，
+  有問題發 Telegram；每週一送一則「一切正常」當 dead-man switch。判斷邏輯是
+  `lib/monitoring/health.ts` 的純函式，有測試）
 - **⚠️ Vercel function region 釘在 `hnd1`（東京）— 不要改**。Supabase 在 ap-northeast-1，
   跨區每 query +170ms
 - **Server component query 並行化** — 互相獨立的 query 塞同一個 `Promise.all`

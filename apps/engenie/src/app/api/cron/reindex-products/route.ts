@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@eg/db/heartbeat";
 import { gateOrCron } from "@eg/auth/session";
 import { ingestProducts } from "@/lib/rag/ingest-products";
 
@@ -44,6 +45,11 @@ async function reindex(models?: string[]) {
     console.warn("[reindex-products] errors:", errors);
   }
   // A count of errors told the reader something failed and not what.
+  await recordHeartbeat(
+    "reindex-products",
+    errors.length === 0,
+    `${processed} processed, ${skipped} skipped, ${errors.length} error(s)${errors[0] ? `: ${errors[0]}` : ""}`,
+  );
   return { ok: true, processed, skipped, error_count: errors.length, errors: errors.slice(0, 20) };
 }
 

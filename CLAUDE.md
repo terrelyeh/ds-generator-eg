@@ -25,7 +25,7 @@
 跨 app 接點（sync→reindex 觸發、spechub widget、LLM keys 歸 engenie、
 產品表唯讀約定）詳見兩個 app 的 CLAUDE.md「Monorepo 接點 / 跨 app 接點」章節。
 
-- packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|errors|rate-limit|types`、`@eg/auth/session|permissions|page-guards|safe-next|pages|routes`、`@eg/google/auth`
+- packages 直接輸出 `.ts`（package.json `exports` map），app 端用 `transpilePackages` 編譯；import 形式：`@eg/db/server|client|admin|settings|errors|rate-limit|heartbeat|types`、`@eg/auth/session|permissions|page-guards|safe-next|pages|routes`、`@eg/google/auth`
 - **新增任何 OpenRouter 呼叫點時必須帶 `feature`**（`chatComplete`/`streamComplete` 的必填選項，
   查 `packages/llm/src/features.ts` 的對照表 → 送進 OpenRouter 的 `user` 欄位做花費歸戶）。
   漏標不會有任何症狀——畫面正常、測試全過，花費只是靜靜落進 `unmapped`。
@@ -53,6 +53,13 @@
   **同一份指南的版型那一節也有護欄**：`npm run check:guide-layouts` 比對
   `PROJECT_LAYOUTS` 與頁面上的 `data-layout` / `data-hex`——改個顏色是一行，
   而那一節連截圖都會過期。
+- **有一支每日健康檢查**（spechub `/api/cron/health`,10:00 TW）。它讀 `job_heartbeats`
+  （migration 00054,三支排程各自在跑完時寫一列）、**主動探測向量檢索**、並比對知識庫的
+  chunk 數量;有問題發 Telegram。**為什麼不看副作用**:Smart Sync 跳過的線不會更新
+  `last_synced_at`、沒變的 chunk 不會被重寫,所以「沒事做」和「沒跑」長得一模一樣——
+  那正是每日同步 504 了好幾天沒人發現的原因。**為什麼不看用量**:Ask 本來就好幾天
+  沒人問,用量歸零是常態。⚠️ **沒有東西在看這支健康檢查**,所以它每週一會送一則
+  「一切正常」——超過一週沒收到,是它自己停了
 - migrations 在 `packages/db/supabase/migrations/`（supabase CLI 的 link 狀態 `.temp` 也在旁邊，`supabase db push` 從 `packages/db` 跑）
 - ⚠️ **套 migration 的順序取決於依賴方向,不是編號**：拿掉 DB 依賴的（例如 00048 收掉
   RLS policy）要**先部署程式再套**;新增 DB 依賴的（00050 的 RPC、00051 的

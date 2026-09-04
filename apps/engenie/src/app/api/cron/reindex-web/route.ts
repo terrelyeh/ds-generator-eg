@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordHeartbeat } from "@eg/db/heartbeat";
 import { createAdminClient } from "@eg/db/admin";
 import { gateOrCron } from "@eg/auth/session";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
@@ -218,6 +219,24 @@ async function handle(request: Request) {
     summary.web = results;
   }
 
+  // `summary` is keyed by source kind, each holding that kind's results.
+  // Walked defensively: the heartbeat must never be the thing that throws.
+  let errorCount = 0;
+  let firstError = "";
+  for (const value of Object.values(summary)) {
+    for (const r of Array.isArray(value) ? value : []) {
+      const errs = (r as { errors?: unknown })?.errors;
+      if (Array.isArray(errs) && errs.length > 0) {
+        errorCount += errs.length;
+        if (!firstError) firstError = String(errs[0]);
+      }
+    }
+  }
+  await recordHeartbeat(
+    "reindex-web",
+    errorCount === 0,
+    `${Object.keys(summary).length} source group(s), ${errorCount} error(s)${firstError ? `: ${firstError}` : ""}`,
+  );
   return NextResponse.json({ ok: true, timestamp: new Date().toISOString(), summary });
 }
 

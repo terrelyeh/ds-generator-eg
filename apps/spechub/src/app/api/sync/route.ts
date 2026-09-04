@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
+import { recordHeartbeat } from "@eg/db/heartbeat";
 import { gateOrCron, requireCron } from "@eg/auth/session";
 import { logIfDbError, throwIfDbError } from "@eg/db/errors";
 import {
@@ -920,6 +921,16 @@ export async function POST(request: Request) {
   }
 
   await releaseSyncLock(supabase);
+
+  // Reaching here is the one thing no side effect can report: a run that
+  // found nothing to do leaves exactly the same trace as a run that never
+  // happened (migration 00054).
+  const lineErrors = results.reduce((sum, r) => sum + r.errors.length, 0);
+  await recordHeartbeat(
+    "sync",
+    lineErrors === 0,
+    `${results.filter((r) => !r.skipped).length}/${results.length} lines synced, ${lineErrors} error(s)`,
+  );
 
   return NextResponse.json({
     ok: true,
