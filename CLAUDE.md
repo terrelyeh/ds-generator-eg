@@ -30,8 +30,18 @@
   所以有一支雙向檢查：`npm run check:feature-tags`（每個呼叫點都有標、每個標籤都有人用、
   **串流那支也送 `user`**、沒有人繞過共用函式自己打 endpoint）。標籤字串是對外契約，
   **改名不會改到舊資料**，儀表板上會裂成兩列。
-- **三支護欄都在 CI 上跑**（`.github/workflows/guards.yml`,PR 和 push main 都會跑）。
+- **所有護欄都在 CI 上跑**（`.github/workflows/guards.yml`,PR 和 push main 都會跑）。
   在那之前它們只是「記得跑才會叫」——**需要有人記得的護欄,只保護已經知道的人**。
+  2026-09-04 起 CI 分成兩個 job:`checks`(兩個 app 的 tsc + lint + `npm test`)和
+  `guards`(下面這幾支無症狀漂移的檢查)。`checks` 以前不存在,而 Next 16 的 `next build`
+  不再跑 ESLint,所以 lint 紅了也擋不住任何東西。
+- **每個 Supabase 寫入都要有人讀 `error`**:`npm run check:db-writes`。
+  supabase-js 不 throw,寫入回 `{ data, error }` 兩邊都 resolve,所以沒人讀的 `error`
+  是隱形的:路由回 200、toast 說已儲存、資料列不存在(pitfall #45)。
+  慣例是 `throwIfDbError(label)(res)` / `logIfDbError(label, res)`,都在 **`@eg/db/errors`**
+  (以前只是 generate-pdf 裡的一個區域閉包,所以「慣例」只有那一個檔案在遵守)。
+  護欄第一次跑報 32 處、修好誤判後報 **67 處** —— 它把外層的 `if (x.length > 0)` 當成
+  「有人在檢查」。真的不需要知道結果的寫入,用 `// db-write-unchecked: <理由>` 明講。
 - **指南頁裡的 UI 標籤有護欄**：`npm run check:guide-labels`。
   `apps/spechub/public/docs/tender-datasheets.html` 裡包在 `<span data-ui>` 的字串
   是「這幾個字就在畫面上」的宣告,腳本拿去比對 `apps/spechub/src/`。

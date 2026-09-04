@@ -59,6 +59,17 @@ interface ModelDraft {
   rules: string;
 }
 
+/** The draft a model would have if nobody had typed anything. */
+function serverDraft(m: ProjectDatasheetModel): ModelDraft {
+  return {
+    id: m.id,
+    model_name: m.model_name,
+    display_name: m.display_name ?? "",
+    raw: serializeSpecRows(asRawDoc(m.raw_doc)),
+    rules: serializeRules(asRules(m.rules)),
+  };
+}
+
 export function ProjectEditor({
   doc,
   models,
@@ -110,44 +121,73 @@ export function ProjectEditor({
   const [opportunity, setOpportunity] = useState(doc.opportunity ?? "");
   const [tenderDate, setTenderDate] = useState(doc.tender_date ?? "");
 
-  const [drafts, setDrafts] = useState<ModelDraft[]>(() =>
-    models.map((m) => ({
-      id: m.id,
-      model_name: m.model_name,
-      display_name: m.display_name ?? "",
-      raw: serializeSpecRows(asRawDoc(m.raw_doc)),
-      rules: serializeRules(asRules(m.rules)),
-    })),
-  );
+  const [drafts, setDrafts] = useState<ModelDraft[]>(() => models.map(serverDraft));
 
   /**
-   * Pick up models added or removed on the server without discarding edits.
+   * What the server last told us about each model, so we can tell an edit
+   * apart from a value we simply have not caught up with.
+   */
+  const lastServer = useRef(new Map<string, ModelDraft>());
+  if (lastServer.current.size === 0 && models.length > 0) {
+    for (const m of models) lastServer.current.set(m.id, serverDraft(m));
+  }
+
+  /**
+   * Reconcile the open editor with what the server now holds.
    *
-   * `drafts` is state seeded from props, so `router.refresh()` after adding a
-   * column re-rendered the page and changed nothing here — the editor kept
-   * saying "0 台" and people clicked Add again, which is how one document
-   * ended up with three catalogue source rows for the same model.
+   * `drafts` is state seeded from props, so `router.refresh()` changed
+   * nothing here. The first version of this fixed the visible half — a column
+   * added on the server appeared, one deleted dropped out — and left the
+   * worse half in place: model CONTENT was never adopted. Extract, intake and
+   * the gap-review merge all write `raw_doc` and `rules` server-side, so
+   * "寫入 N 列" refreshed the page while the textarea still said 還沒有規格,
+   * the dirty check went true against the rows now on the server, and the
+   * next Save posted `raw_doc: []` straight over the extraction. That is
+   * pitfall #70 with the values reversed: not a stale screen, a stale screen
+   * that overwrites.
    *
-   * Re-keying the component would have fixed it by throwing away every unsaved
-   * edit on the other tabs, which is a worse trade. This reconciles instead:
-   * new columns are appended with their server content, deleted ones drop out,
-   * and anything already open keeps exactly what was typed into it.
+   * The rule is per field: a field the user has not touched — still equal to
+   * what the server last said — takes the new server value. A field they have
+   * typed in is theirs and survives, because losing someone's typing to a
+   * background refresh is the one outcome worse than being out of date.
    */
   useEffect(() => {
     setDrafts((prev) => {
       const byId = new Map(prev.map((d) => [d.id, d]));
-      const next = models.map(
-        (m) =>
-          byId.get(m.id) ?? {
-            id: m.id,
-            model_name: m.model_name,
-            display_name: m.display_name ?? "",
-            raw: serializeSpecRows(asRawDoc(m.raw_doc)),
-            rules: serializeRules(asRules(m.rules)),
-          },
-      );
+      const next = models.map((m) => {
+        const server = serverDraft(m);
+        const before = lastServer.current.get(m.id);
+        const draft = byId.get(m.id);
+        lastServer.current.set(m.id, server);
+
+        if (!draft) return server;
+        if (!before) return draft;
+
+        const adopt = (field: keyof Omit<ModelDraft, "id">) =>
+          draft[field] === before[field] ? server[field] : draft[field];
+
+        return {
+          id: m.id,
+          model_name: adopt("model_name"),
+          display_name: adopt("display_name"),
+          raw: adopt("raw"),
+          rules: adopt("rules"),
+        };
+      });
+
       const same =
-        next.length === prev.length && next.every((d, i) => d.id === prev[i]?.id);
+        next.length === prev.length &&
+        next.every((d, i) => {
+          const p = prev[i];
+          return (
+            p &&
+            d.id === p.id &&
+            d.model_name === p.model_name &&
+            d.display_name === p.display_name &&
+            d.raw === p.raw &&
+            d.rules === p.rules
+          );
+        });
       return same ? prev : next;
     });
   }, [models]);
@@ -572,7 +612,15 @@ export function ProjectEditor({
             }}
           />
           <div id="section-status">
-            <GapReview docId={doc.id} key={reviewKey} onCounts={setCounts} />
+            <GapReview
+              docId={doc.id}
+              key={reviewKey}
+              onCounts={setCounts}
+              /* A merge or an applied answer writes `rules` on the server.
+                 Without this the spec preview kept showing the two rows it
+                 had just folded together, and the next Save put them back. */
+              onChanged={() => router.refresh()}
+            />
           </div>
         </TabsContent>
 

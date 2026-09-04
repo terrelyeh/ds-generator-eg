@@ -333,6 +333,10 @@ export async function ingestGitbook(
   const baseUrl = spaceUrl.replace(/\/$/, "");
   const allChunks: ChunkToEmbed[] = [];
 
+  /** Every chunk key each page produced this run, changed or not — see step 7. */
+  const producedKeys = new Set<string>();
+  const producedSourceIds = new Set<string>();
+
   // Fetch existing hashes for change detection
   const supabase = createAdminClient();
   const { data: existingDocs } = await supabase
@@ -376,6 +380,16 @@ export async function ingestGitbook(
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
       const hash = contentHash(chunk.content);
+
+      // What this page produced, whether or not it changed. The cleanup in
+      // step 7 needs this and not `allChunks`: a page where one section was
+      // edited puts ONE chunk into allChunks, so "the highest index this
+      // page still produces" computed from allChunks was that section's
+      // index — and every chunk after it got deleted as stale. The page then
+      // sat behind its `lastModified` check until somebody edited it again,
+      // so the missing sections stayed missing.
+      producedKeys.add(`${sourceId}:${i}`);
+      producedSourceIds.add(sourceId);
 
       // Skip unchanged chunks
       if (!force && hashMap.get(`${sourceId}:${i}`) === hash) {
@@ -554,34 +568,34 @@ export async function ingestGitbook(
     }
   }
 
-  // Step 7: Clean up stale chunks — if a page now produces fewer chunks than before,
-  // remove the old excess chunks
-  const newChunkKeys = new Set(allChunks.map((c) => `${c.sourceId}:${c.chunkIndex}`));
-  const sourceIdsProcessed = new Set(allChunks.map((c) => c.sourceId));
+  // Step 7: Clean up stale chunks — if a page now produces fewer chunks than
+  // before, remove the old excess. Keyed on what each page PRODUCED, not on
+  // what was re-embedded.
+  const newChunkKeys = producedKeys;
+  const sourceIdsProcessed = producedSourceIds;
 
   for (const doc of existingDocs ?? []) {
     if (
       sourceIdsProcessed.has(doc.source_id) &&
       !newChunkKeys.has(`${doc.source_id}:${doc.chunk_index}`)
     ) {
-      // This chunk no longer exists — check if its source was re-processed
-      const maxNewIndex = allChunks
-        .filter((c) => c.sourceId === doc.source_id)
-        .reduce((max, c) => Math.max(max, c.chunkIndex), -1);
-
-      if (doc.chunk_index > maxNewIndex) {
-        // Reported, not thrown: one stale chunk that refuses to go is not a
-        // reason to abandon a re-index that has already done the expensive part.
-        logIfDbError(
-          `gitbook stale chunk ${doc.source_id}#${doc.chunk_index}`,
-          await supabase
-            .from("documents" as "products")
-            .delete()
-            .eq("source_type", "gitbook")
-            .eq("source_id", doc.source_id)
-            .eq("chunk_index", doc.chunk_index),
-        );
-      }
+      // The page was re-processed this run and no longer produces this
+      // index, so it really is stale. The old code went on to compare
+      // against the highest index in `allChunks`, which only held CHANGED
+      // chunks — that second test is what deleted live sections, and with
+      // `producedKeys` there is nothing left for it to add.
+      //
+      // Reported, not thrown: one stale chunk that refuses to go is not a
+      // reason to abandon a re-index that has already paid for the embeddings.
+      logIfDbError(
+        `gitbook stale chunk ${doc.source_id}#${doc.chunk_index}`,
+        await supabase
+          .from("documents" as "products")
+          .delete()
+          .eq("source_type", "gitbook")
+          .eq("source_id", doc.source_id)
+          .eq("chunk_index", doc.chunk_index),
+      );
     }
   }
 
