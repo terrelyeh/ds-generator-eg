@@ -334,9 +334,7 @@ auth.users → profiles ← email_whitelist.invited_by
    （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
 0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
    Telegram 可能一次比較多則。那是正常的。
-0d. **還沒做的**（剩 2 項）：Ask 那邊「整頁被刪掉的來源會留著 chunk」（google-doc / helpcenter / web
-   只修剪變短的尾巴，沒處理消失的來源；gitbook 有 producedKeys 清理可以照抄）、
-   兩個 app 之間 23 個完全相同的檔案（**那是拆分的殘留**——
+0d. **還沒做的**（剩 1 項）：兩個 app 之間 23 個完全相同的檔案（**那是拆分的殘留**——
    EnGenie 本來是 DS Generator 裡的一個功能,長大後拆出去;`ui/` 是刻意各留一份讓品牌分道,
    去重只該碰 auth 頁面 / `google/auth.ts` / `utils.ts`）。
    **2026-09-04 已完成**：分頁的兩套量法、B/C/D 圖片框、feature 行數核對、

@@ -172,6 +172,9 @@ src/
   所以 workspace 裡的拓撲圖沒有圖示）。
   ⑨ `parseFollowUps` 只在最後一條 `---` 之後**全部都像追問**時才切；Stop / 斷線路徑不切。
   以前答案裡的水平線（拓撲 prompt 還要求要有）會把後面整段當成追問然後丟掉。
+  ⑩ **整個消失的來源會被清掉**（PR #64，`deleteVanishedSources`）：google-doc 以 `docId/` 前綴為宇宙、
+  helpcenter 以整站為宇宙**但任何一篇抓取失敗就跳過**、web 以 `label` 為宇宙**沒有 label 就不清**。
+  「產出集合」必須是這次 run **看到的**每一個來源（不是重嵌的那些）——那正是 gitbook 曾經刪掉活頁面的錯。
 - **`/api/ask` 對內部使用者每人每分鐘 30 題、passcode demo 每 IP 20 題**（PR #63；#62 只進了
   helper 檔沒接線）—— `gateWithRateLimit` / `rateLimitAllowed`，底層同 `auth_rate_check`；
   workspace 走自己的配額（`ask_workspace_touch`）不受此影響。
