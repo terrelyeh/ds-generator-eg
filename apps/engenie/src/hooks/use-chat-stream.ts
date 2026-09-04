@@ -52,7 +52,16 @@ export interface UseChatStreamConfig {
   authToken?: string;
 }
 
-/** Split trailing "--- \n followups" off the answer body. */
+/**
+ * Split a trailing "---\nfollow-ups" block off the answer body.
+ *
+ * The split is only real if what follows the last rule actually reads as
+ * follow-ups: a few short lines. A horizontal rule INSIDE the answer — the
+ * topology prompt asks for one — used to be taken as the separator, the
+ * paragraph after it failed the "short line" filter, and that paragraph
+ * was dropped from the answer without a trace. When nothing qualifies, the
+ * text is returned whole.
+ */
 export function parseFollowUps(text: string): { answer: string; followUps: string[] } {
   const sepIdx = text.lastIndexOf("\n---\n");
   if (sepIdx === -1) return { answer: text, followUps: [] };
@@ -66,6 +75,11 @@ export function parseFollowUps(text: string): { answer: string; followUps: strin
       .replace(/^[-*]\s*/, "")
       .trim();
     if (cleaned.length > 5 && cleaned.length < 200) followUps.push(cleaned);
+  }
+  // Every line must qualify, and there must be at most a handful: a block
+  // that is mostly prose is the answer continuing, not suggestions.
+  if (followUps.length === 0 || followUps.length !== lines.length || lines.length > 5) {
+    return { answer: text, followUps: [] };
   }
   return { answer: answerPart, followUps: followUps.slice(0, 3) };
 }
@@ -235,8 +249,9 @@ export function useChatStream(config: UseChatStreamConfig) {
       if (rafIdRef.current !== null) { cancelAnimationFrame(rafIdRef.current); rafIdRef.current = null; }
       if (err instanceof DOMException && err.name === "AbortError") {
         // User hit Stop — keep whatever streamed so far as the final answer.
-        const { answer } = parseFollowUps(fullContent);
-        const partial = (answer || fullContent).trim();
+        // Nothing to split off a stopped answer — the follow-up block, if
+        // any, never arrived. Splitting could only lose text after a rule.
+        const partial = fullContent.trim();
         const finalMessages: ChatMessage[] = [...base, {
           role: "assistant",
           content: partial ? `${partial}\n\n${stoppedLabel}` : stoppedLabel,
@@ -250,8 +265,9 @@ export function useChatStream(config: UseChatStreamConfig) {
         // Network drop / server crash mid-stream. Keep whatever already streamed
         // (don't make the user lose a half-read answer) and mark the interruption;
         // otherwise show a friendly retryable message rather than a raw TypeError.
-        const { answer } = parseFollowUps(fullContent);
-        const partial = (answer || fullContent).trim();
+        // Nothing to split off a stopped answer — the follow-up block, if
+        // any, never arrived. Splitting could only lose text after a rule.
+        const partial = fullContent.trim();
         const finalMessages: ChatMessage[] = [...base, {
           role: "assistant",
           content: partial ? `${partial}\n\n_(連線中斷，回覆可能未完成)_` : "連線中斷，請再試一次。",

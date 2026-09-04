@@ -16,15 +16,16 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { trimStaleChunks } from "./replace-chunks";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { hasSubstantialContent } from "./gitbook-fetcher";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 import { isSafePublicUrl, safeFetch, UnsafeUrlError } from "./safe-url";
+import { stripHiddenHtml } from "./html-clean";
 
 const MAX_CHUNK_CHARS = 5000;
 const MIN_CHUNK_CHARS = 50;
 const EMBED_BATCH_SIZE = 20;
-const MAX_EMBED_CHARS = 21000;
 const FETCH_CONCURRENCY = 3;
 
 export interface IngestWebOptions {
@@ -137,7 +138,7 @@ async function extractWithJina(url: string): Promise<ExtractResult | null> {
 
 /** Convert arbitrary HTML to clean markdown-ish text (last-resort). */
 function htmlToText(html: string): string {
-  let t = html;
+  let t = stripHiddenHtml(html);
   // Drop non-content elements
   t = t.replace(/<script[\s\S]*?<\/script>/gi, "");
   t = t.replace(/<style[\s\S]*?<\/style>/gi, "");
@@ -318,6 +319,8 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
     metadata: Record<string, unknown>;
   }[] = [];
 
+  /** Chunks each source has NOW, so a source that shrank can lose its tail. */
+  const chunkCounts = new Map<string, number>();
   for (const [url, page] of fetched) {
     if (!hasSubstantialContent(page.content)) {
       pagesSkipped++;
@@ -327,6 +330,7 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
 
     const sourceId = sourceIdFromUrl(url);
     const chunks = chunkPage(page.content, page.title, label);
+    chunkCounts.set(sourceId, chunks.length);
 
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
@@ -364,7 +368,7 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
   for (let i = 0; i < allChunks.length; i += EMBED_BATCH_SIZE) {
     const batch = allChunks.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((c) =>
-      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content,
+      capForEmbedding(c.content),
     );
 
     let embeddings: number[][];
@@ -396,6 +400,13 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
       if (upsertError) errors.push(`Upsert ${chunk.sourceId}:${chunk.chunkIndex}: ${JSON.stringify(upsertError)}`);
       else processed++;
     }
+  }
+
+  // Upserts are by (source_id, chunk_index), so a page that came back with
+  // fewer sections kept its old tail — stale text, still retrievable, with
+  // this run's timestamp on the rest. Written first, trimmed after (#74).
+  for (const [sourceId, count] of chunkCounts) {
+    await trimStaleChunks(supabase, "web", sourceId, count);
   }
 
   return { processed, skipped, pages_fetched: fetched.size, pages_skipped: pagesSkipped, errors, methods };

@@ -20,13 +20,12 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { chunkText } from "./chunk";
 import { trimStaleChunks } from "./replace-chunks";
 
 const SOURCE_TYPE = "vertical_guide";
 const EMBED_BATCH_SIZE = 20;
-const MAX_EMBED_CHARS = 21000;
 
 const MODEL_RE =
   /\b(E[CWS][CWS]?\d{2,4}[A-Z]?|EVS\d{2,4}[A-Z]?|ESG\d{2,4}[A-Z]?|EOC\d{2,4}[A-Z]?|EAP\d{2,4}[A-Z]?|ECP\d{2,4}[A-Z]?)\b/gi;
@@ -186,7 +185,7 @@ export async function ingestVerticalGuide(
   for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
     const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((c) =>
-      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content,
+      capForEmbedding(c.content),
     );
     const embeddings = await generateEmbeddings(texts);
 

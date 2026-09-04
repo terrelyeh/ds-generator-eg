@@ -20,11 +20,10 @@
 
 import { createAdminClient } from "@eg/db/admin";
 import { trimStaleChunks } from "./replace-chunks";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { chunkText } from "./chunk";
 
 const EMBED_BATCH_SIZE = 20;
-const MAX_EMBED_CHARS = 21000;
 
 /** EnGenius model-id families, for auto-extracting `models` from article bodies. */
 const MODEL_RE =
@@ -181,7 +180,7 @@ export async function ingestRefinedArticles(
     for (let i = 0; i < chunks.length; i += EMBED_BATCH_SIZE) {
       const batch = chunks.slice(i, i + EMBED_BATCH_SIZE);
       const texts = batch.map((c) =>
-        c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content,
+        capForEmbedding(c.content),
       );
       const embeddings = await generateEmbeddings(texts);
 

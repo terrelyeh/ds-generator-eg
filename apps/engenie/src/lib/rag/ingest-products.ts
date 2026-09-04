@@ -139,13 +139,26 @@ export async function ingestProducts(options?: {
   // field (e.g. the unified taxonomy) backfills onto content-unchanged chunks
   // WITHOUT needing a forced re-embed.
   const sourceIds = products.map((p) => p.model_name);
-  const { data: existingDocs } = await supabase
+  const { data: existingDocs, error: existingErr } = await supabase
     .from("documents" as "products")
     .select("source_id, chunk_index, content_hash, metadata")
     .eq("source_type", "product_spec")
     .in("source_id", sourceIds) as {
     data: { source_id: string; chunk_index: number; content_hash: string; metadata: Record<string, unknown> | null }[] | null;
+    error: { message?: string } | null;
   };
+  // Nothing read the error here, so a transient failure looked like "no
+  // existing chunks": every hash missed, and every product on the line was
+  // re-embedded on one timeout — the expensive full re-index the hash gate
+  // exists to avoid. Better to stop and say so; the daily cron retries.
+  if (existingErr) {
+    return {
+      processed: 0,
+      skipped: 0,
+      refreshed: 0,
+      errors: [`Failed to read existing chunks (would have re-embedded everything): ${existingErr.message ?? "unknown"}`],
+    };
+  }
 
   const existingMap = new Map<string, { hash: string; metadata: Record<string, unknown> }>();
   for (const doc of existingDocs ?? []) {

@@ -16,13 +16,12 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { generateEmbeddings, contentHash, estimateTokens } from "./embeddings";
+import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 
 const API_BASE = "https://wifi-reghub.vercel.app/api/wifi-regs/v1";
 const EMBED_BATCH_SIZE = 20;
-const MAX_EMBED_CHARS = 21000;
 const MIN_CHUNK_CHARS = 80;
 
 export interface IngestWifiRegulationsOptions {
@@ -210,7 +209,7 @@ export async function ingestWifiRegulations(
   for (let i = 0; i < allChunks.length; i += EMBED_BATCH_SIZE) {
     const batch = allChunks.slice(i, i + EMBED_BATCH_SIZE);
     const texts = batch.map((c) =>
-      c.content.length > MAX_EMBED_CHARS ? c.content.slice(0, MAX_EMBED_CHARS) : c.content
+      capForEmbedding(c.content)
     );
 
     let embeddings: number[][];

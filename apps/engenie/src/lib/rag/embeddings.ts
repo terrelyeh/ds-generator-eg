@@ -80,11 +80,46 @@ export function contentHash(content: string): string {
 }
 
 /**
- * Rough token count estimate (for metadata, not billing).
- * ~4 chars per token for English, ~2 for CJK.
+ * Rough token count (for metadata and for the embedding cap, not billing).
+ *
+ * One ratio for every script was the bug: 3.5 characters per token is
+ * about right for English and wildly wrong for CJK, where cl100k spends
+ * roughly a token per character. A 21 000-character Japanese chunk was
+ * ~6 000 tokens by the old estimate and ~21 000 in fact — over the 8 192
+ * limit of text-embedding-3-small, and OpenAI refuses the whole batch of
+ * twenty for the one that is over.
  */
 export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3.5);
+  let cjk = 0;
+  for (const ch of text) {
+    if (/[\u3000-\u9fff\uac00-\ud7af\uff00-\uffef]/.test(ch)) cjk += 1;
+  }
+  return Math.ceil(cjk * 1.2 + (text.length - cjk) / 4);
+}
+
+/** What the embedding model accepts per input. */
+export const EMBED_TOKEN_LIMIT = 8192;
+/** Where we cut, leaving room for the estimate being an estimate. */
+export const EMBED_TOKEN_BUDGET = 7000;
+
+/**
+ * Text trimmed to what the embedding model will accept.
+ *
+ * Replaces six per-pipeline `MAX_EMBED_CHARS` constants (21 000, or 10 000)
+ * that cut by character count — the right amount for English and up to
+ * three times too much for CJK. Binary-searches the cut so the estimate,
+ * not the character count, is what stays under budget.
+ */
+export function capForEmbedding(text: string): string {
+  if (estimateTokens(text) <= EMBED_TOKEN_BUDGET) return text;
+  let lo = 0;
+  let hi = text.length;
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1;
+    if (estimateTokens(text.slice(0, mid)) <= EMBED_TOKEN_BUDGET) lo = mid;
+    else hi = mid - 1;
+  }
+  return text.slice(0, lo);
 }
 
 export { EMBEDDING_MODEL, EMBEDDING_DIMENSIONS };
