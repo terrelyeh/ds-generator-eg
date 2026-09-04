@@ -55,8 +55,8 @@ export async function POST(request: Request) {
     }
   }
 
-  try {
-    const result = await translate({
+  const run = () =>
+    translate({
       source,
       targetLocale: target_locale,
       contentType: content_type,
@@ -68,11 +68,42 @@ export async function POST(request: Request) {
       ref,
     });
 
+  try {
+    let result = await run();
+
+    /**
+     * A translated feature list has to have exactly as many lines as the
+     * English one, because the two are matched BY INDEX — the editor draws
+     * `englishFeatures.map((_, i) => lines[i])` and the datasheet prints the
+     * pairs. A model that merges two bullets into one does not lose a
+     * bullet; it shifts every bullet after it onto the wrong English line
+     * and leaves the last one blank. Nothing downstream can detect that:
+     * the count is padded back to the right length on save, so the stored
+     * list looks well-formed and prints wrong.
+     *
+     * Sampling is at 0.3, so simply asking again usually produces a
+     * correctly split list. If it does not, the caller is told and the form
+     * is left alone — a shifted list quietly filled into the editor is the
+     * one outcome worth avoiding.
+     */
+    let lineMismatch: { expected: number; got: number } | undefined;
+    if (content_type === "features") {
+      const countLines = (t: string) => t.split("\n").filter((l) => l.trim()).length;
+      const expected = countLines(source);
+      if (countLines(result.translated) !== expected) {
+        result = await run();
+        const got = countLines(result.translated);
+        if (got !== expected) lineMismatch = { expected, got };
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       translated: result.translated,
       notes: result.notes,
       provider: result.provider,
+      /** Present only when the feature list came back the wrong length. */
+      line_mismatch: lineMismatch,
       // Exact model + transport, so the caller can record what produced
       // this text. product_translations.translated_by had no writer at
       // all before, which is why existing rows can't be traced.

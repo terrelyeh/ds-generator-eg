@@ -271,32 +271,67 @@ export function estimateRowHeight(row: SpecRow, locale?: string): number {
 }
 
 /**
- * Split a value string so the head occupies approximately `linesToKeep`
- * wrapped lines; the tail gets the remainder. Prefers to break at a
- * whitespace boundary so words aren't chopped mid-character. Returns
- * [head, tail] — both trimmed. If no clean split is found, returns
- * [value, ""] (whole thing stays together).
+ * Split a value so the head occupies at most `linesToKeep` wrapped lines;
+ * the tail gets the rest. Prefers a whitespace boundary so words aren't
+ * chopped. Returns [head, tail], both trimmed, or [value, ""] when no clean
+ * split exists.
+ *
+ * ⚠️ This walks the string the way `countWrappedLines` COUNTS it, and the two
+ * have to stay that way. The first version multiplied `linesToKeep` by
+ * `COL_WIDTH_CHARS` and accumulated raw width across the whole string —
+ * which is only the same thing when the value has no newlines in it.
+ *
+ * `countWrappedLines` wraps each newline-separated segment on its own and
+ * rounds each one up, so `"60 chars\n60 chars\n60 chars"` is six lines, not
+ * `ceil(182/52) = 4`. The old split asked for 20 lines and handed back a head
+ * that rendered 34, because it spent its budget on characters while the page
+ * spent it on lines. The packer had reserved room for 20. The renderer draws
+ * spec values with `white-space: pre-line`, so newlines in a value are the
+ * normal case, not an edge one.
  */
 function splitValueAtLines(
   value: string,
   linesToKeep: number,
 ): [string, string] {
   if (linesToKeep < 1) return ["", value];
-  const targetWidth = linesToKeep * COL_WIDTH_CHARS;
-  let accWidth = 0;
+
+  let linesUsed = 0;
+  let widthOnLine = 0;
   let lastSpaceIdx = -1;
-  let splitIdx = value.length;
+  let splitIdx = -1;
+
   for (let i = 0; i < value.length; i++) {
     const ch = value[i];
-    const w = charWidth(ch);
-    if (accWidth + w > targetWidth) {
-      // Prefer breaking at last whitespace within the head portion
-      splitIdx = lastSpaceIdx > 0 ? lastSpaceIdx : i;
-      break;
+
+    if (ch === "\n") {
+      // The segment that just ended closes whatever line it was on.
+      linesUsed += 1;
+      widthOnLine = 0;
+      lastSpaceIdx = i;
+      if (linesUsed >= linesToKeep) {
+        splitIdx = i;
+        break;
+      }
+      continue;
     }
-    accWidth += w;
+
+    const w = charWidth(ch);
+    if (widthOnLine + w > COL_WIDTH_CHARS) {
+      linesUsed += 1;
+      widthOnLine = 0;
+      if (linesUsed >= linesToKeep) {
+        // Prefer the last whitespace inside the head so a word survives.
+        splitIdx = lastSpaceIdx > 0 ? lastSpaceIdx : i;
+        break;
+      }
+    }
+    widthOnLine += w;
     if (/\s/.test(ch)) lastSpaceIdx = i;
   }
+
+  // Never reached the budget — the whole value fits.
+  if (splitIdx < 0) return [value, ""];
+
   const head = value.slice(0, splitIdx).trim();
   const tail = value.slice(splitIdx).trim();
   if (!head || !tail) return [value, ""];
@@ -331,6 +366,13 @@ function balanceColumns(sections: Section[], locale?: string): SpecPage {
 
   const heights = sections.map((s) => estimateSectionHeight(s, locale));
   const totalH = heights.reduce((a, b) => a + b, 0);
+  // `.spec-col > div + div { margin-top: 12pt }` — real height, and the thing
+  // this function used to leave out. Summing bare section heights made a
+  // column of many small sections look 12pt lighter per boundary than it
+  // renders, so the overflow penalty below could not see 168pt of gaps and
+  // happily moved another section into a column that was already full. The
+  // packer counts them (see `columnHeight`); this has to agree with it.
+  const gaps = (count: number) => Math.max(0, count - 1) * SECTION_GAP;
 
   // Try every split index 1..N-1 and pick the one minimising imbalance.
   // Also require both columns fit in AVAILABLE_HEIGHT — if any candidate
@@ -340,8 +382,9 @@ function balanceColumns(sections: Section[], locale?: string): SpecPage {
   let runningH = 0;
   for (let i = 0; i < sections.length - 1; i++) {
     runningH += heights[i];
-    const leftH = runningH;
-    const rightH = totalH - runningH;
+    const leftCount = i + 1;
+    const leftH = runningH + gaps(leftCount);
+    const rightH = totalH - runningH + gaps(sections.length - leftCount);
     const overflowPenalty =
       (leftH > AVAILABLE_HEIGHT ? leftH - AVAILABLE_HEIGHT : 0) +
       (rightH > AVAILABLE_HEIGHT ? rightH - AVAILABLE_HEIGHT : 0);

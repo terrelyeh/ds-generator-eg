@@ -463,7 +463,15 @@ body {
 .mc-heading { margin-bottom: 8pt; }
 .mc-overview { line-height: 1.65; color: #6f6f6f; }
 .mc-shot { display: flex; align-items: center; justify-content: center; }
-.mc-shot img { max-width: 100%; max-height: 235pt; object-fit: contain; }
+/* pitfall #66: max-width / max-height only CAP, they never scale up — so the
+   rendered size was whatever the FILE happened to be (pixels x 0.75), and
+   sync's sharp.trim() rewrites those pixel counts on every pass. Pinning the
+   width (or the box) makes the size a property of the design instead.
+   height:auto rather than 100% where the container is in normal flow —
+   pinning height there opens a gap under a short image. Same shape as
+   layout A's .hardware-image-container.
+   NOTE: no backticks in here — this CSS lives inside a template literal. */
+.mc-shot img { width: 100%; height: auto; max-height: 235pt; object-fit: contain; }
 .mc-shot-ph { width: 100%; height: 200pt; }
 .cover-note {
   position: absolute; left: 316pt; bottom: 30pt;
@@ -488,7 +496,7 @@ ${bulletDotCss(".benefit .dot")}
 .benefit b { font-weight: ${WT.bold}; color: #4a4a4a; }
 .benefits-note { font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; color: #a7a9ac; margin-top: 8pt; }
 .deploy { margin-top: 16pt; display: flex; justify-content: center; }
-.deploy img { max-width: 100%; max-height: 320pt; object-fit: contain; }
+.deploy img { width: 100%; height: auto; max-height: 320pt; object-fit: contain; }
 /* per-model p2 shares the page with the full feature list; the diagram
    centres in whatever vertical space that list leaves, so every model
    lands balanced regardless of how many features it has */
@@ -560,7 +568,8 @@ ${bulletDotCss(".benefit .dot")}
   border: 0.5pt solid #d9d9d9; display: flex; align-items: center;
   justify-content: center; height: 200pt;
 }
-.ant-plot img { max-width: 100%; max-height: 190pt; object-fit: contain; }
+/* .ant-plot is a fixed 200pt box, so the image fills it outright. */
+.ant-plot img { width: 100%; height: 100%; object-fit: contain; }
 .ant-ph { width: 100%; height: 100%; border: none; background: transparent; font-size: ${PT.tableSm}pt; }
 
 /* ── footer ────────────────────────────────────────────────────────── */
