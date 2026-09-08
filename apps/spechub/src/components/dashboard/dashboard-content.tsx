@@ -23,10 +23,8 @@ import { Columns2, FileText, History, Languages, Swords } from "lucide-react";
 import type { ProductLine } from "@eg/db/types";
 import { can, type Role } from "@eg/auth/permissions";
 import { usesTwoHardwareImages } from "@/lib/datasheet/qr";
-import {
-  LineCoverButton,
-  COVER_PHOTO_CATEGORIES,
-} from "@/components/dashboard/line-cover-button";
+import { LineCoverButton } from "@/components/dashboard/line-cover-button";
+import { COVER_PHOTO_CATEGORIES } from "@/lib/datasheet/cover-photo";
 import { hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 
 interface ProductSummary {

@@ -3,6 +3,7 @@ import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
+import { COVER_PHOTO_POLICIES } from "@/lib/datasheet/cover-photo";
 import { PT, WT } from "@/lib/datasheet/scale";
 import type { ProductLine } from "@eg/db/types";
 import type { SeriesFeatureGroup, SeriesSpecsData } from "@/lib/google/sheets-extra";
@@ -333,16 +334,14 @@ body {
   background: transparent; border: none; color: rgba(255,255,255,0.55);
   align-items: flex-end; padding: 8pt; justify-content: flex-start;
 }
-/* A floor under the title column, then a release — same shape as layout B,
-   different break points because this title runs 410pt wide against B's
-   272pt of copy. The old 0.38 → 0.12 → 0 ramp assumed a photo that is dark
-   on the right; the data-centre shot people actually upload is dark on
-   average but carries bright vertical LED strips straight through the
-   title, and 0.12 does not cover them. 24pt Medium survived it better than
-   B's body copy did, but "E5 Series" at 17pt did not. */
+/* Shared with the upload checker — see lib/datasheet/cover-photo.ts.
+   Layout D's floor is LOWER than layout B's, and that is a rule rather than
+   a preference: the smallest type on this cover is 17pt, which is large
+   text and needs 3:1, where B carries 10pt running copy needing 4.5:1.
+   Crushing this one to B's floor would hide the photograph for no gain. */
 .hero-scrim {
   position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.66) 46%, rgba(0,0,0,0.26) 72%, rgba(0,0,0,0.10) 100%);
+  background: ${COVER_PHOTO_POLICIES.edgeAi.scrim};
 }
 /* metrics traced from the DS_Orin Box draft: title x=34pt (we keep the
    36pt page margin), second line runs to x=400pt → give it 396pt so

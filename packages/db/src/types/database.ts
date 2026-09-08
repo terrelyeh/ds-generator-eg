@@ -68,6 +68,12 @@ export interface Database {
            * its solid backdrop.
            */
           cover_hero_image: string | null;
+          /**
+           * Uploaded cover-photo candidates (max 3); cover_hero_image names
+           * the active one. The layouts read only the active one, so this
+           * array never reaches the print path.
+           */
+          cover_hero_options: string[];
           solution: string;
           solution_id: string;
           last_synced_at: string | null;
