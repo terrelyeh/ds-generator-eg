@@ -333,10 +333,16 @@ body {
   background: transparent; border: none; color: rgba(255,255,255,0.55);
   align-items: flex-end; padding: 8pt; justify-content: flex-start;
 }
-/* subtle darkening so the white title stays readable on bright photos */
+/* A floor under the title column, then a release — same shape as layout B,
+   different break points because this title runs 410pt wide against B's
+   272pt of copy. The old 0.38 → 0.12 → 0 ramp assumed a photo that is dark
+   on the right; the data-centre shot people actually upload is dark on
+   average but carries bright vertical LED strips straight through the
+   title, and 0.12 does not cover them. 24pt Medium survived it better than
+   B's body copy did, but "E5 Series" at 17pt did not. */
 .hero-scrim {
   position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,0.38) 0%, rgba(0,0,0,0.12) 55%, rgba(0,0,0,0) 100%);
+  background: linear-gradient(90deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.66) 46%, rgba(0,0,0,0.26) 72%, rgba(0,0,0,0.10) 100%);
 }
 /* metrics traced from the DS_Orin Box draft: title x=34pt (we keep the
    36pt page margin), second line runs to x=400pt → give it 396pt so

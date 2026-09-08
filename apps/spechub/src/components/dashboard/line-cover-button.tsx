@@ -96,7 +96,37 @@ export function LineCoverButton({
   }
 
   return (
-    <span className="inline-flex items-center gap-1">
+    <span className="group relative inline-flex items-center gap-1">
+      {/* Hover preview. The button's thumbnail is 5x3.5pt — enough to say
+          "there is one", not enough to say WHICH one, and the only other way
+          to look was to open the datasheet. Rendered on hover rather than
+          behind a click because checking the photo is something people do
+          while doing something else. */}
+      {effective && (
+        <span className="pointer-events-none absolute left-0 top-full z-50 mt-1.5 hidden group-hover:block">
+          <span className="pointer-events-auto block rounded-md border border-border bg-popover p-1.5 shadow-lg">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={effective}
+              alt={`${line.label} cover photo`}
+              className="block h-auto w-[280px] rounded-[3px] object-contain"
+            />
+            <span className="mt-1.5 flex items-center justify-between gap-3 px-0.5">
+              <span className="text-[10px] text-muted-foreground">
+                {source === "uploaded" ? "已上傳" : "Drive 同步"}
+              </span>
+              <a
+                href={effective}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] font-medium text-engenius-blue hover:underline"
+              >
+                開原圖 ↗
+              </a>
+            </span>
+          </span>
+        </span>
+      )}
       <input
         ref={inputRef}
         type="file"
