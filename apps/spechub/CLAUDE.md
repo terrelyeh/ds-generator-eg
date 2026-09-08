@@ -187,10 +187,14 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
   ⚠️ **`font_family` 是「內文字體」,不是全部** —— 四種版型的標題（封面主標/副標/型號、
   頁首分類、所有段落標）一律 **Manrope**,寫死在元件裡（`displayFontStack()`）;
   設定頁改的是內文 Roboto。CJK 語系兩條 stack 都會把語系字型放最前面（pitfall #64）。
+- **datasheet 版型的主色不是這裡的 Cloud 藍** —— `#03a9f4` 是**後台 UI** 的品牌色。
+  出圖的四種版型各有自己的一組（A 走 `getTheme()` 的四色;B/D 自 2026-09-08 起同為
+  **`#09909d`**;C 鋼藍）。改版型顏色請看下方 UI Layout Conventions。
 - **datasheet 的版型／字級規範頁、logo 換檔、Cloud 封面置中的機制** →
   [`docs/brand-and-visual.md`](docs/brand-and-visual.md)。要動 PDF 的視覺之前先讀，
-  裡面有三件會靜靜過期的事：規範頁是**產生**的不能手改、CJK 那張表的值在 DB 所以要跑
-  漂移偵測、以及封面置中的數字綁死某一顆圖示的尺寸。
+  裡面有四件會靜靜過期的事：規範頁是**產生**的不能手改、**它的字級字重是讀原始碼但
+  顏色是手抄的**（改色要同時改 `build-type-spec.py` 並重跑,沒有護欄會抓）、
+  CJK 那張表的值在 DB 所以要跑漂移偵測、以及封面置中的數字綁死某一顆圖示的尺寸。
 
 ## Database Tables
 
@@ -239,7 +243,7 @@ auth.users → profiles ← email_whitelist.invited_by
   可以重疊;**新增會跨產品共用的狀態時要問「並行下會不會做兩次」**（pitfall #75）
 - **PDF gen UX**: 兩條路徑都用 `toast.loading` → `toast.success` + `Open PDF` action button（pitfall #47）
 
-### UI Layout Conventions
+### Dashboard UI Conventions
 
 - **Dashboard 兩行 toolbar**: Row 1 = product line tabs；Row 2 = Active toggle | Compare
   Changelog Translations | Sync + Lang column 顯示已啟用語言 badges
@@ -249,19 +253,16 @@ auth.users → profiles ← email_whitelist.invited_by
   「soon」佔位之前**（在元件內依 `product_line_count` 推導,不是 `sort_order`——
   這樣新線一上就自動上移）
 - **Datasheet 版型 = 4 個結構元件 + 標準版型的 4 種配色**（不是「6 種變體」）：
-  A 標準 `preview/[model]/page.tsx`（Cloud 藍 / 灰 / Transceiver 綠 / Station 鋼藍,
-  只有 `getTheme()` 換色）、B `datacenter-preview.tsx`、C `broadband-preview.tsx`
-  （單機+系列共用）、D `edge-ai-series-preview.tsx`（**寫死 en,不支援多語系**）。
-  **四種版型共用一套字級刻度**(`lib/datasheet/scale.ts`)與一條字體規則:
-  標題 Manrope、內文 Roboto、條列圓點是 CSS 畫的 `0.5em` 圓(不是字元 —— 打字元會讓
-  圓點大小變成「字型的屬性」而不是設計的屬性,英文曾經只有中日文的 48%)。
-  **B 與 D 的封面是照片**（滿版 scene + scrim）,圖存 `product_lines.cover_hero_image`,
-  從 dashboard 產線工具列的 **Cover Photo** 上傳（`/api/line-cover`）。
-  ⚠️ **sync 永遠不寫這個欄位** —— Orin Box 另有 Drive 的 `series_hero.png`,
-  但 sync 是**整包替換** `line_datasheets.images`,上傳的圖放那裡會被靜靜洗掉。
-  版型讀取順序是「上傳優先、Drive 次之」。沒有照片會退回純色底,**只有 D 會擋 PDF**。
-  **每一種的字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
-  （站上免登入可看,字級以真實 pt 排出）。新增產品線見
+  A 標準 `preview/[model]/page.tsx`、B `datacenter-preview.tsx`、
+  C `broadband-preview.tsx`（單機+系列共用）、D `edge-ai-series-preview.tsx`。
+  四種共用一套字級刻度（`lib/datasheet/scale.ts`）。**B/D 的封面是照片**，
+  可在 dashboard 產線工具列的 **Cover Photo** 面板管理（最多 3 張候選）。
+  ⚠️ **動版型顏色、scrim、封面照機制之前先讀
+  [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md) 的「版型元件與封面照」**
+  —— 那裡有三件會咬人的事：sync 會整包洗掉 Drive 的 images、scrim 的下限是由
+  最小字級決定的規則、以及規範頁的顏色是手抄的。
+  **字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
+  （站上免登入可看）。新增產品線見
   [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
 
 ## Current Status

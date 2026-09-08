@@ -78,14 +78,21 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **依產品線 5 種版型變體**：
   - **Cloud 藍色**（預設）/ Unmanaged·Extender **灰色**
   - **Transceiver 綠色**（Accessories）— 封面照片置中 + Overview 滿版、**無 Hardware 頁**、QR 指向 **Contact Us**（無 QSG）
-  - **Data Center**（Edge Network Appliance / AI Server）— 照片 hero 封面 + 8 個賣點區塊、
+  - **Data Center 青色 `#09909d`**（Edge Network Appliance / AI Server）— 照片 hero 封面 + 8 個賣點區塊、
     全系列共用的 EDCC 管理平台頁、全寬單機規格表（自動分頁）、Hardware Overview 最多 2 張圖、Contact Us QR。
     封面賣點文案可由 Google Sheet 的 `DS Feature Groups` 列維護（「標籤 | 標題: + 說明」格式）
   - **Broadband 鋼藍**（Broadband Outdoor）— 封面主視覺 + Features & Benefits + 部署應用圖、
     Product Views、Antenna Patterns。**同一套組件同時產「單機」與「整系列」兩種 datasheet**，
     共用同一份線層文案所以不會走鐘；系列版另有跨機型比較表
-  - **Edge AI**（Edge AI Box）— **只出整系列一份**：封面 + 軟體架構頁 + 人工整理的比較表 +
+  - **Edge AI 青色 `#09909d`**（Edge AI Box，與 Data Center 同一個主色）— **只出整系列一份**：封面 + 軟體架構頁 + 人工整理的比較表 +
     各變體 Hardware Overview
+- **封面照管理**（Data Center 與 Edge AI Box 兩種版型）— 這兩種版型的封面是滿版照片。
+  在 Dashboard 產品線工具列的 **Cover Photo** 面板可以：
+  - 上傳最多 **3 張候選**，點縮圖即可切換哪一張印出去（不必刪掉舊的才能看新的）
+  - 移除候選（會一併刪掉檔案，所以會先確認）、開原圖、看目前用的是上傳的還是 Drive 同步的
+  - 上傳後系統會量文字區的亮度，太亮會**提醒**（不會擋）——照片標題壓在左側，
+    所以**主體放左邊、右側留白**給產品渲染圖的構圖最合適
+  - 沒有照片時封面會印純色底，datasheet 照常產出（Edge AI 系列版除外，它本來就要求封面照）
 - **Regenerate**（覆蓋當前版本）vs **New Version**（版本 +1）
 - Preview toolbar + Model page 都有相同的版本控制
 - **Drive 自動建資料夾** — 第一次產 zh / ja PDF 時自動建立 `Cloud Camera_zh` / `Cloud Camera_ja` 等 sibling 資料夾（PM 不需要事先手動建）
