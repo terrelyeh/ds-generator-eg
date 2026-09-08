@@ -17,10 +17,10 @@ src/
     auth/                              # Google OAuth flow（與 engenie 各持一份）
     (print)/                           # ✅ 帶 bypass header 可 headless 抓
       preview/[model]/page.tsx         # Per-model datasheet（?lang=ja&mode=full&toolbar=false）
-        ├ datacenter-preview.tsx       #   Data Center navy 變體
+        ├ datacenter-preview.tsx       #   Data Center 變體
         └ broadband-preview.tsx        #   Broadband 鋼藍，per-model + series 雙 scope
       preview/series/[line]/page.tsx   # Series datasheet，依 category 分派
-        └ edge-ai-series-preview.tsx   #   Edge AI teal（series only）
+        └ edge-ai-series-preview.tsx   #   Edge AI（series only）
     api/
       sync/route.ts                    # Sheets → Supabase sync + 觸發 EnGenie re-index
       generate-pdf/route.ts            # Puppeteer PDF + lock；?model= 或 ?line=（series）

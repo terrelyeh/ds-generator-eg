@@ -38,8 +38,8 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 **6 個 solution 上線**：**Cloud**（9 條線,含 **Cloud PDU**——ECP 四台,預設藍、
 無天線頁、保留 QSG QR）、**Accessories ▸ Transceiver**（綠色、
 無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network Appliance + AI Server**
-（navy 專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
-與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,整系列一份）、
+（專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
+與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（`ds_scope='series'`,整系列一份）、
 **Station Outdoor ▸ Station AP**（鋼藍 navy;Contact-Us QR;**只是 `getTheme()` 一組配色,
 不是新組件**——參考稿量測後就是 Cloud 骨架換色）。
 **Broadband / Data Center / Edge AI 三種自訂版型都吃 `?lang=`**（ja/zh-TW 走

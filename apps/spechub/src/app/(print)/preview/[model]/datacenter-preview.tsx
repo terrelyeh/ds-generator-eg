@@ -16,7 +16,7 @@ import type {
  * "EnGenius-Data-Center-Servers_v1.0" reference PDF (2-in-1 design adapted
  * to per-model per the 2026-07-23 decisions):
  *
- *   1. Cover — navy hero (white headline + YELLOW model + overview +
+ *   1. Cover — photo hero (white headline + YELLOW model + overview +
  *      product shot; no interior photo) + chip-style grouped features
  *      (products.ds_features; falls back to flat features)
  *   2. EDCC — shared management-platform page (static asset rendered from
@@ -31,8 +31,42 @@ import type {
  *   Appliance / AI Server). EN-only for now.
  */
 
-const NAVY = "#16355c";
-const BLUE = "#0073bf";
+/**
+ * One primary, not two. The layout used to carry a navy (#16355c) and a
+ * blue (#0073bf) because the cover hero was a four-stop gradient that
+ * needed both ends. The hero is a photograph now, so the gradient — and
+ * the reason for a second blue — is gone. Shared with layout D (Edge AI),
+ * which is the point: the three lines that share the EDCC story now share
+ * a colour.
+ */
+const PRIMARY = "#09909d";
+
+/**
+ * Cover-hero backdrop while no photograph is set — and the colour the
+ * photo is composited over, so a PNG with alpha never shows white.
+ *
+ * NOT flat PRIMARY. The hero carries white body copy at ~8pt, which lands
+ * at 3.8:1 on PRIMARY; this is the same hue two-thirds darker, so the
+ * overview reads at 11.8:1 the way it did on the old navy gradient.
+ * Layout D solves the same problem with a neutral #3a3f42.
+ */
+const HERO_FALLBACK = "#043e44";
+
+/**
+ * Shared by BOTH Data Center lines (5 models) — the cover is a data-centre
+ * scene, not a per-model shot, so one file serves all of them and no PM
+ * has to supply five. Drop the file at public/datacenter/cover-hero.jpg
+ * and set this to "/datacenter/cover-hero.jpg".
+ *
+ * null until then, deliberately: a path to a file that is not there
+ * renders a broken-image glyph over the backdrop, which looks like a bug
+ * rather than like artwork that has not arrived. Missing photo is NOT
+ * gated in canGenerate — unlike layout D, these five models already ship
+ * PDFs and a colour cover is a fine thing to print.
+ */
+const HERO_PHOTO: string | null = null;
+
+/** Cover model name. Reads on the photo and on HERO_FALLBACK alike. */
 const YELLOW = "#f4d768";
 
 /**
@@ -334,7 +368,7 @@ body {
 }
 
 /* slim navy strip on continuation pages */
-.top-bar { background: ${NAVY}; height: 21.4pt; width: 100%; }
+.top-bar { background: ${PRIMARY}; height: 21.4pt; width: 100%; }
 
 /* Body face, not display — a folio is not a heading, and this layout was
    the only one setting one in Manrope. Weight 200 doesn't exist in Roboto;
@@ -350,7 +384,7 @@ body {
    headline — smaller type needs a touch more weight to match. */
 .section-title {
   font-family: ${displayFont}; font-weight: ${WT.semi};
-  font-size: ${PT.lead}pt; color: ${BLUE};
+  font-size: ${PT.lead}pt; color: ${PRIMARY};
 }
 
 .img-placeholder {
@@ -367,7 +401,7 @@ body {
    below the hero's centre. */
 .cover-header {
   position: absolute; top: 0; left: 0; right: 0; height: 100pt;
-  background: ${BLUE};
+  background: ${PRIMARY};
 }
 .cover-header .logo-img {
   position: absolute; left: 36pt; top: 50%; transform: translateY(-50%); height: 27pt;
@@ -382,10 +416,26 @@ body {
    3-line headline collide with the model line. */
 .hero {
   position: absolute; top: 100pt; left: 0; right: 0; height: ${HERO_HEIGHT}pt;
-  background: linear-gradient(118deg, #10294a 0%, ${NAVY} 40%, #1c4d84 74%, ${BLUE} 122%);
+  background: ${HERO_FALLBACK};
   overflow: hidden;
   padding: ${HERO_PAD_TOP}pt 20pt ${HERO_PAD_BOTTOM}pt 36pt;
 }
+.hero-bg {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: cover; object-position: center;
+}
+/* Darkens the whole frame, hardest on the left. Layout D fades to fully
+   clear on the right because its photo is dark there; this one keeps 22%
+   across the render column, because a light 1U chassis has to hold its
+   edge against whatever the photograph is doing behind it. Re-check this
+   against the actual file — a scrim is fitted to a photo, not derived. */
+.hero-scrim {
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.34) 50%, rgba(0,0,0,0.22) 100%);
+}
+/* The copy and the render are in normal flow; the backdrop is not. Lift
+   them over it explicitly rather than relying on paint order. */
+.hero-headline, .hero-lower { position: relative; z-index: 2; }
 /* Headline + model carry weight; the overview stays light so the
    hierarchy still reads (all-bold would flatten the block). */
 .hero-headline {
@@ -437,7 +487,7 @@ body {
   align-content: space-between;
 }
 .feature-chip {
-  display: inline-block; background: ${BLUE}; color: white;
+  display: inline-block; background: ${PRIMARY}; color: white;
   font-weight: ${WT.medium}; font-size: ${PT.table}pt; padding: 1.5pt 7pt; margin-bottom: 4pt;
 }
 .feature-title {
@@ -455,7 +505,7 @@ body {
   display: flex; align-items: baseline; gap: 5pt; break-inside: avoid;
   font-size: ${PT.table}pt; color: #525355; line-height: 1.55; margin-bottom: 5pt;
 }
-${bulletDotCss(".flat-bullet .dot", BLUE)}
+${bulletDotCss(".flat-bullet .dot", PRIMARY)}
 
 /* ── EDCC shared page ──────────────────────────────────────────────── */
 /* Copy is LIVE TEXT (crisp at any zoom, editable); only the product
@@ -470,7 +520,7 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
 .edcc-features {
   display: grid; grid-template-columns: 1fr 1fr; gap: 16pt 26pt; margin-top: 22pt;
 }
-.edcc-feature { border-left: 2pt solid ${BLUE}; padding-left: 8pt; }
+.edcc-feature { border-left: 2pt solid ${PRIMARY}; padding-left: 8pt; }
 .edcc-feature-title {
   font-size: ${PT.bodyMd}pt; font-weight: ${WT.regular}; color: #231f20; margin-bottom: 3pt;
 }
@@ -488,8 +538,8 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
   padding: 4.5pt 8pt; text-align: left;
 }
 .specs-band th {
-  background: ${BLUE}; color: white; font-weight: ${WT.regular}; font-size: ${PT.table}pt;
-  text-align: center; padding: 5pt; border-color: ${BLUE};
+  background: ${PRIMARY}; color: white; font-weight: ${WT.regular}; font-size: ${PT.table}pt;
+  text-align: center; padding: 5pt; border-color: ${PRIMARY};
 }
 .model-name-row td { background: #6d6e71; color: white; font-size: ${PT.table}pt; }
 .model-number-row td { background: #939598; color: white; font-size: ${PT.table}pt; }
@@ -541,6 +591,13 @@ ${bulletDotCss(".flat-bullet .dot", BLUE)}
           <span className="solution-label">Data Center Solution</span>
         </div>
         <div className="hero">
+          {HERO_PHOTO && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img className="hero-bg" src={HERO_PHOTO} alt="" />
+              <div className="hero-scrim" />
+            </>
+          )}
           {/* The resolved values, not the raw columns: `heroHeadline` and
               `overview` above already fall back per field, and the size
               ladder below is fitted to THEM. Reading product.* here printed

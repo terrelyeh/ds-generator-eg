@@ -131,9 +131,9 @@ defines slots — missing plots show placeholders, same as Product Views.
 | **Cloud (default)** | APs, Switches, Cameras, NVS, Firewalls… | blue `#03a9f4`; two-column cover; spec pages; Hardware Overview + footer |
 | **Gray** | Unmanaged Switches, Extenders | as above, `#58595B` |
 | **Transceiver** | Transceivers | green `#2F855A`; `tx-cover` (image centred, overview full-width); **no hardware page** (footer moves to the last spec page); Contact-Us QR; list drops HW column, Model Name → Description |
-| **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; navy hero + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
+| **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; photo hero (`HERO_PHOTO`, shared by both lines) + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
 | **Broadband** | Broadband APs | `preview/[model]/broadband-preview.tsx`, steel `#1e6796`; renders BOTH scopes (see §5); cover hero art, Features & Benefits, spec table (single or comparison), Product Views, Antenna Patterns |
-| **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, teal `#86c9cf`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
+| **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, `#09909d`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
 | **Station** | Station APs | steel navy `#3a4d78` (band `#445c88`, features box `#f0f2f6`, spec labels `#555e6e`) — a `getTheme()` entry, NOT a component: the v1.3 InDesign reference is the Cloud skeleton recolored. Contact-Us QR; antenna page |
 
 Cloud/gray/transceiver/station live in `preview/[model]/page.tsx` (`getTheme` +
@@ -265,9 +265,9 @@ plus one entry there — content loading, generation and versioning are shared.
 | Solution ▸ Line | Models | Notes |
 |---|---|---|
 | **Accessories ▸ Transceiver** | 13 SFP/QSFP/DAC | green, no hardware page, Contact-Us QR |
-| **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | teal SERIES datasheet, `ds_scope='series'`; `series_*` images pending |
-| **Data Center ▸ Edge Network Appliance** | SE110, SE210 | navy variant |
-| **Data Center ▸ AI Server** | S41, S21, S11 | navy variant; S21/S11 images pending |
+| **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | SERIES datasheet, `ds_scope='series'`; `series_*` images pending |
+| **Data Center ▸ Edge Network Appliance** | SE110, SE210 | Data Center variant |
+| **Data Center ▸ AI Server** | S41, S21, S11 | Data Center variant; S21/S11 images pending |
 | **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel, `ds_scope='both'`; ja translated (Draft); images pending |
 | **Cloud ▸ Cloud PDU** | ECP106/214, ECP106-INT/212-INT | default blue, no antenna page, keeps the QSG QR; images pending |
 | **Station Outdoor ▸ Station AP** | ENH500-AX, EnStation6, ENS621EXT | steel navy; Contact-Us QR; ENH500-AX/EnStation6 plot `Port1/Port2`, ENS621EXT `2.4G/5G`; images pending |

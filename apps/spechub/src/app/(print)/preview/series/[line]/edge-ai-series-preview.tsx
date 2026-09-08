@@ -25,7 +25,14 @@ import type { SeriesImages } from "@/lib/google/drive-images";
  * table, `syncSeriesImages` the artwork.
  */
 
-const TEAL = "#86c9cf";
+/**
+ * Shared Data Center / Edge AI primary. Was #86c9cf, a pale teal that put
+ * white spec-table headers at 1.86:1 — the text was legible only because
+ * readers already knew what it said. This step is dark enough (3.8:1) to
+ * carry white type, and it is the SAME value layout B uses, so the three
+ * lines that share the EDCC story now share a colour too.
+ */
+const TEAL = "#09909d";
 
 /**
  * Where the cover's two lower columns start.
