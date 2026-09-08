@@ -2,6 +2,39 @@
 
 > Extracted from CLAUDE.md 2026-06-09 to keep CLAUDE.md scannable. Read when touching PDF generation, cover/spec layout (lib/datasheet/), or translated datasheets.
 
+### 版型元件與封面照
+
+> 從 CLAUDE.md 移入 2026-09-08。
+
+- **Datasheet 版型 = 4 個結構元件 + 標準版型的 4 種配色**（不是「6 種變體」）：
+  A 標準 `preview/[model]/page.tsx`（Cloud 藍 / 灰 / Transceiver 綠 / Station 鋼藍,
+  只有 `getTheme()` 換色）、B `datacenter-preview.tsx`、C `broadband-preview.tsx`
+  （單機+系列共用）、D `edge-ai-series-preview.tsx`（**寫死 en,不支援多語系**）。
+  **四種版型共用一套字級刻度**(`lib/datasheet/scale.ts`)與一條字體規則:
+  標題 Manrope、內文 Roboto、條列圓點是 CSS 畫的 `0.5em` 圓(不是字元 —— 打字元會讓
+  圓點大小變成「字型的屬性」而不是設計的屬性,英文曾經只有中日文的 48%)。
+  **B/D 的主色與 Edge AI 同為 `#09909d`**（2026-09-08 三條線收斂成一個主色;
+  ⚠️ 規範頁的**顏色是手抄的** —— 改色要同時改 `scripts/design/build-type-spec.py`
+  並重跑產生器,沒有任何護欄會抓到這個漂移。細節見
+  [`brand-and-visual.md`](brand-and-visual.md)）。
+- **B 與 D 的封面是照片**（滿版 scene + scrim）。候選清單存
+  `product_lines.cover_hero_options`（上限 3）,`cover_hero_image` 指**使用中**那張
+  —— 版型只讀後者,所以列印路徑不受清單影響。從 dashboard 產線工具列的
+  **Cover Photo** 面板上傳／切換／移除（`/api/line-cover`）。
+  ⚠️ **sync 永遠不寫這兩個欄位** —— Orin Box 另有 Drive 的 `series_hero.png`,
+  但 sync 是**整包替換** `line_datasheets.images`,上傳的圖放那裡會被靜靜洗掉。
+  版型讀取順序是「上傳優先、Drive 次之」。沒有照片會退回純色底,**只有 D 會擋 PDF**。
+  **移除會連 Storage 檔案一起刪**（有 confirm;上限 3 張,被刪的通常是唯一一份）。
+  ⚠️ **scrim 的定義在 `lib/datasheet/cover-photo.ts`,不在元件裡** —— 上傳檢查器
+  要合成**同一組值**才能判斷照片撐不撐得住,各寫各的話檢查器會在第一次有人動漸層時
+  變成「看起來很合理的謊言」。**兩個版型的下限不同是規則不是調參:由壓在照片上的
+  最小字級決定**（B 有 10pt 內文 → 4.5:1 → 0.72;D 最小 17pt 屬大字 → 3:1 → 0.52）。
+  上傳時 `sharp` 會量文字區、超標**提醒但不擋**——量測不該否決設計者。
+  現有三張封面照是 **`genimg` 產的 AI 圖**（構圖規則:主體在左、右側留白給產品渲染圖）。
+  **每一種的字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
+  （站上免登入可看,字級以真實 pt 排出）。新增產品線見
+  [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
+
 ### PDF Generation
 
 - **Regenerate**（預設）：覆蓋當前版本 PDF，更新 versions 表同一筆記錄
