@@ -424,14 +424,22 @@ body {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: center;
 }
-/* Darkens the whole frame, hardest on the left. Layout D fades to fully
-   clear on the right because its photo is dark there; this one keeps 22%
-   across the render column, because a light 1U chassis has to hold its
-   edge against whatever the photograph is doing behind it. Re-check this
-   against the actual file — a scrim is fitted to a photo, not derived. */
+/* A FLOOR under the copy column, then a release — not a smooth ramp.
+   The first version eased from 0.55 to 0.22 across the whole width, which
+   is fine on average and wrong where it matters: the copy column landed on
+   the vertical LED strip of a server rack, where the ramp had already
+   decayed to ~0.4 and the body copy dissolved into the blinking. Measuring
+   the region hid it — mean luminance said white text sat at 18:1, because
+   the bright pixels are a few narrow bands and the average drowns them.
+
+   So the first two stops hold nearly flat to 42%, which covers hero-copy's
+   272pt, and only then does it fall away for the render column. That keeps
+   this robust against the NEXT photograph too: a smooth ramp has to be
+   re-tuned per image, a floor does not. 16% at the right edge still gives a
+   light 1U chassis something to hold its edge against. */
 .hero-scrim {
   position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.34) 50%, rgba(0,0,0,0.22) 100%);
+  background: linear-gradient(90deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.68) 42%, rgba(0,0,0,0.30) 68%, rgba(0,0,0,0.16) 100%);
 }
 /* The copy and the render are in normal flow; the backdrop is not. Lift
    them over it explicitly rather than relying on paint order. */
@@ -452,8 +460,12 @@ body {
 /* Body copy, so the body face — this was the one place a layout set
    running text in the display face. See BODY_WIDTH_FACTOR: the cover's
    line estimate is face-specific and was re-measured for Roboto. */
+/* Regular, not Light. This is the only running copy in any layout set on a
+   photograph, and 300 at 10pt is the thinnest thing the scale offers — its
+   strokes lose to the rack LEDs behind them in a way the 24pt headline
+   never does. On a flat colour Light was fine; that is what changed. */
 .hero-overview {
-  font-family: ${bodyFont}; font-weight: ${WT.light};
+  font-family: ${bodyFont}; font-weight: ${WT.regular};
   line-height: ${OVERVIEW_LINE_HEIGHT}; color: rgba(255,255,255,0.95);
 }
 /* Wide render column; flat 1U units fill the width, taller chassis the
