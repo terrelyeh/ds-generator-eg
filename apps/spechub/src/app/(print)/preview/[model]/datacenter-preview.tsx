@@ -3,6 +3,7 @@ import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { cjkFontFor, displayFontStack } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
+import { COVER_PHOTO_POLICIES } from "@/lib/datasheet/cover-photo";
 import { PT, WT, LADDER } from "@/lib/datasheet/scale";
 import type {
   Product,
@@ -424,22 +425,16 @@ body {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover; object-position: center;
 }
-/* A FLOOR under the copy column, then a release — not a smooth ramp.
-   The first version eased from 0.55 to 0.22 across the whole width, which
-   is fine on average and wrong where it matters: the copy column landed on
-   the vertical LED strip of a server rack, where the ramp had already
-   decayed to ~0.4 and the body copy dissolved into the blinking. Measuring
-   the region hid it — mean luminance said white text sat at 18:1, because
-   the bright pixels are a few narrow bands and the average drowns them.
-
-   So the first two stops hold nearly flat to 42%, which covers hero-copy's
-   272pt, and only then does it fall away for the render column. That keeps
-   this robust against the NEXT photograph too: a smooth ramp has to be
-   re-tuned per image, a floor does not. 16% at the right edge still gives a
-   light 1U chassis something to hold its edge against. */
+/* The scrim is defined in lib/datasheet/cover-photo.ts, not here, because
+   the upload checker composites the SAME value to decide whether a photo
+   will carry white type. When each side carried its own numbers the checker
+   was a plausible-looking lie the first time anyone touched a gradient.
+   Layout B's floor is the higher of the two: it is the only cover in any
+   layout with 10pt running copy on the image. See that file for why a floor
+   and not a ramp. */
 .hero-scrim {
   position: absolute; inset: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,0.74) 0%, rgba(0,0,0,0.68) 42%, rgba(0,0,0,0.30) 68%, rgba(0,0,0,0.16) 100%);
+  background: ${COVER_PHOTO_POLICIES.datacenter.scrim};
 }
 /* The copy and the render are in normal flow; the backdrop is not. Lift
    them over it explicitly rather than relying on paint order. */
