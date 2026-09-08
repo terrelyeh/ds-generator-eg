@@ -25,7 +25,14 @@ import type { SeriesImages } from "@/lib/google/drive-images";
  * table, `syncSeriesImages` the artwork.
  */
 
-const TEAL = "#86c9cf";
+/**
+ * Shared Data Center / Edge AI primary. Was #86c9cf, a pale teal that put
+ * white spec-table headers at 1.86:1 — the text was legible only because
+ * readers already knew what it said. This step is dark enough (3.8:1) to
+ * carry white type, and it is the SAME value layout B uses, so the three
+ * lines that share the EDCC story now share a colour too.
+ */
+const TEAL = "#09909d";
 
 /**
  * Where the cover's two lower columns start.
@@ -133,7 +140,12 @@ export function EdgeAiSeriesPreview({
           .map((i) => ({ label: i.label, values: [i.value] })),
       );
   const images: SeriesImages = {
-    hero: ld.images?.hero ?? null,
+    // Upload first, Drive second. product_lines.cover_hero_image is set by
+    // the line-cover uploader and never touched by sync; images.hero is the
+    // reverse. Preferring the upload means the button in the dashboard is
+    // the thing that visibly wins, while a PM who still drops
+    // series_hero.png into Drive keeps the workflow they had.
+    hero: pl.cover_hero_image ?? ld.images?.hero ?? null,
     cover_product: ld.images?.cover_product ?? null,
     architecture: ld.images?.architecture ?? null,
     hw_pages: ld.images?.hw_pages ?? [],

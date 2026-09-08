@@ -23,6 +23,10 @@ import { Columns2, FileText, History, Languages, Swords } from "lucide-react";
 import type { ProductLine } from "@eg/db/types";
 import { can, type Role } from "@eg/auth/permissions";
 import { usesTwoHardwareImages } from "@/lib/datasheet/qr";
+import {
+  LineCoverButton,
+  COVER_PHOTO_CATEGORIES,
+} from "@/components/dashboard/line-cover-button";
 import { hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 
 interface ProductSummary {
@@ -351,12 +355,19 @@ export function DashboardContent({
   initialLineId,
   role,
   battlecardLines = [],
-}: DashboardContentProps & { initialLineId?: string; battlecardLines?: string[] }) {
+  driveHeroByLine = {},
+}: DashboardContentProps & {
+  initialLineId?: string;
+  battlecardLines?: string[];
+  /** product_line_id → line_datasheets.images.hero */
+  driveHeroByLine?: Record<string, string | null>;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const canSync = can(role, "sync.run");
   const canEditTranslations = can(role, "translation.edit");
   const canViewBattlecard = can(role, "battlecard.view");
+  const canUploadImage = can(role, "product.upload_image");
   // Default to "All" — matches PM expectation that the dashboard starts
   // as a full overview; they opt into "Active only" when they want to
   // hide Upcoming / Pending noise.
@@ -632,6 +643,17 @@ export function DashboardContent({
               Series Datasheet
             </a>
           )}
+          {/* Cover photo — only the two layouts that draw one. Sits with the
+              line-level actions because it belongs to the LINE, not to any
+              model: one data-centre scene serves all of them. */}
+          {canUploadImage &&
+            activeLine &&
+            COVER_PHOTO_CATEGORIES.has(activeLine.category) && (
+              <LineCoverButton
+                line={activeLine}
+                driveHero={driveHeroByLine[activeLine.id]}
+              />
+            )}
           {canViewBattlecard && battlecardLines.includes(activeLine?.name ?? "") && (
             <Link
               href={`/battlecard/${encodeURIComponent(activeLine?.name ?? "")}`}

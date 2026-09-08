@@ -62,6 +62,12 @@ export interface Database {
           ds_overview_gid: string | null;
           /** gid of the "[For DS] Technical Specifications" tab (series comparison) */
           ds_specs_gid: string | null;
+          /**
+           * Full-bleed cover photograph for layouts B and D. Written only by
+           * /api/line-cover; sync never touches it. Null = the layout prints
+           * its solid backdrop.
+           */
+          cover_hero_image: string | null;
           solution: string;
           solution_id: string;
           last_synced_at: string | null;

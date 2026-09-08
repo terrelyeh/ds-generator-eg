@@ -131,9 +131,9 @@ defines slots — missing plots show placeholders, same as Product Views.
 | **Cloud (default)** | APs, Switches, Cameras, NVS, Firewalls… | blue `#03a9f4`; two-column cover; spec pages; Hardware Overview + footer |
 | **Gray** | Unmanaged Switches, Extenders | as above, `#58595B` |
 | **Transceiver** | Transceivers | green `#2F855A`; `tx-cover` (image centred, overview full-width); **no hardware page** (footer moves to the last spec page); Contact-Us QR; list drops HW column, Model Name → Description |
-| **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; navy hero + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
+| **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; photo hero (`HERO_PHOTO`, shared by both lines) + 8 chip features, shared EDCC page, full-width spec table, 2 hardware renders, Contact-Us QR |
 | **Broadband** | Broadband APs | `preview/[model]/broadband-preview.tsx`, steel `#1e6796`; renders BOTH scopes (see §5); cover hero art, Features & Benefits, spec table (single or comparison), Product Views, Antenna Patterns |
-| **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, teal `#86c9cf`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
+| **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, `#09909d`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
 | **Station** | Station APs | steel navy `#3a4d78` (band `#445c88`, features box `#f0f2f6`, spec labels `#555e6e`) — a `getTheme()` entry, NOT a component: the v1.3 InDesign reference is the Cloud skeleton recolored. Contact-Us QR; antenna page |
 
 Cloud/gray/transceiver/station live in `preview/[model]/page.tsx` (`getTheme` +
@@ -214,6 +214,30 @@ A `series`-scope line can add two more inputs:
 Broadband needs neither — it builds its table from per-model specs and uses
 per-model imagery.
 
+### Cover photograph (layouts B and D)
+
+Data Center and Edge AI Box open on a full-bleed scene rather than a colour
+field. That image belongs to the LINE — one data-centre serves every model —
+and is uploaded from the line's toolbar in the dashboard (**Cover Photo**,
+`product.upload_image`, PNG/JPEG/WebP ≤ 20 MB). It lands in
+`product_lines.cover_hero_image`.
+
+**Sync never writes that column**, which is the point of it. Orin Box has a
+second source — `series_hero.png` in DS Images, which sync folds into
+`line_datasheets.images.hero` — and sync REPLACES that whole jsonb whenever
+the Drive folder lists, so a photo uploaded through the UI would not survive
+there. The layouts read `cover_hero_image` first and Drive second; the button
+says which one is in effect, and clearing the upload falls back to Drive.
+
+The two Data Center lines have no Drive path at all: their `line_datasheets`
+upsert is gated on `ds_overview_gid`, and both are `ds_scope='model'` with no
+overview tab. Upload is their only route.
+
+Absent is a supported state — the cover prints its solid backdrop
+(`HERO_FALLBACK`, a dark step of the primary, because the hero carries white
+body copy). Layout D is the exception: its `canGenerate` has always required a
+hero, so Orin Box's official PDF stays blocked until one exists.
+
 Sync writes it whenever the line sets `ds_overview_gid`, **regardless of
 scope** — per-model datasheets consume it too.
 
@@ -265,9 +289,9 @@ plus one entry there — content loading, generation and versioning are shared.
 | Solution ▸ Line | Models | Notes |
 |---|---|---|
 | **Accessories ▸ Transceiver** | 13 SFP/QSFP/DAC | green, no hardware page, Contact-Us QR |
-| **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | teal SERIES datasheet, `ds_scope='series'`; `series_*` images pending |
-| **Data Center ▸ Edge Network Appliance** | SE110, SE210 | navy variant |
-| **Data Center ▸ AI Server** | S41, S21, S11 | navy variant; S21/S11 images pending |
+| **Edge AI Box ▸ Orin Box** | 6 (E5-NA08…NB16W) | SERIES datasheet, `ds_scope='series'`; `series_*` images pending |
+| **Data Center ▸ Edge Network Appliance** | SE110, SE210 | Data Center variant |
+| **Data Center ▸ AI Server** | S41, S21, S11 | Data Center variant; S21/S11 images pending |
 | **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel, `ds_scope='both'`; ja translated (Draft); images pending |
 | **Cloud ▸ Cloud PDU** | ECP106/214, ECP106-INT/212-INT | default blue, no antenna page, keeps the QSG QR; images pending |
 | **Station Outdoor ▸ Station AP** | ENH500-AX, EnStation6, ENS621EXT | steel navy; Contact-Us QR; ENH500-AX/EnStation6 plot `Port1/Port2`, ENS621EXT `2.4G/5G`; images pending |

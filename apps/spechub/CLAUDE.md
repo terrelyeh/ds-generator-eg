@@ -38,8 +38,8 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 **6 個 solution 上線**：**Cloud**（9 條線,含 **Cloud PDU**——ECP 四台,預設藍、
 無天線頁、保留 QSG QR）、**Accessories ▸ Transceiver**（綠色、
 無 hardware 頁、Contact-Us QR）、**Data Center ▸ Edge Network Appliance + AI Server**
-（navy 專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
-與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（teal;`ds_scope='series'`,整系列一份）、
+（專屬組件）、**Broadband Outdoor ▸ Broadband EOC**（鋼藍;**同時出 per-model
+與整系列兩種 datasheet**）、**Edge AI Box ▸ Orin Box**（`ds_scope='series'`,整系列一份）、
 **Station Outdoor ▸ Station AP**（鋼藍 navy;Contact-Us QR;**只是 `getTheme()` 一組配色,
 不是新組件**——參考稿量測後就是 Cloud 骨架換色）。
 **Broadband / Data Center / Edge AI 三種自訂版型都吃 `?lang=`**（ja/zh-TW 走
@@ -255,6 +255,11 @@ auth.users → profiles ← email_whitelist.invited_by
   **四種版型共用一套字級刻度**(`lib/datasheet/scale.ts`)與一條字體規則:
   標題 Manrope、內文 Roboto、條列圓點是 CSS 畫的 `0.5em` 圓(不是字元 —— 打字元會讓
   圓點大小變成「字型的屬性」而不是設計的屬性,英文曾經只有中日文的 48%)。
+  **B 與 D 的封面是照片**（滿版 scene + scrim）,圖存 `product_lines.cover_hero_image`,
+  從 dashboard 產線工具列的 **Cover Photo** 上傳（`/api/line-cover`）。
+  ⚠️ **sync 永遠不寫這個欄位** —— Orin Box 另有 Drive 的 `series_hero.png`,
+  但 sync 是**整包替換** `line_datasheets.images`,上傳的圖放那裡會被靜靜洗掉。
+  版型讀取順序是「上傳優先、Drive 次之」。沒有照片會退回純色底,**只有 D 會擋 PDF**。
   **每一種的字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
   （站上免登入可看,字級以真實 pt 排出）。新增產品線見
   [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
