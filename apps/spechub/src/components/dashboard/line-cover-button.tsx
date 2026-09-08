@@ -92,6 +92,32 @@ export function LineCoverButton({
       "已切換封面照",
     );
 
+  /**
+   * Removing drops the Storage object too, so this is the one control here
+   * that destroys something. It was a single click, on a 16px target, next
+   * to the thumbnails you click to SWITCH — and the first person to use the
+   * panel lost a photo to it. The recovery only existed because the source
+   * file happened to still be sitting in a scratch directory.
+   *
+   * window.confirm rather than a dialog component: it matches how the rest
+   * of the app asks (project-row-actions, glossary-editor), and a modal for
+   * one line of text inside a popover is more machinery than the question
+   * deserves.
+   */
+  function confirmRemove(url: string) {
+    const isActive = url === active;
+    const others = options.filter((o) => o !== url).length;
+    const consequence = isActive
+      ? others > 0
+        ? "它正在使用中，封面會改用清單裡剩下的第一張。"
+        : driveHero
+          ? "它正在使用中，封面會退回 Drive 同步的那張。"
+          : "它正在使用中，封面會變回純色底。"
+      : "";
+    if (!window.confirm(`移除這張封面照？檔案會一併刪掉，救不回來。${consequence}`)) return;
+    void remove(url);
+  }
+
   const remove = (url: string) =>
     run(
       "移除…",
@@ -179,8 +205,8 @@ export function LineCoverButton({
                     <button
                       type="button"
                       disabled={busy}
-                      onClick={() => remove(url)}
-                      title="移除這張"
+                      onClick={() => confirmRemove(url)}
+                      title="移除這張（檔案會一併刪掉）"
                       className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-black/55 text-[11px] leading-none text-white/80 transition-colors hover:bg-destructive hover:text-white disabled:opacity-50"
                     >
                       ×
