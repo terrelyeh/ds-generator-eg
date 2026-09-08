@@ -53,18 +53,16 @@ const PRIMARY = "#09909d";
 const HERO_FALLBACK = "#043e44";
 
 /**
- * Shared by BOTH Data Center lines (5 models) — the cover is a data-centre
- * scene, not a per-model shot, so one file serves all of them and no PM
- * has to supply five. Drop the file at public/datacenter/cover-hero.jpg
- * and set this to "/datacenter/cover-hero.jpg".
+ * The cover photograph comes from product_lines.cover_hero_image, uploaded
+ * per LINE (Dashboard ▸ the line's toolbar). One scene serves every model
+ * in the line — it is a data-centre, not a product shot — so no PM has to
+ * supply five of them.
  *
- * null until then, deliberately: a path to a file that is not there
- * renders a broken-image glyph over the backdrop, which looks like a bug
- * rather than like artwork that has not arrived. Missing photo is NOT
- * gated in canGenerate — unlike layout D, these five models already ship
- * PDFs and a colour cover is a fine thing to print.
+ * Absent is a supported state, not a broken one: the hero falls back to
+ * HERO_FALLBACK and the datasheet still prints. Unlike layout D, these
+ * five models already ship PDFs, and blocking them on artwork that has
+ * never existed would be a regression.
  */
-const HERO_PHOTO: string | null = null;
 
 /** Cover model name. Reads on the photo and on HERO_FALLBACK alike. */
 const YELLOW = "#f4d768";
@@ -283,6 +281,8 @@ export function DataCenterPreview({
   const qrUrl = (plExt.qr_url_template || "https://www.engeniustech.com/contact-us")
     .replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrUrl)}`;
+
+  const coverPhoto = product.product_lines.cover_hero_image;
 
   // Auto-fit the hero overview to whatever room the headline leaves.
   const heroHeadline = headline || product.full_name;
@@ -591,10 +591,10 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
           <span className="solution-label">Data Center Solution</span>
         </div>
         <div className="hero">
-          {HERO_PHOTO && (
+          {coverPhoto && (
             <>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="hero-bg" src={HERO_PHOTO} alt="" />
+              <img className="hero-bg" src={coverPhoto} alt="" />
               <div className="hero-scrim" />
             </>
           )}

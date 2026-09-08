@@ -140,7 +140,12 @@ export function EdgeAiSeriesPreview({
           .map((i) => ({ label: i.label, values: [i.value] })),
       );
   const images: SeriesImages = {
-    hero: ld.images?.hero ?? null,
+    // Upload first, Drive second. product_lines.cover_hero_image is set by
+    // the line-cover uploader and never touched by sync; images.hero is the
+    // reverse. Preferring the upload means the button in the dashboard is
+    // the thing that visibly wins, while a PM who still drops
+    // series_hero.png into Drive keeps the workflow they had.
+    hero: pl.cover_hero_image ?? ld.images?.hero ?? null,
     cover_product: ld.images?.cover_product ?? null,
     architecture: ld.images?.architecture ?? null,
     hw_pages: ld.images?.hw_pages ?? [],

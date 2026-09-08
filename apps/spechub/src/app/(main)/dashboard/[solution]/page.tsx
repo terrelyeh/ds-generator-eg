@@ -111,6 +111,20 @@ export default async function SolutionDashboardPage({
     .order("sort_order")) as { data: ProductLine[] | null };
 
   const productLineIds = (productLines ?? []).map((pl) => pl.id);
+
+  // Drive's copy of the cover photo, for the lines that have one. Only Orin
+  // Box does today: the cover-photo control shows which of the two sources
+  // is actually printing, and without this it could not tell "no photo"
+  // from "a photo that arrived through Drive".
+  const { data: lineHeroRows } = (await supabase
+    .from("line_datasheets")
+    .select("product_line_id, images")
+    .in("product_line_id", productLineIds.length ? productLineIds : ["-"])) as {
+      data: { product_line_id: string; images: { hero?: string | null } | null }[] | null;
+    };
+  const driveHeroByLine = Object.fromEntries(
+    (lineHeroRows ?? []).map((r) => [r.product_line_id, r.images?.hero ?? null]),
+  );
   // Layout checking is per-line: lines with their own datasheet component
   // don't answer to the Cloud cover's capacity model.
   const lineCategoryById = new Map(
@@ -465,6 +479,7 @@ export default async function SolutionDashboardPage({
         initialLineId={initialLineId}
         role={role}
         battlecardLines={battlecardLines}
+        driveHeroByLine={driveHeroByLine}
       />
     </div>
   );

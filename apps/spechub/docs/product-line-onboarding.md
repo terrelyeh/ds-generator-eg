@@ -214,6 +214,30 @@ A `series`-scope line can add two more inputs:
 Broadband needs neither — it builds its table from per-model specs and uses
 per-model imagery.
 
+### Cover photograph (layouts B and D)
+
+Data Center and Edge AI Box open on a full-bleed scene rather than a colour
+field. That image belongs to the LINE — one data-centre serves every model —
+and is uploaded from the line's toolbar in the dashboard (**Cover Photo**,
+`product.upload_image`, PNG/JPEG/WebP ≤ 20 MB). It lands in
+`product_lines.cover_hero_image`.
+
+**Sync never writes that column**, which is the point of it. Orin Box has a
+second source — `series_hero.png` in DS Images, which sync folds into
+`line_datasheets.images.hero` — and sync REPLACES that whole jsonb whenever
+the Drive folder lists, so a photo uploaded through the UI would not survive
+there. The layouts read `cover_hero_image` first and Drive second; the button
+says which one is in effect, and clearing the upload falls back to Drive.
+
+The two Data Center lines have no Drive path at all: their `line_datasheets`
+upsert is gated on `ds_overview_gid`, and both are `ds_scope='model'` with no
+overview tab. Upload is their only route.
+
+Absent is a supported state — the cover prints its solid backdrop
+(`HERO_FALLBACK`, a dark step of the primary, because the hero carries white
+body copy). Layout D is the exception: its `canGenerate` has always required a
+hero, so Orin Box's official PDF stays blocked until one exists.
+
 Sync writes it whenever the line sets `ds_overview_gid`, **regardless of
 scope** — per-model datasheets consume it too.
 
