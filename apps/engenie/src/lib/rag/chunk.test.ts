@@ -61,4 +61,28 @@ describe("chunkText", () => {
   it("returns nothing for empty input", () => {
     expect(chunkText("   ", "Guide")).toEqual([]);
   });
+
+  it("splits an oversized pipe table by rows and repeats the header on each piece", () => {
+    // A table is one paragraph to the splitter (rows are single-newline
+    // separated), so a big one used to go in whole — stored, but embedded
+    // truncated, with its tail unreachable.
+    const header = "| Skill | Description |\n|---|---|";
+    const rows = Array.from({ length: 24 }, (_, i) => `| skill-${i} | ${para(500)} |`);
+    const chunks = chunkText(`## Capability Skills\n\n${header}\n${rows.join("\n")}`, "Skill Index");
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) {
+      expect(c.content.length).toBeLessThanOrEqual(MAX_CHUNK_CHARS);
+      expect(c.content).toContain(header);
+    }
+    const joined = chunks.map((c) => c.content).join("\n");
+    for (let i = 0; i < 24; i++) expect(joined).toContain(`| skill-${i} |`);
+  });
+
+  it("does not repeat the prefix inside the first part of a split section", () => {
+    const body = Array.from({ length: 8 }, () => para(1200)).join("\n\n");
+    const chunks = chunkText(`## Specifications\n\n${body}`, "ECS1528P", "Cloud Switch");
+    const prefix = "[Cloud Switch > ECS1528P]";
+    expect(chunks[0].content.indexOf(prefix)).toBe(0);
+    expect(chunks[0].content.indexOf(prefix, 1)).toBe(-1);
+  });
 });

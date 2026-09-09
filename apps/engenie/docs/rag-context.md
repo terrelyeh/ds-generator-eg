@@ -27,6 +27,11 @@
 | `google_doc` | `ingest-google-doc.ts` | Service Account Drive API → public export fallback。Tab split by `\[vX.X\]` markers |
 | `wifi_regulation` | `ingest-wifi-regulations.ts` | WiFi RegHub API → 1 chunk per country (ISO code = source_id)，markdown 已預格式化 |
 | `web` | `ingest-web.ts` | 任意網頁 → Firecrawl(有 `FIRECRAWL_API_KEY` 時)→ Jina Reader → 純 fetch 清洗 的層疊萃取 → markdown chunk。source_id = hostname+pathname（無 colon），source_url 存完整網址。`/knowledge` Add Page 加入；每週 cron 重抓 |
+| `text_snippet` | `ingest-text-snippet.ts` | 手打 FAQ / 標準答案；raw markdown 存 chunk 0 metadata 供編輯 |
+| `file` | `ingest-file.ts` | 上傳 PDF → Gemini 抽取 → chunk |
+| `vertical_guide` | `ingest-vertical-guide.ts` | 垂直市場指南 content master，只索引 `rag:✓` 段落；對外可見（product-kind solution） |
+| `support` | `ingest-support.ts` → `ingest-refined.ts` | Intercom 對話經 `/dev/RAG` refinery 精煉的文章；內部限定（knowledge area `support`） |
+| `internal_doc` | `ingest-internal-doc.ts` → `ingest-refined.ts`；前處理 `internal-doc-prep.ts` | 專案 repo 匯出的整包內部文件（SRS / PRD / 設計文件）。**CLI only**：`scripts/index-internal-docs.ts`。一包 = 一個 `metadata.collection`，source_id = `<collection>/<相對路徑>`，版本/狀態放 metadata；內部限定（knowledge area `rd-internal`） |
 
 ## Unified Taxonomy (Solution > Product Line > Model)
 

@@ -90,6 +90,7 @@ const SOURCE_TYPE_LABEL: Record<string, string> = {
   helpcenter: "Help Center",
   text_snippet: "Snippet",
   google_doc: "Internal Doc",
+  internal_doc: "Internal Doc",
   web: "Web",
 };
 
