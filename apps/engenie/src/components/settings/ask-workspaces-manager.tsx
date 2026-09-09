@@ -43,6 +43,15 @@ interface Workspace {
 
 interface Opt { id: string; name?: string; label?: string }
 
+/**
+ * Every source type an explicit whitelist can name. Keep in step with the
+ * Knowledge page's SOURCE_TYPES — a type missing here is not merely absent
+ * from the UI, it is unreachable for any whitelist workspace, and the gap is
+ * silent: the workspace keeps answering, just never from that source.
+ * (`vertical_guide` sat in one workspace's saved scope for months with no
+ * button to show it.) An empty selection still means "all types", so
+ * workspaces that never opened this list are unaffected.
+ */
 const SOURCE_TYPES = [
   { id: "product_spec", label: "Product Specs" },
   { id: "gitbook", label: "Gitbook" },
@@ -52,7 +61,17 @@ const SOURCE_TYPES = [
   { id: "web", label: "Web Pages" },
   { id: "text_snippet", label: "Text Snippets" },
   { id: "file", label: "Files (PDF)" },
+  { id: "vertical_guide", label: "Vertical Guides" },
+  { id: "support", label: "Support Knowledge" },
+  { id: "internal_doc", label: "Internal Docs" },
 ];
+
+/**
+ * Types whose content lives in a kind='knowledge' area, so passing the
+ * source-type filter is not enough on its own — the area has to be ticked
+ * below AND the workspace needs a passcode (`allowedKnowledgeAreas`).
+ */
+const KNOWLEDGE_GATED_TYPES = new Set(["support", "internal_doc"]);
 
 function familyOf(p: string) {
   return p.startsWith("claude") ? "Anthropic" : p.startsWith("gpt") ? "OpenAI" : "Google";
@@ -408,13 +427,29 @@ export function AskWorkspacesManager() {
                   </button>
                 </div>
                 <p className="mt-1 text-[13px] text-muted-foreground/60">知識領域預設不會被產品 scope 撈到；勾選後才會併入此 workspace。新增後到 Knowledge 頁把內容 tag 到該領域。</p>
+                {/*
+                  Without a passcode `allowedKnowledgeAreas()` returns [] and the
+                  ticks above do nothing — deliberately, because ws-auth hands a
+                  token to anyone for a passcode-less workspace. Saying so here is
+                  the whole point: the setting saves, the UI looks right, and the
+                  areas are silently withheld at every question.
+                */}
+                {knowledgeAreas.length > 0 && !(editId ? editHasPasscode : false) && !passcode.trim() && (
+                  <p className="mt-2 rounded-md border border-amber-300/60 bg-amber-50 px-2.5 py-2 text-[13px] text-amber-800">
+                    這個 workspace 沒有 passcode，所以上面勾選的 {knowledgeAreas.length} 個知識領域<strong>不會生效</strong>
+                    —— 沒有密碼的 workspace 網址等於公開，私有領域一律不放行。設一組 passcode 才會恢復。
+                  </p>
+                )}
                 <p className="mb-1 mt-3 text-sm font-medium">來源類型 <span className="font-normal text-muted-foreground/60">(未選=全部)</span></p>
                 <div className="flex flex-wrap gap-2">
                   {SOURCE_TYPES.map((st) => (
                     <button key={st.id} type="button" disabled={saving} onClick={() => setSourceTypes((p) => p.includes(st.id) ? p.filter((x) => x !== st.id) : [...p, st.id])}
-                      className={`rounded-md border px-2.5 py-1 text-sm ${sourceTypes.includes(st.id) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>{st.label}</button>
+                      className={`rounded-md border px-2.5 py-1 text-sm ${sourceTypes.includes(st.id) ? "border-engenius-blue bg-engenius-blue/10 text-engenius-blue" : "hover:bg-muted"}`}>
+                      {KNOWLEDGE_GATED_TYPES.has(st.id) && <span className="mr-1 opacity-60">🔒</span>}{st.label}
+                    </button>
                   ))}
                 </div>
+                <p className="mt-1 text-[13px] text-muted-foreground/60">🔒 的來源屬於某個知識領域，光選類型還不夠 —— 還要在上面勾對應的領域，而且 workspace 要有 passcode。</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
