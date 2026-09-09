@@ -2,11 +2,12 @@
  * Generic ingest for PRE-REFINED knowledge articles — markdown with YAML-ish
  * frontmatter produced by the offline refinery (`/dev/RAG`, 02_refine_with_ai.py).
  *
- * Shared core for the Intercom `support` pipeline and (future) the Mantis
- * bug-tracker pipeline: identical article shape and chunk→embed→upsert, differing
- * only by `sourceType` + the internal `knowledgeArea` the chunks are scoped to.
- * Thin per-source wrappers (ingest-support.ts, later ingest-mantis.ts) just bind
- * those two values.
+ * Shared core for the Intercom `support` pipeline, the `internal_doc` package
+ * pipeline (ingest-internal-doc.ts) and (future) the Mantis bug-tracker
+ * pipeline: identical article shape and chunk→embed→upsert, differing only by
+ * `sourceType` + the internal `knowledgeArea` the chunks are scoped to (plus,
+ * for packages, a shared chunk-prefix `label` and collection-level `extraMeta`).
+ * Thin per-source wrappers just bind those values.
  *
  * Visibility: `knowledgeArea` is written to `metadata.solution` and MUST be a
  * `kind='knowledge'` slug. retrieve.ts then treats these chunks as private/opt-in
@@ -32,8 +33,18 @@ const MODEL_RE =
 export interface RefinedArticleInput {
   /** Raw markdown for one article, INCLUDING its `--- … ---` frontmatter. */
   markdown: string;
-  /** Optional explicit source_id; otherwise taken from frontmatter `id`/`title`. */
+  /**
+   * Optional explicit source_id; otherwise taken from frontmatter `id`/`title`.
+   * Explicit ids may contain `/` (path-shaped ids, like google_doc's `docId/…`);
+   * derived ids are flattened to a plain slug.
+   */
   sourceId?: string;
+  /** Display title override (else frontmatter `title`, else the first heading). */
+  title?: string;
+  /** Citation link, when the document has a stable URL. */
+  sourceUrl?: string | null;
+  /** Per-article metadata merged over the shared fields (e.g. `path`). */
+  meta?: Record<string, unknown>;
 }
 
 export interface IngestRefinedOptions {
@@ -42,6 +53,13 @@ export interface IngestRefinedOptions {
   /** kind='knowledge' solution slug → internal-only gating in retrieve.ts. */
   knowledgeArea: string;
   articles: RefinedArticleInput[];
+  /**
+   * Chunk-prefix label shared by every article (`[label > title]`), e.g. the
+   * package name + version + status. Defaults to each article's own title.
+   */
+  label?: string;
+  /** Metadata written on every chunk of every article (e.g. collection/version/status). */
+  extraMeta?: Record<string, unknown>;
   /** Parse + chunk only; do not embed or write. */
   dryRun?: boolean;
 }
@@ -53,6 +71,8 @@ export interface IngestRefinedArticleResult {
   models: string[];
   chunks: number;
   processed: number;
+  /** Dry-run only: what each chunk would be titled and how big it is. */
+  previews?: { title: string; chars: number }[];
 }
 
 export interface IngestRefinedResult {
@@ -100,14 +120,17 @@ const asStr = (v: FmValue | undefined): string | null => (typeof v === "string" 
 const asArr = (v: FmValue | undefined): string[] =>
   Array.isArray(v) ? v : typeof v === "string" && v ? [v] : [];
 
-/** Colon-free, stable source_id (GET /api/documents splits source ids on ":"). */
-function toSourceId(raw: string): string {
+/**
+ * Colon-free, stable source_id (GET /api/documents splits source ids on ":").
+ * `keepSlash` is for caller-supplied path-shaped ids; derived ids never get one.
+ */
+function toSourceId(raw: string, keepSlash = false): string {
   return (
     raw
       .trim()
       .replace(/[:\s]+/g, "-")
-      .replace(/[^A-Za-z0-9._-]/g, "")
-      .slice(0, 120) || "article"
+      .replace(keepSlash ? /[^A-Za-z0-9._/-]/g : /[^A-Za-z0-9._-]/g, "")
+      .slice(0, 160) || "article"
   );
 }
 
@@ -122,7 +145,7 @@ function normalizeCategory(v: FmValue | undefined): string | null {
 export async function ingestRefinedArticles(
   opts: IngestRefinedOptions,
 ): Promise<IngestRefinedResult> {
-  const { sourceType, knowledgeArea, articles, dryRun = false } = opts;
+  const { sourceType, knowledgeArea, articles, label, extraMeta, dryRun = false } = opts;
   const skipped: { reason: string; sourceId?: string }[] = [];
   const results: IngestRefinedArticleResult[] = [];
 
@@ -132,9 +155,14 @@ export async function ingestRefinedArticles(
 
   for (const article of articles) {
     const { fm, body } = parseFrontmatter(article.markdown);
-    const sourceId = toSourceId(article.sourceId || asStr(fm.id) || asStr(fm.title) || "");
+    const sourceId = article.sourceId
+      ? toSourceId(article.sourceId, true)
+      : toSourceId(asStr(fm.id) || asStr(fm.title) || "");
     const title =
-      asStr(fm.title) || body.match(/^#{1,3}\s+(.+)$/m)?.[1]?.trim() || sourceId;
+      article.title?.trim() ||
+      asStr(fm.title) ||
+      body.match(/^#{1,3}\s+(.+)$/m)?.[1]?.trim() ||
+      sourceId;
     const content = body.trim();
 
     if (!content) {
@@ -153,7 +181,7 @@ export async function ingestRefinedArticles(
     const qNum = qStr != null && qStr !== "" ? Number(qStr) : NaN;
     const quality = Number.isFinite(qNum) ? qNum : null;
 
-    const chunks = chunkText(content, title, asStr(fm.title) || title);
+    const chunks = chunkText(content, title, label || asStr(fm.title) || title);
     totalChunks += chunks.length;
 
     const baseMeta: Record<string, unknown> = {
@@ -168,10 +196,20 @@ export async function ingestRefinedArticles(
       quality,
       source_conversations: asArr(fm.source_conversations),
       source_tickets: asArr(fm.source_tickets),
+      ...extraMeta,
+      ...article.meta,
     };
 
     if (dryRun) {
-      results.push({ sourceId, title, quality, models, chunks: chunks.length, processed: 0 });
+      results.push({
+        sourceId,
+        title,
+        quality,
+        models,
+        chunks: chunks.length,
+        processed: 0,
+        previews: chunks.map((c) => ({ title: c.title, chars: c.content.length })),
+      });
       continue;
     }
 
@@ -192,7 +230,7 @@ export async function ingestRefinedArticles(
           {
             source_type: sourceType,
             source_id: sourceId,
-            source_url: null,
+            source_url: article.sourceUrl ?? null,
             title: chunk.title,
             chunk_index: idx,
             content: chunk.content,

@@ -145,9 +145,26 @@ src/
   —— **沒有 passcode 就沒有私有領域**。`/ask/<slug>` 的網址不難猜,而 `ws-auth` 對沒有
   passcode 的 workspace 會直接發七天 token 給任何人
 - **串流核心只有一份** `hooks/use-chat-stream.ts` — ask-chat（內部）與 engenie-chat（demo/workspace）共用；新增聊天 surface 一律複用，不要複製串流邏輯
-- **10 種 source type / 11 支 `lib/rag/ingest-*`**：product_spec, gitbook, helpcenter,
+- **11 種 source type / 12 支 `lib/rag/ingest-*`**：product_spec, gitbook, helpcenter,
   google_doc, wifi_regulation, web, text_snippet, file(PDF→Gemini 抽取), vertical_guide,
-  support（後兩者共用 `ingest-refined`）。
+  support, internal_doc（後兩者是 `ingest-refined` 的薄 wrapper）。
+- **`internal_doc` = 專案 repo 匯出的整包內部文件**（SRS / PRD / 設計文件；2026-09-09 起，
+  第一包是 Craft AI SRS v2.0）。**只有 CLI**：`scripts/index-internal-docs.ts`（預設 dry-run，
+  `--run` 才寫），沒有 UI 對話框。一包 = 一個 `collection`（`metadata.collection`，也是
+  source_id 前綴 `<collection>/<相對路徑>`），版本放 `metadata.version`/`status`、**不放進
+  source_id** —— 換版 = 逐檔 clean replace，`--prune` 再清掉這次沒看到的檔案（只能在看過
+  整包的 run 之後跑，`--only` 不能配 `--prune`）。chunk 前綴 `[label > title]` 的 label 要把
+  版本和狀態寫進去（`Craft AI SRS v2.0 (Review Draft)`）—— 那是模型在 `<source>` 裡唯一
+  看得到「這是草稿」的地方。知識領域預設 **`rd-internal`（RD 內部知識）**，
+  `assertKnowledgeArea()` 會擋非 `kind='knowledge'` 的 slug：打錯 slug 不會失敗，
+  retrieve.ts 會把它當 product/global 處理 —— 整包變成對外可見。
+  前處理在 `lib/rag/internal-doc-prep.ts`（純函式）：`SKILL.md` 只留 frontmatter + 散文，
+  **砍掉 `## API Operations` / `## Quick Reference` / 任何 `MANDATORY` 載入指示**
+  （那是給跑 skill 的 agent 的 runtime 指令，不是知識；而且「load X before responding」
+  進了 `<source>` 就是一條指令通道，見 pitfall #72）；圖片留 alt 文字、相對連結留文字。
+- **`chunk.ts` 會把超過 5000 字元的 pipe table 按列切、每段重複表頭**（2026-09-09）——
+  表格對段落切分器來說是一個「段落」，以前一張 12k 的 skill-index 表會整個進索引、
+  embedding 卻只嵌前 5000 字元，表尾永遠搜不到。同一次修掉超長區段第一段前綴重複的 bug。
   **會替換整個來源的那幾條一律先寫再刪** —— `trimStaleChunks()`（`lib/rag/replace-chunks.ts`）
   在 upsert 完成之後才砍變短的尾巴。先刪再 embed 曾經能讓一次 429 刪掉整個來源
 - **所有對外抓取走 `lib/rag/safe-url.ts`** —— `isSafePublicUrl()` + `safeFetch()`

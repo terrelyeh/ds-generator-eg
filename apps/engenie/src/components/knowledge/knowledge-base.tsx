@@ -42,6 +42,8 @@ const SOURCE_TYPES: SourceTypeConfig[] = [
   { id: "file", label: "Files (PDF)", icon: "📎", description: "Uploaded PDF documents — read by AI (tables, figures, scanned OCR) and indexed", status: "active", canIngest: true },
   { id: "vertical_guide", label: "Vertical Guides", icon: "🏢", description: "Approved vertical solution guides (industry × product scope) — indexed from the content master; only rag:✓ sections enter the RAG", status: "active", canIngest: true },
   { id: "support", label: "Support Knowledge", icon: "🎧", description: "Curated from Intercom service conversations — clustered & PII-scrubbed by the offline refinery. Internal-only (excluded from the external Search API)", status: "active", canIngest: true },
+  // Indexed by CLI (scripts/index-internal-docs.ts) per package/collection; no dialog here yet.
+  { id: "internal_doc", label: "Internal Docs", icon: "🗂️", description: "Internal document packages (SRS, PRD, design docs) exported from a project repo — one collection per package, scoped to a knowledge area. Internal-only (excluded from the external Search API)", status: "active", canIngest: false },
 ];
 
 const SUMMARY_CARDS = [

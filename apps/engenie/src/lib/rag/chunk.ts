@@ -29,9 +29,41 @@ const GENERIC_HEADINGS =
 
 const MAX_TITLE_CHARS = 90;
 
+/** `| --- | :---: |` — the delimiter row that makes a pipe table a table. */
+const TABLE_SEP_RE = /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?\s*$/;
+
 export interface TextChunk {
   title: string;
   content: string;
+}
+
+/**
+ * A pipe table is one "paragraph" (rows are single-newline separated), so the
+ * paragraph splitter below can't break it and a big table used to go into the
+ * index as one oversized chunk — stored whole, but embedded truncated, so its
+ * tail was unreachable. Split rows into groups under `budget` chars, repeating
+ * the header + delimiter on each so every piece still reads as a table.
+ */
+function splitTable(paragraph: string, budget: number): string[] {
+  const lines = paragraph.split("\n");
+  const isTable = lines.length >= 3 && lines[0].trimStart().startsWith("|") && TABLE_SEP_RE.test(lines[1]);
+  if (!isTable || paragraph.length <= budget) return [paragraph];
+
+  const header = lines.slice(0, 2).join("\n");
+  const groups: string[] = [];
+  let rows: string[] = [];
+  let size = header.length;
+  for (const row of lines.slice(2)) {
+    if (rows.length > 0 && size + row.length + 1 > budget) {
+      groups.push(`${header}\n${rows.join("\n")}`);
+      rows = [];
+      size = header.length;
+    }
+    rows.push(row);
+    size += row.length + 1;
+  }
+  if (rows.length > 0) groups.push(`${header}\n${rows.join("\n")}`);
+  return groups;
 }
 
 /** Make a section title self-describing: "<article> — <section>". */
@@ -94,7 +126,10 @@ export function chunkText(content: string, title: string, label?: string): TextC
     const full = prefix + body;
 
     if (full.length > MAX_CHUNK_CHARS) {
-      const paragraphs = full.split(/\n\n+/);
+      // Split the BODY, not `full` — `current` starts as the prefix already,
+      // so splitting `full` used to put "[label > title]" into part 1 twice.
+      const budget = MAX_CHUNK_CHARS - prefix.length;
+      const paragraphs = body.split(/\n\n+/).flatMap((p) => splitTable(p, budget));
       let current = prefix;
       let part = 1;
       for (const para of paragraphs) {

@@ -1,10 +1,11 @@
 /**
- * Verify the `support` knowledge source end-to-end without a running server:
- *   1. INTERNAL /ask context (no knowledgeAreasAllowed)        → support chunks ARE retrieved
- *   2. EXTERNAL /api/v1/search context (knowledgeAreasAllowed: []) → support chunks are EXCLUDED
+ * Verify an internal-only knowledge source end-to-end without a running server:
+ *   1. INTERNAL /ask context (no knowledgeAreasAllowed)        → its chunks ARE retrieved
+ *   2. EXTERNAL /api/v1/search context (knowledgeAreasAllowed: []) → its chunks are EXCLUDED
  *
  * Run from repo root with the engenie env:
  *   npm -w engenie exec tsx scripts/verify-support-retrieval.ts -- "your question"
+ *   npm -w engenie exec tsx scripts/verify-support-retrieval.ts -- --type internal_doc "your question"
  */
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
@@ -23,8 +24,12 @@ for (const f of [".env.local", ".env"]) {
 }
 
 async function main() {
+  const args = process.argv.slice(2);
+  const typeIdx = args.indexOf("--type");
+  const sourceType = typeIdx >= 0 ? args[typeIdx + 1] : "support";
+  const rest = typeIdx >= 0 ? [...args.slice(0, typeIdx), ...args.slice(typeIdx + 2)] : args;
   const q =
-    process.argv.slice(2).join(" ").trim() ||
+    rest.join(" ").trim() ||
     "my access points keep showing offline in the cloud dashboard — how do I troubleshoot?";
   const { retrieveDocuments } = await import("../src/lib/rag/retrieve");
 
@@ -35,8 +40,8 @@ async function main() {
   for (const d of internal) {
     console.log(`   [${d.source_type}] ${d.title}  (sim ${d.similarity.toFixed(3)})`);
   }
-  const internalSupport = internal.filter((d) => d.source_type === "support").length;
-  console.log(`   → support chunks surfaced: ${internalSupport}\n`);
+  const internalSupport = internal.filter((d) => d.source_type === sourceType).length;
+  console.log(`   → ${sourceType} chunks surfaced: ${internalSupport}\n`);
 
   const external = await retrieveDocuments({
     question: q,
@@ -46,9 +51,9 @@ async function main() {
   });
   console.log(`EXTERNAL /api/v1/search (knowledgeAreasAllowed: []) — ${external.length} chunks:`);
   for (const d of external) console.log(`   [${d.source_type}] ${d.title}`);
-  const externalSupport = external.filter((d) => d.source_type === "support").length;
+  const externalSupport = external.filter((d) => d.source_type === sourceType).length;
   console.log(
-    `   → support chunks leaked: ${externalSupport}  ` +
+    `   → ${sourceType} chunks leaked: ${externalSupport}  ` +
       (externalSupport === 0 ? "✓ internal-only holds" : "✗ LEAK — investigate"),
   );
 }
