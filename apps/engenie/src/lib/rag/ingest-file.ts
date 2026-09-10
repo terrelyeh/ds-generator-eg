@@ -12,6 +12,7 @@
 import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { chunkText } from "./chunk";
+import { viewerPath } from "./doc-view";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 import { trimStaleChunks } from "./replace-chunks";
 
@@ -69,7 +70,9 @@ export async function ingestFile(opts: IngestFileOptions): Promise<IngestFileRes
         {
           source_type: "file",
           source_id: sourceId,
-          source_url: null,
+          // Citations link to the viewer, which hands back a short-lived signed
+          // URL for the stored original.
+          source_url: viewerPath("file", sourceId),
           title: chunk.title,
           chunk_index: idx,
           content: chunk.content,

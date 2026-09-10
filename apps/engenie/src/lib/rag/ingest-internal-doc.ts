@@ -18,6 +18,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { ingestRefinedArticles, type IngestRefinedResult } from "./ingest-refined";
 import { prepareInternalDoc, type PreparedDoc } from "./internal-doc-prep";
+import { viewerPath } from "./doc-view";
 
 /** documents.source_type for internal document packages. */
 export const INTERNAL_DOC_SOURCE_TYPE = "internal_doc";
@@ -106,13 +107,19 @@ export async function ingestInternalDocs(opts: IngestInternalDocsOptions): Promi
   if (!label.trim()) throw new Error("label is required — it becomes the chunk prefix.");
 
   const prepared = files.map((f) => prepareInternalDoc(f));
-  const articles = prepared.map((p, i) => ({
-    markdown: p.markdown,
-    sourceId: `${collection}/${p.sourceId}`,
-    title: p.title,
-    sourceUrl: files[i].sourceUrl ?? null,
-    meta: p.meta,
-  }));
+  const articles = prepared.map((p, i) => {
+    const sourceId = `${collection}/${p.sourceId}`;
+    return {
+      markdown: p.markdown,
+      sourceId,
+      title: p.title,
+      // No external URL for an internal package, so point the citation at the
+      // in-app viewer. That link opens the version that was actually indexed —
+      // a repo link would drift the moment the document is edited again.
+      sourceUrl: files[i].sourceUrl ?? viewerPath(INTERNAL_DOC_SOURCE_TYPE, sourceId),
+      meta: p.meta,
+    };
+  });
 
   const result = await ingestRefinedArticles({
     sourceType: INTERNAL_DOC_SOURCE_TYPE,

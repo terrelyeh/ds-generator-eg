@@ -225,7 +225,10 @@ export async function ingestRefinedArticles(
       for (let j = 0; j < batch.length; j++) {
         const idx = i + j;
         const chunk = batch[j];
-        const chunkMeta = idx === 0 ? { ...baseMeta, article_title: title } : baseMeta;
+        // chunk 0 carries the exact original for the in-app viewer that
+        // citations link to; the fallback (reassembling from chunks) is a
+        // reading copy with seams, not the document as written.
+        const chunkMeta = idx === 0 ? { ...baseMeta, article_title: title, raw: content } : baseMeta;
         const { error } = await supabase!.from("documents" as "products").upsert(
           {
             source_type: sourceType,

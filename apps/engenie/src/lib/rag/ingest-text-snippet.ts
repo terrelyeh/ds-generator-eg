@@ -12,6 +12,7 @@
 import { createAdminClient } from "@eg/db/admin";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { chunkText } from "./chunk";
+import { viewerPath } from "./doc-view";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 import { trimStaleChunks } from "./replace-chunks";
 
@@ -63,7 +64,8 @@ export async function ingestTextSnippet(opts: IngestTextSnippetOptions): Promise
         {
           source_type: "text_snippet",
           source_id: sourceId,
-          source_url: null,
+          // Citations link to the in-app viewer (chunk 0 keeps the raw markdown).
+          source_url: viewerPath("text_snippet", sourceId),
           title: chunk.title,
           chunk_index: idx,
           content: chunk.content,
