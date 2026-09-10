@@ -33,6 +33,21 @@
 | `support` | `ingest-support.ts` → `ingest-refined.ts` | Intercom 對話經 `/dev/RAG` refinery 精煉的文章；內部限定（knowledge area `support`） |
 | `internal_doc` | `ingest-internal-doc.ts` → `ingest-refined.ts`；前處理 `internal-doc-prep.ts` | 專案 repo 匯出的整包內部文件（SRS / PRD / 設計文件）。**CLI only**：`scripts/index-internal-docs.ts`。一包 = 一個 `metadata.collection`，source_id = `<collection>/<相對路徑>`，版本/狀態放 metadata；內部限定（knowledge area `rd-internal`） |
 
+## 引用連得到哪裡
+
+`source_url` 決定 citation 能不能點（`ask-chat.tsx` 的 `CitationTooltip`）：
+
+| source_url | 例子 | 點擊 |
+|---|---|---|
+| http 網址 | gitbook / helpcenter / google_doc / vertical_guide | 開新分頁到原站 |
+| **app 內相對路徑** | `/wifi-regulation/AE`、`/knowledge/doc/internal_doc/…` | 開 app 自己的檢視頁 |
+| `/product/…` | product_spec | **刻意不可點**（那是 SpecHub 的頁面） |
+
+**存在我們這裡的內容**（internal_doc / support / text_snippet / file）走
+`/knowledge/doc/<source_type>/<source_id>`（`lib/rag/doc-view.ts` 的 `viewerPath()`）。
+文字優先取 chunk 0 的 `metadata.raw`，沒有就從 chunk 重組並在頁面標示；`file` 轉 60 秒簽章網址。
+**不要改成絕對網址** —— 相對路徑才能跨部署，也才會自動吃登入。
+
 ## Unified Taxonomy (Solution > Product Line > Model)
 
 所有 source types 在 `documents.metadata` 共用三個 optional 欄位：

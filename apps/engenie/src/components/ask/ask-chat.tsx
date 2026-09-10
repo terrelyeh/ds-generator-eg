@@ -105,7 +105,11 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
   //   - Internal relative paths for wifi_regulation (/wifi-regulation/{code})
   // product_spec intentionally not linkable (no canonical public page yet).
   const isExternal = !!src.source_url?.startsWith("http") && src.source_type !== "product_spec";
-  const isInternal = !!src.source_url?.startsWith("/") && src.source_type === "wifi_regulation";
+  // Relative URLs are pages of this app: the wifi-regulation viewer, and the
+  // /knowledge/doc viewer for anything stored here (internal docs, support
+  // articles, snippets, uploaded files). product_spec's "/product/…" belongs
+  // to SpecHub, not to us, so it stays unlinked.
+  const isInternal = !!src.source_url?.startsWith("/") && src.source_type !== "product_spec";
   const hasExternalLink = isExternal || isInternal;
 
   return (

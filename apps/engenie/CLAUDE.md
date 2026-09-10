@@ -162,6 +162,16 @@ src/
   **砍掉 `## API Operations` / `## Quick Reference` / 任何 `MANDATORY` 載入指示**
   （那是給跑 skill 的 agent 的 runtime 指令，不是知識；而且「load X before responding」
   進了 `<source>` 就是一條指令通道，見 pitfall #72）；圖片留 alt 文字、相對連結留文字。
+- **存在我們自己這裡的內容，引用點得開了**（2026-09-10）——`/knowledge/doc/<source_type>/<source_id>`
+  （catch-all route，internal_doc 的 id 是路徑狀所以會有 `/`）。`source_url` 存**相對路徑**，
+  跟 `wifi_regulation` 早就在做的一樣：不用外部 host、不用 push、自動吃 `(main)` 的登入 +
+  `knowledge.view`，而且**點開的就是被索引的那一版**（指 GitHub 會漂——repo 的
+  house-rules 是 309 行，交付包那份是改寫過的 196 行）。
+  文字來源兩層：**chunk 0 的 `metadata.raw`**（ingest 時寫的原文），沒有就**從 chunk 重組**
+  並在頁面上標示「這是重組的閱讀版」（`support` 那 43 篇是 7 月索引的，走這條）。
+  `file` 不是 markdown —— 那條路徑轉成 60 秒簽章網址。
+  citation 的 `isInternal` 從「只有 wifi_regulation」放寬成「除了 product_spec 的所有相對路徑」
+  （`/product/…` 是 SpecHub 的頁面，不是我們的）。
 - **`chunk.ts` 會把超過 5000 字元的 pipe table 按列切、每段重複表頭**（2026-09-09）——
   表格對段落切分器來說是一個「段落」，以前一張 12k 的 skill-index 表會整個進索引、
   embedding 卻只嵌前 5000 字元，表尾永遠搜不到。同一次修掉超長區段第一段前綴重複的 bug。
