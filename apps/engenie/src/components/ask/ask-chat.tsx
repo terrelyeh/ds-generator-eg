@@ -10,6 +10,7 @@ import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useAskModels } from "@/hooks/use-ask-models";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
+import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
@@ -37,7 +38,6 @@ interface SessionSummary {
   message_count: number;
   updated_at: string;
 }
-
 
 const EXAMPLE_QUESTIONS = [
   "哪些 AP 支援 WiFi 7？",
@@ -166,33 +166,6 @@ function CitationTooltip({ index, sources }: { index: number; sources: Source[] 
   );
 }
 
-/* ─── Reference list at bottom of answer ─── */
-function ReferenceList({ sources }: { sources: Source[] }) {
-  const unique = [...new Map(sources.map((s, i) => [i, s])).values()];
-  if (unique.length === 0) return null;
-
-  return (
-    <details className="mt-3 pt-2 border-t border-border/30">
-      <summary className="cursor-pointer text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors select-none">
-        📎 {unique.length} sources referenced
-      </summary>
-      <div className="mt-1.5 space-y-0.5">
-        {unique.map((s, i) => (
-          <div key={i} className="text-xs text-muted-foreground/50 truncate">
-            {s.source_url ? (
-              <a href={s.source_url} target="_blank" rel="noopener noreferrer" className="hover:text-engenius-blue transition-colors">
-                [{i + 1}] {s.title}
-              </a>
-            ) : (
-              <span>[{i + 1}] {s.title}</span>
-            )}
-          </div>
-        ))}
-      </div>
-    </details>
-  );
-}
-
 /* ─── Markdown with inline citations ─── */
 function MarkdownWithCitations({ content, sources }: { content: string; sources?: Source[] }) {
   // Memoize the components map so it keeps a stable identity across streaming
@@ -298,26 +271,6 @@ function processTextWithCitations(text: string, sources: Source[]): React.ReactN
   });
 }
 
-/* ─── AI message avatar (the little node icon beside each reply) ─── */
-function AskAvatar() {
-  return (
-    <div className="h-6 w-6 rounded-full bg-engenius-blue/10 flex items-center justify-center">
-      <svg className="h-3.5 w-3.5 text-engenius-blue" viewBox="0 0 48 48" fill="none">
-        <circle cx="24" cy="24" r="6" fill="currentColor" opacity="0.9" />
-        <circle cx="24" cy="7" r="2.5" fill="currentColor" opacity="0.5" />
-        <circle cx="24" cy="41" r="2.5" fill="currentColor" opacity="0.5" />
-        <circle cx="7" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
-        <circle cx="41" cy="24" r="2.5" fill="currentColor" opacity="0.5" />
-        <line x1="24" y1="15" x2="24" y2="8" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-        <line x1="24" y1="33" x2="24" y2="40" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-        <line x1="15" y1="24" x2="8" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-        <line x1="33" y1="24" x2="40" y2="24" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
-        <path d="M36 10 L37.5 13.5 L41 15 L37.5 16.5 L36 20 L34.5 16.5 L31 15 L34.5 13.5 Z" fill="currentColor" opacity="0.6" />
-      </svg>
-    </div>
-  );
-}
-
 /* ─── Memoized message row ─── */
 /* Memoized so settled messages don't re-render on every streaming frame —
    only the streaming message (whose `message` identity changes) re-renders. */
@@ -356,14 +309,17 @@ const AskMessage = memo(function AskMessage({
     } catch { /* ignore */ }
   }
 
-  const thinking = !message.content && message.isStreaming;
-
   return (
-    <div className="flex gap-2.5 group/msg animate-in fade-in duration-300">
-      <div className="flex-shrink-0 mt-0.5">
-        <AskAvatar />
-      </div>
-      <div className="flex-1 min-w-0">
+    <div className="group/msg animate-in fade-in duration-300">
+      <div className="min-w-0">
+        <AnswerActivity
+          sources={message.sources}
+          status={loadingStatus}
+          isStreaming={message.isStreaming}
+          hasContent={!!message.content}
+          showCitations
+          allowRelativeLinks
+        />
         {message.content ? (
           <div className="ask-markdown max-w-[46rem]">
             <MarkdownWithCitations content={message.content} sources={message.sources} />
@@ -371,14 +327,13 @@ const AskMessage = memo(function AskMessage({
               <span className="inline-block w-[3px] h-[1.05em] translate-y-[0.15em] bg-engenius-blue/70 animate-pulse ml-0.5 rounded-[1px]" />
             )}
           </div>
-        ) : thinking ? (
-          <div className="flex items-center gap-2.5 py-1.5">
-            <span className="h-4 w-4 rounded-full border-2 border-engenius-blue/30 border-t-engenius-blue animate-spin" />
-            <span className="text-xs text-muted-foreground/70">
-              {loadingStatus === "generating" ? "整理回覆中…" : "搜尋相關資料中…"}
-            </span>
-          </div>
         ) : null}
+
+        {message.isStreaming && message.content && (
+          <div className="mt-3">
+            <EngenieSpark active size={16} />
+          </div>
+        )}
 
         {/* Figures from the sources the answer cited — only once it has
             finished, since the set of citations isn't final until then. */}
@@ -386,15 +341,12 @@ const AskMessage = memo(function AskMessage({
           <AnswerFigures content={message.content} sources={message.sources} />
         )}
 
-        {/* Reference list — sources arrive before the LLM stream, so show
-            them while the answer is still generating (perceived latency). */}
-        {message.sources && message.sources.length > 0 && (
-          <ReferenceList sources={message.sources} />
-        )}
-
         {/* Action bar: copy + provider */}
         {!message.isStreaming && message.content && (
           <div className="mt-2 pt-1.5 flex items-center gap-1.5">
+            <span className="mr-1 inline-flex">
+              <EngenieSpark size={16} />
+            </span>
             <button
               onClick={handleCopy}
               className="text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
@@ -918,7 +870,6 @@ export function AskChat({ compact = false }: AskChatProps) {
             </>
           )}
         </div>
-
 
         {/* Conversation — ChatGPT-style: no card box, content centered, the
             message area is the only scroller (sits at the viewport edge). */}

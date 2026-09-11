@@ -8,11 +8,11 @@ import { EngenieMark } from "./engenie-mark";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
+import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
   type ChatMessage as Message,
-  type ChatSource as Source,
 } from "@/hooks/use-chat-stream";
 import { upsertConversation, newConversationId } from "@/lib/demo/history";
 
@@ -339,16 +339,17 @@ const MessageBubble = memo(function MessageBubble({
   const cursor =
     "[&_p:last-child]:after:ml-1 [&_p:last-child]:after:inline-block [&_p:last-child]:after:h-[0.95em] [&_p:last-child]:after:w-[2.5px] [&_p:last-child]:after:translate-y-[0.15em] [&_p:last-child]:after:rounded-[1px] [&_p:last-child]:after:bg-engenius-dark/70 [&_p:last-child]:after:animate-pulse [&_p:last-child]:after:content-['']";
 
-  const thinking = !message.content && message.isStreaming;
-
-  // Assistant message: EnGenie mark on the left (pulses while thinking),
-  // answer / live status on the right — mirrors the main Ask panel.
+  // Assistant message: activity trace, then the answer at full width; the
+  // EnGenie spark sits under it (turning while it streams) — same as ask-chat.
   return (
-    <div className="mb-8 flex w-full gap-3 animate-in fade-in duration-300">
-      <div className="flex-shrink-0 pt-0.5">
-        <EngenieAvatar thinking={thinking} />
-      </div>
-      <div className="min-w-0 flex-1">
+    <div className="mb-8 w-full animate-in fade-in duration-300">
+      <div className="min-w-0">
+        <AnswerActivity
+          sources={message.sources}
+          status={loadingStatus}
+          isStreaming={message.isStreaming}
+          hasContent={!!message.content}
+        />
         {message.content ? (
           <div
             className={`prose max-w-none ${bodySize} text-engenius-dark
@@ -376,28 +377,16 @@ const MessageBubble = memo(function MessageBubble({
               </ReactMarkdown>
             </MarkdownErrorBoundary>
           </div>
-        ) : thinking ? (
-          <div className="flex items-center gap-2 py-2">
-            <span className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 rounded-full bg-engenius-dark/30 animate-[engenieDot_1.2s_ease-in-out_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-engenius-dark/30 animate-[engenieDot_1.2s_ease-in-out_0.2s_infinite]" />
-              <span className="h-1.5 w-1.5 rounded-full bg-engenius-dark/30 animate-[engenieDot_1.2s_ease-in-out_0.4s_infinite]" />
-            </span>
-            <span className="text-[13px] text-engenius-gray">
-              {loadingStatus === "generating" ? "整理回覆中…" : "搜尋相關資料中…"}
-            </span>
-            <style>{`
-              @keyframes engenieDot {
-                0%, 100% { opacity: 0.25; transform: translateY(0); }
-                50% { opacity: 0.9; transform: translateY(-2px); }
-              }
-            `}</style>
-          </div>
         ) : null}
+        {message.isStreaming && message.content && (
+          <div className="mt-5">
+            <EngenieSpark active size={18} />
+          </div>
+        )}
         {!message.isStreaming && message.content && (
           <>
             <AnswerFigures content={message.content} sources={message.sources} />
-            <ActionBar content={message.content} sources={message.sources} onRegenerate={onRegenerate} />
+            <ActionBar content={message.content} onRegenerate={onRegenerate} />
             {onFollowUp && message.followUps && message.followUps.length > 0 && (
               <FollowUpList questions={message.followUps} onClick={onFollowUp} />
             )}
@@ -407,42 +396,6 @@ const MessageBubble = memo(function MessageBubble({
     </div>
   );
 });
-
-/* ─── Small EnGenie avatar shown beside each assistant reply ─── */
-function EngenieAvatar({ thinking }: { thinking?: boolean }) {
-  return (
-    <div className="relative inline-flex items-center justify-center" style={{ width: 22, height: 22 }}>
-      {thinking && (
-        <span
-          className="absolute inset-0 rounded-full"
-          style={{
-            background: "radial-gradient(circle, rgba(3,169,244,0.45), transparent 68%)",
-            animation: "engenieGlow 1.5s ease-in-out infinite",
-          }}
-        />
-      )}
-      <span
-        style={{
-          display: "inline-block",
-          transformOrigin: "center",
-          animation: thinking ? "engenieBreath 1.5s ease-in-out infinite" : undefined,
-        }}
-      >
-        <EngenieMark size={20} />
-      </span>
-      <style>{`
-        @keyframes engenieBreath {
-          0%, 100% { transform: scale(0.82); opacity: 0.7; }
-          50% { transform: scale(1.16); opacity: 1; }
-        }
-        @keyframes engenieGlow {
-          0%, 100% { opacity: 0.2; transform: scale(0.75); }
-          50% { opacity: 0.75; transform: scale(1.35); }
-        }
-      `}</style>
-    </div>
-  );
-}
 
 function FollowUpList({
   questions,
@@ -487,10 +440,8 @@ function FollowUpList({
   );
 }
 
-function ActionBar({ content, sources, onRegenerate }: { content: string; sources?: Source[]; onRegenerate?: () => void }) {
+function ActionBar({ content, onRegenerate }: { content: string; onRegenerate?: () => void }) {
   const [copied, setCopied] = useState(false);
-  const [refOpen, setRefOpen] = useState(false);
-  const unique = sources ? dedupe(sources) : [];
 
   async function handleCopy() {
     try {
@@ -505,6 +456,7 @@ function ActionBar({ content, sources, onRegenerate }: { content: string; source
   return (
     <div className="mt-6">
       <div className="flex items-center gap-5 text-[13.5px] font-medium text-engenius-dark/55">
+        <EngenieSpark size={18} />
         <button
           onClick={handleCopy}
           className="inline-flex items-center gap-1.5 transition-colors hover:text-engenius-dark"
@@ -534,75 +486,12 @@ function ActionBar({ content, sources, onRegenerate }: { content: string; source
             <span>Retry</span>
           </button>
         )}
-
-        {unique.length > 0 && (
-          <button
-            onClick={() => setRefOpen((v) => !v)}
-            className="inline-flex items-center gap-1.5 transition-colors hover:text-engenius-dark"
-          >
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className={`transition-transform duration-200 ${refOpen ? "rotate-90" : ""}`}
-            >
-              <polyline points="9 18 15 12 9 6" />
-            </svg>
-            <span>{unique.length} references</span>
-          </button>
-        )}
       </div>
-      {refOpen && unique.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {unique.slice(0, 8).map((s, i) => (
-            <SourceChip key={i} source={s} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
-
 
 function stripCitations(text: string): string {
   return text.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, "");
 }
 
-function dedupe(sources: Source[]): Source[] {
-  const seen = new Set<string>();
-  return sources.filter((s) => {
-    const key = `${s.source_type}:${s.source_id}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
-}
-
-function SourceChip({ source }: { source: Source }) {
-  const content = (
-    <span className="inline-flex max-w-[220px] items-center gap-1.5 rounded-full border border-black/[0.14] bg-white px-3 py-1.5 text-[13px] font-medium text-engenius-dark/75 transition-colors hover:border-engenius-blue/50 hover:text-engenius-dark">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-      </svg>
-      <span className="truncate">{source.title}</span>
-    </span>
-  );
-  const isLinkable =
-    source.source_url &&
-    source.source_type !== "product_spec" &&
-    source.source_url.startsWith("http");
-  if (isLinkable) {
-    return (
-      <a href={source.source_url!} target="_blank" rel="noopener noreferrer">
-        {content}
-      </a>
-    );
-  }
-  return content;
-}
