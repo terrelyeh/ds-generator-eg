@@ -11,6 +11,7 @@ import { cookies, headers } from "next/headers";
 import { rateLimitAllowed } from "@eg/db/rate-limit";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 import { allowedKnowledgeAreas, loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
+import { withAssetTokens } from "@/lib/auth/asset-token";
 import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
 import { decryptKey } from "@/lib/auth/api-key";
 
@@ -505,14 +506,25 @@ export async function POST(request: Request) {
         // Sources are fully known the moment retrieval finishes — send them
         // BEFORE the LLM stream so the UI can show what was found while the
         // answer is still generating (perceived latency drops a lot).
-        const sources = docs.map((d) => ({
-          title: d.title,
-          source_id: d.source_id,
-          source_type: d.source_type,
-          source_url: d.source_url,
-          similarity: Math.round(d.similarity * 100) / 100,
-          image_urls: (d.metadata?.image_urls as string[]) ?? [],
-        }));
+        // Readers without an EnGenie session (workspace, widget, extension,
+        // demo) can't load /api/knowledge-assets images — an <img> can't send
+        // their workspace bearer — so their image links carry a signature
+        // good for that one image (lib/auth/asset-token.ts). Internal readers
+        // keep the plain, session-checked URL, which stays valid in history.
+        const signImages = !!ws || caller === "demo";
+        const sources = await Promise.all(
+          docs.map(async (d) => {
+            const imageUrls = (d.metadata?.image_urls as string[]) ?? [];
+            return {
+              title: d.title,
+              source_id: d.source_id,
+              source_type: d.source_type,
+              source_url: d.source_url,
+              similarity: Math.round(d.similarity * 100) / 100,
+              image_urls: signImages ? await withAssetTokens(imageUrls) : imageUrls,
+            };
+          }),
+        );
         sendEvent(JSON.stringify({ type: "sources", sources }));
 
         // Step 3: Build context from matched documents

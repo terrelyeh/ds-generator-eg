@@ -31,7 +31,8 @@ export function workspaceCookieName(slug: string): string {
   return `${WS_COOKIE_PREFIX}${slug}`;
 }
 
-function tokenSecret(): string | null {
+/** Shared with asset-token.ts — one signing secret, domain-separated by message prefix. */
+export function tokenSecret(): string | null {
   return process.env.WORKSPACE_TOKEN_SECRET || process.env.API_KEY_ENC_SECRET || null;
 }
 
@@ -39,7 +40,7 @@ function toHex(buf: ArrayBuffer): string {
   return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function hmacHex(secret: string, msg: string): Promise<string> {
+export async function hmacHex(secret: string, msg: string): Promise<string> {
   const key = await crypto.subtle.importKey(
     "raw",
     new TextEncoder().encode(secret),

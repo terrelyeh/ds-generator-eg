@@ -192,7 +192,12 @@ src/
 - **內部文件的圖存在私有 bucket `knowledge-assets`**（migration 00058）。`/api/knowledge-assets/<path>`
   擋 `ask.use`、驗路徑（`isAllowedAssetPath`：只准 `internal_doc/<collection>/…圖檔`、不准 `..`）、
   **轉址到 1 小時簽章網址**——SVG 從 Supabase 的網域出，不從我們的，直接開成頁面也碰不到 EnGenie session。
-  ⚠️ proxy 的 matcher 排除圖檔副檔名，所以這支 route **不經過 proxy**，保護完全靠 handler 自己的 `gate`。
+  ⚠️ proxy 的 matcher 排除圖檔副檔名，所以這支 route **不經過 proxy**，保護完全靠 handler 自己的檢查。
+  **沒有登入 session 的讀者（workspace / widget / extension）用簽章連結**（2026-09-11）：`/api/ask` 對非內部
+  caller 把 `image_urls` 裡的 asset 網址加上 `?t=<exp>.<sig>`（`lib/auth/asset-token.ts`，
+  HMAC `asset:<path>:<exp>`、24 小時、只開那一張圖）。只替「這次檢索到的來源」簽——那些已經過 workspace 的
+  scope 與知識領域檢查，不多開放任何東西；`asset:` 前綴讓它永遠不會被當成 workspace token 驗過。
+  以前 extension 裡的 SRS 圖**全部被 401、再被 AnswerFigures 靜默藏掉**，畫面上只剩模型自己畫的 ASCII。
   ingest 端：`internal-doc-prep` 把 `![alt](path)` 換成 `（圖：alt）`（沒 alt 就用檔名，不再整張消失），
   同一個字串就是對回 chunk 的鑰匙——含那個字串的 chunk 拿到 `metadata.image_urls`；
   檢視頁那份 `raw` 把圖放回原位。CLI 會自動上傳文件引用到的本機圖檔。

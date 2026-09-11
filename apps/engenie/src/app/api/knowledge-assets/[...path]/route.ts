@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate } from "@eg/auth/session";
 import { isAllowedAssetPath, KNOWLEDGE_ASSETS_BUCKET, safeDecode } from "@/lib/rag/doc-view";
+import { verifyAssetToken } from "@/lib/auth/asset-token";
 
 /**
  * GET /api/knowledge-assets/<storage path>
@@ -15,18 +16,27 @@ import { isAllowedAssetPath, KNOWLEDGE_ASSETS_BUCKET, safeDecode } from "@/lib/r
  * citing this content can be shown the figure it cites, and viewers have
  * ask.use without knowledge.view.
  *
+ * Readers with no session — workspace, widget, extension — pass with a signed
+ * link instead (`?t=`, lib/auth/asset-token.ts). /api/ask mints those only
+ * for the sources it just retrieved for them, so a token opens exactly one
+ * image the caller was already allowed to see. Without it, every SRS diagram
+ * in the extension was a 401 that the answer quietly hid.
+ *
  * Redirecting rather than streaming the bytes keeps the image on Supabase's
  * origin — an SVG opened directly as a page then cannot script against an
  * EnGenie session.
  */
-export async function GET(_request: Request, { params }: { params: Promise<{ path: string[] }> }) {
-  const denied = await gate("ask.use");
-  if (denied) return denied;
-
+export async function GET(request: Request, { params }: { params: Promise<{ path: string[] }> }) {
   const { path } = await params;
   const storagePath = path.map(safeDecode).join("/");
   if (!isAllowedAssetPath(storagePath)) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
+
+  const token = new URL(request.url).searchParams.get("t");
+  if (!(await verifyAssetToken(storagePath, token))) {
+    const denied = await gate("ask.use");
+    if (denied) return denied;
   }
 
   const supabase = createAdminClient();
