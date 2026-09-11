@@ -499,12 +499,12 @@ export function AskWorkspacesManager() {
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
-                <p className="mb-2 text-sm font-medium">嵌入 Widget 安全</p>
+                <p className="mb-2 text-sm font-medium">嵌入安全（Widget / Chrome Extension）</p>
                 <label className="mb-1 block text-sm font-medium text-muted-foreground">允許嵌入的網域 <span className="font-normal text-muted-foreground/60">(一行一個；空=不限制)</span></label>
                 <textarea value={allowedOrigins} disabled={saving} onChange={(e) => setAllowedOrigins(e.target.value)} rows={3}
-                  placeholder={"https://partner.example.com\nhttps://intranet.engenius.com"}
+                  placeholder={"https://partner.example.com\nhttps://intranet.engenius.com\nchrome-extension://<extension id>"}
                   className="w-full rounded-md border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
-                <p className="mt-1 text-[13px] text-muted-foreground/60">只有這些網站能用 widget snippet 嵌入此 chat（瀏覽器以 CSP frame-ancestors 強制）。留空＝任何網站都能嵌入。</p>
+                <p className="mt-1 text-[13px] text-muted-foreground/60">只有這些網站能嵌入此 chat（瀏覽器以 CSP frame-ancestors 強制）。Chrome 側邊欄 extension 也填在這裡：<code className="rounded bg-muted px-1">chrome-extension://&lt;ID&gt;</code>（ID 見 <code className="rounded bg-muted px-1">extensions/engenie-sidepanel/README.md</code>）。留空＝任何網站都能嵌入。</p>
                 {editId && (
                   <div className="mt-3 flex items-center justify-between gap-3 border-t pt-3">
                     <p className="text-[13px] text-muted-foreground/60">撤銷所有已發出的 token；widget 與 /ask 連線需重新驗證。</p>

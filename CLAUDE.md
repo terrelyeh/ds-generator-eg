@@ -19,6 +19,8 @@
 │   ├── google/         # @eg/google — service account 的 `getGoogleAuth()`（token 快取共用；Sheets/Drive/Docs helper 仍各 app 自己）
 │   └── llm/            # @eg/llm — OpenRouter chat client（chat completions 統一入口；**embedding 不走這裡**）
 │                       #   + features.ts = 花費歸戶的功能標籤對照表（OpenRouter `user` 欄位）
+├── extensions/
+│   └── engenie-sidepanel/  # Chrome 側邊欄 extension：iframe EnGenie 的 /embed/<slug>（純靜態、無 build、不是 npm workspace）
 └── package.json        # npm workspaces：apps/*, packages/*
 ```
 

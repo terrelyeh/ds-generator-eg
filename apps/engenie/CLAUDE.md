@@ -199,6 +199,14 @@ src/
   完全沒有檢查;而且 `::ffff:169.254.169.254` 這種寫法會直接通過
 - **Knowledge 的 Product Specs 清單**用 `knowledge/product-spec-list.tsx` 依 Solution ▸ Product Line 折疊分組 + 搜尋 + 每條產品線各自 re-index（走 `product_line_id`；`/api/taxonomy` 有回 product line `id`）。其餘來源類型維持平鋪表。
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（**沒設白名單 = 不限制;白名單「讀不到」= 只准 `'self'`**——2026-09-04 起兩種情況分開,之前 Supabase 一次 2 秒的抖動就是限制關掉的那一刻）
+- **Chrome 側邊欄 extension**（2026-09-11，repo 根目錄的 `extensions/engenie-sidepanel/`）——
+  Side Panel 裡 iframe `/embed/<slug>`，**沒有自己的聊天邏輯**：認證、知識範圍、模型、配額全在 workspace。
+  它只是另一個嵌入點，**不是新的 workspace 類型**——在「允許嵌入的網域」加一行 `chrome-extension://<id>` 就好。
+  `normalizeOrigins()`（抽到 `lib/ask/origins.ts`，有測試）以前只收 http(s)，`chrome-extension://` 會被**靜默刪掉**
+  （`new URL()` 對這個 scheme 的 `.origin` 是字串 `"null"`）——清單因此變空就等於不送 CSP、任何網站都能嵌。
+  extension ID 由 manifest 的 `key` 固定為 `dakefbpojccpgknegbfbfeicfadbeamk`（沒有 key 的話，載入未封裝的 ID
+  會跟著資料夾絕對路徑變，換台電腦就對不上白名單）。對應的 workspace 是 **`ext`**：有 passcode、**所有知識**
+  （6 個領域全勾、不限 scope），內部測試用。**以後新開的知識領域不會自動進 `ext`**，要記得去勾。
 - Gemini 一律 `x-goog-api-key` header；錯誤回前端先 `redactSecrets()`
 - **2026-09-04 Ask/ingest 硬化（PR #61）**：
   ① **檢索到的文字包在 `<source id="Source N" …>` 元素裡**，system prompt 有一條

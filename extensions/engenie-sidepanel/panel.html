@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <title>EnGenie Ask</title>
+    <link rel="stylesheet" href="panel.css" />
+  </head>
+  <body>
+    <!-- The chat itself is EnGenie's existing /embed/<slug> page — the same one
+         the SpecHub side widget uses. clipboard-write lets its Copy button work
+         inside the frame. -->
+    <iframe id="engenie" title="EnGenie Ask" allow="clipboard-write"></iframe>
+    <script type="module" src="panel.js"></script>
+  </body>
+</html>

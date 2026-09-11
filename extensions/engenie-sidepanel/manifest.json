@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "EnGenie Ask",
+  "version": "0.1.0",
+  "description": "在任何網頁用 Chrome 側邊欄打開 EnGenie Ask（內部測試）。",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAo3/mg3fuGpWSUXQI5vO4+BMUkKDWU7a76O6yiYhYo09g9wvOIC1KNHeWEoJ72qmyJXZHXe/+GC/yFcWoTDz62BGs6XG3dg4EqHRgUDu17i0JTJxR22wmkApQC5kOScC1hjgxPpLM7NGQSREBI6G9hN15xUNJlDvzwip1zhyH0D5q0BRELUhmX+dfSsZ0KVmsw2uG0KvCtd4HSgyawrxGf4aYFv/I19n2SsWF1c0dJ51xifCBocpqIT1Thp4BxReX+rQ8ABz+ZB97536RLTo4bVFJUiNtgbKXuqQXEwuAL3q+4g7Lkeo3gblUa8So6789tQ+ywllA0wD10+Au0UTiTQIDAQAB",
+  "minimum_chrome_version": "116",
+  "permissions": ["sidePanel"],
+  "background": { "service_worker": "background.js" },
+  "side_panel": { "default_path": "panel.html" },
+  "action": {
+    "default_title": "EnGenie Ask",
+    "default_icon": { "16": "icons/icon-16.png", "32": "icons/icon-32.png" }
+  },
+  "icons": { "16": "icons/icon-16.png", "48": "icons/icon-48.png", "128": "icons/icon-128.png" },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Alt+Shift+E", "mac": "Command+Shift+E" },
+      "description": "打開 EnGenie Ask"
+    }
+  }
+}
