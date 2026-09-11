@@ -4,6 +4,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { gate, getCurrentUser } from "@eg/auth/session";
 import { encryptKey } from "@/lib/auth/api-key";
 import { getDefaultModel } from "@eg/llm/models";
+import { normalizeOrigins } from "@/lib/ask/origins";
 
 /**
  * Admin CRUD for Ask workspaces (per-department /ask/<slug> entries).
@@ -75,23 +76,6 @@ function normalizeScope(s: WorkspaceInput["scope"]) {
     source_types: Array.isArray(v.source_types) ? v.source_types : [],
     knowledge_areas: Array.isArray(v.knowledge_areas) ? v.knowledge_areas : [],
   };
-}
-
-/** Keep only valid http(s) origins (scheme://host[:port]); drop paths + dupes. */
-function normalizeOrigins(input: unknown): string[] {
-  if (!Array.isArray(input)) return [];
-  const out: string[] = [];
-  for (const v of input) {
-    if (typeof v !== "string") continue;
-    const s = v.trim();
-    if (!s) continue;
-    try {
-      const u = new URL(s);
-      if (u.protocol !== "http:" && u.protocol !== "https:") continue;
-      out.push(u.origin);
-    } catch { /* skip invalid entries */ }
-  }
-  return [...new Set(out)];
 }
 
 export async function POST(request: Request) {
