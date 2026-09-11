@@ -5,6 +5,7 @@ import { cjkFontFor, displayFontStack } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { COVER_PHOTO_POLICIES } from "@/lib/datasheet/cover-photo";
 import { PT, WT, LADDER } from "@/lib/datasheet/scale";
+import { buildDcSpecBlocks, paginateDcSpecBlocks, withStripes } from "@/lib/datasheet/dc-spec-table";
 import type {
   Product,
   ProductLine,
@@ -23,7 +24,8 @@ import type {
  *   2. EDCC — shared management-platform page (static asset rendered from
  *      the reference PDF; zero PM work)
  *   3..n. Technical Specifications — FULL-WIDTH single-model table
- *      (blue band + dark Model Name/Number bands + alternating rows),
+ *      (primary band + dark Model Name/Number bands + alternating rows, and
+ *      a band per named sheet section — lib/datasheet/dc-spec-table),
  *      paginated by estimated row height
  *   n+1. Hardware Overview — 1–2 renders ({model}_hardware[_2].png) +
  *      Contact-Us footer (Transceiver-style QR)
@@ -114,13 +116,6 @@ interface DcQueryRow extends Product {
   spec_sections: (SpecSection & { spec_items: SpecItem[] })[];
 }
 
-/** Rough line count for a spec value in the 385pt value column (8pt Roboto). */
-function estLines(text: string, charsPerLine: number): number {
-  return text
-    .split("\n")
-    .reduce((sum, seg) => sum + Math.max(1, Math.ceil(seg.trim().length / charsPerLine)), 0);
-}
-
 // ── Cover hero auto-fit ──────────────────────────────────────────────
 // The hero band is a fixed height, but PM-written overviews vary a lot
 // (SE110's ran 11 lines and ate the band's entire bottom padding). Rather
@@ -179,32 +174,6 @@ function fitOverviewSize(overview: string, available: number): number {
   return ladder[ladder.length - 1];
 }
 
-interface SpecRow {
-  label: string;
-  value: string;
-}
-
-/** Split flat spec rows into pages by estimated height. */
-function paginateSpecRows(rows: SpecRow[], firstPageBudget: number, restPageBudget: number): SpecRow[][] {
-  const pages: SpecRow[][] = [];
-  let current: SpecRow[] = [];
-  let used = 0;
-  let budget = firstPageBudget;
-  for (const row of rows) {
-    const h = Math.max(estLines(row.value, 86), estLines(row.label, 24)) * 11 + 11;
-    if (used + h > budget && current.length > 0) {
-      pages.push(current);
-      current = [];
-      used = 0;
-      budget = restPageBudget;
-    }
-    current.push(row);
-    used += h;
-  }
-  if (current.length > 0) pages.push(current);
-  return pages;
-}
-
 function Placeholder({ slot, className }: { slot: string; className?: string }) {
   return <div className={`img-placeholder ${className ?? ""}`}>missing: {slot}</div>;
 }
@@ -253,19 +222,13 @@ export function DataCenterPreview({
   );
   const useGroups = dsGroups.length > 0;
 
-  // Flat spec rows — the DC table renders without category headers (the
-  // sheets carry a single implicit section; the reference design has none).
-  const specRows: SpecRow[] = (product.spec_sections ?? [])
-    .sort((a, b) => a.sort_order - b.sort_order)
-    .flatMap((s) =>
-      (s.spec_items ?? [])
-        .sort((a, b) => a.sort_order - b.sort_order)
-        .map((i) => ({ label: i.label, value: i.value }))
-    )
-    .filter((r) => r.value.trim() !== "" && r.value.trim().toUpperCase() !== "N/A");
+  // Named sheet sections print as a band inside the table; the rows directly
+  // under the sheet's "Technical Specifications" row sit under the page title
+  // instead (the parser files them as "General") — see lib/datasheet/dc-spec-table.
+  const specBlocks = buildDcSpecBlocks(product.spec_sections ?? []);
 
   // First spec page: title(70) + band(22) + 2 model bands(40) → ~600pt of rows.
-  const specPages = paginateSpecRows(specRows, 590, 655);
+  const specPages = paginateDcSpecBlocks(specBlocks, 590, 655).map(withStripes);
 
   // Locales carry their own hardware render — its callouts are translated
   // in the image itself.
@@ -315,7 +278,7 @@ export function DataCenterPreview({
     (!isTranslated || translationConfirmed) &&
     !!overview && overview.trim().length > 0 &&
     (useGroups || (Array.isArray(features) && features.length > 0)) &&
-    specRows.length > 0;
+    specBlocks.length > 0;
 
   const totalPages = 2 + specPages.length + 1;
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -554,7 +517,15 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
 .spec-row td { font-size: ${PT.table}pt; line-height: 1.4; }
 .spec-row td.spec-label { color: #231f20; font-weight: ${WT.regular}; }
 .spec-row td.spec-value { color: #525355; white-space: pre-line; }
-.spec-row:nth-child(even) td { background: #eff0f0; }
+.spec-row.alt td { background: #eff0f0; }
+/* A named sheet section ("High-Performance AI & Graphics Acceleration").
+   Same colours as the table band, but set left like the labels and one
+   weight up, so it reads as a heading over the rows beneath it rather than
+   as a second table title (that band is centred). */
+.spec-section-row td {
+  background: ${PRIMARY}; color: white; font-weight: ${WT.medium}; font-size: ${PT.table}pt;
+  padding: 5pt 8pt; border-color: ${PRIMARY};
+}
 
 /* ── Hardware overview ─────────────────────────────────────────────── */
 .hw-page { position: absolute; top: 21.4pt; left: 36pt; right: 36pt; }
@@ -721,12 +692,18 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
                     </tr>
                   </>
                 )}
-                {rows.map((r, ri) => (
-                  <tr key={ri} className="spec-row">
-                    <td className="spec-label">{r.label}</td>
-                    <td className="spec-value">{r.value}</td>
-                  </tr>
-                ))}
+                {rows.map((b, bi) =>
+                  b.kind === "section" ? (
+                    <tr key={bi} className="spec-section-row">
+                      <td colSpan={2}>{b.title}</td>
+                    </tr>
+                  ) : (
+                    <tr key={bi} className={b.alt ? "spec-row alt" : "spec-row"}>
+                      <td className="spec-label">{b.label}</td>
+                      <td className="spec-value">{b.value}</td>
+                    </tr>
+                  ),
+                )}
               </tbody>
             </table>
           </div>
