@@ -131,6 +131,7 @@ export function ModelsEditor() {
         return;
       }
       toast.success(`已儲存 ${data.count} 個模型`);
+      if (data.warning) toast.warning(data.warning);
       setDirty(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
@@ -176,7 +177,9 @@ export function ModelsEditor() {
           ）。還被 Ask workspace 指定的模型會擋下來，不會讓你刪成空指向。
         </p>
         <p className="text-muted-foreground">
-          新增前先確認 slug 真的存在 —— 打錯字的 model 要到實際呼叫時才會失敗：
+          儲存時會拿 OpenRouter 的模型清單檢查每個啟用中的 slug，打錯會直接擋下並提示正確寫法。
+          「永遠最新版」的別名開頭有 <code className="font-mono">~</code>，例如{" "}
+          <code className="font-mono">~deepseek/deepseek-v4-flash-latest</code>。查 slug：
           <code className="ml-1 rounded bg-muted px-1 py-0.5 font-mono">
             npx tsx apps/spechub/scripts/list-openrouter-models.ts claude
           </code>
