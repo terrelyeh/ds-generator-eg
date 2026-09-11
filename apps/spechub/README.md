@@ -79,7 +79,8 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
   - **Cloud 藍色**（預設）/ Unmanaged·Extender **灰色**
   - **Transceiver 綠色**（Accessories）— 封面照片置中 + Overview 滿版、**無 Hardware 頁**、QR 指向 **Contact Us**（無 QSG）
   - **Data Center 青色 `#09909d`**（Edge Network Appliance / AI Server）— 照片 hero 封面 + 8 個賣點區塊、
-    全系列共用的 EDCC 管理平台頁、全寬單機規格表（自動分頁）、Hardware Overview 最多 2 張圖、Contact Us QR。
+    全系列共用的 EDCC 管理平台頁、全寬單機規格表（依 sheet 分段，每段一條灰色標題，第一段 General
+    以 Model Name / Model Number 開頭；自動分頁，短的段落不會被拆到兩頁）、Hardware Overview 最多 2 張圖、Contact Us QR。
     封面賣點文案可由 Google Sheet 的 `DS Feature Groups` 列維護（「標籤 | 標題: + 說明」格式）
   - **Broadband 鋼藍**（Broadband Outdoor）— 封面主視覺 + Features & Benefits + 部署應用圖、
     Product Views、Antenna Patterns。**同一套組件同時產「單機」與「整系列」兩種 datasheet**，
