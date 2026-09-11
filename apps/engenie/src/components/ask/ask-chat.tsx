@@ -277,6 +277,7 @@ function processTextWithCitations(text: string, sources: Source[]): React.ReactN
    only the streaming message (whose `message` identity changes) re-renders. */
 const AskMessage = memo(function AskMessage({
   message,
+  question,
   isLast,
   compact,
   loadingStatus,
@@ -284,6 +285,8 @@ const AskMessage = memo(function AskMessage({
   onRegenerate,
 }: {
   message: Message;
+  /** The user message this answers — figures open by default only if it asked for one. */
+  question?: string;
   isLast: boolean;
   compact: boolean;
   loadingStatus: "searching" | "generating" | null;
@@ -342,7 +345,7 @@ const AskMessage = memo(function AskMessage({
         {/* Figures from the sources the answer cited — only once it has
             finished, since the set of citations isn't final until then. */}
         {!message.isStreaming && message.content && (
-          <AnswerFigures content={content} sources={message.sources} />
+          <AnswerFigures content={content} sources={message.sources} question={question} />
         )}
 
         {/* Action bar: copy + provider */}
@@ -905,6 +908,7 @@ export function AskChat({ compact = false }: AskChatProps) {
                   <AskMessage
                     key={i}
                     message={msg}
+                    question={i > 0 && messages[i - 1]?.role === "user" ? messages[i - 1].content : undefined}
                     isLast={i === messages.length - 1}
                     compact={compact}
                     loadingStatus={msg.isStreaming ? loadingStatus : null}

@@ -75,3 +75,16 @@ export function citedFigures(
   }
   return figures;
 }
+
+/**
+ * Did the question ask for something visual? Answer figures stay folded
+ * behind「相關圖片（N）」unless it did — four large screenshots under an
+ * answer nobody asked to see read as noise. Deliberately a list of explicit
+ * asks, not every "圖": 意圖 / 試圖 are not requests for a picture.
+ */
+const VISUAL_ASK_RE =
+  /(架構圖|示意圖|流程圖|拓[樸撲]|截圖|圖片|圖示|附圖|有圖|看圖|給我圖|畫面|長什麼樣|長怎樣|看起來|diagram|image|picture|screenshot|figure|topology|look like)/i;
+
+export function asksForVisuals(question: string | null | undefined): boolean {
+  return !!question && VISUAL_ASK_RE.test(question);
+}

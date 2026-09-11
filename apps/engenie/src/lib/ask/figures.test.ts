@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { citedFigures, citedIndexes, isSafeImageUrl } from "./figures";
+import { asksForVisuals, citedFigures, citedIndexes, isSafeImageUrl } from "./figures";
 
 const src = (title: string, image_urls: string[] = []) => ({ title, image_urls });
 
@@ -57,5 +57,20 @@ describe("isSafeImageUrl", () => {
     expect(isSafeImageUrl("//evil.example/x.png")).toBe(false);
     expect(isSafeImageUrl("/\\evil.example/x.png")).toBe(false);
     expect(isSafeImageUrl("javascript:alert(1)")).toBe(false);
+  });
+});
+
+describe("asksForVisuals", () => {
+  it("is true when the question asks to see something", () => {
+    for (const q of ["Craft AI 的架構圖長怎樣？", "給我 VPN 設定畫面的截圖", "show me the topology", "What does the dashboard look like?", "有圖嗎"]) {
+      expect(asksForVisuals(q)).toBe(true);
+    }
+  });
+
+  it("is false for an ordinary question — and for words that merely contain 圖", () => {
+    for (const q of ["怎麼設定 Site-to-Site VPN？", "PRO license 到期後設備還能用嗎？", "這個設計的意圖是什麼", "他試圖連線但失敗", ""]) {
+      expect(asksForVisuals(q)).toBe(false);
+    }
+    expect(asksForVisuals(undefined)).toBe(false);
   });
 });

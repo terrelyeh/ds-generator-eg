@@ -225,6 +225,7 @@ export function EngenieChat({
                 <MessageBubble
                   key={i}
                   message={m}
+                  question={i > 0 && messages[i - 1]?.role === "user" ? messages[i - 1].content : undefined}
                   compact={compact}
                   loadingStatus={m.isStreaming ? loadingStatus : null}
                   onFollowUp={isLastAssistant ? submit : undefined}
@@ -312,12 +313,15 @@ export function EngenieChat({
 /* ─── Message bubble (memoized to prevent re-render of prior messages during streaming) ─── */
 const MessageBubble = memo(function MessageBubble({
   message,
+  question,
   compact = false,
   loadingStatus = null,
   onFollowUp,
   onRegenerate,
 }: {
   message: Message;
+  /** The user message this answers — figures open by default only if it asked for one. */
+  question?: string;
   compact?: boolean;
   loadingStatus?: "searching" | "generating" | null;
   onFollowUp?: (q: string) => void;
@@ -388,7 +392,7 @@ const MessageBubble = memo(function MessageBubble({
         )}
         {!message.isStreaming && message.content && (
           <>
-            <AnswerFigures content={content} sources={message.sources} />
+            <AnswerFigures content={content} sources={message.sources} question={question} />
             <ActionBar content={content} onRegenerate={onRegenerate} />
             {onFollowUp && message.followUps && message.followUps.length > 0 && (
               <FollowUpList questions={message.followUps} onClick={onFollowUp} />
