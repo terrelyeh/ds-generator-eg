@@ -192,6 +192,10 @@ src/
   總共最多 4 張、只收 http(s) 或同源路徑。**不要改成顯示所有撈到的來源的圖**——最多 12 個來源，
   會把沒被用到的別型號截圖放在答案旁邊。串流結束才顯示（引用在那之前還不完整）。
   圖一律用 `<img>`，**不 inline SVG**（圖片形式的 SVG 不能跑 script）。
+  **點圖開的是頁內 viewer，不是圖片網址**（2026-09-11）——Supabase Storage 對 SVG 回
+  `Content-Disposition: attachment` + sandbox CSP（防止 SVG 在它的網域跑 script），開成分頁就是下載；
+  `<img>` 不理這個標頭，所以 viewer 直接用同一個網址放大（點圖切換原尺寸、捲動檢視，← → 換張，Esc 關閉）。
+  viewer 用 portal 掛到 `document.body`——聊天列有進場動畫，被 transform 的祖先會讓 `position: fixed` 失效。
   舊的 `image_map`（伺服器每次都送、前端收下存進歷史、兩個介面都沒畫）已刪掉——同一件事有兩條路，
   就是它半途而廢三個月的原因。
 - **內部文件的圖存在私有 bucket `knowledge-assets`**（migration 00058）。`/api/knowledge-assets/<path>`
