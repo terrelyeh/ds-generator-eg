@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X, ZoomIn, ZoomOut } from "lucide-react";
-import { citedFigures, type AnswerFigure, type FigureSource } from "@/lib/ask/figures";
+import { ChevronLeft, ChevronRight, Image as ImageIcon, X, ZoomIn, ZoomOut } from "lucide-react";
+import { asksForVisuals, citedFigures, type AnswerFigure, type FigureSource } from "@/lib/ask/figures";
 
 /**
- * Images from the sources an answer cited, under the answer. Shared by both
+ * Images from the sources an answer cited, under the answer — folded behind
+ * 「相關圖片（N）」unless the question asked for something visual. Shared by both
  * chat surfaces (ask-chat and engenie-chat). Render it only once the answer
  * has finished streaming — until then the set of citations isn't final.
  *
@@ -20,42 +21,64 @@ import { citedFigures, type AnswerFigure, type FigureSource } from "@/lib/ask/fi
  * the same URL fitted, with click-to-zoom for diagrams too dense to read in a
  * side panel.
  */
-export function AnswerFigures({ content, sources }: { content: string; sources?: FigureSource[] }) {
+export function AnswerFigures({
+  content,
+  sources,
+  question,
+}: {
+  content: string;
+  sources?: FigureSource[];
+  /** The user's question — figures open by default only when it asked for something visual. */
+  question?: string;
+}) {
   const figures = citedFigures(content, sources);
   // An external screenshot that has since moved should vanish, not leave a
   // broken-image icon in the answer.
   const [broken, setBroken] = useState<Set<string>>(() => new Set());
   const [openIndex, setOpenIndex] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(() => asksForVisuals(question));
   const visible = figures.filter((f) => !broken.has(f.url));
   if (visible.length === 0) return null;
 
   const single = visible.length === 1;
   return (
     <>
-      <div className={`mt-3 grid max-w-[46rem] gap-2 ${single ? "grid-cols-1" : "grid-cols-2"}`}>
-        {visible.map((f, i) => (
-          <button
-            key={f.url}
-            type="button"
-            onClick={() => setOpenIndex(i)}
-            aria-label={`放大檢視：[${f.citation}] ${f.sourceTitle}`}
-            className="group block cursor-zoom-in overflow-hidden rounded-lg border border-black/10 bg-white text-left transition-shadow hover:shadow-md dark:border-white/10 dark:bg-slate-900"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={f.url}
-              alt={f.sourceTitle}
-              loading="lazy"
-              onError={() => setBroken((prev) => new Set(prev).add(f.url))}
-              className={`block h-auto w-full bg-slate-50 object-contain dark:bg-slate-800 ${single ? "max-h-[28rem]" : "max-h-60"}`}
-            />
-            <span className="flex items-center gap-1.5 border-t border-black/5 px-2.5 py-1.5 text-[11px] text-slate-500 dark:border-white/5 dark:text-slate-400">
-              <span className="font-medium text-slate-600 dark:text-slate-300">[{f.citation}]</span>
-              <span className="truncate">{f.sourceTitle}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="mt-3 inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground transition-colors hover:text-foreground"
+      >
+        <ImageIcon className="h-3.5 w-3.5" />
+        相關圖片（{visible.length}）
+        <ChevronRight className={`h-3.5 w-3.5 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />
+      </button>
+      {expanded && (
+        <div className={`mt-2 grid max-w-[46rem] gap-2 ${single ? "grid-cols-1" : "grid-cols-2"}`}>
+          {visible.map((f, i) => (
+            <button
+              key={f.url}
+              type="button"
+              onClick={() => setOpenIndex(i)}
+              aria-label={`放大檢視：[${f.citation}] ${f.sourceTitle}`}
+              className="group block cursor-zoom-in overflow-hidden rounded-lg border border-black/10 bg-white text-left transition-shadow hover:shadow-md dark:border-white/10 dark:bg-slate-900"
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={f.url}
+                alt={f.sourceTitle}
+                loading="lazy"
+                onError={() => setBroken((prev) => new Set(prev).add(f.url))}
+                className={`block h-auto w-full bg-slate-50 object-contain dark:bg-slate-800 ${single ? "max-h-[28rem]" : "max-h-60"}`}
+              />
+              <span className="flex items-center gap-1.5 border-t border-black/5 px-2.5 py-1.5 text-[11px] text-slate-500 dark:border-white/5 dark:text-slate-400">
+                <span className="font-medium text-slate-600 dark:text-slate-300">[{f.citation}]</span>
+                <span className="truncate">{f.sourceTitle}</span>
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
       {openIndex !== null && visible[openIndex] && (
         <FigureViewer figures={visible} index={openIndex} onIndex={setOpenIndex} onClose={() => setOpenIndex(null)} />
       )}
