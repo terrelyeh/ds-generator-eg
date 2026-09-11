@@ -172,6 +172,22 @@ src/
   `file` 不是 markdown —— 那條路徑轉成 60 秒簽章網址。
   citation 的 `isInternal` 從「只有 wifi_regulation」放寬成「除了 product_spec 的所有相對路徑」
   （`/product/…` 是 SpecHub 的頁面，不是我們的）。
+- **答案下方會顯示被引用來源的原圖**（2026-09-11）——`components/chat/answer-figures.tsx`，兩個聊天介面共用。
+  選圖在 `lib/ask/figures.ts`（純函式）：**只看答案真的 `[n]` 引用到的來源**、依引用順序、每來源最多 2 張、
+  總共最多 4 張、只收 http(s) 或同源路徑。**不要改成顯示所有撈到的來源的圖**——最多 12 個來源，
+  會把沒被用到的別型號截圖放在答案旁邊。串流結束才顯示（引用在那之前還不完整）。
+  圖一律用 `<img>`，**不 inline SVG**（圖片形式的 SVG 不能跑 script）。
+  舊的 `image_map`（伺服器每次都送、前端收下存進歷史、兩個介面都沒畫）已刪掉——同一件事有兩條路，
+  就是它半途而廢三個月的原因。
+- **內部文件的圖存在私有 bucket `knowledge-assets`**（migration 00058）。`/api/knowledge-assets/<path>`
+  擋 `ask.use`、驗路徑（`isAllowedAssetPath`：只准 `internal_doc/<collection>/…圖檔`、不准 `..`）、
+  **轉址到 1 小時簽章網址**——SVG 從 Supabase 的網域出，不從我們的，直接開成頁面也碰不到 EnGenie session。
+  ⚠️ proxy 的 matcher 排除圖檔副檔名，所以這支 route **不經過 proxy**，保護完全靠 handler 自己的 `gate`。
+  ingest 端：`internal-doc-prep` 把 `![alt](path)` 換成 `（圖：alt）`（沒 alt 就用檔名，不再整張消失），
+  同一個字串就是對回 chunk 的鑰匙——含那個字串的 chunk 拿到 `metadata.image_urls`；
+  檢視頁那份 `raw` 把圖放回原位。CLI 會自動上傳文件引用到的本機圖檔。
+- **`/knowledge/doc` 檢視頁擋的是 `ask.use`，不是 `knowledge.view`**（2026-09-11 修）——
+  viewer 有 `ask.use` 沒有 `knowledge.view`，擋錯那個就等於 viewer 點每一條引用都被踢走。
 - **`chunk.ts` 會把超過 5000 字元的 pipe table 按列切、每段重複表頭**（2026-09-09）——
   表格對段落切分器來說是一個「段落」，以前一張 12k 的 skill-index 表會整個進索引、
   embedding 卻只嵌前 5000 字元，表尾永遠搜不到。同一次修掉超長區段第一段前綴重複的 bug。

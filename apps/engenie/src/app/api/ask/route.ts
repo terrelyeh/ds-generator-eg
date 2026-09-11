@@ -496,7 +496,7 @@ export async function POST(request: Request) {
         if (docs.length === 0 && recentHistory.length === 0) {
           sendEvent(JSON.stringify({ type: "chunk", content: "I couldn't find relevant product information to answer your question. Try rephrasing or asking about a specific product model." }));
           sendEvent(JSON.stringify({ type: "sources", sources: [] }));
-          sendEvent(JSON.stringify({ type: "metadata", follow_ups: [], image_map: {}, provider: "none", persona: personaId, profile: profileId, match_count: 0 }));
+          sendEvent(JSON.stringify({ type: "metadata", follow_ups: [], provider: "none", persona: personaId, profile: profileId, match_count: 0 }));
           sendEvent("[DONE]");
           controller.close();
           return;
@@ -564,14 +564,6 @@ export async function POST(request: Request) {
           ? `Previous conversation:\n${recentHistory.map((m) => `${m.role === "user" ? "User" : "Assistant"}: ${m.content}`).join("\n\n")}\n\n---\n\n`
           : "";
 
-        // Build image map from matched docs
-        const imageMap: Record<string, string[]> = {};
-        for (const d of docs) {
-          const urls = (d.metadata?.image_urls as string[]) ?? [];
-          if (urls.length > 0) {
-            imageMap[d.title] = urls;
-          }
-        }
 
         // Detect question language. LLMs (esp. Gemini Flash) are stubborn
         // about defaulting to Chinese when the RAG context is Chinese-heavy,
@@ -626,7 +618,6 @@ IMPORTANT formatting rules:
         sendEvent(JSON.stringify({
           type: "metadata",
           follow_ups: [],
-          image_map: Object.keys(imageMap).length > 0 ? imageMap : undefined,
           // The model that answered, not the one the request asked for — a
           // disabled or stale slug falls back to the surface default, and the
           // client used to display the slug it sent as if it had been used.

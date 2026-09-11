@@ -4,7 +4,8 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { createAdminClient } from "@eg/db/admin";
 import { requirePagePermission } from "@eg/auth/page-guards";
-import { loadDoc, VIEWABLE_SOURCE_TYPES } from "@/lib/rag/doc-view";
+import { can } from "@eg/auth/permissions";
+import { loadDoc, safeDecode, VIEWABLE_SOURCE_TYPES } from "@/lib/rag/doc-view";
 
 export const dynamic = "force-dynamic";
 
@@ -53,11 +54,15 @@ async function redirectToStoredFile(sourceId: string): Promise<never> {
 }
 
 export default async function KnowledgeDocPage({ params }: PageProps) {
+  // ask.use, not knowledge.view: this is where citations lead, and viewers
+  // can use Ask — so they are shown these citations — without having
+  // knowledge.view. Gating on the stricter one bounced them off every link.
   // Redirects on failure (it does not return an element).
-  await requirePagePermission("knowledge.view");
+  const user = await requirePagePermission("ask.use");
+  const canBrowse = can(user.role, "knowledge.view");
 
   const { slug } = await params;
-  const [sourceType, ...idParts] = slug.map((s) => decodeURIComponent(s));
+  const [sourceType, ...idParts] = slug.map(safeDecode);
   const sourceId = idParts.join("/");
   if (!sourceType || !sourceId) notFound();
 
@@ -79,13 +84,13 @@ export default async function KnowledgeDocPage({ params }: PageProps) {
       <div className="mx-auto max-w-3xl px-6 py-10">
         <div className="mb-6 flex items-center justify-between">
           <Link
-            href="/knowledge"
+            href={canBrowse ? "/knowledge" : "/ask"}
             className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M10 12L6 8l4-4" />
             </svg>
-            Knowledge Base
+            {canBrowse ? "Knowledge Base" : "Ask"}
           </Link>
           <span className="inline-flex items-center gap-1.5 rounded-full bg-engenius-blue/10 px-2.5 py-1 text-[11px] font-medium text-engenius-blue">
             <span>{badge.icon}</span>

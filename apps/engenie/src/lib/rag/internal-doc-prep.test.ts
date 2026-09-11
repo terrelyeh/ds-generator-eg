@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   cleanMarkdown,
+  extractImages,
   parseDocFrontmatter,
   prepareInternalDoc,
   stripSections,
@@ -92,7 +93,7 @@ describe("stripSections", () => {
 });
 
 describe("cleanMarkdown", () => {
-  it("keeps image alt text, strips relative links, keeps http links", () => {
+  it("keeps image alt text (the file name when there is none), strips relative links, keeps http links", () => {
     const md = [
       "![Craft AI 產品架構全貌](diagrams/stack.svg)",
       "![](diagrams/blank.png)",
@@ -103,7 +104,9 @@ describe("cleanMarkdown", () => {
     ].join("\n\n");
     const out = cleanMarkdown(md);
     expect(out).toContain("（圖：Craft AI 產品架構全貌）");
-    expect(out).not.toContain("blank.png");
+    // An alt-less image used to vanish from the text entirely; now it leaves
+    // its file name, so it can still be matched back to a chunk.
+    expect(out).toContain("（圖：blank.png）");
     expect(out).toContain("See Memory Contract §9 and Annex E.");
     expect(out).toContain("[repository](https://github.com/x/y)");
     expect(out).not.toContain('<a id=');
@@ -154,5 +157,34 @@ describe("prepareInternalDoc", () => {
     expect(doc.markdown).toContain("## API Operations");
     expect(doc.dropped).toEqual([]);
     expect(doc.meta).toEqual({ path: "references/01/house-rules.md", doc_kind: "doc" });
+  });
+});
+
+describe("extractImages", () => {
+  it("resolves a local image against the file it appears in", () => {
+    expect(extractImages("![Stack overview](diagrams/stack.svg)", "Craft-AI-SRS-v2.0.md")).toEqual([
+      { marker: "（圖：Stack overview）", alt: "Stack overview", path: "diagrams/stack.svg", url: null },
+    ]);
+    expect(extractImages("![a](../../diagrams/x.png)", "references/01/house-rules.md")[0].path).toBe(
+      "diagrams/x.png",
+    );
+  });
+
+  it("uses the exact marker cleanMarkdown leaves, so a chunk can be matched back", () => {
+    const md = 'Intro\n\n![Flow of a change](diagrams/flow.svg "Change flow")\n\n![](img/raw.png)';
+    const markers = extractImages(md, "doc.md").map((i) => i.marker);
+    expect(markers).toEqual(["（圖：Flow of a change）", "（圖：raw.png）"]);
+    const cleaned = cleanMarkdown(md);
+    for (const m of markers) expect(cleaned).toContain(m);
+  });
+
+  it("keeps external images as URLs and refuses paths that leave the package", () => {
+    const imgs = extractImages("![x](https://cdn.example/x.png)\n\n![y](../../outside.png)", "a/doc.md");
+    expect(imgs[0]).toMatchObject({ url: "https://cdn.example/x.png", path: null });
+    expect(imgs[1]).toMatchObject({ url: null, path: null });
+  });
+
+  it("ignores images inside HTML comments", () => {
+    expect(extractImages("<!-- ![old](old.png) -->", "doc.md")).toEqual([]);
   });
 });
