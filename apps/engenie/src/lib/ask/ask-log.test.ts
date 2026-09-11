@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { citedSources, cleanVisitorId, topSimilarity } from "./ask-log";
+import { citedSources, cleanVisitorId, sourceLabel, topSimilarity } from "./ask-log";
 
 const docs = [
   { title: "ECW536 Datasheet", source_type: "product_spec", source_id: "ecw536" },
@@ -40,5 +40,18 @@ describe("topSimilarity", () => {
 
   it("is null when nothing was retrieved", () => {
     expect(topSimilarity([])).toBeNull();
+  });
+});
+
+describe("sourceLabel", () => {
+  it("names the document rather than the section it came from", () => {
+    expect(sourceLabel({ title: "Product Positioning:", source_type: "google_doc", source_id: "x/ecw536s-message-guide", metadata: { doc_title: "Message Guide_ECW536S" } })).toBe("Message Guide_ECW536S");
+    expect(sourceLabel({ title: "Configuring Port Forwarding", source_type: "helpcenter", source_id: "9964642", metadata: { article_title: "NAT / Port Forwarding" } })).toBe("NAT / Port Forwarding");
+    expect(sourceLabel({ title: "E5-NA08W — Technical Specifications", source_type: "product_spec", source_id: "E5-NA08W" })).toBe("E5-NA08W");
+  });
+
+  it("falls back to the chunk's own title", () => {
+    expect(sourceLabel({ title: "7. Handling Trial Licenses", source_type: "support", source_id: "INTERCOM-X", metadata: {} })).toBe("7. Handling Trial Licenses");
+    expect(sourceLabel({ title: "Overview", source_type: "google_doc", source_id: "y", metadata: null })).toBe("Overview");
   });
 });

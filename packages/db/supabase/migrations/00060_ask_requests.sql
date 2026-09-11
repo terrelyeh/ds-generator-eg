@@ -135,18 +135,20 @@ as $$
   limit p_limit
 $$;
 
+-- One row per cited document. The chunks of one document carry different
+-- section titles, so rows group on source_id and show its latest label.
 create or replace function public.ask_analytics_sources(
   p_from timestamptz, p_to timestamptz, p_key text default null, p_limit integer default 8
 )
 returns table (title text, source_type text, times integer)
 language sql stable set search_path = public
 as $$
-  select c->>'title', c->>'source_type', count(*)::int
+  select (array_agg(c->>'title' order by r.created_at desc))[1], min(c->>'source_type'), count(*)::int
   from public.ask_requests r
   cross join lateral jsonb_array_elements(r.cited) as c
   where r.created_at >= p_from and r.created_at < p_to
     and (p_key is null or coalesce(r.workspace, r.channel) = p_key)
-  group by 1, 2
+  group by c->>'source_id'
   order by 3 desc, 1
   limit p_limit
 $$;
