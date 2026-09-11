@@ -9,6 +9,7 @@ import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
 import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
+import { normalizeCitations } from "@/lib/ask/citations";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
@@ -339,6 +340,10 @@ const MessageBubble = memo(function MessageBubble({
   const cursor =
     "[&_p:last-child]:after:ml-1 [&_p:last-child]:after:inline-block [&_p:last-child]:after:h-[0.95em] [&_p:last-child]:after:w-[2.5px] [&_p:last-child]:after:translate-y-[0.15em] [&_p:last-child]:after:rounded-[1px] [&_p:last-child]:after:bg-engenius-dark/70 [&_p:last-child]:after:animate-pulse [&_p:last-child]:after:content-['']";
 
+  // One citation form for everything below (lib/ask/citations.ts) — a model
+  // that writes "[Source 7]" would otherwise leak it as text and lose its images.
+  const content = normalizeCitations(message.content);
+
   // Assistant message: activity trace, then the answer at full width; the
   // EnGenie spark sits under it (turning while it streams) — same as ask-chat.
   return (
@@ -367,13 +372,13 @@ const MessageBubble = memo(function MessageBubble({
               prose-table:text-[13.5px] prose-th:bg-black/[0.03] prose-th:py-2.5 prose-th:px-3 prose-td:py-2.5 prose-td:px-3 prose-td:align-top
               ${message.isStreaming ? cursor : ""}`}
           >
-            <MarkdownErrorBoundary fallback={stripCitations(message.content)}>
+            <MarkdownErrorBoundary fallback={stripCitations(content)}>
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[[rehypeHighlight, { ignoreMissing: true, detect: true }]]}
                 components={markdownComponents}
               >
-                {stripCitations(message.content)}
+                {stripCitations(content)}
               </ReactMarkdown>
             </MarkdownErrorBoundary>
           </div>
@@ -385,8 +390,8 @@ const MessageBubble = memo(function MessageBubble({
         )}
         {!message.isStreaming && message.content && (
           <>
-            <AnswerFigures content={message.content} sources={message.sources} />
-            <ActionBar content={message.content} onRegenerate={onRegenerate} />
+            <AnswerFigures content={content} sources={message.sources} />
+            <ActionBar content={content} onRegenerate={onRegenerate} />
             {onFollowUp && message.followUps && message.followUps.length > 0 && (
               <FollowUpList questions={message.followUps} onClick={onFollowUp} />
             )}

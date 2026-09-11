@@ -11,6 +11,7 @@ import { useAskModels } from "@/hooks/use-ask-models";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
 import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
+import { normalizeCitations } from "@/lib/ask/citations";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
@@ -301,9 +302,12 @@ const AskMessage = memo(function AskMessage({
     );
   }
 
+  // One citation form for everything below (lib/ask/citations.ts).
+  const content = normalizeCitations(message.content);
+
   async function handleCopy() {
     try {
-      await navigator.clipboard.writeText(message.content);
+      await navigator.clipboard.writeText(content);
       setCopied(true);
       setTimeout(() => setCopied(false), 1600);
     } catch { /* ignore */ }
@@ -322,7 +326,7 @@ const AskMessage = memo(function AskMessage({
         />
         {message.content ? (
           <div className="ask-markdown max-w-[46rem]">
-            <MarkdownWithCitations content={message.content} sources={message.sources} />
+            <MarkdownWithCitations content={content} sources={message.sources} />
             {message.isStreaming && (
               <span className="inline-block w-[3px] h-[1.05em] translate-y-[0.15em] bg-engenius-blue/70 animate-pulse ml-0.5 rounded-[1px]" />
             )}
@@ -338,7 +342,7 @@ const AskMessage = memo(function AskMessage({
         {/* Figures from the sources the answer cited — only once it has
             finished, since the set of citations isn't final until then. */}
         {!message.isStreaming && message.content && (
-          <AnswerFigures content={message.content} sources={message.sources} />
+          <AnswerFigures content={content} sources={message.sources} />
         )}
 
         {/* Action bar: copy + provider */}
