@@ -9,7 +9,7 @@ import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
 import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
-import { normalizeCitations } from "@/lib/ask/citations";
+import { normalizeCitations, stripCitations } from "@/lib/ask/citations";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
@@ -496,7 +496,4 @@ function ActionBar({ content, onRegenerate }: { content: string; onRegenerate?: 
   );
 }
 
-function stripCitations(text: string): string {
-  return text.replace(/\[\d+(?:\s*,\s*\d+)*\]/g, "");
-}
 

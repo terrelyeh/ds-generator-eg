@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeCitations } from "./citations";
+import { normalizeCitations, stripCitations } from "./citations";
 
 describe("normalizeCitations", () => {
   it("rewrites [Source N] to [N]", () => {
@@ -22,5 +22,23 @@ describe("normalizeCitations", () => {
 
   it("leaves a marker that is still streaming in for the next frame", () => {
     expect(normalizeCitations("…變更設定 [Source 7")).toBe("…變更設定 [Source 7");
+  });
+});
+
+describe("stripCitations", () => {
+  it("removes markers together with the space in front of them", () => {
+    // Otherwise every Gemini 3.7 sentence in the widget ends "設定 。".
+    expect(stripCitations("無法變更設定 [7]。網段不能重疊 [2, 3]。")).toBe("無法變更設定。網段不能重疊。");
+    expect(stripCitations("supports WiFi 7 [3].")).toBe("supports WiFi 7.");
+  });
+
+  it("never joins lines and leaves links and other brackets alone", () => {
+    expect(stripCitations("line one [2]\nline two")).toBe("line one\nline two");
+    const s = "see [the guide](https://x.example) and **Configure > VPN**";
+    expect(stripCitations(s)).toBe(s);
+  });
+
+  it("works on what normalizeCitations produces", () => {
+    expect(stripCitations(normalizeCitations("開啟即可 [Source 1]。"))).toBe("開啟即可。");
   });
 });

@@ -19,3 +19,14 @@ const SOURCE_CITE_RE = /[[【]\s*Sources?\s*\d+(?:\s*[,，、]\s*(?:Sources?\s*)
 export function normalizeCitations(text: string): string {
   return text.replace(SOURCE_CITE_RE, (m) => `[${(m.match(/\d+/g) ?? []).join(", ")}]`);
 }
+
+/**
+ * Remove inline citation markers, for surfaces that list sources elsewhere
+ * (the widget and extension show them in「參考了 N 則資料」). Takes the spaces
+ * in front of a marker with it — "設定 [7]。" must become "設定。", not
+ * "設定 。"; Gemini 3.7 puts a space before every citation — but never a
+ * newline. Expects normalised input (run normalizeCitations first).
+ */
+export function stripCitations(text: string): string {
+  return text.replace(/[ \t]*\[\d+(?:\s*,\s*\d+)*\]/g, "");
+}
