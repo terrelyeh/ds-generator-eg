@@ -24,9 +24,9 @@ import type {
  *   2. EDCC — shared management-platform page (static asset rendered from
  *      the reference PDF; zero PM work)
  *   3..n. Technical Specifications — FULL-WIDTH single-model table
- *      (primary band + dark Model Name/Number bands + alternating rows, and
- *      a band per named sheet section — lib/datasheet/dc-spec-table),
- *      paginated by estimated row height
+ *      (primary title band, then a grey band per spec group — "General"
+ *      first, opened by Model Name / Model Number — and alternating rows;
+ *      lib/datasheet/dc-spec-table), paginated by estimated row height
  *   n+1. Hardware Overview — 1–2 renders ({model}_hardware[_2].png) +
  *      Contact-Us footer (Transceiver-style QR)
  *
@@ -43,6 +43,13 @@ import type {
  * a colour.
  */
 const PRIMARY = "#09909d";
+
+/**
+ * Spec-group band: the grey layout A puts its categories on, whatever the
+ * theme. One sheet then reads the same in both layouts — a grey band per
+ * group, "General" first.
+ */
+const GROUP_BAND = "#6b7580";
 
 /**
  * Cover-hero backdrop while no photograph is set — and the colour the
@@ -222,13 +229,18 @@ export function DataCenterPreview({
   );
   const useGroups = dsGroups.length > 0;
 
-  // Named sheet sections print as a band inside the table; the rows directly
-  // under the sheet's "Technical Specifications" row sit under the page title
-  // instead (the parser files them as "General") — see lib/datasheet/dc-spec-table.
-  const specBlocks = buildDcSpecBlocks(product.spec_sections ?? []);
+  // Every spec group prints under a grey band — "General" first, as in layout
+  // A — and the model's identity opens that first group as ordinary rows.
+  // See lib/datasheet/dc-spec-table.
+  const specBlocks = buildDcSpecBlocks(product.spec_sections ?? [], [
+    { label: "Model Name", value: product.subtitle || "" },
+    { label: "Model Number", value: product.model_name },
+  ]);
 
-  // First spec page: title(70) + band(22) + 2 model bands(40) → ~600pt of rows.
-  const specPages = paginateDcSpecBlocks(specBlocks, 590, 655).map(withStripes);
+  // First spec page: title(70) + title band(22) → ~630pt of blocks. The two
+  // identity rows are blocks now, so they come out of this budget instead of
+  // the 40pt it used to set aside for them.
+  const specPages = paginateDcSpecBlocks(specBlocks, 630, 655).map(withStripes);
 
   // Locales carry their own hardware render — its callouts are translated
   // in the image itself.
@@ -511,20 +523,17 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
   background: ${PRIMARY}; color: white; font-weight: ${WT.regular}; font-size: ${PT.table}pt;
   text-align: center; padding: 5pt; border-color: ${PRIMARY};
 }
-.model-name-row td { background: #6d6e71; color: white; font-size: ${PT.table}pt; }
-.model-number-row td { background: #939598; color: white; font-size: ${PT.table}pt; }
-.model-name-row td:first-child, .model-number-row td:first-child { text-align: left; }
 .spec-row td { font-size: ${PT.table}pt; line-height: 1.4; }
 .spec-row td.spec-label { color: #231f20; font-weight: ${WT.regular}; }
 .spec-row td.spec-value { color: #525355; white-space: pre-line; }
 .spec-row.alt td { background: #eff0f0; }
-/* A named sheet section ("High-Performance AI & Graphics Acceleration").
-   Same colours as the table band, but set left like the labels and one
-   weight up, so it reads as a heading over the rows beneath it rather than
-   as a second table title (that band is centred). */
+/* A spec group ("General", "High-Performance AI & Graphics Acceleration").
+   Layout A's category grey, set left and one weight up, so it reads as a
+   heading over the rows beneath it; the centred primary band above stays
+   the table's title. */
 .spec-section-row td {
-  background: ${PRIMARY}; color: white; font-weight: ${WT.medium}; font-size: ${PT.table}pt;
-  padding: 5pt 8pt; border-color: ${PRIMARY};
+  background: ${GROUP_BAND}; color: white; font-weight: ${WT.medium}; font-size: ${PT.table}pt;
+  padding: 5pt 8pt; border-color: ${GROUP_BAND};
 }
 
 /* ── Hardware overview ─────────────────────────────────────────────── */
@@ -680,18 +689,6 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
                 </thead>
               )}
               <tbody>
-                {pi === 0 && (
-                  <>
-                    <tr className="model-name-row">
-                      <td>Model Name</td>
-                      <td>{product.subtitle}</td>
-                    </tr>
-                    <tr className="model-number-row">
-                      <td>Model Number</td>
-                      <td>{product.model_name}</td>
-                    </tr>
-                  </>
-                )}
                 {rows.map((b, bi) =>
                   b.kind === "section" ? (
                     <tr key={bi} className="spec-section-row">

@@ -169,7 +169,7 @@ B = [
     ("EDCC 小標",    ".edcc-feature-title", "—", "#231f20", "Node View", {}),
     ("EDCC 內文",    ".edcc-feature-text",  "1.5", "#525355", "Manage servers even when the OS is unresponsive.", dict(lh=1.5)),
     ("規格表頭",     ".specs-band th",  "—",    "白字／主色底", "Specifications", dict(bg=DCB)),
-    ("規格分類列",   ".spec-section-row td", "—", "白字／主色底", "High-Performance AI & Graphics Acceleration", dict(bg=DCB)),
+    ("規格分類列",   ".spec-section-row td", "—", "白字／底 #6b7580", "High-Performance AI & Graphics Acceleration", dict(bg="#6b7580")),
     ("硬體副標",     ".hw-subtitle",    "—",    "#231f20", "Front Panel", {}),
     ("頁碼",         ".page-number",    "—",    "#58595b", "4", {}),
     ("頁尾聲明",     ".footer-disclaimer", "1.45", "#6d6e71", "EnGenius Technologies, Inc. All rights reserved.", dict(lh=1.45)),
@@ -292,7 +292,7 @@ cmp_body = cmp_table([
 cmp_spec = cmp_table([
     ("版面",     "雙欄",          "全寬表格",      "全寬表格",      "全寬表格"),
     cmp_type("分類列", ".spec-category-header", ".spec-section-row td", ".band-row th", ".specs-band th"),
-    ("分類列底", "#6b7580",       "#09909d",       "#1e6796",      "#09909d"),
+    ("分類列底", "#6b7580",       "#6b7580",       "#1e6796",      "#09909d"),
     cmp_type("標籤", ".spec-label", ".spec-row td", ".desc-row td", ".model-name-row td"),
     cmp_type("數值", ".spec-value", ".spec-row td", ".spec-row td", ".spec-row td"),
     ("數值行高", "1.4（CJK 1.5）", "1.4",          "1.4",          "1.35"),
