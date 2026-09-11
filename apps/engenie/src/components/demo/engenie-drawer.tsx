@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { isOpenRouterKey, OPENROUTER_KEY_ERROR, OPENROUTER_KEY_HINT } from "@/lib/ask/byok-key";
 import { EngenieMark } from "./engenie-mark";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { listConversations, deleteConversation, type DemoConversation } from "@/lib/demo/history";
@@ -56,7 +57,6 @@ export interface EngenieDrawerProps {
   /** user_byok workspace: render a section for the user's own key. */
   userByok?: boolean;
   userKey?: string | null;
-  byokFamily?: string;
   onSetUserKey?: (key: string) => void;
   onClearUserKey?: () => void;
 }
@@ -140,7 +140,6 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 
           {tab === "settings" && props.userByok && (
             <UserKeySection
-              byokFamily={props.byokFamily}
               hasKey={!!(props.userKey && props.userKey.trim())}
               onSave={(k) => props.onSetUserKey?.(k)}
               onClear={() => props.onClearUserKey?.()}
@@ -312,17 +311,16 @@ export function EngenieDrawer(props: EngenieDrawerProps) {
 
 /** User-supplied LLM key entry for a user_byok workspace (kept in this browser). */
 function UserKeySection({
-  byokFamily,
   hasKey,
   onSave,
   onClear,
 }: {
-  byokFamily?: string;
   hasKey: boolean;
   onSave: (key: string) => void;
   onClear: () => void;
 }) {
   const [val, setVal] = useState("");
+  const [err, setErr] = useState("");
   const [show, setShow] = useState(false);
   return (
     <Section title="你的 API key">
@@ -337,17 +335,26 @@ function UserKeySection({
           <input
             type={show ? "text" : "password"}
             value={val}
-            onChange={(e) => setVal(e.target.value)}
-            placeholder={hasKey ? "輸入新的 key 以更換" : `${byokFamily || ""} API key`}
+            onChange={(e) => { setVal(e.target.value); setErr(""); }}
+            placeholder={hasKey ? "輸入新的 key 以更換" : `OpenRouter API key（${OPENROUTER_KEY_HINT}）`}
             className="min-w-0 flex-1 rounded-lg border border-black/[0.1] bg-white px-3 py-2 font-mono text-[12px] text-engenius-dark outline-none focus:border-engenius-blue/50"
           />
           <button onClick={() => setShow((s) => !s)} className="flex-shrink-0 text-[11px] font-medium text-engenius-dark/45 hover:text-engenius-dark/70">
             {show ? "隱藏" : "顯示"}
           </button>
         </div>
+        {err && <p className="mt-1.5 text-[11.5px] text-red-600">{err}</p>}
         <div className="mt-2 flex gap-2">
           <button
-            onClick={() => { if (val.trim()) { onSave(val.trim()); setVal(""); } }}
+            onClick={() => {
+              const v = val.trim();
+              if (!v) return;
+              // Checked here so a Google key is caught before the first question,
+              // not reported back as OpenRouter's 401.
+              if (!isOpenRouterKey(v)) { setErr(OPENROUTER_KEY_ERROR); return; }
+              onSave(v);
+              setVal("");
+            }}
             disabled={!val.trim()}
             className="flex-1 rounded-lg bg-engenius-dark px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-engenius-dark/90 disabled:opacity-40"
           >
@@ -360,7 +367,7 @@ function UserKeySection({
           )}
         </div>
         <p className="mt-2 text-[11px] leading-snug text-engenius-dark/45">
-          只存在你目前的瀏覽器，不會上傳保存；每次提問時會用來呼叫 {byokFamily || "LLM"}。
+          只存在你目前的瀏覽器，不會上傳保存；每次提問時用來呼叫 OpenRouter（一把 key 就能用所有模型）。
         </p>
       </div>
     </Section>

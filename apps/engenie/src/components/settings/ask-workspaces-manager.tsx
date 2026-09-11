@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { isOpenRouterKey, OPENROUTER_KEY_ERROR, OPENROUTER_KEY_HINT } from "@/lib/ask/byok-key";
 import { Button } from "@/components/ui/button";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
 import { useAskModels } from "@/hooks/use-ask-models";
@@ -72,10 +73,6 @@ const SOURCE_TYPES = [
  * below AND the workspace needs a passcode (`allowedKnowledgeAreas`).
  */
 const KNOWLEDGE_GATED_TYPES = new Set(["support", "internal_doc"]);
-
-function familyOf(p: string) {
-  return p.startsWith("claude") ? "Anthropic" : p.startsWith("gpt") ? "OpenAI" : "Google";
-}
 
 export function AskWorkspacesManager() {
   const [list, setList] = useState<Workspace[]>([]);
@@ -165,6 +162,10 @@ export function AskWorkspacesManager() {
     // BYOK needs a key — either a newly entered one, or an existing saved one.
     if (llmMode === "byok" && !byokKey.trim() && !(editId && editHasByok)) {
       toast.error("BYOK 模式需要填入 API key");
+      return;
+    }
+    if (llmMode === "byok" && byokKey.trim() && !isOpenRouterKey(byokKey)) {
+      toast.error(OPENROUTER_KEY_ERROR);
       return;
     }
     setSaving(true);
@@ -297,9 +298,9 @@ export function AskWorkspacesManager() {
                   </td>
                   <td className="px-3 py-2 text-[13px] text-muted-foreground">
                     {w.llm_mode === "byok"
-                      ? <span>BYOK · {familyOf(w.provider)}{!w.has_byok_key && <span className="text-red-600"> (key missing)</span>}</span>
+                      ? <span>BYOK · OpenRouter key{!w.has_byok_key && <span className="text-red-600"> (key missing)</span>}</span>
                       : w.llm_mode === "user_byok"
-                      ? <span>User BYOK · {familyOf(w.provider)}</span>
+                      ? <span>User BYOK · OpenRouter key</span>
                       : "Shared key"}
                     <div className="text-muted-foreground/60">{w.provider}</div>
                   </td>
@@ -389,16 +390,16 @@ export function AskWorkspacesManager() {
                 {llmMode === "byok" && (
                   <div className="mt-2">
                     <label className="mb-1 block text-sm font-medium text-muted-foreground">
-                      BYOK API key（{familyOf(provider)}）{editId && editHasByok && <span className="font-normal text-muted-foreground/60">(leave blank to keep)</span>}
+                      OpenRouter API key{editId && editHasByok && <span className="font-normal text-muted-foreground/60">(leave blank to keep)</span>}
                     </label>
-                    <input value={byokKey} disabled={saving} onChange={(e) => setByokKey(e.target.value)} placeholder={editId && editHasByok ? "•••••• (unchanged)" : `${familyOf(provider)} key`}
+                    <input value={byokKey} disabled={saving} onChange={(e) => setByokKey(e.target.value)} placeholder={editId && editHasByok ? "•••••• (unchanged)" : OPENROUTER_KEY_HINT}
                       className="w-full rounded-md border px-3 py-2 font-mono text-sm focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
-                    <p className="mt-1 text-[13px] text-muted-foreground/60">Key 須與所選模型同家族（Claude→Anthropic、GPT→OpenAI、Gemini→Google）。AES 加密儲存，整個 workspace 共用這一把。</p>
+                    <p className="mt-1 text-[13px] text-muted-foreground/60">要 OpenRouter 的 key（sk-or- 開頭），不是 Google／Anthropic／OpenAI 的原廠 key——所有模型都經過 OpenRouter，一把就能用全部模型。AES 加密儲存，整個 workspace 共用這一把。</p>
                   </div>
                 )}
                 {llmMode === "user_byok" && (
                   <p className="mt-2 rounded-md bg-amber-50 px-3 py-2 text-[13px] text-amber-700">
-                    每位使用者第一次進來時，會在前台輸入自己的 {familyOf(provider)} API key（存在他自己的瀏覽器，不進資料庫）。你只需選好模型，這裡不用填 key。
+                    每位使用者第一次進來時，會在前台輸入自己的 OpenRouter API key（sk-or- 開頭，存在他自己的瀏覽器，不進資料庫）。你只需選好模型，這裡不用填 key。
                   </p>
                 )}
               </div>

@@ -12,6 +12,7 @@ import { rateLimitAllowed } from "@eg/db/rate-limit";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
 import { allowedKnowledgeAreas, loadWorkspaceBySlug, publicWorkspace } from "@/lib/ask/workspaces";
 import { withAssetTokens } from "@/lib/auth/asset-token";
+import { isOpenRouterKey, OPENROUTER_KEY_ERROR } from "@/lib/ask/byok-key";
 import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
 import { decryptKey } from "@/lib/auth/api-key";
 
@@ -376,6 +377,14 @@ export async function POST(request: Request) {
   if (ws && ws.llm_mode === "byok") {
     const k = decryptKey(ws.byok_key_encrypted);
     if (!k) return NextResponse.json({ error: "Workspace BYOK key not set or unreadable" }, { status: 400 });
+    // Every completion goes to OpenRouter; a vendor key stored before that
+    // move would only ever come back as OpenRouter's 401.
+    if (!isOpenRouterKey(k)) {
+      return NextResponse.json(
+        { error: "這個 workspace 的 BYOK key 不是 OpenRouter key（sk-or- 開頭），請到 Settings → Ask Workspaces 更新。" },
+        { status: 400 },
+      );
+    }
     llmKeyOverride = k;
   } else if (ws && ws.llm_mode === "user_byok") {
     const uk = body.userKey?.trim();
@@ -384,6 +393,9 @@ export async function POST(request: Request) {
         { error: "This workspace needs your own API key. Add it to start chatting.", code: "user_key_required" },
         { status: 400 },
       );
+    }
+    if (!isOpenRouterKey(uk)) {
+      return NextResponse.json({ error: OPENROUTER_KEY_ERROR, code: "user_key_invalid" }, { status: 400 });
     }
     llmKeyOverride = uk;
   }
