@@ -52,17 +52,20 @@ export async function GET() {
   const { data, error } = (await supabase
     .from("ask_workspaces" as "products")
     .select(
-      "id, slug, name, enabled, llm_mode, provider, byok_provider, scope, persona, profile, allow_switch, welcome_subtitle, welcome_description, example_questions, rate_limit_per_min, daily_limit, allowed_origins, token_version, request_count, last_used_at, note, passcode_hash, byok_key_encrypted, created_at",
+      "id, slug, name, enabled, llm_mode, provider, byok_provider, scope, persona, profile, allow_switch, welcome_subtitle, welcome_description, example_questions, rate_limit_per_min, daily_limit, allowed_origins, token_version, request_count, last_used_at, note, passcode_hash, passcode_encrypted, byok_key_encrypted, created_at",
     )
     .order("created_at", { ascending: false })) as {
-    data: ({ passcode_hash: string | null; byok_key_encrypted: string | null; [k: string]: unknown }[]) | null;
+    data: ({ passcode_hash: string | null; passcode_encrypted: string | null; byok_key_encrypted: string | null; [k: string]: unknown }[]) | null;
     error: unknown;
   };
   if (error) return NextResponse.json({ error: "Failed to list workspaces" }, { status: 500 });
   // Strip secrets; expose only whether they're set.
-  const workspaces = (data ?? []).map(({ passcode_hash, byok_key_encrypted, ...rest }) => ({
+  const workspaces = (data ?? []).map(({ passcode_hash, passcode_encrypted, byok_key_encrypted, ...rest }) => ({
     ...rest,
     has_passcode: !!passcode_hash,
+    // Whether the admin page can show it — never the passcode itself; that
+    // comes from /api/ask-workspaces/passcode, on request.
+    passcode_viewable: !!passcode_hash && !!passcode_encrypted,
     has_byok_key: !!byok_key_encrypted,
   }));
   return NextResponse.json({ ok: true, workspaces });
@@ -127,7 +130,11 @@ export async function POST(request: Request) {
     allowed_origins: normalizeOrigins(body.allowed_origins),
     created_by: user?.id ?? null,
   };
-  if (body.passcode) row.passcode_hash = hashPasscode(body.passcode);
+  if (body.passcode) {
+    row.passcode_hash = hashPasscode(body.passcode);
+    // Recoverable copy so the admin page can show and share it (00059).
+    row.passcode_encrypted = encryptKey(body.passcode);
+  }
   if (llm_mode === "byok" && body.byok_key) row.byok_key_encrypted = encryptKey(body.byok_key);
 
   const supabase = createAdminClient();
@@ -183,7 +190,10 @@ export async function PATCH(request: Request) {
   if (body.note !== undefined) update.note = body.note?.trim() || null;
   if (body.allowed_origins !== undefined) update.allowed_origins = normalizeOrigins(body.allowed_origins);
   // Secrets: only when a non-empty value is provided.
-  if (body.passcode) update.passcode_hash = hashPasscode(body.passcode);
+  if (body.passcode) {
+    update.passcode_hash = hashPasscode(body.passcode);
+    update.passcode_encrypted = encryptKey(body.passcode);
+  }
   if (body.byok_key && !isOpenRouterKey(body.byok_key)) {
     return NextResponse.json({ error: OPENROUTER_KEY_ERROR }, { status: 400 });
   }

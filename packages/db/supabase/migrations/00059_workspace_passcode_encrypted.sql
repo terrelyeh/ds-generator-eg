@@ -1,0 +1,13 @@
+-- A workspace's passcode, recoverable by admins.
+--
+-- passcode_hash (scrypt) stays the only thing /api/ws-auth verifies against.
+-- This adds an AES-256-GCM copy — the same encryptKey() scheme and the same
+-- API_KEY_ENC_SECRET as api_keys.key_encrypted and byok_key_encrypted — so the
+-- admin page can show and copy a passcode to hand it on (a branch office, a
+-- colleague trying the extension). Until now the hash was the only record: a
+-- passcode, once set, could be neither shown nor shared without replacing it.
+--
+-- Written only by /api/ask-workspaces when a passcode is set; read only by
+-- /api/ask-workspaces/passcode (admin, on request). Passcodes set before this
+-- have no copy until they are set again. Service-role only, like the table.
+alter table ask_workspaces add column if not exists passcode_encrypted text;
