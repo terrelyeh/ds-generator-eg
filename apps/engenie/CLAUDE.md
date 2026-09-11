@@ -182,6 +182,11 @@ src/
   連結規則 `sourceHref()`：http(s) 到處可連；**app 內路徑只在內部 `/ask` 可連**——workspace / widget /
   extension 的讀者拿的是 workspace token 不是登入 session，連 `/knowledge/doc` 會被踢去登入。
   左側頭像欄（`AskAvatar` / `EngenieAvatar`）拿掉了；星形改在答案底部 Copy/Retry 那排最左，串流中會轉。
+- **引用格式一律先過 `normalizeCitations()`**（`lib/ask/citations.ts`，2026-09-11）——
+  資料包在 `<source id="Source N">` 裡，有些模型會照抄 id：Gemini 3.7 Flash 同一題 10 個引用全寫成
+  `[Source 7]`（3.5 是 8 個 `[7]`）。下游只認 `[N]`：widget 會把它當文字印出來、ask-chat 不變 tooltip、
+  `AnswerFigures` 找不到引用所以沒有圖。兩個介面在渲染前各呼叫一次（連舊的歷史紀錄一起修好），
+  prompt 也明講「只寫數字」。**新增任何讀 `message.content` 找引用的地方，先過這個函式。**
 - **答案下方會顯示被引用來源的原圖**（2026-09-11）——`components/chat/answer-figures.tsx`，兩個聊天介面共用。
   選圖在 `lib/ask/figures.ts`（純函式）：**只看答案真的 `[n]` 引用到的來源**、依引用順序、每來源最多 2 張、
   總共最多 4 張、只收 http(s) 或同源路徑。**不要改成顯示所有撈到的來源的圖**——最多 12 個來源，
