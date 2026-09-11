@@ -49,6 +49,8 @@ export type Permission =
   | "review.self_approve"
   // billing / spend visibility
   | "billing.view"
+  // workspace analytics — includes what people typed into Ask
+  | "analytics.view"
   // settings
   | "settings.view"
   | "settings.edit_typography"
@@ -90,6 +92,10 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   // Company AI spend. Admin-only for the same reason API keys are —
   // it's account-level financial data, not content.
   "billing.view": ["admin"],
+
+  // Workspace analytics shows the questions people typed into Ask, so it is
+  // admin-only like the rest of the account-level data.
+  "analytics.view": ["admin"],
 
   // Editor gets settings access for Glossary + Typography. Personas and
   // API Keys remain admin-only because they're cross-cutting config.

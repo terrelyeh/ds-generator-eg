@@ -6,7 +6,7 @@ import { resolveModel } from "@eg/llm/models";
 import { getPersona, listPersonas, USER_PROFILES } from "@/lib/rag/personas";
 import { type TaxonomyMeta } from "@/lib/rag/taxonomy";
 import { retrieveDocuments } from "@/lib/rag/retrieve";
-import { gateWithRateLimit } from "@eg/auth/session";
+import { gateWithRateLimit, getCurrentUser } from "@eg/auth/session";
 import { cookies, headers } from "next/headers";
 import { rateLimitAllowed } from "@eg/db/rate-limit";
 import { DEMO_COOKIE, isValidDemoToken } from "@/lib/auth/demo-session";
@@ -15,6 +15,8 @@ import { withAssetTokens } from "@/lib/auth/asset-token";
 import { isOpenRouterKey, OPENROUTER_KEY_ERROR } from "@/lib/ask/byok-key";
 import { workspaceCookieName, verifyWorkspaceToken, parseWorkspaceBearer } from "@/lib/auth/workspace-session";
 import { decryptKey } from "@/lib/auth/api-key";
+import { citedSources, cleanVisitorId, topSimilarity, type AskChannel, type AskRequestLog } from "@/lib/ask/ask-log";
+import { recordAskRequest } from "@/lib/ask/record-ask";
 
 // Allow up to 60s for RAG queries (embedding + vector search + LLM)
 /**
@@ -177,6 +179,8 @@ interface AskRequest {
   workspace?: string;
   /** User-supplied LLM key for a `user_byok` workspace. Never stored/logged. */
   userKey?: string;
+  /** Random per-browser id from workspace / demo clients — counts visitors, identifies nobody. */
+  visitor?: string;
 }
 
 /**
@@ -309,6 +313,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing question" }, { status: 400 });
   }
 
+  // One ask_requests row per question (lib/ask/ask-log.ts). The id also goes
+  // back to the client with the answer, so a 👍/👎 can find its row.
+  const requestId = crypto.randomUUID();
+  const t0 = Date.now();
+  const visitorId = cleanVisitorId(body.visitor);
+
   // Defaults to "user": the workspace branch never reaches gateAskOrDemo,
   // and a workspace already carries its own scope.
   let caller: AskCaller = "user";
@@ -342,6 +352,11 @@ export async function POST(request: Request) {
         t.reason === "daily_limit" ? "Daily limit reached for this workspace."
         : t.reason === "rate_limit" ? "Too many requests — try again shortly."
         : "This workspace is disabled.";
+      await recordAskRequest({
+        id: requestId, channel: "workspace", workspace: ws.slug, user_id: null, visitor_id: visitorId,
+        question, model: null, persona: null, profile: null, match_count: 0, top_similarity: null,
+        cited: [], outcome: "rate_limited", error: t.reason, retrieval_ms: null, ttft_ms: null, duration_ms: null,
+      });
       return NextResponse.json({ error: msg }, { status: 429 });
     }
   } else {
@@ -402,6 +417,31 @@ export async function POST(request: Request) {
   // Retrieval (embed → vector search → taxonomy filter → cross-lingual
   // supplements → re-rank → trim) lives in the shared lib/rag/retrieve.ts so
   // the chat and the Search API stay in lockstep.
+
+  const channel: AskChannel = ws ? "workspace" : caller === "demo" ? "demo" : "internal";
+  // Internal /ask knows who is asking. Looked up alongside the answer, so it
+  // costs the answer nothing.
+  const userIdPromise: Promise<string | null> =
+    channel === "internal" ? getCurrentUser().then((u) => u?.id ?? null).catch(() => null) : Promise.resolve(null);
+  const log: AskRequestLog = {
+    id: requestId,
+    channel,
+    workspace: ws?.slug ?? null,
+    user_id: null,
+    visitor_id: channel === "internal" ? null : visitorId,
+    question,
+    model: mapped.slug,
+    persona: personaId,
+    profile: profileId,
+    match_count: 0,
+    top_similarity: null,
+    cited: [],
+    outcome: "error",
+    error: null,
+    retrieval_ms: null,
+    ttft_ms: null,
+    duration_ms: null,
+  };
 
   // Create SSE stream
   const encoder = new TextEncoder();
@@ -495,6 +535,7 @@ export async function POST(request: Request) {
         } catch (searchError) {
           const safe = redactSecrets(String(searchError));
           console.error("Vector search error:", safe);
+          log.error = `Search failed. ${safe}`;
           // `type: "error"`, not a chunk. A chunk is answer text: the client
           // appends it, saves it to history and to localStorage, and the
           // whole outage reads as EnGenie calmly explaining that search
@@ -506,13 +547,17 @@ export async function POST(request: Request) {
           return; // `finally` closes the controller.
         }
 
+        log.retrieval_ms = Date.now() - t0;
+        log.match_count = docs.length;
+        log.top_similarity = topSimilarity(docs);
+
         if (docs.length === 0 && recentHistory.length === 0) {
           sendEvent(JSON.stringify({ type: "chunk", content: "I couldn't find relevant product information to answer your question. Try rephrasing or asking about a specific product model." }));
           sendEvent(JSON.stringify({ type: "sources", sources: [] }));
-          sendEvent(JSON.stringify({ type: "metadata", follow_ups: [], provider: "none", persona: personaId, profile: profileId, match_count: 0 }));
+          sendEvent(JSON.stringify({ type: "metadata", follow_ups: [], provider: "none", persona: personaId, profile: profileId, match_count: 0, request_id: requestId }));
           sendEvent("[DONE]");
-          controller.close();
-          return;
+          log.outcome = "no_match";
+          return; // `finally` records the request, then closes the controller.
         }
 
         // Sources are fully known the moment retrieval finishes — send them
@@ -620,6 +665,7 @@ IMPORTANT formatting rules:
         sendEvent(JSON.stringify({ type: "status", status: "generating" }));
         const llmKey = await llmKeyPromise;
 
+        let answer = "";
         await streamComplete({
           model: mapped.slug,
           system: systemPrompt,
@@ -632,11 +678,16 @@ IMPORTANT formatting rules:
           apiKey: llmKey,
           surface: "ask",
           feature: "ask",
-          ref: ws?.slug ?? "internal",
+          ref: ws?.slug ?? (caller === "demo" ? "demo" : "internal"),
           signal: upstream.signal,
-          onChunk: (text) =>
-            sendEvent(JSON.stringify({ type: "chunk", content: text })),
+          onChunk: (text) => {
+            if (log.ttft_ms === null) log.ttft_ms = Date.now() - t0;
+            answer += text;
+            sendEvent(JSON.stringify({ type: "chunk", content: text }));
+          },
         });
+        log.outcome = "answered";
+        log.cited = citedSources(answer, docs);
 
         // Step 6: Send metadata (sources already went out before the stream)
         sendEvent(JSON.stringify({
@@ -649,6 +700,7 @@ IMPORTANT formatting rules:
           persona: personaId,
           profile: profileId,
           match_count: docs.length,
+          request_id: requestId,
         }));
         sendEvent("[DONE]");
       } catch (err) {
@@ -656,16 +708,23 @@ IMPORTANT formatting rules:
         // an error would paint the partial answer they chose to keep as a
         // failure.
         if (request.signal.aborted || (err instanceof Error && err.name === "AbortError")) {
+          log.outcome = "stopped";
           return;
         }
         const safe = redactSecrets(err instanceof Error ? err.message : String(err));
         console.error("Ask SSE error:", safe);
+        log.error = safe;
         // Structured "error", not a content chunk — an upstream failure
         // arriving as a chunk is indistinguishable from an answer, which is
         // how a days-long Ask outage read as normal output.
         sendEvent(JSON.stringify({ type: "error", content: `\n\nError: ${safe}` }));
         sendEvent("[DONE]");
       } finally {
+        log.duration_ms = Date.now() - t0;
+        log.user_id = await userIdPromise;
+        // Before the close, not after: once the stream ends the function may
+        // be frozen with the write still pending.
+        await recordAskRequest(log);
         request.signal.removeEventListener("abort", abortUpstream);
         closed = true;
         try {

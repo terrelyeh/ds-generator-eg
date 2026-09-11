@@ -27,6 +27,8 @@ export interface ChatMessage {
   sources?: ChatSource[];
   followUps?: string[];
   provider?: string;
+  /** The ask_requests row this answer came from — what 👍/👎 is recorded against. */
+  requestId?: string;
   isStreaming?: boolean;
 }
 
@@ -138,6 +140,7 @@ export function useChatStream(config: UseChatStreamConfig) {
     let streamSources: ChatSource[] = [];
     let streamFollowUps: string[] = [];
     let streamProvider = provider;
+    let streamRequestId: string | undefined;
 
     try {
       const res = await fetch(endpoint, {
@@ -205,6 +208,7 @@ export function useChatStream(config: UseChatStreamConfig) {
             } else if (event.type === "metadata") {
               streamFollowUps = event.follow_ups ?? [];
               streamProvider = event.provider ?? provider;
+              streamRequestId = event.request_id ?? undefined;
             } else if (event.type === "error") {
               // Backend signalled a structured error mid-stream.
               fullContent += (fullContent ? "\n\n" : "") + (event.content || event.message || "（伺服器發生錯誤，請稍後再試）");
@@ -237,6 +241,7 @@ export function useChatStream(config: UseChatStreamConfig) {
         sources: streamSources,
         followUps: finalFollowUps,
         provider: streamProvider,
+        requestId: streamRequestId,
         isStreaming: false,
       }];
       setMessages(finalMessages);
