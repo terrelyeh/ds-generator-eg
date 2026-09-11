@@ -9,6 +9,7 @@ import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint"
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useAskModels } from "@/hooks/use-ask-models";
 import { ChatPre } from "@/components/chat/chat-pre";
+import { AnswerFigures } from "@/components/chat/answer-figures";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
@@ -379,6 +380,12 @@ const AskMessage = memo(function AskMessage({
           </div>
         ) : null}
 
+        {/* Figures from the sources the answer cited — only once it has
+            finished, since the set of citations isn't final until then. */}
+        {!message.isStreaming && message.content && (
+          <AnswerFigures content={message.content} sources={message.sources} />
+        )}
+
         {/* Reference list — sources arrive before the LLM stream, so show
             them while the answer is still generating (perceived latency). */}
         {message.sources && message.sources.length > 0 && (
@@ -542,7 +549,7 @@ export function AskChat({ compact = false }: AskChatProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           id: sessionId || undefined, title, persona, provider: effectiveProvider, profile,
-          messages: msgs.map((m) => ({ role: m.role, content: m.content, sources: m.sources, provider: m.provider, followUps: m.followUps, imageMap: m.imageMap })),
+          messages: msgs.map((m) => ({ role: m.role, content: m.content, sources: m.sources, provider: m.provider, followUps: m.followUps })),
         }),
       });
       const data = await res.json();

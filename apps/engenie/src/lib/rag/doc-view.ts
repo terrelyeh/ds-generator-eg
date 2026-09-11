@@ -119,3 +119,37 @@ export function viewerPath(sourceType: string, sourceId: string): string {
   const segments = sourceId.split("/").filter(Boolean).map(encodeURIComponent);
   return `/knowledge/doc/${encodeURIComponent(sourceType)}/${segments.join("/")}`;
 }
+
+/** Private bucket for images that belong to indexed knowledge (migration 00058). */
+export const KNOWLEDGE_ASSETS_BUCKET = "knowledge-assets";
+
+/**
+ * Storage paths the asset route will sign: an image under a source-type
+ * prefix, no empty/dot segments. Anything else in the bucket — or any other
+ * bucket — is unreachable through the route.
+ */
+const ASSET_PATH_RE = /^internal_doc\/[a-z0-9][a-z0-9-]*\/[A-Za-z0-9._/-]+\.(svg|png|jpe?g|webp)$/i;
+
+export function isAllowedAssetPath(storagePath: string): boolean {
+  if (!ASSET_PATH_RE.test(storagePath)) return false;
+  return !storagePath.split("/").some((seg) => seg === "" || seg === "." || seg === "..");
+}
+
+/** Where a package image is stored: `<source_type>/<collection>/<package-relative path>`. */
+export function assetStoragePath(sourceType: string, collection: string, relPath: string): string {
+  return `${sourceType}/${collection}/${relPath}`;
+}
+
+/** Relative URL answers and the viewer use for a stored image (served by /api/knowledge-assets). */
+export function assetUrl(storagePath: string): string {
+  return `/api/knowledge-assets/${storagePath.split("/").filter(Boolean).map(encodeURIComponent).join("/")}`;
+}
+
+/** decodeURIComponent that returns its input on a malformed escape instead of throwing. */
+export function safeDecode(s: string): string {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return s;
+  }
+}

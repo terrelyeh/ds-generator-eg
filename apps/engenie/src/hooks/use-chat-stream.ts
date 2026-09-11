@@ -26,7 +26,6 @@ export interface ChatMessage {
   content: string;
   sources?: ChatSource[];
   followUps?: string[];
-  imageMap?: Record<string, string[]>;
   provider?: string;
   isStreaming?: boolean;
 }
@@ -138,7 +137,6 @@ export function useChatStream(config: UseChatStreamConfig) {
     let fullContent = "";
     let streamSources: ChatSource[] = [];
     let streamFollowUps: string[] = [];
-    let streamImageMap: Record<string, string[]> = {};
     let streamProvider = provider;
 
     try {
@@ -206,7 +204,6 @@ export function useChatStream(config: UseChatStreamConfig) {
               });
             } else if (event.type === "metadata") {
               streamFollowUps = event.follow_ups ?? [];
-              streamImageMap = event.image_map ?? {};
               streamProvider = event.provider ?? provider;
             } else if (event.type === "error") {
               // Backend signalled a structured error mid-stream.
@@ -239,7 +236,6 @@ export function useChatStream(config: UseChatStreamConfig) {
         content: answer,
         sources: streamSources,
         followUps: finalFollowUps,
-        imageMap: Object.keys(streamImageMap).length > 0 ? streamImageMap : undefined,
         provider: streamProvider,
         isStreaming: false,
       }];

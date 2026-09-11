@@ -45,6 +45,18 @@ export interface RefinedArticleInput {
   sourceUrl?: string | null;
   /** Per-article metadata merged over the shared fields (e.g. `path`). */
   meta?: Record<string, unknown>;
+  /**
+   * Images that belong to this article. A chunk whose text contains `marker`
+   * gets `url` in its `metadata.image_urls` — which is what answers and
+   * citation tooltips show.
+   */
+  images?: { marker: string; url: string }[];
+  /**
+   * Stored as chunk 0's `metadata.raw` (the viewer's copy) when it should
+   * differ from the chunked text — e.g. with images put back where their
+   * markers are. Defaults to the chunked text.
+   */
+  raw?: string;
 }
 
 export interface IngestRefinedOptions {
@@ -72,7 +84,7 @@ export interface IngestRefinedArticleResult {
   chunks: number;
   processed: number;
   /** Dry-run only: what each chunk would be titled and how big it is. */
-  previews?: { title: string; chars: number }[];
+  previews?: { title: string; chars: number; images: number }[];
 }
 
 export interface IngestRefinedResult {
@@ -142,6 +154,15 @@ function normalizeCategory(v: FmValue | undefined): string | null {
   return first || null;
 }
 
+/** URLs of the images whose marker text appears in this chunk (deduped, in declared order). */
+export function imageUrlsForChunk(
+  chunkContent: string,
+  images: { marker: string; url: string }[] | undefined,
+): string[] {
+  if (!images?.length) return [];
+  return [...new Set(images.filter((i) => i.marker && chunkContent.includes(i.marker)).map((i) => i.url))];
+}
+
 export async function ingestRefinedArticles(
   opts: IngestRefinedOptions,
 ): Promise<IngestRefinedResult> {
@@ -208,7 +229,11 @@ export async function ingestRefinedArticles(
         models,
         chunks: chunks.length,
         processed: 0,
-        previews: chunks.map((c) => ({ title: c.title, chars: c.content.length })),
+        previews: chunks.map((c) => ({
+          title: c.title,
+          chars: c.content.length,
+          images: imageUrlsForChunk(c.content, article.images).length,
+        })),
       });
       continue;
     }
@@ -228,7 +253,10 @@ export async function ingestRefinedArticles(
         // chunk 0 carries the exact original for the in-app viewer that
         // citations link to; the fallback (reassembling from chunks) is a
         // reading copy with seams, not the document as written.
-        const chunkMeta = idx === 0 ? { ...baseMeta, article_title: title, raw: content } : baseMeta;
+        const imageUrls = imageUrlsForChunk(chunk.content, article.images);
+        const withImages = imageUrls.length > 0 ? { ...baseMeta, image_urls: imageUrls } : baseMeta;
+        const chunkMeta =
+          idx === 0 ? { ...withImages, article_title: title, raw: article.raw ?? content } : withImages;
         const { error } = await supabase!.from("documents" as "products").upsert(
           {
             source_type: sourceType,

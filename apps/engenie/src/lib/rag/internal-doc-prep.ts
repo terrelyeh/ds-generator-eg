@@ -34,6 +34,18 @@ export interface PreparedDoc {
   meta: Record<string, unknown>;
   /** Headings of the sections removed (skills only) — shown in dry-run output. */
   dropped: string[];
+  /** Images the document references, each with the marker its text keeps. */
+  images: DocImage[];
+}
+
+export interface DocImage {
+  /** The text cleanMarkdown leaves where the image was — how a chunk is matched back to it. */
+  marker: string;
+  alt: string;
+  /** Package-relative path of a local image; null for an external one or one outside the package. */
+  path: string | null;
+  /** URL of an external (http) image; null for a local one. */
+  url: string | null;
 }
 
 /** H2 sections of a SKILL.md that are runtime plumbing, not product knowledge. */
@@ -131,7 +143,7 @@ export function cleanMarkdown(body: string): string {
     body
       .replace(/<!--[\s\S]*?-->/g, "")
       .replace(/<a\s+(?:id|name)="[^"]*"\s*><\/a>/g, "")
-      .replace(/!\[([^\]]*)\]\([^)]*\)/g, (_m, alt: string) => (alt.trim() ? `（圖：${alt.trim()}）` : ""))
+      .replace(/!\[([^\]]*)\]\(([^)]*)\)/g, (_m, alt: string, target: string) => imageMarker(alt, target))
       .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (m, text: string, target: string) =>
         /^(https?:|mailto:)/i.test(target.trim()) ? m : text,
       )
@@ -150,6 +162,61 @@ export function toDocSourceId(relPath: string): string {
 function humanize(relPath: string): string {
   const base = relPath.split("/").pop() ?? relPath;
   return base.replace(/\.md$/i, "").replace(/[-_]+/g, " ");
+}
+
+/** `diagrams/x.svg "title"` / `<diagrams/x.svg>` → `diagrams/x.svg`. */
+function imageTarget(raw: string): string {
+  return (raw.trim().split(/\s+/)[0] ?? "").replace(/^<|>$/g, "");
+}
+
+/**
+ * What an image becomes in the indexed text. Its alt text when there is some —
+ * the package's diagrams carry full-sentence descriptions, which is what makes
+ * them findable at all — else the file name, so an image is never dropped
+ * without a trace. The same string is how a chunk is matched back to its image.
+ */
+export function imageMarker(alt: string, rawTarget: string): string {
+  const label = alt.trim() || imageTarget(rawTarget).split(/[?#]/)[0].split("/").pop() || "image";
+  return `（圖：${label}）`;
+}
+
+/** Resolve a link target against the file it appears in; null if it leaves the package. */
+export function resolvePackagePath(fromRelPath: string, target: string): string | null {
+  const clean = target.split(/[?#]/)[0];
+  if (!clean) return null;
+  const out = clean.startsWith("/") ? [] : fromRelPath.split("/").slice(0, -1);
+  for (const seg of clean.split("/")) {
+    if (seg === "" || seg === ".") continue;
+    if (seg === "..") {
+      if (out.length === 0) return null;
+      out.pop();
+    } else {
+      out.push(seg);
+    }
+  }
+  return out.length ? out.join("/") : null;
+}
+
+/** Images a document body references, each with the marker cleanMarkdown will leave for it. */
+export function extractImages(body: string, relPath: string): DocImage[] {
+  const text = body.replace(/<!--[\s\S]*?-->/g, "");
+  const seen = new Set<string>();
+  const out: DocImage[] = [];
+  for (const m of text.matchAll(/!\[([^\]]*)\]\(([^)]*)\)/g)) {
+    const target = imageTarget(m[2]);
+    const external = /^https?:\/\//i.test(target);
+    const img: DocImage = {
+      marker: imageMarker(m[1], m[2]),
+      alt: m[1].trim(),
+      path: external ? null : resolvePackagePath(relPath, target),
+      url: external ? target : null,
+    };
+    const key = `${img.marker}|${img.path ?? img.url}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(img);
+  }
+  return out;
 }
 
 export function prepareInternalDoc(input: InternalDocInput): PreparedDoc {
@@ -171,6 +238,7 @@ export function prepareInternalDoc(input: InternalDocInput): PreparedDoc {
       markdown: `${head}\n\n${cleanMarkdown(body)}`.trim(),
       meta,
       dropped,
+      images: extractImages(body, relPath),
     };
   }
 
@@ -181,5 +249,6 @@ export function prepareInternalDoc(input: InternalDocInput): PreparedDoc {
     markdown: cleanMarkdown(rawBody),
     meta: { path: relPath, doc_kind: "doc" },
     dropped: [],
+    images: extractImages(rawBody, relPath),
   };
 }

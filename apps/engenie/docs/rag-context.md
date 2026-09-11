@@ -48,6 +48,13 @@
 文字優先取 chunk 0 的 `metadata.raw`，沒有就從 chunk 重組並在頁面標示；`file` 轉 60 秒簽章網址。
 **不要改成絕對網址** —— 相對路徑才能跨部署，也才會自動吃登入。
 
+## 答案裡的圖
+
+來源的 `metadata.image_urls` 走兩個地方：引用 hover 的 tooltip（最多 2 張），以及**答案下方的圖**
+（`AnswerFigures`，只取被引用來源的圖，最多 4 張）。GitBook / Help Center 的圖是外部網址；
+internal_doc 的圖存私有 bucket `knowledge-assets`，走 `/api/knowledge-assets/…`（擋 `ask.use`，轉址到簽章網址）。
+chunk 拿到哪張圖，是看 chunk 內文有沒有那張圖留下的 `（圖：alt）` 字串。
+
 ## Unified Taxonomy (Solution > Product Line > Model)
 
 所有 source types 在 `documents.metadata` 共用三個 optional 欄位：

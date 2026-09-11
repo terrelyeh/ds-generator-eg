@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { docTitle, reconstructFromChunks, stripChunkPrefix, viewerPath } from "./doc-view";
+import { assetUrl, docTitle, isAllowedAssetPath, reconstructFromChunks, stripChunkPrefix, viewerPath } from "./doc-view";
 
 const chunk = (i: number, content: string, extra: Partial<{ title: string; metadata: Record<string, unknown> }> = {}) => ({
   chunk_index: i,
@@ -73,5 +73,31 @@ describe("docTitle", () => {
   it("falls back to chunk 0's title, then to the id", () => {
     expect(docTitle([chunk(1, "x", { title: "Section B" }), chunk(0, "x", { title: "Section A" })], "id")).toBe("Section A");
     expect(docTitle([chunk(0, "x")], "some/source-id")).toBe("some/source-id");
+  });
+});
+
+describe("isAllowedAssetPath", () => {
+  it("accepts an image under internal_doc/<collection>/", () => {
+    expect(isAllowedAssetPath("internal_doc/craft-ai-srs/diagrams/x.svg")).toBe(true);
+    expect(isAllowedAssetPath("internal_doc/craft-ai-srs/diagrams/welcome.PNG")).toBe(true);
+  });
+
+  it("refuses traversal, empty segments, other prefixes and non-images", () => {
+    // The route signs whatever path this lets through, and the bucket sits
+    // next to user-uploaded PDFs in the same project.
+    expect(isAllowedAssetPath("internal_doc/craft-ai-srs/../../secret.png")).toBe(false);
+    expect(isAllowedAssetPath("internal_doc/craft-ai-srs//x.svg")).toBe(false);
+    expect(isAllowedAssetPath("file/some-upload.pdf")).toBe(false);
+    expect(isAllowedAssetPath("some-upload.pdf")).toBe(false);
+    expect(isAllowedAssetPath("internal_doc/craft-ai-srs/notes.md")).toBe(false);
+  });
+});
+
+describe("assetUrl", () => {
+  it("builds the route URL from the storage path, escaping each segment", () => {
+    expect(assetUrl("internal_doc/craft-ai-srs/diagrams/x.svg")).toBe(
+      "/api/knowledge-assets/internal_doc/craft-ai-srs/diagrams/x.svg",
+    );
+    expect(assetUrl("internal_doc/pkg/a b.png")).toBe("/api/knowledge-assets/internal_doc/pkg/a%20b.png");
   });
 });

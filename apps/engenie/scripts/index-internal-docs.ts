@@ -96,8 +96,15 @@ async function main() {
     sourceUrl: urlBase ? urlBase.replace(/\/?$/, "/") + relPath : null,
   }));
 
-  const { ingestInternalDocs, ensureKnowledgeArea, assertKnowledgeArea, pruneVanishedInternalDocs } =
-    await import("../src/lib/rag/ingest-internal-doc");
+  const {
+    ingestInternalDocs,
+    ensureKnowledgeArea,
+    assertKnowledgeArea,
+    pruneVanishedInternalDocs,
+    uploadInternalDocAssets,
+    assetContentType,
+  } = await import("../src/lib/rag/ingest-internal-doc");
+  const { prepareInternalDoc } = await import("../src/lib/rag/internal-doc-prep");
   const { MAX_CHUNK_CHARS } = await import("../src/lib/rag/chunk");
 
   if (run) {
@@ -108,6 +115,36 @@ async function main() {
     await assertKnowledgeArea(supabase, area);
   }
 
+  // Images the documents reference. Local ones are uploaded to the private
+  // assets bucket (on --run) so answers citing that section can show them;
+  // only images actually there get attached — a figure that 404s is worse
+  // than none.
+  const referenced = new Set<string>();
+  let external = 0;
+  for (const f of files) {
+    for (const img of prepareInternalDoc(f).images) {
+      if (img.path) referenced.add(img.path);
+      else if (img.url) external++;
+    }
+  }
+  const onDisk = [...referenced].filter((p) => existsSync(join(dir, p)) && assetContentType(p) !== null);
+  const missing = [...referenced].filter((p) => !onDisk.includes(p));
+  let assets = new Set(onDisk);
+  if (run && onDisk.length > 0) {
+    const { createAdminClient } = await import("@eg/db/admin");
+    assets = await uploadInternalDocAssets(
+      createAdminClient(),
+      collection,
+      onDisk.map((p) => ({ path: p, bytes: readFileSync(join(dir, p)) })),
+    );
+  }
+  console.log(
+    `images: ${referenced.size} referenced, ${onDisk.length} found` +
+      (run ? `, ${assets.size} uploaded` : " (not uploaded — dry run)") +
+      (external ? `, ${external} external` : ""),
+  );
+  if (missing.length) console.log(`⚠ missing or unsupported: ${missing.join(", ")}`);
+
   const result = await ingestInternalDocs({
     knowledgeArea: area,
     collection,
@@ -115,6 +152,7 @@ async function main() {
     version: opt("--version"),
     status: opt("--status"),
     files,
+    assets,
     dryRun: !run,
   });
 
@@ -129,7 +167,8 @@ async function main() {
   for (const a of result.articles) {
     const prep = result.prepared.find((p) => `${collection}/${p.sourceId}` === a.sourceId);
     const dropped = prep?.dropped.length ? `  dropped: ${prep.dropped.join(" | ")}` : "";
-    console.log(`  - ${a.sourceId}\n      "${a.title}"  ${a.chunks}c${dropped}`);
+    const imgs = prep?.images.length ? `  🖼 ${prep.images.length}` : "";
+    console.log(`  - ${a.sourceId}\n      "${a.title}"  ${a.chunks}c${imgs}${dropped}`);
     for (const c of a.previews ?? []) {
       if (c.chars > MAX_CHUNK_CHARS) oversized.push({ sourceId: a.sourceId, title: c.title, chars: c.chars });
     }

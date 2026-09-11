@@ -7,6 +7,7 @@ import rehypeHighlight from "rehype-highlight";
 import { EngenieMark } from "./engenie-mark";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
+import { AnswerFigures } from "@/components/chat/answer-figures";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
 import {
   useChatStream,
@@ -395,6 +396,7 @@ const MessageBubble = memo(function MessageBubble({
         ) : null}
         {!message.isStreaming && message.content && (
           <>
+            <AnswerFigures content={message.content} sources={message.sources} />
             <ActionBar content={message.content} sources={message.sources} onRegenerate={onRegenerate} />
             {onFollowUp && message.followUps && message.followUps.length > 0 && (
               <FollowUpList questions={message.followUps} onClick={onFollowUp} />
