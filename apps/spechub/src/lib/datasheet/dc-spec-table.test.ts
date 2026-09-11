@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  IMPLICIT_SECTION,
   buildDcSpecBlocks,
   estimateDcBlockHeight,
   paginateDcSpecBlocks,
@@ -25,15 +24,24 @@ const SE110 = [
     ],
   },
   {
-    category: IMPLICIT_SECTION,
+    category: "General",
     sort_order: 0,
     spec_items: [item("Form Factor", "1U Rackmount", 0), item("Socket Type", "BGA", 1)],
   },
 ];
 
+const IDENTITY = [
+  { label: "Model Name", value: "1U Edge Server" },
+  { label: "Model Number", value: "SE110" },
+];
+
+const labels = (blocks: DcSpecBlock[]) =>
+  blocks.map((b) => (b.kind === "section" ? `[${b.title}]` : b.label));
+
 describe("buildDcSpecBlocks", () => {
-  it("bands every named section but not the one under the page title", () => {
+  it("bands every group, General included — the rule layout A follows", () => {
     expect(buildDcSpecBlocks(SE110)).toEqual([
+      { kind: "section", title: "General" },
       { kind: "row", label: "Form Factor", value: "1U Rackmount" },
       { kind: "row", label: "Socket Type", value: "BGA" },
       { kind: "section", title: "High-Performance AI & Graphics Acceleration" },
@@ -42,27 +50,60 @@ describe("buildDcSpecBlocks", () => {
     ]);
   });
 
-  it("prints no band over a section whose every value is blank or N/A", () => {
-    const blocks = buildDcSpecBlocks([
-      { category: IMPLICIT_SECTION, sort_order: 0, spec_items: [item("Form Factor", "1U Rackmount", 0)] },
-      { category: "Compliance", sort_order: 1, spec_items: [item("EMC", "N/A", 0), item("Safety", "  ", 1)] },
+  it("opens the first group with Model Name and Model Number", () => {
+    expect(labels(buildDcSpecBlocks(SE110, IDENTITY))).toEqual([
+      "[General]",
+      "Model Name",
+      "Model Number",
+      "Form Factor",
+      "Socket Type",
+      "[High-Performance AI & Graphics Acceleration]",
+      "Supports expansion with up to",
+      "LLM Workload Capacity",
     ]);
-    expect(blocks.filter((b) => b.kind === "section")).toEqual([]);
   });
 
-  it("bands the first section too when the sheet names it", () => {
+  it("prints no band over a group whose every value is blank or N/A", () => {
     const blocks = buildDcSpecBlocks([
-      { category: "Processor & Memory", sort_order: 0, spec_items: [item("Socket Type", "BGA", 0)] },
+      { category: "General", sort_order: 0, spec_items: [item("Form Factor", "1U Rackmount", 0)] },
+      { category: "Compliance", sort_order: 1, spec_items: [item("EMC", "N/A", 0), item("Safety", "  ", 1)] },
     ]);
-    expect(blocks[0]).toEqual({ kind: "section", title: "Processor & Memory" });
+    expect(labels(blocks)).toEqual(["[General]", "Form Factor"]);
+  });
+
+  it("hands the identity rows to the first group that prints, not to an empty one", () => {
+    const blocks = buildDcSpecBlocks(
+      [
+        { category: "General", sort_order: 0, spec_items: [item("PCH Chipset", "", 0)] },
+        { category: "Processor & Memory", sort_order: 1, spec_items: [item("Socket Type", "BGA", 0)] },
+      ],
+      IDENTITY,
+    );
+    expect(labels(blocks)).toEqual(["[Processor & Memory]", "Model Name", "Model Number", "Socket Type"]);
+  });
+
+  it("prints no table at all when no group has a printable row", () => {
+    // The Generate gate reads an empty result as "no specs"; two identity
+    // rows on their own must not look like a spec sheet to it.
+    expect(buildDcSpecBlocks([{ category: "General", sort_order: 0, spec_items: [] }], IDENTITY)).toEqual([]);
+  });
+});
+
+describe("estimateDcBlockHeight", () => {
+  it("gives a 261-character value the 3 lines it prints on", () => {
+    // SE110/SE210's Target Workloads. At 86 characters a line it was
+    // estimated at 4, and that phantom line moved SE210's whole AI group
+    // onto a page of its own.
+    const oneLine = estimateDcBlockHeight({ kind: "row", label: "Target Workloads", value: "x" });
+    const long = estimateDcBlockHeight({ kind: "row", label: "Target Workloads", value: "x".repeat(261) });
+    expect(long).toBe(oneLine + 2 * 11);
   });
 });
 
 describe("paginateDcSpecBlocks", () => {
   const row = (label: string): DcSpecBlock => ({ kind: "row", label, value: "x" });
   const band = (title: string): DcSpecBlock => ({ kind: "section", title });
-  const names = (pages: DcSpecBlock[][]) =>
-    pages.map((p) => p.map((b) => (b.kind === "section" ? `[${b.title}]` : b.label)));
+  const names = (pages: DcSpecBlock[][]) => pages.map(labels);
   const THREE = estimateDcBlockHeight(row("a")) * 3;
 
   it("never leaves a band as the last thing on a page", () => {
