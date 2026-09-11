@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { listModels, invalidateModelCache, SUPPORTED_SURFACES } from "@eg/llm/models";
+import { findUnknownSlugs, type UnknownSlug } from "@eg/llm/catalog";
 import { getCurrentUser } from "@eg/auth/session";
 import { can } from "@eg/auth/permissions";
 
@@ -129,6 +130,16 @@ export async function PUT(request: Request) {
     }
   }
 
+  // Shape isn't enough: "deepseek/deepseek-v4-flash-latest" has it and names
+  // nothing — OpenRouter's always-latest aliases start with "~" — and the
+  // first to say so was Ask, with a 400. So enabled rows must exist on
+  // OpenRouter. Disabled rows aren't checked: they can't be called, and
+  // switching off a model OpenRouter has retired must stay possible.
+  const check = await findUnknownSlugs(models.filter((m) => m.enabled).map((m) => m.slug.trim()));
+  if (check.unknown.length) {
+    return NextResponse.json({ error: check.unknown.map(describeUnknown).join(" ") }, { status: 400 });
+  }
+
   const supabase = createAdminClient();
 
   // Replace wholesale: the UI edits the list as a unit, and a diff would
@@ -187,5 +198,19 @@ export async function PUT(request: Request) {
   // take hold until the TTL lapsed.
   invalidateModelCache();
 
-  return NextResponse.json({ ok: true, count: models.length });
+  return NextResponse.json({
+    ok: true,
+    count: models.length,
+    // OpenRouter didn't answer: saved anyway — its outage shouldn't lock the
+    // catalog — but the editor says the ids went unchecked.
+    ...(check.unverified ? { warning: "連不到 OpenRouter，這次沒有檢查 model id。" } : {}),
+  });
+}
+
+/** One sentence per slug OpenRouter doesn't know, for the editor's toast. */
+function describeUnknown({ slug, suggestions }: UnknownSlug): string {
+  const hint = suggestions.length
+    ? `是不是要填 ${suggestions.join("、")}？`
+    : "請到 openrouter.ai/models 確認 model id。";
+  return `OpenRouter 上找不到「${slug}」，${hint}（暫時不處理的話，取消這一列的「啟用」就能儲存。）`;
 }

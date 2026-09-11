@@ -105,6 +105,11 @@ src/
    使用者找不到；已搬回本 app 與 API Keys / AI 用量並列。
    **spechub 保留一支唯讀的 `/api/settings/models?surface=translate`** 給它的翻譯下拉用
    —— 兩 app 共用同一個 DB，各自直讀，不跨 app 呼叫。
+   **存檔時會拿 OpenRouter 的模型清單檢查每個啟用中的 slug**（`@eg/llm/catalog`，2026-09-11）——
+   以前只檢查有沒有 `/`，少了 `~` 的 `deepseek/deepseek-v4-flash-latest` 照樣存進去，要到 Ask 才 400。
+   清單沒列的再問單一模型查詢（它認得 `:nitro` 這類後綴和改名別名）；真的找不到就擋下並建議最接近的 id
+   （少打／多打 `~` 優先）。**停用的列不檢查**，這樣 OpenRouter 下架的模型還能關掉再存。
+   連不到 OpenRouter 時照存，但回 `warning`，編輯器會跳提示。
    **slug 不能就地改**（它是那列的身分，`ask_workspaces.provider` / `chat_sessions.provider` /
    帳本 `llm_usage_events.model` 都拿它當參照）——換模型 = **新增一列 → 移預設 → 停用舊的**，
    頁面上有寫。列可以刪（✕），但 **PUT 會擋掉還被 ask_workspace 指定的 slug 並點名是哪幾個**，
