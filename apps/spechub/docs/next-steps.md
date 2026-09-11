@@ -18,6 +18,8 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
 7b. **渲染端改動需重產 PDF 才生效** — 2026-08-12~13 的字型/字級/分區間距/logo 全是渲染端,
    已產出的 ~90 份 PDF 仍是舊版,挑產品線 Regenerate 才會套用。**CJK 字級收斂尚未做**
    （`scale.ts` 只涵蓋 en/es;ja/zh-TW 在 `app_settings`、刻意較大,要不要一起收斂是獨立決定）。
+   2026-09-11 Data Center 規格表改版（#79 / #82:分組灰帶、型號改成一般列）同理,
+   5 份 DC PDF 要 Regenerate 才是新版。
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 

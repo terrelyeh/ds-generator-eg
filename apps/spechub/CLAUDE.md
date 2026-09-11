@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-04。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-09-11。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -264,6 +264,10 @@ auth.users → profiles ← email_whitelist.invited_by
   **字型/字級/顏色/logo 對照表 → [`/design/datasheet-type-spec.html`](public/design/datasheet-type-spec.html)**
   （站上免登入可看）。新增產品線見
   [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md)
+- **改 datasheet 版型之前,先看同一份 sheet 在版型 A 怎麼印**,再用 prod 頁面做 mockup
+  （puppeteer + bypass header,只改 DOM 截圖）跟使用者確認才動程式。2026-09-11 的 DC 規格表
+  因為自行決定「`General` 不印分類帶」而跟所有 AP/Switch 版型不一致,重做了一次（#79 → #82）;
+  B 的分組/分頁規則在 `lib/datasheet/dc-spec-table.ts`（細節見 datasheet-rendering.md）
 
 ## Current Status
 
@@ -276,9 +280,7 @@ auth.users → profiles ← email_whitelist.invited_by
    —— 門關了但鑰匙沒換。金鑰在 EnGenie `/settings/api-keys` 改。
 0b. **手動按一次 Generate PDF、問 Ask 一題** —— 這兩條 headless 驗不了
    （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
-0c. **看隔天的 09:00 排程** —— 它之前連續 504,第一次成功會補完累積數週的變更,
-   Telegram 可能一次比較多則。那是正常的。
-0d. **審查的 75 項全部關閉（PR #49–#67, migrations 00048–00055）。**
+0c. **審查的 75 項全部關閉（PR #49–#67, migrations 00048–00055）。**
    哪一項在哪一支 PR、以及每一個決定的理由，看 memory `project-code-review-2026-09`
    或 `git log`。**這裡不留已完成清單** —— 它不影響下一個 session 怎麼寫程式。
    刻意只做一半的三件事:去重只碰 auth 頁面與 `getGoogleAuth()`（`ui/` 各留一份是

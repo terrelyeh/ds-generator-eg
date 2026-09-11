@@ -21,3 +21,11 @@
    （那句是從 EOC655 複製的）。會印在 datasheet 第 2 頁。
 4. **Cloud AP 素材缺口** — 27 台裡 21 台在 Drive 沒有 datasheet 用圖 → 英文版 PDF 生不出來
    （日/中文版不受影響,各語系有自己的 hardware image）。其他線各缺 1–3 台。
+5. **Data Center sheet 錯字待 PM 修**（2026-09-11 查,會印在 datasheet 上）——
+   Edge Appliance「(2)Detail Specs」**B12 / C12**（SE110 / SE210 Power Supply）與
+   「(3)Comparison」C13 的 `80 Plus Plantinum` → Platinum;AI Server「(2)Detail Specs」
+   **C17 / D17**（S21 / S11 System Management）的 `Firmware Upgarde` → Upgrade;
+   **B22**（S41 Target Workloads）結尾多一個 `"`。
+   另外 Edge Appliance 的 Environment / System Management / Central Management /
+   Compliance 四列目前整列空白 = parser 眼中的分類標題,現在沒事只因下面沒有規格;
+   **只填其中幾列時,空格要填 `-`**,否則空白列會變成多出來的一條灰色分類帶。
