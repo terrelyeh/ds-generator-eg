@@ -226,6 +226,11 @@ src/
   openrouter.ai，BYOK 的 key 就是 `streamComplete` 的 bearer。畫面卻一直要「google key」，填原廠 key 只會拿到
   OpenRouter 的 401。格式判斷只在 `lib/ask/byok-key.ts`，管理頁、使用者的 key 欄位、`/api/ask-workspaces`、
   `/api/ask` 四處共用。`ask_workspaces.byok_provider` 欄位現在沒有意義（留著沒刪）。
+- **workspace passcode 可以查看／複製**（2026-09-11，migration 00059）——`passcode_hash`（scrypt）仍是
+  `ws-auth` 唯一的驗證依據；另存一份 `passcode_encrypted`（`encryptKey`，同 api_keys／BYOK，`API_KEY_ENC_SECRET`）。
+  只有 `POST /api/ask-workspaces/passcode`（admin、`no-store`）會解開，**列表 API 永遠不帶明文**，只回
+  `passcode_viewable`。解開後**用 hash 再驗一次**，對不上就當成不可查看——給分公司一組錯的 passcode 比
+  「請重設一次」更糟。00059 之前設定的 passcode 只有 hash，要重設一次（同一組也可以）才看得到。
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（**沒設白名單 = 不限制;白名單「讀不到」= 只准 `'self'`**——2026-09-04 起兩種情況分開,之前 Supabase 一次 2 秒的抖動就是限制關掉的那一刻）
 - **Chrome 側邊欄 extension**（2026-09-11，repo 根目錄的 `extensions/engenie-sidepanel/`）——
   Side Panel 裡 iframe `/embed/<slug>`，**沒有自己的聊天邏輯**：認證、知識範圍、模型、配額全在 workspace。

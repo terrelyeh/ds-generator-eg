@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import { workspaceShareText } from "@/lib/ask/share-info";
 import { isOpenRouterKey, OPENROUTER_KEY_ERROR, OPENROUTER_KEY_HINT } from "@/lib/ask/byok-key";
 import { Button } from "@/components/ui/button";
 import { InfoHint, PERSONA_HINT, PROFILE_HINT } from "@/components/ui/info-hint";
@@ -37,6 +38,8 @@ interface Workspace {
   last_used_at: string | null;
   note: string | null;
   has_passcode: boolean;
+  /** The passcode is stored in a recoverable form (set on or after migration 00059). */
+  passcode_viewable?: boolean;
   has_byok_key: boolean;
   allowed_origins?: string[];
   token_version?: number;
@@ -112,6 +115,8 @@ export function AskWorkspacesManager() {
   const [daily, setDaily] = useState("");
   const [allowedOrigins, setAllowedOrigins] = useState("");
   const [editHasPasscode, setEditHasPasscode] = useState(false);
+  const [editViewable, setEditViewable] = useState(false);
+  const [revealed, setRevealed] = useState<string | null>(null);
   const [editHasByok, setEditHasByok] = useState(false);
 
   const fetchList = useCallback(async () => {
@@ -135,14 +140,14 @@ export function AskWorkspacesManager() {
   }, []);
 
   function resetForm() {
-    setSlug(""); setName(""); setPasscode(""); setLlmMode("shared"); setProvider(defaultSlug);
+    setSlug(""); setName(""); setPasscode(""); setRevealed(null); setEditViewable(false); setLlmMode("shared"); setProvider(defaultSlug);
     setByokKey(""); setTax(EMPTY_TAXONOMY_VALUE); setSourceTypes([]); setKnowledgeAreas([]); setPersona("default"); setProfile("default");
     setAllowSwitch(true); setWelcomeSubtitle(""); setWelcomeDescription(""); setExamples(""); setRate(30); setDaily(""); setAllowedOrigins("");
     setEditId(null); setEditHasPasscode(false); setEditHasByok(false);
   }
   function openCreate() { resetForm(); setOpen(true); }
   function openEdit(w: Workspace) {
-    setEditId(w.id); setSlug(w.slug); setName(w.name); setPasscode(""); setLlmMode(w.llm_mode);
+    setEditId(w.id); setSlug(w.slug); setName(w.name); setPasscode(""); setRevealed(null); setEditViewable(!!w.passcode_viewable); setLlmMode(w.llm_mode);
     setProvider(w.provider); setByokKey("");
     setTax({ solution: w.scope?.solution ?? GLOBAL_SOLUTION_SLUG, product_lines: w.scope?.product_lines ?? [], models: w.scope?.models ?? [] });
     setSourceTypes(w.scope?.source_types ?? []);
@@ -230,6 +235,28 @@ export function AskWorkspacesManager() {
     }
   }
 
+  /** Decrypted on request by the admin-only reveal route; null when it can't be recovered. */
+  async function fetchPasscode(id: string): Promise<string | null> {
+    try {
+      const r = await fetch("/api/ask-workspaces/passcode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const d = (await r.json()) as { viewable?: boolean; passcode?: string | null };
+      return d.viewable && d.passcode ? d.passcode : null;
+    } catch {
+      return null;
+    }
+  }
+
+  async function copyShareInfo(w: Workspace) {
+    const pc = w.has_passcode ? await fetchPasscode(w.id) : null;
+    await navigator.clipboard?.writeText(workspaceShareText({ name: w.name, url: `${origin}/ask/${w.slug}`, passcode: pc }));
+    if (w.has_passcode && !pc) toast.warning("已複製網址——這組 passcode 設定得比較早，無法顯示；請到 Edit 重新輸入一次（同一組也可以）");
+    else toast.success(pc ? "已複製網址和 passcode" : "已複製網址（這個 workspace 沒有 passcode）");
+  }
+
   async function toggle(w: Workspace) {
     const r = await fetch("/api/ask-workspaces", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: w.id, enabled: !w.enabled }) });
     const d = await r.json();
@@ -313,6 +340,7 @@ export function AskWorkspacesManager() {
                   <td className="px-3 py-2 text-right">
                     <div className="flex items-center justify-end gap-3">
                       <button onClick={() => { navigator.clipboard?.writeText(`${origin}/ask/${w.slug}`); toast.success("Entry URL copied"); }} className="text-engenius-blue hover:underline">Copy URL</button>
+                      <button onClick={() => copyShareInfo(w)} className="text-engenius-blue hover:underline" title="複製網址和 passcode，交給要使用的人">Share</button>
                       <button onClick={() => { navigator.clipboard?.writeText(`<script src="${origin}/widget.js" data-workspace="${w.slug}" data-title="${w.name.replace(/"/g, "&quot;")}" async></script>`); toast.success("Embed snippet copied — paste before </body>"); }} className="text-engenius-blue hover:underline" title="Copy a floating chat widget snippet for other sites">Embed</button>
                       <button onClick={() => openEdit(w)} className="text-engenius-blue hover:underline">Edit</button>
                       <button onClick={() => toggle(w)} className="text-muted-foreground hover:text-engenius-dark">{w.enabled ? "Disable" : "Enable"}</button>
@@ -363,6 +391,23 @@ export function AskWorkspacesManager() {
                 <label className="mb-1 block text-sm font-medium text-muted-foreground">Passcode {editId && editHasPasscode && <span className="font-normal text-muted-foreground/60">(leave blank to keep)</span>}</label>
                 <input value={passcode} disabled={saving} onChange={(e) => setPasscode(e.target.value)} placeholder={editId && editHasPasscode ? "•••••• (unchanged)" : "set an access code"}
                   className="w-full rounded-md border px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-engenius-blue/50" />
+                {editId && editHasPasscode && (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[13px]">
+                    {editViewable ? (
+                      revealed ? (
+                        <>
+                          <code className="rounded bg-muted px-1.5 py-0.5 font-mono">{revealed}</code>
+                          <button type="button" onClick={() => { navigator.clipboard?.writeText(revealed); toast.success("Passcode copied"); }} className="text-engenius-blue hover:underline">複製</button>
+                          <button type="button" onClick={() => setRevealed(null)} className="text-muted-foreground hover:underline">隱藏</button>
+                        </>
+                      ) : (
+                        <button type="button" onClick={async () => { const pc = editId ? await fetchPasscode(editId) : null; if (pc) setRevealed(pc); else toast.error("無法取得這組 passcode，請重新輸入一次"); }} className="text-engenius-blue hover:underline">顯示目前的 passcode</button>
+                      )
+                    ) : (
+                      <span className="text-muted-foreground/70">這組 passcode 設定於「可查看」功能之前，無法顯示——重新輸入一次（同一組也可以）並儲存，之後就能查看和分享。</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="rounded-lg border border-dashed border-muted-foreground/20 bg-muted/20 p-3">
