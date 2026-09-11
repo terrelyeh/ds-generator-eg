@@ -172,6 +172,16 @@ src/
   `file` 不是 markdown —— 那條路徑轉成 60 秒簽章網址。
   citation 的 `isInternal` 從「只有 wifi_regulation」放寬成「除了 product_spec 的所有相對路徑」
   （`/product/…` 是 SpecHub 的頁面，不是我們的）。
+- **等待畫面顯示「真的」進度、答案佔滿全寬、EnGenie 標記在底部**（2026-09-11）——
+  `components/chat/answer-activity.tsx`（`AnswerActivity` + `EngenieSpark`），**兩個聊天介面共用**。
+  等待時照串流實際的三段走：`searching` → `sources`（模型開始寫之前就送到，列出真正找到的前 4 則）→
+  `generating`（附經過秒數）。**不要加「正在閱讀第 3 份…」這種假步驟**——檢索是一次搜尋、模型一次讀完全部，
+  沒有那種中間狀態可顯示。開始出字後收合成答案上方一行「參考了 N 則資料」，**它就是答案的來源清單**
+  （取代了原本答案下方的 `ReferenceList` / "N references" chips，兩處都刪了）。分組規則在
+  `lib/ask/activity.ts`（純函式、有測試）：同來源同段落標題算一則，citation 編號全保留。
+  連結規則 `sourceHref()`：http(s) 到處可連；**app 內路徑只在內部 `/ask` 可連**——workspace / widget /
+  extension 的讀者拿的是 workspace token 不是登入 session，連 `/knowledge/doc` 會被踢去登入。
+  左側頭像欄（`AskAvatar` / `EngenieAvatar`）拿掉了；星形改在答案底部 Copy/Retry 那排最左，串流中會轉。
 - **答案下方會顯示被引用來源的原圖**（2026-09-11）——`components/chat/answer-figures.tsx`，兩個聊天介面共用。
   選圖在 `lib/ask/figures.ts`（純函式）：**只看答案真的 `[n]` 引用到的來源**、依引用順序、每來源最多 2 張、
   總共最多 4 張、只收 http(s) 或同源路徑。**不要改成顯示所有撈到的來源的圖**——最多 12 個來源，
