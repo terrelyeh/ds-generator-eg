@@ -8,18 +8,6 @@ import type { DemoConversation } from "@/lib/demo/history";
 import { getUserKey, setUserKey as persistUserKey, clearUserKey } from "@/lib/demo/byok";
 import type { ChatMessage } from "@/hooks/use-chat-stream";
 
-/**
- * Human label for the key family a user_byok workspace expects.
- *
- * The fallback reads the vendor off the model slug ("anthropic/claude-...").
- * It used to test `startsWith("claude")`, which no slug satisfies — so every
- * workspace without an explicit byok_provider was labelled Google.
- */
-function familyLabel(byokProvider?: string | null, provider?: string): string {
-  const f = byokProvider ?? provider?.split("/")[0] ?? "google";
-  return f === "anthropic" ? "Anthropic" : f === "openai" ? "OpenAI" : "Google";
-}
-
 export function EngenieShell({
   workspace,
   title = "EnGenie",
@@ -55,7 +43,6 @@ export function EngenieShell({
   const [allowSwitch, setAllowSwitch] = useState(true);
   // LLM mode + user_byok key state (user brings their own key in the UI).
   const [llmMode, setLlmMode] = useState<string>("shared");
-  const [byokFamily, setByokFamily] = useState<string>("");
   const [userKey, setUserKey] = useState<string>("");
   // Incrementing this remounts EngenieChat to reset messages + input state
   const [chatKey, setChatKey] = useState(0);
@@ -103,7 +90,6 @@ export function EngenieShell({
           if (d.workspace.profile) setProfile(d.workspace.profile);
           const mode = d.workspace.llm_mode ?? "shared";
           setLlmMode(mode);
-          setByokFamily(familyLabel(d.workspace.byok_provider, d.workspace.provider));
           // user_byok: load this browser's saved key for the workspace (if any).
           if (mode === "user_byok" && workspace) setUserKey(getUserKey(workspace));
         }
@@ -177,7 +163,6 @@ export function EngenieShell({
           compact={compact}
           userByok={llmMode === "user_byok"}
           userKey={userKey}
-          byokFamily={byokFamily}
         />
       </div>
 
@@ -199,7 +184,6 @@ export function EngenieShell({
         workspace={workspace}
         userByok={llmMode === "user_byok"}
         userKey={userKey}
-        byokFamily={byokFamily}
         onSetUserKey={handleSetUserKey}
         onClearUserKey={handleClearUserKey}
       />

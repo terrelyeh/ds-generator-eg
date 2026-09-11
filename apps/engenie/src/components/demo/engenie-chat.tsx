@@ -61,7 +61,6 @@ export interface EngenieChatProps {
   userByok?: boolean;
   userKey?: string | null;
   /** Provider family label for the key the user must bring (e.g. "Google"). */
-  byokFamily?: string;
 }
 
 const FALLBACK_QUESTIONS = [
@@ -91,7 +90,6 @@ export function EngenieChat({
   compact,
   userByok,
   userKey,
-  byokFamily,
 }: EngenieChatProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -197,7 +195,7 @@ export function EngenieChat({
                     <rect x="3" y="11" width="18" height="11" rx="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
                   </svg>
                   <span className="min-w-0">
-                    <span className="block text-[14px] font-semibold tracking-tight text-engenius-dark">輸入你的 {byokFamily || ""} API key</span>
+                    <span className="block text-[14px] font-semibold tracking-tight text-engenius-dark">輸入你的 OpenRouter API key</span>
                     <span className="mt-0.5 block text-[12px] leading-snug text-engenius-dark/55">這個工作區需要你自己的 key 才能開始（只存在你的瀏覽器）</span>
                   </span>
                 </button>
@@ -268,7 +266,7 @@ export function EngenieChat({
               autosize();
             }}
             onKeyDown={handleKeyDown}
-            placeholder={needsKey ? `請先設定你的 ${byokFamily || ""} API key` : "Ask EnGenie..."}
+            placeholder={needsKey ? "請先設定你的 OpenRouter API key" : "Ask EnGenie..."}
             disabled={loading || needsKey}
             className="flex-1 resize-none bg-transparent py-2 leading-[1.5] text-engenius-dark outline-none placeholder:text-engenius-dark/40 disabled:opacity-50"
             style={{ fontFamily: "inherit", fontSize: compact ? "14.5px" : "16px" }}

@@ -222,6 +222,10 @@ src/
   guard 以前私藏在 `ingest-web.ts` 且只在一個呼叫點跑,gitbook / helpcenter / sitemap
   完全沒有檢查;而且 `::ffff:169.254.169.254` 這種寫法會直接通過
 - **Knowledge 的 Product Specs 清單**用 `knowledge/product-spec-list.tsx` 依 Solution ▸ Product Line 折疊分組 + 搜尋 + 每條產品線各自 re-index（走 `product_line_id`；`/api/taxonomy` 有回 product line `id`）。其餘來源類型維持平鋪表。
+- **BYOK 的 key 一律是 OpenRouter key**（`sk-or-…`，2026-09-11 修正畫面）—— 8 月起所有 completion 都打
+  openrouter.ai，BYOK 的 key 就是 `streamComplete` 的 bearer。畫面卻一直要「google key」，填原廠 key 只會拿到
+  OpenRouter 的 401。格式判斷只在 `lib/ask/byok-key.ts`，管理頁、使用者的 key 欄位、`/api/ask-workspaces`、
+  `/api/ask` 四處共用。`ask_workspaces.byok_provider` 欄位現在沒有意義（留著沒刪）。
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（**沒設白名單 = 不限制;白名單「讀不到」= 只准 `'self'`**——2026-09-04 起兩種情況分開,之前 Supabase 一次 2 秒的抖動就是限制關掉的那一刻）
 - **Chrome 側邊欄 extension**（2026-09-11，repo 根目錄的 `extensions/engenie-sidepanel/`）——
   Side Panel 裡 iframe `/embed/<slug>`，**沒有自己的聊天邏輯**：認證、知識範圍、模型、配額全在 workspace。

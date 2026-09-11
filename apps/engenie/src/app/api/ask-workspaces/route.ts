@@ -5,6 +5,7 @@ import { gate, getCurrentUser } from "@eg/auth/session";
 import { encryptKey } from "@/lib/auth/api-key";
 import { getDefaultModel } from "@eg/llm/models";
 import { normalizeOrigins } from "@/lib/ask/origins";
+import { isOpenRouterKey, OPENROUTER_KEY_ERROR } from "@/lib/ask/byok-key";
 
 /**
  * Admin CRUD for Ask workspaces (per-department /ask/<slug> entries).
@@ -102,6 +103,9 @@ export async function POST(request: Request) {
   if (llm_mode === "byok" && !body.byok_key) {
     return NextResponse.json({ error: "BYOK 模式需要填入 API key。" }, { status: 400 });
   }
+  if (body.byok_key && !isOpenRouterKey(body.byok_key)) {
+    return NextResponse.json({ error: OPENROUTER_KEY_ERROR }, { status: 400 });
+  }
 
   const row: Record<string, unknown> = {
     slug,
@@ -180,6 +184,9 @@ export async function PATCH(request: Request) {
   if (body.allowed_origins !== undefined) update.allowed_origins = normalizeOrigins(body.allowed_origins);
   // Secrets: only when a non-empty value is provided.
   if (body.passcode) update.passcode_hash = hashPasscode(body.passcode);
+  if (body.byok_key && !isOpenRouterKey(body.byok_key)) {
+    return NextResponse.json({ error: OPENROUTER_KEY_ERROR }, { status: 400 });
+  }
   if (body.byok_key) update.byok_key_encrypted = encryptKey(body.byok_key);
 
   if (Object.keys(update).length === 0) {
