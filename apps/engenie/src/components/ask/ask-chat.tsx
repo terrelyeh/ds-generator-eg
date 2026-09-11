@@ -10,6 +10,7 @@ import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { useAskModels } from "@/hooks/use-ask-models";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
+import { AnswerFeedback } from "@/components/chat/answer-feedback";
 import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
 import { normalizeCitations } from "@/lib/ask/citations";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
@@ -382,6 +383,10 @@ const AskMessage = memo(function AskMessage({
                 </svg>
               </button>
             )}
+            <AnswerFeedback
+              requestId={message.requestId}
+              buttonClassName="text-muted-foreground/70 hover:text-foreground transition-colors p-1 rounded hover:bg-muted"
+            />
             {message.provider && (
               <span className="ml-auto text-xs text-muted-foreground/30">via {message.provider}</span>
             )}

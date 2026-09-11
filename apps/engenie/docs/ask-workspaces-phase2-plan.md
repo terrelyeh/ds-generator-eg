@@ -94,3 +94,15 @@ Phase 1 的 workspace 只有 passcode、沒有「使用者身分」。私有文�
 - 完全獨立的知識庫（每 workspace 一套向量空間）—— 沒必要，`workspace_id` 過濾就夠。
 - 對外（非內部部門）開放 —— 仍是內部工具。
 - 跨 workspace 分享私有文件 —— 真有需求再說。
+
+## 待辦：用 Microsoft 365 帳號登入（等 IT，2026-09-12）
+
+要按「人」看各 workspace 的用量，就得知道是誰在問；現在的 passcode 只能算到匿名瀏覽器。
+公司用 Microsoft 365（自有網域），方向是在 Microsoft Entra ID 註冊應用程式、接 Supabase 的 Azure 登入：
+支援的帳戶類型選「只有這個組織」，Supabase 設公司的 tenant URL，manifest 加 `email` 與 `xms_edov` 兩個 optional claim。
+
+**要先找 IT 確認的兩個租用戶設定**（Microsoft 預設都開放，但很多公司會關）：
+1. 一般使用者能不能註冊應用程式——關了就請 IT 給 Application Developer 角色，或由 IT 註冊後把我們設成擁有者。
+2. 使用者能不能自己同意授權——關了就請 IT 代表全公司同意一次。
+
+分公司若有獨立的 Microsoft 365 租用戶，要另外設定成多組織。在那之前，workspace 一律維持 passcode 控管。

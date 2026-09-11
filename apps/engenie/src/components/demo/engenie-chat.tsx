@@ -8,6 +8,8 @@ import { EngenieMark } from "./engenie-mark";
 import { useStickToBottom } from "@/hooks/use-stick-to-bottom";
 import { ChatPre } from "@/components/chat/chat-pre";
 import { AnswerFigures } from "@/components/chat/answer-figures";
+import { AnswerFeedback } from "@/components/chat/answer-feedback";
+import { visitorId } from "@/lib/ask/visitor";
 import { AnswerActivity, EngenieSpark } from "@/components/chat/answer-activity";
 import { normalizeCitations, stripCitations } from "@/lib/ask/citations";
 import { MarkdownErrorBoundary } from "@/components/chat/markdown-error-boundary";
@@ -98,7 +100,7 @@ export function EngenieChat({
   // Shared chat streaming engine — same logic as the desktop Ask panel.
   // Live status ("searching" → "generating") drives 搜尋相關資料中… / 整理回覆中…
   const { messages, setMessages, loading, loadingStatus, submit, stop, regenerate } = useChatStream({
-    getParams: () => ({ provider, persona, profile, ...(workspace ? { workspace } : {}), ...(userKey ? { userKey } : {}) }),
+    getParams: () => ({ provider, persona, profile, visitor: visitorId(), ...(workspace ? { workspace } : {}), ...(userKey ? { userKey } : {}) }),
     authToken,
     stoppedLabel: "_(已停止)_",
     onComplete: (msgs) => {
@@ -225,6 +227,7 @@ export function EngenieChat({
                 <MessageBubble
                   key={i}
                   message={m}
+                  authToken={authToken}
                   question={i > 0 && messages[i - 1]?.role === "user" ? messages[i - 1].content : undefined}
                   compact={compact}
                   loadingStatus={m.isStreaming ? loadingStatus : null}
@@ -318,6 +321,7 @@ const MessageBubble = memo(function MessageBubble({
   loadingStatus = null,
   onFollowUp,
   onRegenerate,
+  authToken,
 }: {
   message: Message;
   /** The user message this answers — figures open by default only if it asked for one. */
@@ -326,6 +330,8 @@ const MessageBubble = memo(function MessageBubble({
   loadingStatus?: "searching" | "generating" | null;
   onFollowUp?: (q: string) => void;
   onRegenerate?: () => void;
+  /** Workspace bearer — the feedback buttons need it inside a cross-site iframe. */
+  authToken?: string;
 }) {
   const bodySize = compact ? "text-[13.5px]" : "text-[15px]";
   if (message.role === "user") {
@@ -393,7 +399,7 @@ const MessageBubble = memo(function MessageBubble({
         {!message.isStreaming && message.content && (
           <>
             <AnswerFigures content={content} sources={message.sources} question={question} />
-            <ActionBar content={content} onRegenerate={onRegenerate} />
+            <ActionBar content={content} onRegenerate={onRegenerate} requestId={message.requestId} authToken={authToken} />
             {onFollowUp && message.followUps && message.followUps.length > 0 && (
               <FollowUpList questions={message.followUps} onClick={onFollowUp} />
             )}
@@ -447,7 +453,17 @@ function FollowUpList({
   );
 }
 
-function ActionBar({ content, onRegenerate }: { content: string; onRegenerate?: () => void }) {
+function ActionBar({
+  content,
+  onRegenerate,
+  requestId,
+  authToken,
+}: {
+  content: string;
+  onRegenerate?: () => void;
+  requestId?: string;
+  authToken?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -493,6 +509,12 @@ function ActionBar({ content, onRegenerate }: { content: string; onRegenerate?: 
             <span>Retry</span>
           </button>
         )}
+        <AnswerFeedback
+          requestId={requestId}
+          authToken={authToken}
+          buttonClassName="inline-flex items-center transition-colors hover:text-engenius-dark"
+          iconClassName="h-[15px] w-[15px]"
+        />
       </div>
     </div>
   );

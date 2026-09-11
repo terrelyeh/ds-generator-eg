@@ -238,6 +238,18 @@ src/
   只有 `POST /api/ask-workspaces/passcode`（admin、`no-store`）會解開，**列表 API 永遠不帶明文**，只回
   `passcode_viewable`。解開後**用 hash 再驗一次**，對不上就當成不可查看——給分公司一組錯的 passcode 比
   「請重設一次」更糟。00059 之前設定的 passcode 只有 hash，要重設一次（同一組也可以）才看得到。
+- **Workspace 分析**（2026-09-12，migration 00060）——`/api/ask` 每一題寫一列 `ask_requests`
+  （頻道／workspace／登入者 id 或匿名訪客 id／問題／結果／找到幾筆與最高相似度／引用來源／首字時間／👍👎）。
+  **為什麼另開一張表**：花費帳本只看得到有呼叫模型的題目，而「找不到資料」的題目根本不會呼叫模型——
+  最想看的知識缺口原本沒留下任何紀錄。
+  - 頁面 `/settings/workspace-analytics`（與 `/[key]`），權限 `analytics.view`（admin）——問題內容是使用者打的字。
+    API `/api/analytics/workspaces[/<key>[/questions]]`，彙總全在 `ask_analytics_*` RPC；**花費仍讀帳本**（`ref` = workspace）。
+  - 匿名訪客 id：`lib/ask/visitor.ts`（localStorage `engenie_visitor_v1`）。**算的是瀏覽器，不是人**；要按人拆得先有登入。
+  - 👍👎：`/api/ask/feedback`，憑回答附帶的 request id（UUID）寫入、7 天內可改；不需要 session，
+    所以 widget／extension／demo 都能用。按了 👎 的題目會進知識缺口清單。
+  - 「相似度低」門檻 `LOW_SIMILARITY = 0.45`（`lib/analytics/types.ts`）要和 00060 SQL 的預設值一致，有實際資料後再調。
+  - 問題原文保留 90 天：`ask_requests_redact()` 由 `reindex-products` 的每日 cron 順便呼叫；次數與結果不刪。
+  - 帳本的 `ref`：demo 從這版起記成 `demo`（以前和內部 /ask 一起記成 `internal`）。
 - workspace session token = `<version>.<exp>.<sig>`（HMAC, `WORKSPACE_TOKEN_SECRET`）；widget 嵌入網域白名單 = proxy 設 CSP `frame-ancestors`（**沒設白名單 = 不限制;白名單「讀不到」= 只准 `'self'`**——2026-09-04 起兩種情況分開,之前 Supabase 一次 2 秒的抖動就是限制關掉的那一刻）
 - **Chrome 側邊欄 extension**（2026-09-11，repo 根目錄的 `extensions/engenie-sidepanel/`）——
   Side Panel 裡 iframe `/embed/<slug>`，**沒有自己的聊天邏輯**：認證、知識範圍、模型、配額全在 workspace。
