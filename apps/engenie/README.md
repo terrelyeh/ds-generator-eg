@@ -9,33 +9,43 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 ### Ask — AI 知識問答（RAG）
 - **自然語言查詢** — 用中文 / 英文 / 日文問產品規格、比較、設定、推薦、法規，答案以公司自有知識庫為依據（不靠模型的泛用知識）
 - **向量語意搜尋** — pgvector + OpenAI Embedding，語意命中而非關鍵字匹配
-- **多 AI 模型即時切換** — Gemini、GPT、Claude 三大家族，全部經 OpenRouter；**提供哪些模型、預設哪一個，可在 Settings 自行維護，不用改程式**
+- **多 AI 模型即時切換** — Gemini、GPT、Claude、DeepSeek 等，全部經 OpenRouter；**提供哪些模型、預設哪一個，可在 Settings 自行維護，不用改程式**
 - **跨語言檢索** — 中文問題也能精準命中英文文件；偵測到型號（ECW536）或國家（台灣）時自動補查 + 重新排序
 - **三維度 Prompt** — 回答角度（Persona）、對話對象（User Profile）、產出格式（規劃中）
-- **快速回覆** — 首字約 2–3 秒（平行檢索 + 熱路徑快取 + Flash 免思考）；來源卡片在答案生成前就先出現，不用乾等
-- **ChatGPT 級體驗** — 平順串流 + 即時狀態（「搜尋中…」→「整理回覆中…」）、可隨時停止 / 重新生成；往上讀歷史不會被拉回底部
+- **快速回覆** — 首字約 2–3 秒（平行檢索 + 熱路徑快取 + Flash 免思考）；找到的資料在答案生成前就先列出來，不用乾等
+- **等待時看得到進度** — 搜尋 → 列出實際找到的資料 → 撰寫中（附經過秒數）；平順串流、可隨時停止 / 重新生成；往上讀歷史不會被拉回底部
 - **Markdown 渲染** — 表格、清單、程式碼區塊（語法高亮 + 複製）；回答會主動用表格做產品比較、粗體標出型號與規格
-- **來源引用 + 延伸問題** — 附可點擊的來源連結，並生成 3 個「自包」的延伸追問
+- **來源與延伸問題** — 答案上方一行「參考了 N 則資料」，展開後可點；存在站內的文件（內部文件、支援文章、文字片段）會開站內檢視頁。並生成 3 個「自包」的延伸追問
+- **附上來源的原圖** — 引用到的來源若有圖（架構圖、截圖），會附在答案下方；問題沒在要圖時先收成「相關圖片（N）」，點圖可放大、左右切換
+- **👍 / 👎** — 每則回答都能按；按了沒幫助的題目會出現在 Workspace 分析的知識缺口清單
 - **對話持久化** — 自動存 DB、側邊欄歷史、可恢復 / 批次刪除
 
 ### Ask Workspaces — 部門專屬聊天入口
-同一套知識庫，三種對外形式任選或並用：
+同一套知識庫，四種對外形式任選或並用：
 
 - **整頁入口** `/ask/<slug>` — 每個部門自己的 Ask 聊天頁，免登入（passcode 進入）
 - **嵌入式浮動 widget** — 像 Intercom 右下角的聊天泡泡，貼一段 `<script>` 即可放進任何網站；樣式隔離、手機自動全螢幕、跨站安全（token 認證，不靠第三方 cookie）
 - **Search API** — 機器對機器的 JSON 檢索（見下方）
+- **Chrome 側邊欄 extension** — 在任何網頁都能叫出 Ask（`extensions/engenie-sidepanel/`，目前給內部測試用，對應 workspace `ext`）
 
 其他特性：
 - **共用知識庫、各自範圍** — 用 taxonomy（Solution / Product Line）+ 來源類型 scope 限定每個 workspace 看得到的內容
 - ⚠️ **沒有設 passcode 的 workspace 讀不到部門知識領域** — `/ask/<slug>` 的網址本身不難猜，
   所以「免登入」和「看得到部門私有內容」不能同時成立。沒有 passcode 的 workspace 照常運作、
   保留產品範圍，只是不會從私有領域回答；設一組 passcode 就會恢復
-- **LLM 三種模式** — `共用 key + 配額`（公司出錢、可設每分 / 每日上限）、`Workspace BYOK`（整個 workspace 一把 key）、`User BYOK`（使用者自己在前台輸入、只存在他的瀏覽器）
+- **LLM 三種模式** — `共用 key + 配額`（公司出錢、可設每分 / 每日上限）、`Workspace BYOK`（整個 workspace 一把 key）、`User BYOK`（使用者自己在前台輸入、只存在他的瀏覽器）；BYOK 的 key 一律是 OpenRouter key（`sk-or-` 開頭）
 - **可自訂歡迎畫面** — 每個 workspace 自己的 persona / 對話對象 / 歡迎語 / **範例問題（最多 6 個，按產品線、設定、比較、法規等不同意圖設計）**
 - **嵌入安全** — 每個 workspace 可設「允許嵌入的網域」白名單；可一鍵「撤銷連線」讓所有已發出的 token 立即失效
+- **Passcode 可查看、一鍵分享** — 管理員可在 workspace 編輯頁看到並複製 passcode；列表的 Share 一次複製名稱、網址和 passcode
+
+### Workspace 分析（`/settings/workspace-analytics`）
+- **各 workspace 一目了然** — 提問數、訪客數（不重複的瀏覽器）、每日走勢、答不出來的比例、錯誤、花費、最後使用與狀態（正常／答不出來偏多／有錯誤／沉睡）
+- **知識缺口** — 找不到資料、最接近的資料也不夠像、或使用者按了沒幫助的問題，依被問的次數排序；點下去直接看那些題目
+- **單一 workspace** — 每日提問（依結果分段、可切成表格）、問了什麼（可篩選、搜尋、展開看引用與耗時）、最常被引用的來源、各模型花費
+- 期間 7／30／90 天；只有 admin 看得到；問題原文保留 90 天。提問紀錄從 2026-09-12 開始，花費有 8/8 以後的歷史
 
 ### Knowledge Base — 知識索引管理（`/knowledge`）
-- **8 種來源類型**：
+- **11 種來源類型**：
   - **Product Specs** — 從 DB 自動 tag taxonomy 的產品規格（overview + 規格）
   - **Gitbook Docs** — 含 Vision API 圖片描述；QSG 自動抽出 LED behavior table
   - **Help Center** — Intercom 技術文章
@@ -44,6 +54,9 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
   - **Web Pages** — 貼任意網址即索引（Firecrawl → Jina → fetch 層疊萃取）
   - **Text Snippets** — 手動文字片段（FAQ、競品比較、標準答案），Markdown 編輯
   - **Files (PDF)** — 上傳 PDF 由 AI（Gemini）讀取：表格轉 Markdown、圖表描述、掃描檔 OCR
+  - **Vertical Guides** — 產業解決方案指南（由 `vertical-guide` skill 產出的定稿）
+  - **Support Knowledge** — 由 Intercom 客服對話整理成的主題文章（只給內部看）
+  - **Internal Docs** — 專案交付的內部文件包（例如 Craft AI SRS），用 CLI 匯入私有知識領域「RD 內部知識」；引用會開站內檢視頁，文件裡的圖也會一起顯示
 - **統一 Taxonomy（Solution > Product Line > Model）** — 所有來源共用的三層分類；Ask 查詢可按任一層 filter
 - **Product Specs 分組瀏覽** — 型號清單依 **Solution ▸ Product Line 折疊分組**、可搜尋（型號 / 標題）、**每條產品線各自 Re-index**，量大也好管理
 - **Edit Taxonomy** — 每個來源都能事後補 tag，不用重跑 ingest
@@ -59,15 +72,16 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 - **`/wifi-regulation/[code]`** — 單一國家法規的乾淨 markdown 頁面（UNII 頻段、頻道、功率限制、DFS）；Ask 的法規引用會直接連到此頁
 
 ### Settings
-- **Ask Workspaces**（`/settings/ask-workspaces`）— 發 / 編部門 workspace、設範圍與上限、複製入口連結或 Embed snippet
+- **Ask Workspaces**（`/settings/ask-workspaces`）— 發 / 編部門 workspace、設範圍與上限、複製入口連結或 Embed snippet、查看 / 分享 passcode
 - **Ask Personas**（`/settings/personas`）— 管理 AI 問答的 system prompt（角色）
 - **Ask Welcome**（`/settings/ask-welcome`）— 自訂內部 Ask 的歡迎語、說明、範例問題
 - **API Access**（`/settings/api-access`）— 核發 / 管理對外 Search API key + skill 安裝指引
 - **AI Provider API Keys**（`/settings/api-keys`）— OpenRouter key（Ask 與 SpecHub 各一把，方便分開看花費與單獨撤銷）+ OpenAI key（RAG embedding 專用，**不可移除**）
 - **AI Models**（`/settings/models`）— 翻譯與 Ask 的下拉選單提供哪些模型、預設哪一個、reasoning 檔位。
   換模型 = 新增一列 slug → 設為預設 → 停用舊的（頁面上有寫步驟）；不再需要的列可以刪掉，
-  但還被某個 Ask workspace 指定的模型會擋下來並告訴你是哪幾個
+  但還被某個 Ask workspace 指定的模型會擋下來並告訴你是哪幾個。存檔時會拿 OpenRouter 的模型清單檢查每個啟用中的 ID，打錯（例如「最新版」別名少了開頭的 `~`）會直接擋下並提示正確寫法
 - **AI 用量與餘額**（`/settings/ai-usage`）— OpenRouter 剩餘額度、近 7/30 天花費、各功能（SpecHub 翻譯 vs Ask）與各模型的花費分佈
+- **Workspace 分析**（`/settings/workspace-analytics`）— 各 workspace 的用量、知識缺口、錯誤與花費（見上方）
 
 ### Access Control
 - **Google OAuth 登入** + Email 白名單 + 4 種角色（Admin / Editor / PM / Viewer），與 SpecHub 共用同一套 RBAC（`@eg/auth`）
@@ -75,6 +89,7 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 - **暴力猜測防護** — demo / workspace passcode 端點依 IP 限流（每 5 分鐘 10 次）
 - **Demo 連線 12 小時後到期** — 需要重新輸入 passcode（先前發出的 cookie 永久有效）
 - **對話隱私** — Ask 歷史綁定登入者，各自只看得到自己的對話
+- **Workspace 分析只有 admin 看得到** — 裡面有使用者問的問題原文（保留 90 天）
 
 ### Design Docs（公開、可分享）
 - [`/docs/ask-integration.html`](https://engenie-eg.vercel.app/docs/ask-integration.html) — 整合服務總覽（EnGenie 回答 vs 呼叫端的腦兩種家族）
@@ -90,10 +105,10 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 | UI | Tailwind CSS v4 + shadcn/ui |
 | Database | Supabase (PostgreSQL + Storage)，與 SpecHub 共用 |
 | Vector Search | pgvector (HNSW) + OpenAI Embedding (`text-embedding-3-small`) |
-| LLM | 經 **OpenRouter** 統一接入 Claude / GPT / Gemini；模型清單存 DB，可在 Settings 維護 |
+| LLM | 經 **OpenRouter** 統一接入 Claude / GPT / Gemini / DeepSeek 等；模型清單存 DB，可在 Settings 維護 |
 | Chat Rendering | react-markdown + remark-gfm + highlight.js |
 | Auth | Supabase Auth + Google OAuth + DB whitelist + 4-role RBAC（`@eg/auth`） |
-| Deployment | Vercel（專案 `engenie-eg`）+ Vercel Cron + GitHub Actions |
+| Deployment | Vercel（專案 `engenie-eg`，原生 Git 部署）+ Vercel Cron；GitHub Actions 只跑 CI |
 
 ## Getting Started
 
@@ -114,8 +129,8 @@ npm run dev -w engenie
 ## Deployment
 
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，function region 釘 **`hnd1`（東京）— 不要改**（Supabase 在 ap-northeast-1，跨區每 query +170ms）
-- **部署走 GitHub Actions**（`prebuilt` build + deploy），`main` 一推就上 prod；engenie 的 Vercel 原生 build 已停用
-- **Crons**：`/api/cron/reindex-web`（每週日 re-crawl web 來源）、`/api/cron/reindex-products`（每日 09:30 台灣時間，全量備援；SpecHub sync 完成後也會即時 POST 觸發窄域 re-index）
+- **部署走 Vercel 原生 Git 整合**，`main` 一推就上 prod（2026-08-06 起；先前的 GitHub Actions 部署已移除）。PR 與 push 會在 GitHub Actions 跑 CI：兩個 app 的型別檢查、lint、測試，以及資料寫入等護欄
+- **Crons**：`/api/cron/reindex-web`（每週日 re-crawl web 來源）、`/api/cron/reindex-products`（每日 09:30 台灣時間，全量備援；SpecHub sync 完成後也會即時 POST 觸發窄域 re-index；這支每天也會清掉 90 天前的 Ask 問題原文）
 
 ## Environment Variables
 

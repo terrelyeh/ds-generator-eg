@@ -19,6 +19,7 @@
 │   ├── google/         # @eg/google — service account 的 `getGoogleAuth()`（token 快取共用；Sheets/Drive/Docs helper 仍各 app 自己）
 │   └── llm/            # @eg/llm — OpenRouter chat client（chat completions 統一入口；**embedding 不走這裡**）
 │                       #   + features.ts = 花費歸戶的功能標籤對照表（OpenRouter `user` 欄位）
+│                       #   + catalog.ts = 模型 id 對 OpenRouter 清單的檢查（/settings/models 存檔時用）
 ├── extensions/
 │   └── engenie-sidepanel/  # Chrome 側邊欄 extension：iframe EnGenie 的 /embed/<slug>（純靜態、無 build、不是 npm workspace）
 └── package.json        # npm workspaces：apps/*, packages/*
@@ -46,6 +47,7 @@
   (以前只是 generate-pdf 裡的一個區域閉包,所以「慣例」只有那一個檔案在遵守)。
   護欄第一次跑報 32 處、修好誤判後報 **67 處** —— 它把外層的 `if (x.length > 0)` 當成
   「有人在檢查」。真的不需要知道結果的寫入,用 `// db-write-unchecked: <理由>` 明講。
+  注意 **`logIfDbError` 回傳 true 代表寫入成功**（沒有錯）——寫成 `if (logIfDbError(…)) return 500` 會把成功當失敗。
 - **指南頁裡的 UI 標籤有護欄**：`npm run check:guide-labels`。
   `apps/spechub/public/docs/tender-datasheets.html` 裡包在 `<span data-ui>` 的字串
   是「這幾個字就在畫面上」的宣告,腳本拿去比對 `apps/spechub/src/`。
@@ -80,4 +82,10 @@
   Ignored Build Step 已改回 Automatic。
   ⚠️ **依賴一定要宣告在「真正 import 它的那個 app」** —— 同一天踩了兩次（`@eg/llm`、`shadcn`），
   兩次都是本機 build 全綠、只有 Vercel 會爆。**本機 build 過不代表依賴宣告對了。**
+- **在 git worktree 裡驗證**（worktree 的 `node_modules` 是指回主目錄的 symlink）：
+  ① `@eg/*` 會解析到**主目錄**的 packages——改了 `packages/*`，要讓 tsc 看到就暫時在
+  `apps/<app>/node_modules/@eg/` 放一條指向 worktree 的 link，驗完拿掉；
+  ② `next dev` 的 Turbopack 拒絕指到 root 外面的 symlink——加 `--webpack`；
+  ③ Tailwind v4 以**啟動目錄**為掃描基準——一定要從 `apps/<app>` 裡面啟動，否則新元件的 class
+  不會產生，畫面看起來像版型壞掉。
 - **進 app 工作前先讀該 app 的 CLAUDE.md**：[apps/spechub/CLAUDE.md](apps/spechub/CLAUDE.md) · [apps/engenie/CLAUDE.md](apps/engenie/CLAUDE.md)
