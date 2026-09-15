@@ -2,6 +2,14 @@ import { google } from "googleapis";
 import { getGoogleAuth } from "@eg/google/auth";
 
 /**
+ * Per request. Neither the Drive calls nor the public export had a timeout,
+ * and the weekly re-crawl fetches every indexed doc in turn: one export that
+ * hung held the job until Vercel killed it. A doc with pasted screenshots
+ * exports megabytes of base64, so this is generous — but it ends.
+ */
+const REQUEST_TIMEOUT_MS = 60_000;
+
+/**
  * Fetch a Google Doc's content as markdown via Drive API (service account auth).
  *
  * Works for private docs as long as the doc is shared with the service account
@@ -23,11 +31,14 @@ async function fetchViaServiceAccount(docId: string): Promise<{
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
-  const meta = await drive.files.get({
-    fileId: docId,
-    fields: "id, name, mimeType",
-    supportsAllDrives: true,
-  });
+  const meta = await drive.files.get(
+    {
+      fileId: docId,
+      fields: "id, name, mimeType",
+      supportsAllDrives: true,
+    },
+    { timeout: REQUEST_TIMEOUT_MS },
+  );
 
   const title = meta.data.name || "Untitled";
 
@@ -39,13 +50,13 @@ async function fetchViaServiceAccount(docId: string): Promise<{
   try {
     const res = await drive.files.export(
       { fileId: docId, mimeType: "text/markdown" },
-      { responseType: "text" }
+      { responseType: "text", timeout: REQUEST_TIMEOUT_MS }
     );
     content = typeof res.data === "string" ? res.data : String(res.data);
   } catch {
     const res = await drive.files.export(
       { fileId: docId, mimeType: "text/plain" },
-      { responseType: "text" }
+      { responseType: "text", timeout: REQUEST_TIMEOUT_MS }
     );
     content = typeof res.data === "string" ? res.data : String(res.data);
   }
@@ -69,13 +80,13 @@ async function fetchViaPublicExport(docId: string): Promise<{
   // Try markdown first — Google Docs now supports md export
   let res = await fetch(
     `https://docs.google.com/document/d/${docId}/export?format=md`,
-    { redirect: "follow" }
+    { redirect: "follow", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }
   );
   let format: "md" | "txt" = "md";
   if (!res.ok) {
     res = await fetch(
       `https://docs.google.com/document/d/${docId}/export?format=txt`,
-      { redirect: "follow" }
+      { redirect: "follow", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }
     );
     format = "txt";
   }
