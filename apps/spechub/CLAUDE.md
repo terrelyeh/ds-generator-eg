@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-15。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-09-16。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -47,7 +47,7 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
 下方 Architecture 的 product-line onboarding）。
 另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
-另含**官網 Datasheet 查詢**（產品頁「官網」分頁 + `/website`;讀五個區域官網的 datasheet 對照 SpecHub,**只讀不寫**）。
+另含**官網 Datasheet 查詢與上架提醒**（產品頁「官網」分頁 + `/website`;讀五個區域官網的 datasheet 對照 SpecHub,**只讀不寫**;可上架標記 + 每個工作日 09:30 檢查 + Telegram）。
 
 功能清單與產品定位詳見 [README.md](README.md)。
 
@@ -154,10 +154,13 @@ blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 
 ### 官網 Datasheet 查詢 → [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md)
 
 讀五個區域官網（EU/JP/TW/APAC/IN × 正式站/測試站）的 datasheet,對照 SpecHub 版本。產品頁「官網」分頁 +
-`/website`（依型號 / 依站台）,`website_check.view`（admin/editor）,`lib/website/`,表 `website_checks`（00061）。
-**改之前必讀該檔**,最容易踩的三條:① **只讀公開 REST,伺服器上沒有 WordPress 帳密**（實測十站都讀得到;
-網址 env 在 Vercel Preview / Production 都已設）;② **正式站是測試站手動整站覆寫的**,所以沒有上線時間、推送是整站一次、
-直接改正式站會被洗掉（`prodnewer` 最優先）;③ **檔案大小是指紋**（同版號 Regenerate 的舊檔靠它抓,不能比雜湊）。
+`/website`（依型號 / 依站台 / 上架追蹤）,`website_check.view` / `.mark`（admin/editor）,`lib/website/`,
+表 `website_checks`（00061）、`website_marks` + `website_site_state`（00062）,每日檢查 `/api/cron/website-check`。
+**改之前必讀該檔**,最容易踩的:① **只讀公開 REST,伺服器上沒有 WordPress 帳密**;② **正式站是測試站手動整站覆寫的**,
+所以沒有上線時間、推送是整站一次、直接改正式站會被洗掉（`prodnewer` 最優先）,**推送靠「正式站最新內容往前跳」偵測**;
+③ **檔案大小是指紋**（同版號 Regenerate 的舊檔靠它抓,不能比雜湊）;④ **標記的語言跟標記的版本比、其他語言跟最新版比**
+（`targetsFromMarks`,手動查詢和每日檢查共用）;⑤ 每個站只吃一種語言（`siteLanguage`）,判斷一律用 `SiteVerdict.languages`,
+不要拿站的整體狀態。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 
@@ -293,9 +296,9 @@ auth.users → profiles ← email_whitelist.invited_by
    審查刻意只做一半的三件事（不是待辦,是別當成漏做）:去重只碰 auth 頁面與 `getGoogleAuth()`
    （`ui/` 各留一份是拆分時的決定）、passcode 登入時才就地升級成 scrypt、限流只有每分鐘沒有每日上限。
 
-**🔜 官網 Datasheet 查詢 1b**（1a 已上線,PR #92）：「可上架」標記、每日檢查、Telegram 提醒
-（推送提醒發**小群組**,那位同事不用 SpecHub → 訊息要自足）、記錄各站推送時間。
-設計結論與限制見 [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) 的「還沒做」。
+**🔜 官網 Datasheet 1b 上線前設定**（程式 2026-09-16 做完）：套 migration 00062、建推送小群組與行銷群組
+（`@engenius_ds_bot`）並設 `TELEGRAM_WEBSITE_PUSH_CHAT_ID` / `TELEGRAM_WEBSITE_MKT_CHAT_ID`。
+細節見 [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) 的「上線前要做的」。
 
 其餘待辦（產品線素材、多語言擴展、翻譯 feedback、Battlecard 競品資料、自動邀請信）
 按領域列在 [`docs/next-steps.md`](docs/next-steps.md)。**只有下面這幾條需要現在知道**：
@@ -315,12 +318,14 @@ npm run lint
 - Vercel 自動部署 main branch；Cron: `/api/sync` 每天 09:00 台灣時間、
   **`/api/cron/health` 每天 10:00**（讀 `job_heartbeats` + 探測向量檢索 + 比對 chunk 數，
   有問題發 Telegram；每週一送一則「一切正常」當 dead-man switch。判斷邏輯是
-  `lib/monitoring/health.ts` 的純函式，有測試）
+  `lib/monitoring/health.ts` 的純函式，有測試）、**`/api/cron/website-check` 週一到週五 09:30**。
+  ⚠️ **新增 `/api/cron/*` 的路由不用改 proxy**（`SERVICE_PATHS` 放行整個前綴,handler 自己 `requireCron`）——
+  2026-09-16 以前沒放行,`/api/cron/health` 一直被導到登入頁,健康檢查從沒跑過;**新排程記得寫心跳並登記 `EXPECTED_JOBS`**
 - **⚠️ Vercel function region 釘在 `hnd1`（東京）— 不要改**。Supabase 在 ap-northeast-1，
   跨區每 query +170ms
 - **Server component query 並行化** — 互相獨立的 query 塞同一個 `Promise.all`
 - 需要的 env vars: `NEXT_PUBLIC_SUPABASE_URL/ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`,
-  `GOOGLE_SERVICE_ACCOUNT_JSON`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, `CRON_SECRET`（與 engenie 同值）,
+  `GOOGLE_SERVICE_ACCOUNT_JSON`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, **`TELEGRAM_WEBSITE_PUSH_CHAT_ID` / `TELEGRAM_WEBSITE_MKT_CHAT_ID`**（官網提醒的兩個群組;沒設就不發）, `CRON_SECRET`（與 engenie 同值）,
   `VERCEL_AUTOMATION_BYPASS_SECRET`, `PDF_PREVIEW_BASE_URL`, **`ENGENIE_INTERNAL_URL`**,
   **`NEXT_PUBLIC_ENGENIE_URL`**, `API_KEY_ENC_SECRET`（讀共用加密設定時需要）,
   **`FIRECRAWL_API_KEY`**（battlecard ↻sync / 🔍web 抓取用;Vercel prod/dev/preview 已設）,
@@ -390,7 +395,7 @@ npm run lint
 - [`docs/next-steps.md`](docs/next-steps.md) — 各領域的待辦清單（做完就刪，不留歷史）
 - [`docs/brand-and-visual.md`](docs/brand-and-visual.md) — datasheet 的版型/字級規範頁、CJK 漂移偵測、logo、封面置中
 - [`docs/battlecard.md`](docs/battlecard.md) — 競品 battlecard:資料模型、抽取流程、關鍵雷
-- [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) — 官網 Datasheet 查詢:判斷規則、正式站覆寫、檔案大小指紋、讀取策略、1b 待辦
+- [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) — 官網 Datasheet 查詢:判斷規則、正式站覆寫、檔案大小指紋、讀取策略、1b 標記／每日檢查／推送偵測／Telegram
 - [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md) — 新增產品線、sheet 契約、各 category datasheet 變體
 - [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md) — **西文上線 / OpenRouter 遷移 / 花費帳本 / 翻譯審核**（2026-08-06~07）。
   **動這四塊之前先讀**——裡面有三個「看起來多餘、實際上不能拆」的設計（保留 `openai_api_key`、

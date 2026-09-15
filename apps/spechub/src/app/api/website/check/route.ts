@@ -1,21 +1,30 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@eg/db/admin";
 import { throwIfDbError } from "@eg/db/errors";
+import { can } from "@eg/auth/permissions";
 import { gate, gateWithRateLimit, getCurrentUser } from "@eg/auth/session";
 import { loadBaseline } from "@/lib/website/baseline";
 import { checkModel, sharedCatalog } from "@/lib/website/check";
+import { loadMarks, targetsFromMarks, type MarkRow } from "@/lib/website/marks";
+import { loadLanguageStates, loadSiteStates } from "@/lib/website/model-state";
 import { SITE_CODES, siteConfig, type SiteCode } from "@/lib/website/sites";
 
 /**
  * The website datasheet check for one model.
  *
- *   GET  ?model=ECW536         → the last saved check per site, and SpecHub's
- *                                current versions to read it against
+ *   GET  ?model=ECW536         → the last saved check per site, SpecHub's
+ *                                versions to read it against, each language's
+ *                                latest version and 可上架 mark, and when each
+ *                                site was last pushed
  *   POST { model, site }       → check one site now and save it
  *
  * One site per POST on purpose: the product page fires all five at once and
  * shows each site as it lands, instead of one request that makes people
  * wait for the slowest site.
+ *
+ * A language marked 可上架 is judged against the marked version, the same as
+ * the daily check, so the tab and the reminders never disagree.
  */
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
@@ -26,6 +35,17 @@ function readModel(value: unknown): string | null {
   return typeof value === "string" && MODEL_PATTERN.test(value.trim()) ? value.trim().toUpperCase() : null;
 }
 
+type ProductRow = { id: string; model_name: string; current_versions: Record<string, string> | null };
+
+async function findProduct(supabase: SupabaseClient, model: string): Promise<{ product: ProductRow | null; marks: MarkRow[] }> {
+  const { data: product } = (await supabase
+    .from("products")
+    .select("id, model_name, current_versions")
+    .ilike("model_name", model.replace(/[%_\\]/g, "\\$&"))
+    .maybeSingle()) as { data: ProductRow | null };
+  return { product, marks: product ? await loadMarks(supabase, [product.id]) : [] };
+}
+
 export async function GET(request: Request) {
   const denied = await gate("website_check.view");
   if (denied) return denied;
@@ -34,8 +54,9 @@ export async function GET(request: Request) {
   if (!model) return NextResponse.json({ error: "型號格式不對" }, { status: 400 });
 
   const supabase = createAdminClient();
-  const [{ modelName, baseline }, rows] = await Promise.all([
-    loadBaseline(supabase, model),
+  const [user, { product, marks }] = await Promise.all([getCurrentUser(), findProduct(supabase, model)]);
+  const [{ modelName, baseline }, rows, languages, siteState] = await Promise.all([
+    loadBaseline(supabase, model, product ? targetsFromMarks(marks, product.id) : undefined),
     supabase
       .from("website_checks")
       .select("site, checked_at, status, verdict, baseline")
@@ -43,6 +64,8 @@ export async function GET(request: Request) {
       data: { site: string; checked_at: string; status: string; verdict: unknown; baseline: unknown }[] | null;
       error: { message: string } | null;
     }>,
+    product ? loadLanguageStates(supabase, product, marks) : Promise.resolve([]),
+    loadSiteStates(supabase),
   ]);
   if (rows.error) return NextResponse.json({ error: rows.error.message }, { status: 500 });
 
@@ -50,7 +73,11 @@ export async function GET(request: Request) {
     {
       model,
       productModel: modelName,
+      productId: product?.id ?? null,
       baseline,
+      languages,
+      siteState,
+      canMark: can(user?.role, "website_check.mark"),
       sites: (rows.data ?? []).map((row) => ({
         site: row.site,
         checkedAt: row.checked_at,
@@ -74,7 +101,8 @@ export async function POST(request: Request) {
   if (!model || !site) return NextResponse.json({ error: "需要型號和站台（EU、JP、TW、APAC、IN）" }, { status: 400 });
 
   const supabase = createAdminClient();
-  const [user, { modelName, baseline }] = await Promise.all([getCurrentUser(), loadBaseline(supabase, model)]);
+  const [user, { product, marks }] = await Promise.all([getCurrentUser(), findProduct(supabase, model)]);
+  const { modelName, baseline } = await loadBaseline(supabase, model, product ? targetsFromMarks(marks, product.id) : undefined);
   const result = await checkModel(model, baseline, { sites: [site], catalogFor: sharedCatalog });
   const verdict = result.sites[0];
 
@@ -86,8 +114,8 @@ export async function POST(request: Request) {
         checked_at: result.checkedAt,
         checked_by: user?.id ?? null,
         status: verdict.status,
-        verdict,
-        baseline,
+        verdict: verdict as never,
+        baseline: baseline as never,
       },
       { onConflict: "model_name,site" },
     ),
