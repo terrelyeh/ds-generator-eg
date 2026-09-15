@@ -82,6 +82,11 @@ translation_mode, **confirmed**。
 - `website_checks`（migration `00061`）— 官網 datasheet 查詢每個 **(型號, 站台)** 的上次結果
   （`verdict` + 當時的 SpecHub `baseline`）。model_name 是大寫、可以不在 products 裡（Fit AP）。
   RLS 開、沒有 policy,只有 `website_check.view` 的 API 用 service role 讀寫
+- `website_marks`（migration `00062`）— 每個 **(product_id, locale)** 一列「可上架／不上架」標記:
+  `decision` ready/skip、標記時的 `version` 與那份 PDF 的 `generated_at`（看得出之後重產過）、`marked_by`。
+  locale 只有 en / ja / zh-TW（西文沒有官網）
+- `website_site_state`（migration `00062`）— 每站一列,每日檢查改寫:正式站與測試站最新內容的 `modified`、
+  `last_push_at` + `push_detected`（false = 還只是下限）、`pending`（測試站上比正式站新的 datasheet,JSON）
 - `profiles` — role TEXT CHECK (admin/editor/pm/viewer)；
   `email_whitelist` — 邀請制白名單
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import type { SiteVerdict, SpecHubBaseline } from "@/lib/website/compare";
 import { SITE_CODES, type SiteCode } from "@/lib/website/sites";
 import { IssueList, ModelCheckView, type SiteState } from "./model-check-view";
 import { SiteQueryView } from "./site-query-view";
+import { TrackingView, type TrackingData } from "./tracking-view";
 
 /**
  * 官網查詢: check datasheets on the regional sites without going through a
@@ -45,15 +46,48 @@ function writeRecent(models: string[]) {
 const blankSites = (loading: boolean) =>
   Object.fromEntries(SITE_CODES.map((site) => [site, { site, verdict: null, checkedAt: null, loading, error: null }])) as Record<SiteCode, SiteState>;
 
+type Mode = "model" | "site" | "tracking";
+const MODE_LABEL: Record<Mode, string> = { model: "依型號", site: "依站台", tracking: "上架追蹤" };
+
 export function WebsiteQuery() {
-  const [mode, setMode] = useState<"model" | "site">("model");
+  const [mode, setMode] = useState<Mode>("model");
   const [chips, setChips] = useState<string[]>([]);
   const [draft, setDraft] = useState("");
   const [recent, setRecent] = useState<string[]>([]);
   const [results, setResults] = useState<Record<string, ModelResult>>({});
   const [order, setOrder] = useState<string[]>([]);
 
+  const [tracking, setTracking] = useState<TrackingData | null>(null);
+
   useEffect(() => setRecent(readRecent()), []);
+
+  // ?tab=tracking — the marketing digest links straight to the work list.
+  useEffect(() => {
+    const tab = new URLSearchParams(window.location.search).get("tab");
+    if (tab === "tracking" || tab === "site") setMode(tab);
+  }, []);
+
+  const loadTracking = useCallback(async () => {
+    const res = await fetch("/api/website/tracking", { cache: "no-store" });
+    const body = (await res.json().catch(() => null)) as (TrackingData & { error?: string }) | null;
+    if (!res.ok || !body) {
+      toast.error(body?.error ?? "讀不到上架追蹤");
+      return;
+    }
+    setTracking(body);
+  }, []);
+
+  useEffect(() => {
+    void loadTracking();
+  }, [loadTracking]);
+
+  function switchMode(next: Mode) {
+    setMode(next);
+    const url = new URL(window.location.href);
+    if (next === "model") url.searchParams.delete("tab");
+    else url.searchParams.set("tab", next);
+    window.history.replaceState(null, "", url);
+  }
 
   /** Typed or pasted text may hold several models: "ECW536 EWS377-FIT, ECW230". */
   function splitModels(text: string): string[] {
@@ -140,7 +174,7 @@ export function WebsiteQuery() {
   }
 
   function openModel(model: string) {
-    setMode("model");
+    switchMode("model");
     setChips([model]);
     void runModels([model]);
   }
@@ -156,22 +190,28 @@ export function WebsiteQuery() {
       </div>
 
       <div className="flex w-fit gap-1 rounded-lg bg-slate-200/70 p-1" role="tablist" aria-label="查詢方式">
-        {(["model", "site"] as const).map((key) => (
-          <button
-            key={key}
-            type="button"
-            role="tab"
-            aria-selected={mode === key}
-            onClick={() => setMode(key)}
-            className={`rounded-md px-4 py-1.5 text-xs font-medium transition-all ${mode === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
-          >
-            {key === "model" ? "依型號" : "依站台"}
-          </button>
-        ))}
+        {(["model", "site", "tracking"] as const).map((key) => {
+          const todo = key === "tracking" && tracking ? tracking.sites.reduce((sum, s) => sum + s.toHandle, 0) : 0;
+          return (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              aria-selected={mode === key}
+              onClick={() => switchMode(key)}
+              className={`rounded-md px-4 py-1.5 text-xs font-medium transition-all ${mode === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+            >
+              {MODE_LABEL[key]}
+              {todo > 0 && <span className="ml-1.5 font-semibold tabular-nums text-amber-700">{todo}</span>}
+            </button>
+          );
+        })}
       </div>
 
       <div className="rounded-xl bg-slate-100 p-3 sm:p-4">
-        {mode === "site" ? (
+        {mode === "tracking" ? (
+          <TrackingView data={tracking} reload={loadTracking} />
+        ) : mode === "site" ? (
           <SiteQueryView onOpenModel={openModel} />
         ) : (
           <div className="flex flex-col gap-4">

@@ -27,6 +27,8 @@ export const EXPECTED_JOBS: { job: string; label: string; maxAgeHours: number }[
   { job: "reindex-products", label: "EnGenie 產品重新索引", maxAgeHours: 26 },
   // Weekly, Sunday. Eight days.
   { job: "reindex-web", label: "EnGenie 網頁重新索引", maxAgeHours: 192 },
+  // Weekdays 09:30 TW. Friday's run is 72.5 hours old at Monday's 10:00 check.
+  { job: "website-check", label: "官網 Datasheet 每日檢查", maxAgeHours: 74 },
 ];
 
 /** Fraction of the corpus that may disappear between runs before we shout. */

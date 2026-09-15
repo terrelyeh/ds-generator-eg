@@ -32,7 +32,8 @@ src/
       settings/{providers,typography,fonts}/  # providers 與 engenie 各持一份
       products/[model]/layout-ack/
       battlecard/{value,matchup,resync,websearch,confirm-all}/  # 競品比較 CRUD + 抽取
-      website/{probe,check,categories,site-query}/  # 官網 datasheet 查詢（只讀五個區域 WordPress 站）
+      website/{probe,check,categories,site-query,marks,tracking}/  # 官網 datasheet 查詢（只讀五個區域 WordPress 站）+ 可上架標記、上架追蹤
+      cron/{health,website-check}/     # 每日健康檢查、官網每日檢查（requireCron;proxy 放行 /api/cron）
       notify/、users/*                  # Telegram 通知、admin user management
   proxy.ts                             # session refresh + auth gate + Puppeteer automation bypass
   components/
@@ -46,8 +47,9 @@ src/
                                        #   typography、locales/、qr.ts、radio-patterns.ts
     translate/                         # prompts + providers (claude/openai/gemini)
     battlecard/spec-mapping.ts         # dimension_key → EnGenius spec label 對應(自家值 seed 用)
-    website/                           # 官網查詢:sites/wp-client(讀取)、parse/compare(純函式,有測試)、
-                                       #   check(打官網)、baseline(SpecHub 那一側)
+    website/                           # 官網查詢:sites/wp-client(讀取)、parse/compare/reminders(純函式,有測試)、
+                                       #   check(打官網)、baseline(SpecHub 那一側,可指定標記的版本)、
+                                       #   marks/model-state(標記讀寫)、site-state(推送偵測)、daily(每日檢查)
     notifications/
 packages/（repo root）
   db/    → @eg/db：supabase server/client/admin、settings(getApiKey)、DB types、supabase/migrations/

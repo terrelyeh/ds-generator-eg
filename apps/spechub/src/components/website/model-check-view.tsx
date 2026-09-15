@@ -6,6 +6,7 @@ import type { FoundDatasheet, Row, SiteVerdict, SpecHubBaseline, Status } from "
 import { LANGUAGE_LABEL } from "@/lib/website/compare";
 import { SPECHUB_LANGUAGE, STATUS_LABEL, STATUS_TONE, type StatusTone } from "@/lib/website/labels";
 import { SITE_CODES, SITE_LANGUAGES, type SiteCode } from "@/lib/website/sites";
+import { SiteLabel } from "./badges";
 
 /**
  * One model's datasheets across the five regional sites: SpecHub's versions,
@@ -131,7 +132,7 @@ function SiteCards({ sites }: { sites: SiteState[] }) {
         return (
           <div key={s.site} className="flex min-w-0 flex-col gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2.5 shadow-sm">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-base font-bold leading-none tracking-wide text-slate-900">{s.site}</span>
+              <SiteLabel site={s.site} className="text-base leading-none" />
               {s.loading ? <Spinner /> : s.error ? <StatusBadge status="fail" /> : s.verdict ? <StatusBadge status={s.verdict.status} /> : null}
             </div>
             <span title={summary} className={`truncate text-xs ${calm ? "text-slate-500" : "font-medium text-slate-800"}`}>
@@ -149,7 +150,7 @@ function SiteRows({ state, onRetry }: { state: SiteState; onRetry?: (site: SiteC
   const group = "border-t-2 border-slate-400";
   const siteCell = (span: number) => (
     <td rowSpan={span} className={`${group} whitespace-nowrap border-r border-slate-200 bg-slate-50 px-4 py-3 align-top`}>
-      <span className="block text-lg font-bold leading-tight tracking-wide text-slate-900">{site}</span>
+      <SiteLabel site={site} className="text-lg leading-tight" />
       <span className="mt-0.5 block text-xs text-slate-500">{siteLanguageLabel(site)}</span>
     </td>
   );
@@ -296,10 +297,13 @@ export function ModelCheckView({
   baseline,
   sites,
   onRetry,
+  showCards = true,
 }: {
   baseline: SpecHubBaseline | undefined;
   sites: SiteState[];
   onRetry?: (site: SiteCode) => void;
+  /** The product page's 官網 tab already shows every site above, so its detail view leaves the cards out. */
+  showCards?: boolean;
 }) {
   const ordered = SITE_CODES.map((code) => sites.find((s) => s.site === code) ?? { site: code, verdict: null, checkedAt: null, loading: false, error: null });
   const issues = ordered.flatMap((s) => s.verdict?.issues ?? []).filter((issue) => !issue.includes("查詢失敗"));
@@ -309,7 +313,7 @@ export function ModelCheckView({
   return (
     <div className="flex flex-col gap-4">
       <BaselineLine baseline={baseline} />
-      <SiteCards sites={ordered} />
+      {showCards && <SiteCards sites={ordered} />}
       <div className="overflow-x-auto rounded-lg border border-slate-400 bg-white">
         <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead>

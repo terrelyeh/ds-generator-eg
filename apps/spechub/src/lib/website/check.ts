@@ -26,7 +26,7 @@ import { wpGet, type WpResult } from "./wp-client";
 const PRODUCT_FIELDS = "id,link,title,status,acf.model_number,acf.type,acf.technology_type";
 const FILE_FIELDS = "id,title,status,acf";
 
-function failure(result: WpResult<unknown>): string | null {
+export function failure(result: WpResult<unknown>): string | null {
   if (result.kind === "json" && result.status === 200) return null;
   if (result.kind === "timeout") return "逾時";
   if (result.kind === "network") return "連不上";
@@ -128,7 +128,7 @@ function toFound(model: string, file: WpFile, onPage: boolean, known: Set<string
   };
 }
 
-const isDatasheet = (file: WpFile) => Boolean(file.filename) && (file.type === "data-sheet" || looksLikeDatasheet(file.title, file.filename));
+export const isDatasheet = (file: WpFile) => Boolean(file.filename) && (file.type === "data-sheet" || looksLikeDatasheet(file.title, file.filename));
 
 export async function readSide(
   model: string,

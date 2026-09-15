@@ -7,6 +7,7 @@ import type { GenerationFilter } from "@/lib/website/check";
 import { LANGUAGE_LABEL, type Row, type SiteVerdict, type SpecHubBaseline } from "@/lib/website/compare";
 import type { DocLanguage } from "@/lib/website/parse";
 import { SITE_CODES, SITE_LANGUAGES, type SiteCode } from "@/lib/website/sites";
+import { SiteLabel } from "./badges";
 import { formatDate, formatDateTime, isCalm, IssueText, siteLanguageLabel, StatusBadge } from "./model-check-view";
 
 /**
@@ -364,7 +365,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                 const issues = models.filter((m) => (m.verdicts[site]?.issues.length ?? 0) > 0 && m.verdicts[site]?.status !== "push").length;
                 return (
                   <span key={site} className="flex items-baseline gap-1.5">
-                    <b className="text-base font-bold tracking-wide text-slate-900">{site}</b>
+                    <SiteLabel site={site} className="text-base" />
                     <span className="tabular-nums">{onSite.length} 款</span>
                     {pushing > 0 && (
                       <span>
@@ -418,7 +419,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                         <th className="px-3 py-2.5">SpecHub</th>
                         {result.sites.map((site) => (
                           <th key={site} className="px-3.5 py-2">
-                            <span className="block text-base font-bold leading-tight tracking-wide text-slate-900">{site}</span>
+                            <SiteLabel site={site} className="text-base leading-tight" />
                             <span className="block text-xs font-normal text-slate-500">{siteLanguageLabel(site)}</span>
                           </th>
                         ))}

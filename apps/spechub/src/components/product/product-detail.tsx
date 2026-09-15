@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
 import { WebsiteTab } from "@/components/website/website-tab";
+import { useRegenerateGuard } from "@/components/website/regenerate-guard";
 import { can, type Role } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/datasheet/qr";
@@ -95,7 +96,8 @@ interface ProductDetailProps {
   role?: Role;
   /** Issues found by the last website datasheet check, for the 官網 tab label.
    *  Null when this model has never been checked or the role can't see the tab. */
-  websiteIssueCount?: number | null;
+  /** Sites that need something for this model's 可上架 versions, from the last check. Null = never checked. */
+  websiteTodoCount?: number | null;
 }
 
 function LayoutWarningBanner({
@@ -801,7 +803,7 @@ function QsgUrlCard({
   );
 }
 
-export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [], websiteIssueCount = null }: ProductDetailProps) {
+export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [], websiteTodoCount = null }: ProductDetailProps) {
   // Role-derived flags. Prefixed `roleCan` to avoid collision with the
   // existing `canGenerate` that signals "all required fields are filled
   // (Product Image, Hardware Image, Overview, Features)".
@@ -812,7 +814,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const roleCanTranslate = can(role, "translation.edit");
   const roleCanCheckWebsite = can(role, "website_check.view");
   const [activeTab, setActiveTab] = useState<"detail" | "translations" | "website">("detail");
-  const [websiteIssues, setWebsiteIssues] = useState<number | null>(websiteIssueCount);
+  const [websiteIssues, setWebsiteIssues] = useState<number | null>(websiteTodoCount);
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [resyncing, setResyncing] = useState(false);
@@ -957,9 +959,19 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
     .filter((l) => currentVersions[l] && !localesWithHistory.has(l))
     .sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)));
 
-  async function handleGeneratePdf(mode: "regenerate" | "new", locale = "en") {
+  const { confirmRegenerate, dialog: regenerateDialog } = useRegenerateGuard();
+
+  async function handleGeneratePdf(requested: "regenerate" | "new", locale = "en") {
     setShowGenMenu(false);
     setShowLangMenu(false);
+    let mode = requested;
+    // A version marked 可上架 may already be on the regional sites; ask before
+    // overwriting it under the same number.
+    if (mode === "regenerate") {
+      const choice = await confirmRegenerate(product.model_name, locale, locale === "en" ? currentVer : currentVersions[locale] ?? "");
+      if (choice === "cancel") return;
+      if (choice === "new") mode = "new";
+    }
     setGenerating(true);
     const toastId = toast.loading("Generating PDF…", {
       description: `${product.model_name}${locale !== "en" ? ` · ${locale.toUpperCase()}` : ""}`,
@@ -1018,6 +1030,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
 
   return (
     <div className="space-y-6">
+      {regenerateDialog}
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm">
         <Link
@@ -1404,7 +1417,8 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           </button>
         )}
         {/* Where this model's datasheet stands on the five regional sites.
-            The number is what the last check found; no number = never checked. */}
+            The number is how many sites need something for the versions marked
+            可上架 (the same count as the tab's headline); no number = never checked. */}
         {roleCanCheckWebsite && (
           <button
             onClick={() => setActiveTab("website")}
@@ -1427,7 +1441,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
       <Separator />
 
       {activeTab === "website" && roleCanCheckWebsite && (
-        <WebsiteTab model={product.model_name} onIssueCount={setWebsiteIssues} />
+        <WebsiteTab model={product.model_name} onCount={setWebsiteIssues} />
       )}
 
       {/* Translations tab */}
