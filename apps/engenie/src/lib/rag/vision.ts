@@ -7,6 +7,15 @@ import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 
 const VISION_MODEL = "gemini-3.5-flash";
 
+/**
+ * Neither call had a timeout, and the weekly re-crawl waits on every one of
+ * them: a single image that never answered held the function until Vercel
+ * killed it at 300s, with nothing written. Generous next to the usual few
+ * seconds — a full LED table is 2000 output tokens — but finite.
+ */
+const IMAGE_FETCH_TIMEOUT_MS = 15_000;
+const GENERATE_TIMEOUT_MS = 40_000;
+
 const DESCRIPTION_PROMPT = `You are describing an image from EnGenius networking product documentation.
 Your description will be embedded into a vector database for semantic search.
 
@@ -45,7 +54,7 @@ export async function describeImage(imageUrl: string): Promise<string | null> {
 
   try {
     // Fetch the image and convert to base64
-    const imageRes = await fetch(imageUrl);
+    const imageRes = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!imageRes.ok) {
       console.warn(`Failed to fetch image ${imageUrl}: ${imageRes.status}`);
       return null;
@@ -60,6 +69,7 @@ export async function describeImage(imageUrl: string): Promise<string | null> {
       `https://generativelanguage.googleapis.com/v1beta/models/${VISION_MODEL}:generateContent`,
       {
         method: "POST",
+        signal: AbortSignal.timeout(GENERATE_TIMEOUT_MS),
         headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
         body: JSON.stringify({
           contents: [
@@ -109,16 +119,23 @@ export async function describeImage(imageUrl: string): Promise<string | null> {
 /**
  * Describe multiple images, with concurrency control.
  * Returns a Map of imageUrl → description (null if failed).
+ *
+ * With a `deadline` (epoch ms), no new round starts once it has passed, and
+ * the images not reached are simply ABSENT from the map — distinct from
+ * null, which means "tried and failed". Callers use the difference to hold
+ * back a page rather than write it without its descriptions.
  */
 export async function describeImages(
   imageUrls: string[],
-  concurrency = 3
+  concurrency = 3,
+  deadline?: number,
 ): Promise<Map<string, string | null>> {
   const results = new Map<string, string | null>();
   const unique = [...new Set(imageUrls)];
 
   // Process in batches to avoid rate limits
   for (let i = 0; i < unique.length; i += concurrency) {
+    if (deadline !== undefined && Date.now() >= deadline) break;
     const batch = unique.slice(i, i + concurrency);
     const descriptions = await Promise.all(
       batch.map((url) => describeImage(url))
