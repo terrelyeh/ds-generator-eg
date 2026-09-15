@@ -66,7 +66,7 @@ src/
       api-keys/route.ts              # 對外 API key CRUD
       settings/route.ts, settings/models # LLM keys（app_settings）與模型目錄（存檔時對 OpenRouter 驗 id）
       ws-auth, demo-auth, chat-sessions
-      cron/reindex-web/route.ts      # 每週日 re-crawl web 來源
+      cron/reindex-web/route.ts      # 每週日 re-crawl web 來源（200s 時間預算，跑不完的留到下週；心跳每次都寫）
       cron/reindex-products/route.ts # product_spec re-index：POST(spechub sync)/GET(每日 09:30 TW，順便清 90 天前的問題原文)
   components/
     layout/engenie-shell.tsx         # navbar(Ask/Knowledge/Settings) + footer + Toaster
@@ -144,6 +144,9 @@ scripts/index-internal-docs.ts       # internal_doc 整包匯入（只有 CLI）
 - **站內內容的引用連到 `/knowledge/doc/<type>/<id>`**，擋 `ask.use`（不是 `knowledge.view`）；app 內路徑只有內部 `/ask` 的讀者連得開。
 - **`/api/knowledge-assets` 不經過 proxy**（matcher 排除圖檔副檔名），保護全靠 handler；沒有登入的讀者用 `asset-token` 簽章連結（24 小時、只開那一張）。
 - **ingest 先寫再刪**（`trimStaleChunks()`）；**所有對外抓取走 `lib/rag/safe-url.ts`**；HTML 轉文字前先 `stripHiddenHtml()`；檢索到的文字包在 `<source>` 元素裡。
+- **ingest 讀既有 chunk 一律分頁**（`selectAll()`，`lib/rag/select-all.ts`）——PostgREST 一次最多 1000 列、截斷不報錯。
+- **「消失的來源」只能在 run 真的列舉了整個宇宙時清**（pitfall #77）：手動給的網址清單（Add Article、逐列 Sync、cron 分批）不是宇宙；web 完全不清。
+- **GitBook 以批次邊做邊寫**；「這頁做完了」的標記（`last_modified`、`page_hash`）只在該頁最後一次寫入，規則與測試在 `lib/rag/gitbook-plan.ts`。
 - **BYOK 的 key 一律是 OpenRouter key**，格式判斷只在 `lib/ask/byok-key.ts`。
 - **passcode 驗證只看 `passcode_hash`**；`passcode_encrypted`（00059）只給 admin 查看，解開後再用 hash 驗一次。
 - **每一題寫一列 `ask_requests`**（00060，在 `/api/ask` 串流結束、關閉前寫），回答的 metadata 帶 `request_id` 給 👍👎；`LOW_SIMILARITY`（TS）要和 00060 SQL 的預設值一致。
@@ -173,7 +176,7 @@ scripts/index-internal-docs.ts       # internal_doc 整包匯入（只有 CLI）
 
 ## Common Pitfalls
 
-全部 22 條（編號沿用 spechub、不重排）在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。最常踩的：
+全部 24 條（編號沿用 spechub、不重排）在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。最常踩的：
 
 - **#54** `useChatStream` 的 POST body 一律 `...getParams()` 展開——寫死欄位清單會靜默丟掉 workspace／userKey。
 - **#59** 檢索的 embedding 只用「當前問題」，不串對話歷史。
@@ -195,6 +198,8 @@ npm run build -w engenie
 
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，region **hnd1**（不要改）
 - Crons：`/api/cron/reindex-web` 週日、`/api/cron/reindex-products` 每日 09:30 TW（GET 順便跑 `ask_requests_redact()`，清掉 90 天前的問題原文）。
+  **`reindex-web` 在 2026-09-16 之前從沒跑完過**（9/6、9/13 都在 300s 被殺，pitfall #76）：現在 200s 後不再開始新來源、
+  沒做到的寫進心跳（`ok=false`，下週接著做），每個來源一行 log 說花了多久；`?only=` 窄化的手動 run 不寫心跳。
   **兩支都會在跑完時寫 `job_heartbeats`**（`recordHeartbeat` from `@eg/db/heartbeat`）——
   SpecHub 的 `/api/cron/health` 靠它判斷排程有沒有跑，而不是靠副作用（沒變更的 chunk
   不會被重寫，「沒事做」和「沒跑」在資料上一模一樣）。**新增排程時記得補一行心跳，
@@ -206,7 +211,7 @@ npm run build -w engenie
 ## 詳細文件
 
 - [`docs/ask-implementation-notes.md`](docs/ask-implementation-notes.md) — Ask / RAG 各條規則的原因與歷史（2026-09-13 從本檔搬出，依主題排列）
-- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — 全部 pitfalls（#54–#75，編號不重排）
+- [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — 全部 pitfalls（#54–#77，編號不重排）
 - [`docs/agent-architecture.md`](docs/agent-architecture.md) — **設計提案**：**單一 agent**（從純 RAG 到「工具導向 Agent」：tool calling / agent loop 基礎觀念 + 針對本系統的設計、分階段計畫、安全模型）。尚未實作；排在 monorepo Phase 5 之後
 - [`docs/multi-agent-architecture.md`](docs/multi-agent-architecture.md) — **設計參考**：**多 agent**（agent-architecture 的姊妹篇）。何時才需要、四種 topology（supervisor / agent-as-tool / pipeline / handoff）、上下文傳遞等核心難題、套到 EnGenie 的安全邊界切法與漸進路線。**兩份是並行主題**，HTML 已公開於 `/docs/agent-architecture.html`、`/docs/multi-agent-architecture.html`（可分享）
 - [`docs/engenie-knowledge-mcp.md`](docs/engenie-knowledge-mcp.md) — **設計草案**：把知識庫包成 **MCP server**（`engenie_search` 工具），讓任何 MCP client（Claude Code/Desktop、Cursor…）把 EnGenie 知識當原生工具——`engenius-kb` skill 的產品化（＝整合總覽 ask-integration 的 B2 那格）。HTML 公開於 `/docs/engenie-knowledge-mcp.html`
