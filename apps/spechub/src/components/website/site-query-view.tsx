@@ -7,7 +7,7 @@ import type { GenerationFilter } from "@/lib/website/check";
 import { LANGUAGE_LABEL, type Row, type SiteVerdict, type SpecHubBaseline } from "@/lib/website/compare";
 import type { DocLanguage } from "@/lib/website/parse";
 import { SITE_CODES, SITE_LANGUAGES, type SiteCode } from "@/lib/website/sites";
-import { formatDate, formatDateTime, StatusBadge } from "./model-check-view";
+import { formatDate, formatDateTime, isCalm, IssueText, siteLanguageLabel, StatusBadge } from "./model-check-view";
 
 /**
  * 官網查詢 · 依站台: every product in a category on the chosen sites.
@@ -79,11 +79,11 @@ function timeLine(site: SiteCode, verdict: SiteVerdict, baseline: SpecHubBaselin
   return uploaded ? `${monthDay(uploaded)} 上傳` : "";
 }
 
-function specHubText(site: SiteCode, entry: QueryModel): { text: string; muted: boolean } {
-  if (entry.baseline === null) return { text: "不在 SpecHub", muted: true };
+function specHubText(site: SiteCode, entry: QueryModel): { label: string; version: string | null } {
+  if (entry.baseline === null) return { label: "不在 SpecHub", version: null };
   const language = siteLanguage(site, entry.baseline);
-  if (!language) return { text: "沒有 PDF", muted: true };
-  return { text: `${LANGUAGE_LABEL[language]} v${entry.baseline[language]!.version}`, muted: false };
+  if (!language) return { label: "沒有 PDF", version: null };
+  return { label: LANGUAGE_LABEL[language], version: entry.baseline[language]!.version };
 }
 
 /** Issues grouped by site, with a site's pending pushes folded into one line: one push publishes them all. */
@@ -121,21 +121,24 @@ function GroupedIssueList({ groups }: { groups: [SiteCode, string[]][] }) {
   }
   return (
     <div className="overflow-hidden rounded-lg border border-slate-400">
-      <div className="flex items-center justify-between gap-3 border-b-2 border-slate-300 bg-slate-100 px-3 py-2">
-        <span className="text-sm font-semibold text-slate-800">{total} 件事要處理</span>
+      <div className="flex items-center justify-between gap-3 border-b-2 border-slate-300 bg-slate-100 px-4 py-2.5">
+        <span className="text-[15px] font-bold text-slate-900">{total} 件事要處理</span>
         <Button size="sm" variant="outline" className="h-7 bg-white" onClick={copy}>
           複製給行銷
         </Button>
       </div>
-      <div className="bg-white py-1">
+      <div className="divide-y divide-slate-200 bg-white">
         {groups.map(([site, lines]) => (
-          <div key={site}>
-            <p className="px-3 pt-2.5 text-xs font-semibold tracking-wide text-slate-900">
-              {site}（{lines.length}）
+          <div key={site} className="py-1">
+            <p className="flex items-baseline gap-2 px-4 pt-2.5 text-base font-bold tracking-wide text-slate-900">
+              {site}
+              <span className="text-xs font-normal tracking-normal text-slate-500">{lines.length} 件</span>
             </p>
-            <ol className="list-decimal space-y-1.5 pb-2 pl-8 pr-3 pt-1 text-sm text-slate-800">
+            <ol className="list-decimal space-y-2 pb-2.5 pl-9 pr-4 pt-1.5 text-sm leading-relaxed text-slate-700 marker:text-slate-400">
               {lines.map((line) => (
-                <li key={line}>{line}</li>
+                <li key={line}>
+                  <IssueText text={line} />
+                </li>
               ))}
             </ol>
           </div>
@@ -148,8 +151,8 @@ function GroupedIssueList({ groups }: { groups: [SiteCode, string[]][] }) {
 function CellDetail({ site, verdict }: { site: SiteCode; verdict: SiteVerdict }) {
   const lines = [...verdict.missing.map((m) => ({ kind: "missing" as const, ...m })), ...verdict.rows.map((r) => ({ kind: "row" as const, ...r }))];
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs font-semibold tracking-wide text-slate-900">{site} 明細</p>
+    <div className="flex flex-col gap-2.5">
+      <p className="text-base font-bold tracking-wide text-slate-900">{site} 明細</p>
       {lines.length === 0 && <p className="text-sm text-slate-600">{verdict.summary}</p>}
       {lines.map((line) =>
         line.kind === "missing" ? (
@@ -157,8 +160,8 @@ function CellDetail({ site, verdict }: { site: SiteCode; verdict: SiteVerdict })
             <StatusBadge status={line.status} />沒有{LANGUAGE_LABEL[line.language]} Datasheet · {line.why}
           </p>
         ) : (
-          <div key={line.fileId} className="grid gap-x-6 gap-y-1 text-sm sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
-            <span className="break-all font-mono text-[11.5px] text-slate-800">
+          <div key={line.fileId} className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
+            <span className="break-all font-mono text-[12.5px] text-slate-700">
               {line.production?.url || line.staging?.url ? (
                 <a href={line.production?.url ?? line.staging?.url ?? undefined} target="_blank" rel="noopener noreferrer" className="hover:text-sky-700 hover:underline">
                   {line.filename}
@@ -171,7 +174,7 @@ function CellDetail({ site, verdict }: { site: SiteCode; verdict: SiteVerdict })
             <span className="whitespace-nowrap tabular-nums text-slate-700">測試站 {versionOf(line.staging)} · {formatDate(line.staging?.uploadedAt)}</span>
             <span className="flex flex-wrap items-center gap-1.5">
               <StatusBadge status={line.status} />
-              <span className="text-[11px] text-slate-600">{line.why}</span>
+              <span className="text-xs text-slate-600">{line.why}</span>
             </span>
           </div>
         ),
@@ -257,6 +260,8 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
   const visible = result ? models.filter((m) => filter === "all" || (filter === "issue" ? hasIssue(m) : noDatasheet(m))) : [];
   const groups = result ? groupedIssues(result, result.models) : [];
   const single = result?.sites.length === 1 ? result.sites[0] : null;
+  // The matrix's SpecHub column shows only the languages the chosen sites publish in.
+  const wanted = result ? [...new Set(result.sites.flatMap((site) => SITE_LANGUAGES[site]))] : [];
 
   return (
     <div className="flex flex-col gap-4">
@@ -342,7 +347,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
       {result && !loading && (
         <section className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-[0_1px_3px_rgba(16,24,40,0.10),0_1px_2px_rgba(16,24,40,0.06)]">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-300 bg-slate-50 px-4 py-3 sm:px-5">
-            <h2 className="text-base font-semibold text-slate-900">
+            <h2 className="text-lg font-bold text-slate-900">
               {result.sites.join(" · ")} · {categories?.find((c) => c.key === result.category)?.label ?? result.category}
               {result.generation ? ` · Wi-Fi ${result.generation}` : ""}
             </h2>
@@ -352,16 +357,25 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
             {formKey !== queriedKey && (
               <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">條件已變更，按「查詢」更新結果。</p>
             )}
-            <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-600">
+            <div className="flex flex-wrap gap-x-7 gap-y-1.5 text-sm text-slate-600">
               {result.sites.map((site) => {
                 const onSite = models.filter((m) => m.verdicts[site] && m.verdicts[site]!.status !== "nopage");
                 const pushing = models.filter((m) => m.verdicts[site]?.status === "push").length;
                 const issues = models.filter((m) => (m.verdicts[site]?.issues.length ?? 0) > 0 && m.verdicts[site]?.status !== "push").length;
                 return (
-                  <span key={site}>
-                    <b className="font-semibold text-slate-900">{site}</b> {onSite.length} 款
-                    {pushing > 0 && <> · <b className="font-semibold text-sky-700">{pushing}</b> 項待推送</>}
-                    {issues > 0 && <> · <b className="font-semibold text-amber-800">{issues}</b> 款有狀況</>}
+                  <span key={site} className="flex items-baseline gap-1.5">
+                    <b className="text-base font-bold tracking-wide text-slate-900">{site}</b>
+                    <span className="tabular-nums">{onSite.length} 款</span>
+                    {pushing > 0 && (
+                      <span>
+                        · <b className="font-semibold tabular-nums text-sky-700">{pushing}</b> 項待推送
+                      </span>
+                    )}
+                    {issues > 0 && (
+                      <span>
+                        · <b className="font-semibold tabular-nums text-amber-800">{issues}</b> 款有狀況
+                      </span>
+                    )}
                   </span>
                 );
               })}
@@ -387,9 +401,9 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
             <div className="overflow-x-auto rounded-lg border border-slate-400">
               <table className="w-full min-w-[720px] border-collapse text-sm">
                 <thead>
-                  <tr className="border-b-2 border-slate-300 bg-slate-100 text-left text-xs font-semibold whitespace-nowrap text-slate-700">
+                  <tr className="border-b-2 border-slate-300 bg-slate-100 text-left align-bottom text-[13px] font-semibold whitespace-nowrap text-slate-700">
                     <th className="px-3 py-2.5">型號</th>
-                    <th className="px-3 py-2.5">世代</th>
+                    <th className="w-20 px-3 py-2.5">世代</th>
                     {single ? (
                       <>
                         <th className="px-3 py-2.5">Datasheet</th>
@@ -403,8 +417,9 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                       <>
                         <th className="px-3 py-2.5">SpecHub</th>
                         {result.sites.map((site) => (
-                          <th key={site} className="px-3 py-2.5">
-                            {site} <span className="font-normal text-slate-500">{SITE_LANGUAGES[site].map((l) => LANGUAGE_LABEL[l]).join("／")}</span>
+                          <th key={site} className="px-3.5 py-2">
+                            <span className="block text-base font-bold leading-tight tracking-wide text-slate-900">{site}</span>
+                            <span className="block text-xs font-normal text-slate-500">{siteLanguageLabel(site)}</span>
                           </th>
                         ))}
                       </>
@@ -420,16 +435,21 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                     </tr>
                   )}
                   {visible.map((entry) => {
+                    const line = "border-t border-slate-300";
                     const modelCell = (
-                      <td className="border-t border-slate-200 px-3 py-2.5 align-top">
-                        <button type="button" onClick={() => onOpenModel(entry.model)} className="whitespace-nowrap font-medium text-slate-900 hover:text-sky-700 hover:underline">
+                      <td className={`${line} px-3 py-3 align-top`}>
+                        <button
+                          type="button"
+                          onClick={() => onOpenModel(entry.model)}
+                          className="whitespace-nowrap text-[15px] font-semibold leading-tight text-slate-900 hover:text-sky-700 hover:underline"
+                        >
                           {entry.model}
                         </button>
-                        <span className="block text-[11px] text-slate-500">{entry.name}</span>
+                        <span className="mt-0.5 block text-xs text-slate-500">{entry.name}</span>
                       </td>
                     );
                     const generationCell = (
-                      <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2.5 align-top text-slate-700">
+                      <td className={`${line} whitespace-nowrap px-3 py-3 align-top text-[13px] text-slate-600`}>
                         {entry.generation ?? "—"}
                         {entry.generationUncertain && <span title="從規格文字判斷，可能不準">?</span>}
                       </td>
@@ -438,45 +458,59 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                       const verdict = entry.verdicts[single]!;
                       const row = leadRow(verdict);
                       const hub = specHubText(single, entry);
+                      const dim = row?.status === "skip";
+                      const version = `${line} whitespace-nowrap px-3 py-3 align-top text-[15px] tabular-nums ${dim ? "text-slate-500" : "font-semibold text-slate-900"}`;
                       return (
                         <tr key={entry.model}>
                           {modelCell}
                           {generationCell}
-                          <td className="border-t border-slate-200 px-3 py-2.5 align-top">
+                          <td className={`${line} px-3 py-3 align-top`}>
                             {row ? (
-                              <span className="break-all font-mono text-[11.5px] text-slate-800">{row.filename}</span>
+                              <span className={`break-all font-mono text-[12.5px] ${dim ? "text-slate-500" : "text-slate-700"}`}>{row.filename}</span>
                             ) : (
-                              <span className="text-slate-500">{verdict.status === "nopage" ? "沒有產品頁" : "沒有 Datasheet"}</span>
+                              <span className="text-[13px] text-slate-500">{verdict.status === "nopage" ? "沒有產品頁" : "沒有 Datasheet"}</span>
                             )}
                           </td>
-                          <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2.5 align-top tabular-nums">{row ? versionOf(row.production) : "—"}</td>
-                          <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2.5 align-top tabular-nums">{row ? versionOf(row.staging) : "—"}</td>
-                          <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2.5 align-top tabular-nums text-slate-700">
+                          <td className={version}>{row ? versionOf(row.production) : <span className="font-normal text-slate-400">—</span>}</td>
+                          <td className={version}>{row ? versionOf(row.staging) : <span className="font-normal text-slate-400">—</span>}</td>
+                          <td className={`${line} whitespace-nowrap px-3 py-3 align-top text-[13px] tabular-nums text-slate-600`}>
                             {formatDate(row ? [row.production?.uploadedAt, row.staging?.uploadedAt].filter(Boolean).sort().pop() : null)}
                           </td>
-                          <td className="border-t border-slate-200 px-3 py-2.5 align-top">
+                          <td className={`${line} px-3 py-3 align-top`}>
                             <StatusBadge status={verdict.status} />
-                            <span className="mt-1 block text-[11px] leading-snug text-slate-600">{row?.why ?? verdict.missing[0]?.why ?? verdict.summary}</span>
+                            {/* A series sheet can be the only file listed while the status comes from the missing single-model one. */}
+                            <span className="mt-1.5 block text-xs leading-snug text-slate-600">
+                              {(row && row.status === verdict.status ? row.why : null) ?? verdict.missing[0]?.why ?? row?.why ?? verdict.summary}
+                            </span>
                           </td>
-                          <td className={`whitespace-nowrap border-t border-slate-200 px-3 py-2.5 align-top ${hub.muted ? "text-slate-500" : "text-slate-800"}`}>{hub.text}</td>
+                          <td className={`${line} whitespace-nowrap px-3 py-3 align-top text-[13px]`}>
+                            {hub.version ? (
+                              <span className="text-slate-600">
+                                {hub.label} <b className="font-semibold tabular-nums text-slate-900">v{hub.version}</b>
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">{hub.label}</span>
+                            )}
+                          </td>
                         </tr>
                       );
                     }
                     const expanded = open?.model === entry.model && result.sites.includes(open.site) ? open.site : null;
+                    const hubLanguages = entry.baseline ? wanted.filter((l) => entry.baseline![l]) : [];
                     return (
                       <Fragment key={entry.model}>
                         <tr>
                           {modelCell}
                           {generationCell}
-                          <td className="whitespace-nowrap border-t border-slate-200 px-3 py-2.5 align-top text-[12px] text-slate-700">
+                          <td className={`${line} whitespace-nowrap px-3 py-3 align-top text-[13px] text-slate-600`}>
                             {entry.baseline === null ? (
                               <span className="text-slate-500">不在 SpecHub</span>
-                            ) : Object.keys(entry.baseline).length === 0 ? (
-                              <span className="text-slate-500">沒有 PDF</span>
+                            ) : hubLanguages.length === 0 ? (
+                              <span className="text-slate-500">沒有{wanted.map((l) => LANGUAGE_LABEL[l]).join("／")} PDF</span>
                             ) : (
-                              (Object.entries(entry.baseline) as [DocLanguage, { version: string }][]).map(([l, v]) => (
-                                <span key={l} className="block tabular-nums">
-                                  {LANGUAGE_LABEL[l]} v{v.version}
+                              hubLanguages.map((l) => (
+                                <span key={l} className="block leading-relaxed">
+                                  {LANGUAGE_LABEL[l]} <b className="font-semibold tabular-nums text-slate-900">v{entry.baseline![l]!.version}</b>
                                 </span>
                               ))
                             )}
@@ -485,7 +519,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                             const verdict = entry.verdicts[site];
                             if (!verdict || verdict.status === "nopage") {
                               return (
-                                <td key={site} className="border-t border-slate-200 px-3 py-2.5 align-top text-xs text-slate-400">
+                                <td key={site} className={`${line} px-3.5 py-3 align-top text-xs text-slate-400`}>
                                   無產品頁
                                 </td>
                               );
@@ -500,22 +534,29 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                                     ? `沒有${LANGUAGE_LABEL[verdict.missing[0].language]}版`
                                     : "沒有 Datasheet";
                             const isOpen = expanded === site;
+                            const calm = isCalm(verdict.status);
                             return (
-                              <td key={site} className="border-t border-slate-200 px-1.5 py-1.5 align-top">
+                              <td key={site} className={`${line} px-1.5 py-1.5 align-top`}>
                                 <button
                                   type="button"
                                   aria-expanded={isOpen}
                                   onClick={() => setOpen(isOpen ? null : { model: entry.model, site })}
-                                  className={`block w-full rounded-md px-1.5 py-1 text-left transition-colors ${isOpen ? "bg-sky-50 ring-1 ring-sky-200" : "hover:bg-slate-50"}`}
+                                  className={`block w-full rounded-md px-2 py-1.5 text-left transition-colors ${isOpen ? "bg-sky-50 ring-1 ring-sky-300" : "hover:bg-slate-50"}`}
                                 >
-                                  <span className="block whitespace-nowrap tabular-nums text-slate-900">
+                                  <span
+                                    className={`block whitespace-nowrap tabular-nums ${
+                                      !row ? "text-[13px] font-medium text-slate-700" : verdict.status === "skip" ? "text-[15px] text-slate-500" : "text-[15px] font-semibold text-slate-900"
+                                    }`}
+                                  >
                                     {version}
-                                    {row && row.scope !== "single" && <span className="ml-1 text-[11px] text-slate-500">系列</span>}
+                                    {row && row.scope !== "single" && <span className="ml-1.5 text-xs font-normal text-slate-500">系列</span>}
                                   </span>
-                                  <span className="mt-1 block">
+                                  <span className="mt-1.5 block">
                                     <StatusBadge status={verdict.status} />
                                   </span>
-                                  <span className="mt-1 block whitespace-nowrap text-[11px] text-slate-500">{timeLine(site, verdict, entry.baseline)}</span>
+                                  <span className={`mt-1.5 block whitespace-nowrap text-xs ${calm ? "text-slate-400" : "text-slate-600"}`}>
+                                    {timeLine(site, verdict, entry.baseline)}
+                                  </span>
                                 </button>
                               </td>
                             );
@@ -523,7 +564,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                         </tr>
                         {expanded && (
                           <tr>
-                            <td colSpan={3 + result.sites.length} className="border-t border-slate-200 bg-slate-50 px-4 py-3">
+                            <td colSpan={3 + result.sites.length} className={`${line} bg-slate-50 px-4 py-3.5`}>
                               <CellDetail site={expanded} verdict={entry.verdicts[expanded]!} />
                             </td>
                           </tr>
