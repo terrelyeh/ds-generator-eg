@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
+import { WebsiteTab } from "@/components/website/website-tab";
 import { can, type Role } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/datasheet/qr";
@@ -92,6 +93,9 @@ interface ProductDetailProps {
   /** Caller-supplied user role. Used to hide editor-only controls
    *  (Generate / Resync / Upload / Mark-as-Reviewed / Translation Editor). */
   role?: Role;
+  /** Issues found by the last website datasheet check, for the 官網 tab label.
+   *  Null when this model has never been checked or the role can't see the tab. */
+  websiteIssueCount?: number | null;
 }
 
 function LayoutWarningBanner({
@@ -797,7 +801,7 @@ function QsgUrlCard({
   );
 }
 
-export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [] }: ProductDetailProps) {
+export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [], websiteIssueCount = null }: ProductDetailProps) {
   // Role-derived flags. Prefixed `roleCan` to avoid collision with the
   // existing `canGenerate` that signals "all required fields are filled
   // (Product Image, Hardware Image, Overview, Features)".
@@ -806,7 +810,9 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const roleCanGenerate = can(role, "pdf.generate");
   const roleCanResync = can(role, "sync.run");
   const roleCanTranslate = can(role, "translation.edit");
-  const [activeTab, setActiveTab] = useState<"detail" | "translations">("detail");
+  const roleCanCheckWebsite = can(role, "website_check.view");
+  const [activeTab, setActiveTab] = useState<"detail" | "translations" | "website">("detail");
+  const [websiteIssues, setWebsiteIssues] = useState<number | null>(websiteIssueCount);
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [resyncing, setResyncing] = useState(false);
@@ -1397,9 +1403,32 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
             )}
           </button>
         )}
+        {/* Where this model's datasheet stands on the five regional sites.
+            The number is what the last check found; no number = never checked. */}
+        {roleCanCheckWebsite && (
+          <button
+            onClick={() => setActiveTab("website")}
+            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+              activeTab === "website"
+                ? "bg-background text-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            官網
+            {websiteIssues !== null && (
+              <span className={`ml-1.5 tabular-nums ${websiteIssues > 0 ? "font-semibold text-amber-700" : "text-muted-foreground/50"}`}>
+                {websiteIssues}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       <Separator />
+
+      {activeTab === "website" && roleCanCheckWebsite && (
+        <WebsiteTab model={product.model_name} onIssueCount={setWebsiteIssues} />
+      )}
 
       {/* Translations tab */}
       {activeTab === "translations" && (
