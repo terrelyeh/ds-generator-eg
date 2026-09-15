@@ -173,15 +173,15 @@ export function ReviewPanel({
           </span>
         </div>
         {reviews.length > 0 && (
-          <span className="text-xs text-slate-400">{reviews.length} 則紀錄</span>
+          <span className="text-xs text-slate-500">{reviews.length} 則紀錄</span>
         )}
       </div>
 
       <div className="max-h-72 space-y-3 overflow-y-auto px-4 py-3">
         {loading ? (
-          <p className="text-xs text-slate-400">讀取中…</p>
+          <p className="text-xs text-slate-500">讀取中…</p>
         ) : reviews.length === 0 ? (
-          <p className="text-xs text-slate-400">還沒有審核紀錄。</p>
+          <p className="text-xs text-slate-500">還沒有審核紀錄。</p>
         ) : (
           reviews.map((r) => {
             const target = describeTarget(r);
@@ -211,7 +211,7 @@ export function ReviewPanel({
                       {target}
                     </span>
                   )}
-                  <span className="ml-auto tabular-nums text-slate-400">
+                  <span className="ml-auto tabular-nums text-slate-500">
                     {new Date(r.created_at).toLocaleString("zh-TW")}
                   </span>
                 </div>
@@ -287,12 +287,12 @@ export function ReviewPanel({
               只留言
             </Button>
           </div>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-[11px] text-slate-500">
             「只留言」不會改變狀態 —— 提個小意見不該擋住或放行 PDF。
           </p>
         </div>
       ) : (
-        <div className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-400">
+        <div className="border-t border-slate-100 px-4 py-2.5 text-xs text-slate-500">
           你沒有審核 {localeLabel} 的權限，只能閱讀意見。
         </div>
       )}

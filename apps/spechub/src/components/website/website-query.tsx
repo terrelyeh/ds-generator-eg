@@ -185,7 +185,7 @@ export function WebsiteQuery() {
                     {chips.map((chip) => (
                       <span key={chip} className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-slate-50 py-0.5 pl-2 pr-1 font-mono text-xs text-slate-800">
                         {chip}
-                        <button type="button" aria-label={`移除 ${chip}`} onClick={() => setChips(chips.filter((c) => c !== chip))} className="px-1 text-slate-400 hover:text-slate-700">
+                        <button type="button" aria-label={`移除 ${chip}`} onClick={() => setChips(chips.filter((c) => c !== chip))} className="px-1 text-slate-500 hover:text-slate-700">
                           ×
                         </button>
                       </span>

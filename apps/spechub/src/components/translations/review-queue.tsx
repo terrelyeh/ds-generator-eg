@@ -27,7 +27,7 @@ function Rows({
   showComment?: boolean;
 }) {
   if (rows.length === 0) {
-    return <p className="px-4 py-6 text-sm text-slate-400">{emptyText}</p>;
+    return <p className="px-4 py-6 text-sm text-slate-500">{emptyText}</p>;
   }
   return (
     <ul className="divide-y divide-slate-100">
@@ -42,7 +42,7 @@ function Rows({
             </Link>
             <span className="text-xs text-slate-500">{localeLabel(r.locale)}</span>
             {r.translated_at && (
-              <span className="ml-auto text-xs tabular-nums text-slate-400">
+              <span className="ml-auto text-xs tabular-nums text-slate-500">
                 {new Date(r.translated_at).toLocaleDateString("zh-TW")}
               </span>
             )}
@@ -72,7 +72,7 @@ export function ReviewQueue() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p className="py-12 text-center text-sm text-slate-400">讀取中…</p>;
+  if (loading) return <p className="py-12 text-center text-sm text-slate-500">讀取中…</p>;
   if (!data) return null;
 
   const showReview = data.toReview.length > 0 || data.reviewLocales !== null;
@@ -92,12 +92,12 @@ export function ReviewQueue() {
             <h2 className="text-sm font-semibold text-[#231f20]">
               待我審核
               {data.reviewLocales && (
-                <span className="ml-2 text-xs font-normal text-slate-400">
+                <span className="ml-2 text-xs font-normal text-slate-500">
                   （{data.reviewLocales.map(localeLabel).join("、")}）
                 </span>
               )}
             </h2>
-            <span className="text-xs tabular-nums text-slate-400">{data.toReview.length}</span>
+            <span className="text-xs tabular-nums text-slate-500">{data.toReview.length}</span>
           </div>
           <Rows rows={data.toReview} emptyText="目前沒有待審核的翻譯。" />
         </section>
@@ -106,7 +106,7 @@ export function ReviewQueue() {
       <section className="rounded-lg border border-slate-200 bg-white">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
           <h2 className="text-sm font-semibold text-[#231f20]">被退回，待修改</h2>
-          <span className="text-xs tabular-nums text-slate-400">{data.toFix.length}</span>
+          <span className="text-xs tabular-nums text-slate-500">{data.toFix.length}</span>
         </div>
         <Rows rows={data.toFix} emptyText="沒有被退回的翻譯。" showComment />
       </section>
