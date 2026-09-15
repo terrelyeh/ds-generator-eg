@@ -1487,6 +1487,36 @@ export type Database = {
         }
         Relationships: []
       }
+      website_checks: {
+        Row: {
+          baseline: Json | null
+          checked_at: string
+          checked_by: string | null
+          model_name: string
+          site: string
+          status: string
+          verdict: Json
+        }
+        Insert: {
+          baseline?: Json | null
+          checked_at?: string
+          checked_by?: string | null
+          model_name: string
+          site: string
+          status: string
+          verdict: Json
+        }
+        Update: {
+          baseline?: Json | null
+          checked_at?: string
+          checked_by?: string | null
+          model_name?: string
+          site?: string
+          status?: string
+          verdict?: Json
+        }
+        Relationships: []
+      }
       versions: {
         Row: {
           changes: string

@@ -78,6 +78,27 @@ export function createCatalogCache() {
   };
 }
 
+const SHARED_TTL_MS = 10 * 60 * 1000;
+const shared = new Map<string, { at: number; promise: Promise<Catalog> }>();
+
+/**
+ * Product lists shared across requests on a warm instance, for ten minutes.
+ *
+ * Fetching them is most of a first check (two pages of ACF per site and
+ * environment, 2–4s each), and they only change when someone adds a product
+ * page. Files are never cached, so a datasheet uploaded a minute ago shows on
+ * the next check; a brand-new product page can take up to ten minutes.
+ */
+export function sharedCatalog(config: SiteConfig): Promise<Catalog> {
+  const key = `${config.code}:${config.env}:${config.baseUrl}`;
+  const hit = shared.get(key);
+  if (hit && Date.now() - hit.at < SHARED_TTL_MS) return hit.promise;
+  const promise = fetchCatalog(config);
+  shared.set(key, { at: Date.now(), promise });
+  promise.catch(() => shared.delete(key));
+  return promise;
+}
+
 async function fetchFiles(config: SiteConfig, query: string): Promise<WpFile[]> {
   const result = await wpGet<unknown[]>(config, `/wp-json/wp/v2/file?${query}&per_page=100&_fields=${FILE_FIELDS}`);
   const error = failure(result);
