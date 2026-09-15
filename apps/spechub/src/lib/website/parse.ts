@@ -45,6 +45,16 @@ export function versionText(text: string | null | undefined): string {
   return match ? `v${match[1]}` : "";
 }
 
+/**
+ * The version a file name claims for this model. The model number comes out
+ * first, together with a hardware revision glued to it: EWS357APv3's "v3" is
+ * the third hardware revision, not the datasheet's version.
+ */
+export function fileVersionOf(model: string, filename: string): string {
+  const escaped = model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return versionText(filename.replace(new RegExp(`${escaped}(?:v\\d+)?`, "gi"), " "));
+}
+
 /** Numeric parts with trailing zeros dropped, so v1.0 equals v1. Null when there is no version. */
 export function parseVersion(text: string | null | undefined): number[] | null {
   const raw = versionText(text);

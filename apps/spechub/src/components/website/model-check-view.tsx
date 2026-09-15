@@ -209,9 +209,16 @@ function SiteRows({ state, onRetry }: { state: SiteState; onRetry?: (site: SiteC
   );
 }
 
-export function IssueList({ issues, title }: { issues: string[]; title?: string }) {
+export function IssueList({ issues, title, failedSites = [] }: { issues: string[]; title?: string; failedSites?: string[] }) {
   if (!issues.length) {
-    return <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">✓ 沒有發現問題</div>;
+    // A site that couldn't be read is not a site without problems.
+    return failedSites.length ? (
+      <div className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        其他站沒有發現問題，但 {failedSites.join("、")} 查詢失敗，那一站的狀況還不知道，請重試。
+      </div>
+    ) : (
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">✓ 沒有發現問題</div>
+    );
   }
   async function copy() {
     try {
@@ -276,7 +283,9 @@ export function ModelCheckView({
           </tbody>
         </table>
       </div>
-      {!busy && anyChecked && <IssueList issues={issues} />}
+      {!busy && anyChecked && (
+        <IssueList issues={issues} failedSites={ordered.filter((s) => s.error || s.verdict?.status === "fail").map((s) => s.site)} />
+      )}
     </div>
   );
 }

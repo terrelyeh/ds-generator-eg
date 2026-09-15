@@ -1,12 +1,12 @@
 import { judgeSite, type FoundDatasheet, type SiteSide, type SiteVerdict, type SpecHubBaseline } from "./compare";
 import {
   fileFromRest,
+  fileVersionOf,
   languageOf,
   looksLikeDatasheet,
   modelTokens,
   productFromRest,
   scopeOf,
-  versionText,
   wifiGeneration,
   type WpFile,
   type WpProduct,
@@ -109,7 +109,6 @@ async function fetchFiles(config: SiteConfig, query: string): Promise<WpFile[]> 
 
 function toFound(model: string, file: WpFile, onPage: boolean, known: Set<string>): FoundDatasheet {
   const { scope, otherModels } = scopeOf(model, file.title, file.filename, known);
-  const withoutModel = file.filename.replace(new RegExp(model.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " ");
   return {
     fileId: file.id,
     title: file.title,
@@ -118,7 +117,7 @@ function toFound(model: string, file: WpFile, onPage: boolean, known: Set<string
     scope,
     otherModels,
     versionField: file.versionField,
-    fileVersion: versionText(withoutModel),
+    fileVersion: fileVersionOf(model, file.filename),
     status: file.status,
     onPage,
     typeMismatch: file.type !== "data-sheet",

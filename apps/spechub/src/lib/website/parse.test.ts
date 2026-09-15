@@ -3,6 +3,7 @@ import {
   compareVersions,
   decodeEntities,
   explicitLanguage,
+  fileVersionOf,
   fileFromRest,
   languageOf,
   looksLikeDatasheet,
@@ -218,5 +219,17 @@ describe("productFromRest / wifiGeneration", () => {
 describe("decodeEntities", () => {
   it("decodes numeric and common named entities", () => {
     expect(decodeEntities("A &amp; B &#8211; C &#x2019; &nbsp;D")).toBe("A & B – C ’  D");
+  });
+});
+
+describe("fileVersionOf", () => {
+  it("reads the version after taking the model number out", () => {
+    expect(fileVersionOf("ECW536", "DS_Cloud_ECW536_v1.3.pdf")).toBe("v1.3");
+    expect(fileVersionOf("ECW201L-POE", "DS_Cloud_ECW201L-PoE_v1.0.pdf")).toBe("v1.0");
+  });
+
+  it("doesn't read a hardware revision glued to the model as the datasheet version", () => {
+    expect(fileVersionOf("EWS357AP", "EWS357APv3_11ax_DataSheet_20200904.pdf")).toBe("");
+    expect(fileVersionOf("EWS357AP", "EWS357APv3_DataSheet_v1.4.pdf")).toBe("v1.4");
   });
 });

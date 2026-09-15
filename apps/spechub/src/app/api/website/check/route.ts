@@ -4,7 +4,7 @@ import { throwIfDbError } from "@eg/db/errors";
 import { gate, gateWithRateLimit, getCurrentUser } from "@eg/auth/session";
 import { loadBaseline } from "@/lib/website/baseline";
 import { checkModel, sharedCatalog } from "@/lib/website/check";
-import { SITE_CODES, type SiteCode } from "@/lib/website/sites";
+import { SITE_CODES, siteConfig, type SiteCode } from "@/lib/website/sites";
 
 /**
  * The website datasheet check for one model.
@@ -93,5 +93,9 @@ export async function POST(request: Request) {
     ),
   );
 
-  return NextResponse.json({ model, productModel: modelName, site, checkedAt: result.checkedAt, status: verdict.status, verdict, baseline });
+  // Near-identical model numbers on this site (ECW536 → ECW536S), offered as a one-click add.
+  const catalog = await sharedCatalog(siteConfig(site, "production")).catch(() => null);
+  const variants = catalog ? [...catalog.known].filter((m) => m !== model && m.startsWith(model)).sort() : [];
+
+  return NextResponse.json({ model, productModel: modelName, site, checkedAt: result.checkedAt, status: verdict.status, verdict, baseline, variants });
 }
