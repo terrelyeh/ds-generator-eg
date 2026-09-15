@@ -34,7 +34,7 @@ export async function GET(request: Request) {
   if (!model) return NextResponse.json({ error: "型號格式不對" }, { status: 400 });
 
   const supabase = createAdminClient();
-  const [baseline, rows] = await Promise.all([
+  const [{ modelName, baseline }, rows] = await Promise.all([
     loadBaseline(supabase, model),
     supabase
       .from("website_checks")
@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   return NextResponse.json(
     {
       model,
-      inSpecHub: baseline !== null,
+      productModel: modelName,
       baseline,
       sites: (rows.data ?? []).map((row) => ({
         site: row.site,
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
   if (!model || !site) return NextResponse.json({ error: "需要型號和站台（EU、JP、TW、APAC、IN）" }, { status: 400 });
 
   const supabase = createAdminClient();
-  const [user, baseline] = await Promise.all([getCurrentUser(), loadBaseline(supabase, model)]);
+  const [user, { modelName, baseline }] = await Promise.all([getCurrentUser(), loadBaseline(supabase, model)]);
   const result = await checkModel(model, baseline, { sites: [site], catalogFor: sharedCatalog });
   const verdict = result.sites[0];
 
@@ -93,5 +93,5 @@ export async function POST(request: Request) {
     ),
   );
 
-  return NextResponse.json({ model, site, checkedAt: result.checkedAt, status: verdict.status, verdict, baseline });
+  return NextResponse.json({ model, productModel: modelName, site, checkedAt: result.checkedAt, status: verdict.status, verdict, baseline });
 }

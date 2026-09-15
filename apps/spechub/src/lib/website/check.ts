@@ -7,6 +7,7 @@ import {
   productFromRest,
   scopeOf,
   versionText,
+  wifiGeneration,
   type WpFile,
   type WpProduct,
 } from "./parse";
@@ -196,4 +197,135 @@ export async function checkModel(
     }),
   );
   return { model, checkedAt: new Date().toISOString(), sites, issues: sites.flatMap((s) => s.issues) };
+}
+
+// ---------------------------------------------------------------- a whole category on chosen sites
+
+export type GenerationFilter = "7" | "6E" | "6" | "5";
+
+/** URL category paths as filter options: each top level ("access-point") and each full path under it. */
+export function categoryKeys(category: string): string[] {
+  if (category.startsWith("legacy/")) return [category];
+  const parts = category.split("/");
+  return parts.map((_, i) => parts.slice(0, i + 1).join("/"));
+}
+
+/** Access points proper — the "wireless" category also holds power adapters and SFP modules, which have no generation. */
+const isAccessPoint = (product: WpProduct) => product.category.includes("access-point");
+
+const inCategory = (product: WpProduct, key: string) => key === "all" || product.category === key || product.category.startsWith(`${key}/`);
+
+function matchesGeneration(product: WpProduct, filter: GenerationFilter | null): boolean {
+  if (!filter) return true;
+  const { generation } = wifiGeneration(product);
+  if (filter === "6") return generation === "Wi-Fi 6" || generation === "Wi-Fi 6E";
+  return generation === `Wi-Fi ${filter}`;
+}
+
+export interface SiteQueryModel {
+  model: string;
+  name: string;
+  generation: string | null;
+  /** The generation came from page text only, which is the least reliable source. */
+  generationUncertain: boolean;
+  verdicts: Partial<Record<SiteCode, SiteVerdict>>;
+}
+
+export interface SiteQueryResult {
+  checkedAt: string;
+  models: SiteQueryModel[];
+  /** Access points left out because no generation could be read. */
+  unknownGeneration: string[];
+}
+
+/**
+ * Every product in a category on the chosen sites, in bulk: per site and
+ * environment the product list, one request for the matched pages' file
+ * lists and a few for the files themselves. Unlike a single-model check this
+ * doesn't search for datasheets that aren't on a page — that search is per
+ * model and would multiply the requests by the size of the category.
+ */
+export async function querySites(
+  sites: readonly SiteCode[],
+  filter: { category: string; generation: GenerationFilter | null },
+  baselinesFor: (models: string[]) => Promise<Map<string, SpecHubBaseline>>,
+  catalogFor: (config: SiteConfig) => Promise<Catalog> = sharedCatalog,
+): Promise<SiteQueryResult> {
+  const pairs = sites.flatMap((code) => (["production", "staging"] as const).map((env) => siteConfig(code, env)));
+
+  const loaded = await Promise.all(
+    pairs.map(async (config) => {
+      if (!config.baseUrl) return { config, error: "還沒設定這個站的網址", catalog: null, matched: [] as WpProduct[], unreadable: [] as string[], files: new Map<number, WpFile[]>() };
+      try {
+        const catalog = await catalogFor(config);
+        // Filter by generation before asking for any file lists: a category like
+        // "wireless" is 116 pages, and a generation usually cuts that to a fifth.
+        const matched = catalog.products.filter((p) => inCategory(p, filter.category) && matchesGeneration(p, filter.generation));
+        const unreadable = filter.generation
+          ? catalog.products.filter((p) => inCategory(p, filter.category) && isAccessPoint(p) && !wifiGeneration(p).generation).map((p) => p.model)
+          : [];
+        const ids = matched.map((p) => p.id);
+        const chunks = Array.from({ length: Math.ceil(ids.length / 100) }, (_, i) => ids.slice(i * 100, (i + 1) * 100));
+        const details = await Promise.all(
+          chunks.map(async (chunk) => {
+            const result = await wpGet<unknown[]>(config, `/wp-json/wp/v2/product_model?include=${chunk.join(",")}&per_page=100&_fields=id,link,acf.product_files`);
+            const error = failure(result);
+            if (error) throw new Error(error);
+            return Array.isArray(result.data) ? result.data : [];
+          }),
+        );
+        const fileIdsByProduct = new Map<number, number[]>();
+        for (const record of details.flat()) {
+          const product = productFromRest({ link: "", ...(record as object) });
+          const id = (record as { id?: number }).id;
+          if (typeof id === "number") fileIdsByProduct.set(id, product?.fileIds ?? []);
+        }
+        const allIds = [...new Set([...fileIdsByProduct.values()].flat())];
+        const fileChunks = Array.from({ length: Math.ceil(allIds.length / 100) }, (_, i) => allIds.slice(i * 100, (i + 1) * 100));
+        const byId = new Map((await Promise.all(fileChunks.map((c) => fetchFiles(config, `include=${c.join(",")}`)))).flat().map((f) => [f.id, f]));
+        const files = new Map<number, WpFile[]>(
+          matched.map((p) => [p.id, (fileIdsByProduct.get(p.id) ?? []).map((id) => byId.get(id)).filter((f): f is WpFile => Boolean(f))]),
+        );
+        return { config, error: null as string | null, catalog, matched, unreadable, files };
+      } catch (error) {
+        return { config, error: error instanceof Error ? error.message : "查詢失敗", catalog: null, matched: [] as WpProduct[], unreadable: [] as string[], files: new Map<number, WpFile[]>() };
+      }
+    }),
+  );
+
+  // Which models are in scope: on any chosen site, production or staging, in the category and generation.
+  const byModel = new Map<string, WpProduct>();
+  const unknownGeneration = new Set<string>(loaded.flatMap((l) => l.unreadable));
+  for (const { matched } of loaded) {
+    for (const product of matched) if (!byModel.has(product.model)) byModel.set(product.model, product);
+  }
+  const models = [...byModel.keys()].sort((a, b) => a.localeCompare(b, "en", { numeric: true }));
+  const baselines = await baselinesFor(models);
+
+  const sideFor = (config: SiteConfig, model: string): SiteSide => {
+    const entry = loaded.find((l) => l.config.code === config.code && l.config.env === config.env)!;
+    if (entry.error) return { error: entry.error, pageFound: false, datasheets: [] };
+    const page = entry.catalog!.products.find((p) => p.model === model);
+    if (!page) return { error: null, pageFound: false, datasheets: [] };
+    const known = new Set([...entry.catalog!.known, model]);
+    return {
+      error: null,
+      pageFound: true,
+      datasheets: (entry.files.get(page.id) ?? []).filter(isDatasheet).map((f) => toFound(model, f, true, known)),
+    };
+  };
+
+  return {
+    checkedAt: new Date().toISOString(),
+    unknownGeneration: [...unknownGeneration].filter((m) => !byModel.has(m)).sort(),
+    models: models.map((model) => {
+      const product = byModel.get(model)!;
+      const { generation, source } = wifiGeneration(product);
+      const verdicts: Partial<Record<SiteCode, SiteVerdict>> = {};
+      for (const code of sites) {
+        verdicts[code] = judgeSite(code, model, sideFor(siteConfig(code, "production"), model), sideFor(siteConfig(code, "staging"), model), baselines.get(model) ?? null);
+      }
+      return { model, name: product.name, generation, generationUncertain: source === "text", verdicts };
+    }),
+  };
 }

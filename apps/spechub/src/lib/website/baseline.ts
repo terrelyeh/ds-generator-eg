@@ -34,25 +34,64 @@ async function storedSize(supabase: SupabaseClient, publicUrl: string | null): P
   return Number.isFinite(size) && size > 0 ? size : null;
 }
 
-/** Null when SpecHub has no product with this model number. */
-export async function loadBaseline(supabase: SupabaseClient, model: string): Promise<SpecHubBaseline> {
+interface ProductRow {
+  id: string;
+  model_name: string;
+  current_versions: Record<string, string> | null;
+}
+
+export interface SpecHubModel {
+  /** SpecHub's own spelling of the model number (ECW201L-PoE), for links. Null when SpecHub doesn't have it. */
+  modelName: string | null;
+  baseline: SpecHubBaseline;
+}
+
+/** Null baseline when SpecHub has no product with this model number. */
+export async function loadBaseline(supabase: SupabaseClient, model: string): Promise<SpecHubModel> {
   const { data: product } = (await supabase
     .from("products")
     .select("id, model_name, current_versions")
     .ilike("model_name", model.replace(/[%_\\]/g, "\\$&"))
-    .maybeSingle()) as { data: { id: string; model_name: string; current_versions: Record<string, string> | null } | null };
-  if (!product) return null;
-
+    .maybeSingle()) as { data: ProductRow | null };
+  if (!product) return { modelName: null, baseline: null };
   const { data: rows } = (await supabase
     .from("versions")
     .select("version, locale, generated_at, pdf_storage_path")
     .eq("product_id", product.id)) as { data: VersionRow[] | null };
+  return { modelName: product.model_name, baseline: await baselineFrom(supabase, product, rows ?? []) };
+}
 
+/**
+ * The same for many models at once — the site query can cover forty. One
+ * products read, one versions read, and a Storage listing per PDF.
+ * Keyed by the upper-cased model number the sites use.
+ */
+export async function loadBaselines(supabase: SupabaseClient, models: string[]): Promise<Map<string, SpecHubModel>> {
+  const wanted = new Set(models.map((m) => m.toUpperCase()));
+  const { data: products } = (await supabase.from("products").select("id, model_name, current_versions")) as { data: ProductRow[] | null };
+  const matched = (products ?? []).filter((p) => wanted.has(p.model_name.toUpperCase()));
+  const { data: rows } = matched.length
+    ? ((await supabase
+        .from("versions")
+        .select("product_id, version, locale, generated_at, pdf_storage_path")
+        .in("product_id", matched.map((p) => p.id))) as { data: (VersionRow & { product_id: string })[] | null })
+    : { data: [] };
+  const result = new Map<string, SpecHubModel>([...wanted].map((m) => [m, { modelName: null, baseline: null }]));
+  await Promise.all(
+    matched.map(async (product) => {
+      const mine = (rows ?? []).filter((r) => r.product_id === product.id);
+      result.set(product.model_name.toUpperCase(), { modelName: product.model_name, baseline: await baselineFrom(supabase, product, mine) });
+    }),
+  );
+  return result;
+}
+
+async function baselineFrom(supabase: SupabaseClient, product: ProductRow, rows: VersionRow[]): Promise<SpecHubBaseline> {
   const baseline: Partial<Record<DocLanguage, SpecHubVersion>> = {};
   const current = product.current_versions ?? {};
   await Promise.all(
     Object.entries(SITE_LANGUAGE).map(async ([locale, language]) => {
-      const mine = (rows ?? []).filter((r) => (r.locale ?? "en") === locale);
+      const mine = rows.filter((r) => (r.locale ?? "en") === locale);
       const newest = mine.reduce<VersionRow | null>((best, r) => {
         const v = parseVersion(r.version);
         const bv = best ? parseVersion(best.version) : null;
