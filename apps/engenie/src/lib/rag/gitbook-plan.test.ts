@@ -5,10 +5,11 @@ import {
   indexExistingPages,
   missingMarkers,
   pageFingerprint,
+  planPageWrites,
   selectPagesToFetch,
   staleChunkIndices,
   stripRelativeUpdated,
-  visionCoverage,
+  visionState,
   type ExistingGitbookRow,
 } from "./gitbook-plan";
 
@@ -89,6 +90,8 @@ describe("stripRelativeUpdated / pageFingerprint", () => {
     for (const when of ["a month ago", "about 1 month ago", "yesterday", "last year"]) {
       expect(stripRelativeUpdated(`Body\n\nLast updated ${when}`)).toBe("Body");
     }
+    // The /jp spaces print the same footer in Japanese.
+    expect(stripRelativeUpdated("本文\n\n最終更新 8 か月前")).toBe("本文");
   });
 
   it("does not change as the relative date ages", () => {
@@ -107,21 +110,49 @@ describe("stripRelativeUpdated / pageFingerprint", () => {
   });
 });
 
-describe("visionCoverage", () => {
+describe("visionState", () => {
   const a = "https://files.gitbook.io/a.png";
   const b = "https://files.gitbook.io/b.png";
+  const none = new Set<string>();
 
-  it("is complete when every image has a description", () => {
-    expect(visionCoverage([a, b], new Map([[a, "x"], [b, "y"]]))).toEqual({ attempted: true, described: true });
-    expect(visionCoverage([], new Map())).toEqual({ attempted: true, described: true });
+  it("is complete when every image was described — or failed for good", () => {
+    expect(visionState([a, b], new Map([[a, "x"], [b, "y"]]), none)).toBe("complete");
+    // A 404 image will 404 next week too: write the page, don't retry it forever.
+    expect(visionState([a, b], new Map([[a, "x"], [b, null]]), none)).toBe("complete");
+    expect(visionState([], new Map(), none)).toBe("complete");
   });
 
-  it("is attempted but not described when a call failed", () => {
-    expect(visionCoverage([a, b], new Map([[a, "x"], [b, null]]))).toEqual({ attempted: true, described: false });
+  it("holds the page back when a call failed in a way worth retrying", () => {
+    // A 429 used to leave the description out and record the page's date, so
+    // an LED table stayed missing until someone edited the page.
+    expect(visionState([a, b], new Map([[a, "x"]]), new Set([b]))).toBe("retry");
   });
 
-  it("is not attempted when the deadline stopped Vision before an image", () => {
-    expect(visionCoverage([a, b], new Map([[a, "x"]]))).toEqual({ attempted: false, described: false });
+  it("is deferred when the deadline stopped Vision before an image", () => {
+    expect(visionState([a, b], new Map([[a, "x"]]), none)).toBe("deferred");
+  });
+});
+
+describe("planPageWrites", () => {
+  it("puts the markers on the last write, after the trim", () => {
+    expect(planPageWrites([0, 2, FOCUSED_CHUNK_INDEX], [3])).toEqual([
+      { kind: "upsert", chunkIndex: 0, withMarkers: false },
+      { kind: "upsert", chunkIndex: 2, withMarkers: false },
+      { kind: "trim", chunkIndices: [3] },
+      { kind: "upsert", chunkIndex: FOCUSED_CHUNK_INDEX, withMarkers: true },
+    ]);
+  });
+
+  it("records the markers on their own when nothing changed, rewriting them after a trim", () => {
+    expect(planPageWrites([], [])).toEqual([{ kind: "markers", rewrite: false }]);
+    expect(planPageWrites([], [2, 3])).toEqual([
+      { kind: "trim", chunkIndices: [2, 3] },
+      { kind: "markers", rewrite: true },
+    ]);
+  });
+
+  it("gives a single changed chunk the markers", () => {
+    expect(planPageWrites([1], [])).toEqual([{ kind: "upsert", chunkIndex: 1, withMarkers: true }]);
   });
 });
 

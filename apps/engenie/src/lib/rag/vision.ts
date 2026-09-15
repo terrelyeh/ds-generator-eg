@@ -4,6 +4,7 @@
  */
 
 import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
+import { isTransientHttpStatus } from "./safe-url";
 
 const VISION_MODEL = "gemini-3.5-flash";
 
@@ -39,25 +40,31 @@ General rules:
 - Write in English for consistent embedding quality.
 - Do NOT start with "This image shows" — just describe or extract directly.`;
 
+/** A description, or why there is none and whether trying again could help. */
+type ImageDescription =
+  | { ok: true; text: string }
+  | { ok: false; retry: boolean; reason: string };
+
 /**
  * Generate a text description of an image using Gemini Vision.
  *
- * @param imageUrl - URL of the image to describe
- * @returns Text description of the image, or null if failed
+ * Failures are sorted, because the caller acts on the difference: a missing
+ * image or a file Gemini refuses will fail the same way next week, while a
+ * timeout, a rate limit or a server error may not — and a page must not be
+ * stored without a description it could still get (see gitbook-plan
+ * `visionState`).
  */
-export async function describeImage(imageUrl: string): Promise<string | null> {
-  const apiKey = await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
-  if (!apiKey) {
-    console.warn("Google AI API key not configured — skipping image description");
-    return null;
-  }
-
+async function describeImage(imageUrl: string, apiKey: string): Promise<ImageDescription> {
+  let stage = "image fetch";
   try {
     // Fetch the image and convert to base64
     const imageRes = await fetch(imageUrl, { signal: AbortSignal.timeout(IMAGE_FETCH_TIMEOUT_MS) });
     if (!imageRes.ok) {
-      console.warn(`Failed to fetch image ${imageUrl}: ${imageRes.status}`);
-      return null;
+      return {
+        ok: false,
+        retry: isTransientHttpStatus(imageRes.status),
+        reason: `image HTTP ${imageRes.status}`,
+      };
     }
 
     const contentType = imageRes.headers.get("content-type") || "image/png";
@@ -65,6 +72,7 @@ export async function describeImage(imageUrl: string): Promise<string | null> {
     const base64 = Buffer.from(arrayBuffer).toString("base64");
 
     // Call Gemini Vision API
+    stage = "Gemini";
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${VISION_MODEL}:generateContent`,
       {
@@ -97,51 +105,78 @@ export async function describeImage(imageUrl: string): Promise<string | null> {
     );
 
     if (!res.ok) {
-      const errText = await res.text();
-      console.warn(`Gemini Vision API error: ${res.status} — ${errText.slice(0, 200)}`);
-      return null;
+      const errText = await res.text().catch(() => "");
+      return {
+        ok: false,
+        // 400/413 are this file (unsupported or too large). Anything else —
+        // a rate limit, an outage, a key problem — is not the image's fault.
+        retry: res.status !== 400 && res.status !== 413,
+        reason: `Gemini HTTP ${res.status} ${errText.slice(0, 120)}`.trim(),
+      };
     }
 
     const data = await res.json();
 
     // Extract text from response (handle thinking parts like in ask/route.ts)
     const parts = data.candidates?.[0]?.content?.parts;
-    if (!parts || parts.length === 0) return null;
-
-    const textParts = parts.filter((p: { text?: string }) => p.text !== undefined);
-    return textParts[textParts.length - 1]?.text?.trim() ?? null;
+    const textParts = (parts ?? []).filter((p: { text?: string }) => p.text !== undefined);
+    const text: string | undefined = textParts[textParts.length - 1]?.text?.trim();
+    // No text back (a safety block, say) will be no text next time too.
+    return text ? { ok: true, text } : { ok: false, retry: false, reason: "Gemini returned no text" };
   } catch (err) {
-    console.warn(`Image description failed for ${imageUrl}:`, err);
-    return null;
+    // A timeout or a dropped connection: worth another try on a later run.
+    return { ok: false, retry: true, reason: `${stage}: ${err instanceof Error ? err.message : String(err)}` };
   }
+}
+
+export interface DescribedImages {
+  /** url → description, or null when it failed in a way that will fail again. */
+  descriptions: Map<string, string | null>;
+  /** Failures worth another try (timeouts, rate limits, 5xx, no API key). Not in `descriptions`. */
+  retry: { url: string; reason: string }[];
 }
 
 /**
  * Describe multiple images, with concurrency control.
- * Returns a Map of imageUrl → description (null if failed).
  *
- * With a `deadline` (epoch ms), no new round starts once it has passed, and
- * the images not reached are simply ABSENT from the map — distinct from
- * null, which means "tried and failed". Callers use the difference to hold
- * back a page rather than write it without its descriptions.
+ * With a `deadline` (epoch ms), no new round starts once it has passed. An
+ * image the run did not reach is in neither `descriptions` nor `retry`.
  */
 export async function describeImages(
   imageUrls: string[],
   concurrency = 3,
   deadline?: number,
-): Promise<Map<string, string | null>> {
-  const results = new Map<string, string | null>();
+): Promise<DescribedImages> {
+  const descriptions = new Map<string, string | null>();
+  const retry: DescribedImages["retry"] = [];
   const unique = [...new Set(imageUrls)];
+  if (unique.length === 0) return { descriptions, retry };
+
+  // A missing key is configuration, not the images: describing them without
+  // it would store every page with no descriptions, and fingerprint them so
+  // they were never described once the key was set.
+  const apiKey = await getApiKey("google_ai_api_key", API_KEY_MAP.google_ai_api_key);
+  if (!apiKey) {
+    console.warn("Google AI API key not configured — image descriptions postponed");
+    return { descriptions, retry: unique.map((url) => ({ url, reason: "Google AI API key not configured" })) };
+  }
 
   // Process in batches to avoid rate limits
   for (let i = 0; i < unique.length; i += concurrency) {
     if (deadline !== undefined && Date.now() >= deadline) break;
     const batch = unique.slice(i, i + concurrency);
-    const descriptions = await Promise.all(
-      batch.map((url) => describeImage(url))
-    );
-    batch.forEach((url, j) => results.set(url, descriptions[j]));
+    const outcomes = await Promise.all(batch.map((url) => describeImage(url, apiKey)));
+    batch.forEach((url, j) => {
+      const outcome = outcomes[j];
+      if (outcome.ok) {
+        descriptions.set(url, outcome.text);
+        return;
+      }
+      console.warn(`Image description failed for ${url} (${outcome.retry ? "will retry" : "permanent"}): ${outcome.reason}`);
+      if (outcome.retry) retry.push({ url, reason: outcome.reason });
+      else descriptions.set(url, null);
+    });
   }
 
-  return results;
+  return { descriptions, retry };
 }

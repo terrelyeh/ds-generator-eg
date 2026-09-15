@@ -10,34 +10,29 @@ import { fetchGoogleDoc } from "@/lib/google/docs";
 import { selectAll } from "@/lib/rag/select-all";
 import {
   chunkList,
+  HARD_STOP_MS,
   requestedKinds,
+  rotateForWeek,
+  START_CUTOFF_MS,
   summarizeRun,
+  WORK_BUDGET_MS,
   type SourceKind,
   type UnitOutcome,
 } from "@/lib/rag/reindex-web-run";
 import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
 
+// The budget inside it — start cutoffs, GitBook's deadline, the hard stop
+// that guarantees the heartbeat — is in lib/rag/reindex-web-run.ts.
 export const maxDuration = 300;
 
 /**
- * When to stop STARTING work, counted from the start of the request.
- *
- * Vercel kills the function at `maxDuration`, and nothing after that runs —
- * not the heartbeat, not a log line. That is how both scheduled runs so far
- * ended (2026-09-06 and 09-13: "Task timed out after 300 seconds", nothing
- * else in the log). Work already in flight when this passes still has to
- * finish: a GitBook batch's last round of image descriptions (up to ~55s at
- * the Vision timeouts), its embeddings and upserts, or one Google Doc. 200s
- * leaves that about 100.
- */
-const WORK_BUDGET_MS = 200_000;
-/**
  * Help Center articles / web pages per ingest call. Both pipelines fetch a
  * whole call's list before writing any of it, so a call is the smallest step
- * the budget can stop between.
+ * the budget can stop between. A web page can take three engines' timeouts
+ * before it gives up, so its units are small.
  */
 const HELPCENTER_ARTICLES_PER_UNIT = 20;
-const WEB_PAGES_PER_UNIT = 10;
+const WEB_PAGES_PER_UNIT = 5;
 
 /**
  * Weekly re-crawl of the WEB knowledge sources so Ask SpecHub stays fresh.
@@ -57,11 +52,13 @@ const WEB_PAGES_PER_UNIT = 10;
  * each source's existing taxonomy (and label) is read back and re-applied so a
  * refresh never wipes manually-assigned Solution/Product-Line/Model tags.
  *
- * Budgeted: each source is a unit, units run one at a time, and none starts
- * after WORK_BUDGET_MS. What did not fit is named in the heartbeat and done
- * next week — GitBook resumes page by page, because it writes as it goes.
- * The heartbeat is written on every run that gets past auth, including one
- * that ran out of time or hit errors; `ok` says whether it did everything.
+ * Budgeted: each source is a unit, units run one at a time, none starts after
+ * its kind's cutoff, and the order within a kind rotates weekly. What did not
+ * fit is named in the heartbeat and done another week — GitBook resumes page
+ * by page, because it writes as it goes. At the hard stop the run records its
+ * heartbeat and answers even if a unit is still running. The heartbeat is
+ * written on every run that gets past auth, including one that ran out of
+ * time or hit errors; `ok` says whether it did everything.
  *
  * Auth: CRON_SECRET bearer (what Vercel Cron sends) / editor+admin.
  * `?only=gitbook,helpcenter` narrows it for a manual run — and a narrowed run
@@ -183,25 +180,39 @@ async function googleDocUnits(supabase: Supabase): Promise<Unit[]> {
  * Sources grouped by (label, taxonomy), because one ingest call takes one of
  * each — then cut into units the budget can stop between.
  */
+type SourceRow = {
+  source_id: string;
+  source_url: string | null;
+  label: string | null;
+  collection?: string | null;
+} & TaxRow;
+
 function groupedUnits(
   kind: "helpcenter" | "web",
-  rows: ({ source_id: string; source_url: string | null; label: string | null } & TaxRow)[],
+  rows: SourceRow[],
   perUnit: number,
-  ingest: (urls: string[], label: string | null, tax: Partial<TaxonomyMeta>) => Promise<{ processed: number; errors: string[] }>,
+  ingest: (
+    batch: (SourceRow & { source_url: string })[],
+    label: string | null,
+    tax: Partial<TaxonomyMeta>,
+  ) => Promise<{ processed: number; errors: string[] }>,
 ): Unit[] {
   const seen = new Set<string>();
-  const groups = new Map<string, { label: string | null; tax: Partial<TaxonomyMeta>; urls: string[] }>();
+  const groups = new Map<
+    string,
+    { label: string | null; tax: Partial<TaxonomyMeta>; rows: (SourceRow & { source_url: string })[] }
+  >();
   for (const r of rows) {
     if (!r.source_url || seen.has(r.source_id)) continue;
     seen.add(r.source_id);
     const tax = taxFrom(r);
     const key = `${r.label ?? ""}::${JSON.stringify(tax)}`;
-    if (!groups.has(key)) groups.set(key, { label: r.label, tax, urls: [] });
-    groups.get(key)!.urls.push(r.source_url);
+    if (!groups.has(key)) groups.set(key, { label: r.label, tax, rows: [] });
+    groups.get(key)!.rows.push({ ...r, source_url: r.source_url });
   }
   const noun = kind === "helpcenter" ? "article(s)" : "page(s)";
-  return [...groups.values()].flatMap(({ label, tax, urls }) =>
-    chunkList(urls, perUnit).map((batch) => ({
+  return [...groups.values()].flatMap(({ label, tax, rows: groupRows }) =>
+    chunkList(groupRows, perUnit).map((batch) => ({
       kind,
       target: `${batch.length} ${noun}${label ? ` · ${label}` : ""}`,
       run: () => ingest(batch, label, tax),
@@ -210,16 +221,21 @@ function groupedUnits(
 }
 
 async function helpcenterUnits(supabase: Supabase): Promise<Unit[]> {
-  const rows = await firstChunks<{ source_id: string; source_url: string | null; label: string | null } & TaxRow>(
+  const rows = await firstChunks<SourceRow>(
     supabase,
     "helpcenter",
-    `source_id, source_url, label:metadata->>helpcenter_label, ${TAX_COLUMNS}`,
+    `source_id, source_url, label:metadata->>helpcenter_label, collection:metadata->>collection, ${TAX_COLUMNS}`,
     "help center articles",
   );
-  return groupedUnits("helpcenter", rows, HELPCENTER_ARTICLES_PER_UNIT, async (urls, label, tax) => {
+  return groupedUnits("helpcenter", rows, HELPCENTER_ARTICLES_PER_UNIT, async (batch, label, tax) => {
     const r = await ingestHelpcenter({
       collectionUrls: [],
-      articleUrls: urls,
+      articleUrls: batch.map((a) => a.source_url),
+      // The collection is part of every chunk's text; without the stored
+      // one each refresh would rename it and re-embed the whole article.
+      collectionByUrl: Object.fromEntries(
+        batch.filter((a) => a.collection).map((a) => [a.source_url, a.collection as string]),
+      ),
       label: label || "EnGenius Help Center",
       force: false,
       taxonomy: tax,
@@ -229,14 +245,19 @@ async function helpcenterUnits(supabase: Supabase): Promise<Unit[]> {
 }
 
 async function webUnits(supabase: Supabase): Promise<Unit[]> {
-  const rows = await firstChunks<{ source_id: string; source_url: string | null; label: string | null } & TaxRow>(
+  const rows = await firstChunks<SourceRow>(
     supabase,
     "web",
     `source_id, source_url, label:metadata->>web_label, ${TAX_COLUMNS}`,
     "web pages",
   );
-  return groupedUnits("web", rows, WEB_PAGES_PER_UNIT, async (urls, label, tax) => {
-    const r = await ingestWeb({ pageUrls: urls, label: label || undefined, force: false, taxonomy: tax });
+  return groupedUnits("web", rows, WEB_PAGES_PER_UNIT, async (batch, label, tax) => {
+    const r = await ingestWeb({
+      pageUrls: batch.map((p) => p.source_url),
+      label: label || undefined,
+      force: false,
+      taxonomy: tax,
+    });
     return { processed: r.processed, errors: r.errors };
   });
 }
@@ -281,33 +302,64 @@ async function runUnit(unit: Unit, deadline: number): Promise<UnitOutcome> {
   }
 }
 
+function notRun(unit: Unit, status: "deferred" | "interrupted"): UnitOutcome {
+  return { kind: unit.kind, target: unit.target, status, errors: [], ms: 0, processed: 0, deferredPages: 0 };
+}
+
 async function handle(request: Request) {
   const denied = await gateOrCron(request, "knowledge.edit");
   if (denied) return denied;
 
   const startedAt = Date.now();
-  const deadline = startedAt + WORK_BUDGET_MS;
   const only = new URL(request.url).searchParams.get("only");
   const outcomes: UnitOutcome[] = [];
   let fatal: string | undefined;
 
   try {
     const supabase = createAdminClient();
+
+    // Every source first, so a run cut short can still say what it did not reach.
+    const units: Unit[] = [];
     for (const kind of requestedKinds(only)) {
-      let units: Unit[];
       try {
-        units = await DISCOVER[kind](supabase);
+        units.push(...rotateForWeek(await DISCOVER[kind](supabase), startedAt));
       } catch (err) {
         outcomes.push({ kind, target: "source list", status: "failed", errors: [messageOf(err)], ms: 0, processed: 0, deferredPages: 0 });
-        continue;
       }
+    }
+
+    const results = new Map<Unit, UnitOutcome>();
+    const progress: { running: Unit | null; stopped: boolean } = { running: null, stopped: false };
+    const work = (async () => {
       for (const unit of units) {
-        if (Date.now() >= deadline) {
-          outcomes.push({ kind, target: unit.target, status: "deferred", errors: [], ms: 0, processed: 0, deferredPages: 0 });
-          continue;
-        }
-        outcomes.push(await runUnit(unit, deadline));
+        if (progress.stopped) return;
+        if (Date.now() - startedAt >= START_CUTOFF_MS[unit.kind]) continue;
+        progress.running = unit;
+        results.set(unit, await runUnit(unit, startedAt + WORK_BUDGET_MS));
+        progress.running = null;
       }
+    })();
+
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const hardStop = new Promise<"hard stop">((resolve) => {
+      timer = setTimeout(() => resolve("hard stop"), Math.max(0, startedAt + HARD_STOP_MS - Date.now()));
+    });
+    try {
+      if ((await Promise.race([work.then(() => "done" as const), hardStop])) === "hard stop") {
+        // The unit still running keeps its writes so far (every pipeline
+        // writes first and marks pages done last); it just is not waited for.
+        progress.stopped = true;
+        console.error(
+          `[reindex-web] hard stop at ${HARD_STOP_MS / 1000}s — ` +
+            (progress.running ? `${progress.running.kind} ${progress.running.target} still running` : "between units"),
+        );
+      }
+    } finally {
+      clearTimeout(timer);
+    }
+
+    for (const unit of units) {
+      outcomes.push(results.get(unit) ?? notRun(unit, unit === progress.running ? "interrupted" : "deferred"));
     }
   } catch (err) {
     // Nothing above is expected to throw past its own catch. If something

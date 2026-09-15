@@ -33,6 +33,13 @@ export interface IngestHelpcenterOptions {
   collectionUrls: string[];
   /** Direct article URLs to index (bypass collection page parsing) */
   articleUrls?: string[];
+  /**
+   * Collection name per article URL, for `articleUrls`. Without it every
+   * article is filed under `label`, and the collection is part of each chunk's
+   * text (`[collection > title]`) — so a refresh would rename them all and
+   * re-embed every chunk. The weekly cron passes what is stored.
+   */
+  collectionByUrl?: Record<string, string>;
   /** Human-readable label (e.g., "Help Center") */
   label: string;
   /** Force re-embed even if unchanged */
@@ -352,13 +359,22 @@ export async function ingestHelpcenter(
   let allArticles: ArticleLink[] = [];
   /**
    * Where the article list came from, which decides whether this run may
-   * delete articles it did not see. Only a parsed collection is the whole
-   * Help Center. A hand-given list is a few articles — "Add Article" passes
-   * ONE, and the weekly cron passes batches — and the fallback is a list in
-   * this file that articles added through the UI are not in. Treating either
-   * as the universe deleted every other article.
+   * delete articles it did not see:
+   *
+   *   explicit    — a hand-given list. "Add Article" passes ONE article and
+   *                 the weekly cron passes batches; treating that as the whole
+   *                 Help Center deleted every other article.
+   *   fallback    — KNOWN_ARTICLES, a list in this file that articles added
+   *                 through the UI are not in.
+   *   partial     — a collection page listed nothing. Intercom is a SPA, and
+   *                 parsing it returns [] rather than failing, so an empty
+   *                 collection is far more likely unparsed than emptied.
+   *   collections — every collection page listed its articles.
+   *
+   * Only `collections` may delete, and only among articles filed under the
+   * collections it parsed.
    */
-  let discovery: "explicit" | "collections" | "fallback" = "collections";
+  let discovery: "explicit" | "collections" | "partial" | "fallback" = "collections";
 
   if (options.articleUrls && options.articleUrls.length > 0) {
     // Direct article URLs provided
@@ -366,13 +382,15 @@ export async function ingestHelpcenter(
     allArticles = options.articleUrls.map((url) => ({
       url,
       title: url.split("/").pop()?.replace(/-/g, " ") || "Article",
-      collection: label,
+      collection: options.collectionByUrl?.[url] || label,
     }));
   } else {
     // Try parsing collection pages
+    let emptyCollections = 0;
     for (const url of collectionUrls) {
       try {
         const articles = await parseCollectionPage(url);
+        if (articles.length === 0) emptyCollections++;
         allArticles.push(...articles);
       } catch (err) {
         errors.push(`Collection parse failed (SPA): ${err instanceof Error ? err.message : String(err)}`);
@@ -383,6 +401,8 @@ export async function ingestHelpcenter(
     if (allArticles.length === 0 && KNOWN_ARTICLES.length > 0) {
       discovery = "fallback";
       allArticles = [...KNOWN_ARTICLES];
+    } else if (emptyCollections > 0) {
+      discovery = "partial";
     }
   }
 
@@ -424,18 +444,16 @@ export async function ingestHelpcenter(
   const supabase = createAdminClient();
 
   // Fetch existing hashes — paged; an unpaged read stops at 1000 rows.
-  let existingDocs: { source_id: string; chunk_index: number; content_hash: string }[];
+  type ExistingRow = { source_id: string; chunk_index: number; content_hash: string; collection: string | null };
+  let existingDocs: ExistingRow[];
   try {
     existingDocs = await selectAll((from, to) =>
       supabase
         .from("documents" as "products")
-        .select("source_id, chunk_index, content_hash")
+        .select("source_id, chunk_index, content_hash, collection:metadata->>collection")
         .eq("source_type", "helpcenter")
         .order("id")
-        .range(from, to) as unknown as PromiseLike<{
-        data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
-        error: unknown;
-      }>,
+        .range(from, to) as unknown as PromiseLike<{ data: ExistingRow[] | null; error: unknown }>,
     "helpcenter existing chunks");
   } catch (err) {
     errors.push(err instanceof Error ? err.message : String(err));
@@ -575,11 +593,19 @@ export async function ingestHelpcenter(
   // A source that disappeared entirely — a tab deleted, an article
   // unpublished, a page removed — kept every chunk it ever had, and those
   // chunks stayed retrievable with nothing to say they were gone. A run that
-  // parsed the collections saw the whole help centre, so the universe is every
-  // helpcenter chunk — but only when every article fetched, and never for a
-  // run that was handed its articles (see `discovery`).
+  // parsed every collection saw those collections whole, so the universe is
+  // the stored articles filed under them — not every helpcenter chunk, which
+  // includes articles added by hand from other collections. Only when every
+  // article fetched, and never for a run that was handed its articles (see
+  // `discovery`).
   if (discovery === "collections" && fetchFailures === 0 && chunkCounts.size > 0) {
-    await deleteVanishedSources(createAdminClient(), "helpcenter", existingDocs.map((d) => d.source_id), new Set(chunkCounts.keys()));
+    const parsed = new Set(uniqueArticles.map((a) => a.collection));
+    await deleteVanishedSources(
+      createAdminClient(),
+      "helpcenter",
+      existingDocs.filter((d) => d.collection !== null && parsed.has(d.collection)).map((d) => d.source_id),
+      new Set(chunkCounts.keys()),
+    );
   } else {
     console.warn(`[helpcenter] skipping vanished-source cleanup: ${cleanupSkipReason}`);
   }

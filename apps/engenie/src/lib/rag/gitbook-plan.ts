@@ -113,7 +113,7 @@ export function selectPagesToFetch(
  * edited to anything comparing its text.
  */
 const RELATIVE_UPDATED_LINE =
-  /^[ \t]*Last updated (?:(?:about |over |almost )?(?:\d+|an?) (?:second|minute|hour|day|week|month|year)s? ago|yesterday|today|just now|last (?:week|month|year))[ \t]*$/gim;
+  /^[ \t]*(?:Last updated (?:(?:about |over |almost )?(?:\d+|an?) (?:second|minute|hour|day|week|month|year)s? ago|yesterday|today|just now|last (?:week|month|year))|最終更新\s*(?:\d+\s*(?:秒|分|時間|日|週間|か月|ヶ月|年)前|昨日|今日|先週|先月|昨年))[ \t]*$/gim;
 
 export function stripRelativeUpdated(text: string): string {
   return text.replace(RELATIVE_UPDATED_LINE, "").replace(/\n{3,}/g, "\n\n").trim();
@@ -145,29 +145,66 @@ export function pageFingerprint(page: {
 }
 
 /**
- * Did Vision get to every image of a page, and did every description land?
+ * Where a page's images stand after this run's Vision calls.
  *
- * `attempted` false means the run stopped describing (its deadline passed)
- * before reaching all of them: the page must not be written, or it would
- * replace stored descriptions with none. `described` false means some calls
- * failed: the page is written, but without a fingerprint, so a later run
- * tries those images again.
+ *   complete — every image has a description, or failed in a way that will
+ *              fail again (the image is gone, Gemini refused the file). The
+ *              page is written and fingerprinted, so it is not retried weekly.
+ *   retry    — a call failed in a way worth another try: a timeout, a 429, a
+ *              5xx, a missing key. Nothing of the page is written. Writing it
+ *              would overwrite a stored description with nothing and record
+ *              the page's date, so it would not be looked at again until
+ *              somebody edits it — an LED table lost to one rate limit.
+ *   deferred — Vision stopped at the deadline before this page's images.
+ *              Nothing is written; the next run picks it up.
+ *
+ * `descriptions` holds text, or null for a lasting failure; `retry` holds the
+ * images whose failures were temporary. An image in neither was not reached.
  */
-export function visionCoverage(
+export type VisionState = "complete" | "retry" | "deferred";
+
+export function visionState(
   imageUrls: string[],
   descriptions: Map<string, string | null>,
-): { attempted: boolean; described: boolean } {
-  let attempted = true;
-  let described = true;
+  retry: Set<string>,
+): VisionState {
+  let state: VisionState = "complete";
   for (const url of imageUrls) {
-    if (!descriptions.has(url)) {
-      attempted = false;
-      described = false;
-    } else if (descriptions.get(url) === null) {
-      described = false;
-    }
+    if (retry.has(url)) return "retry";
+    if (!descriptions.has(url)) state = "deferred";
   }
-  return { attempted, described };
+  return state;
+}
+
+/** One step of writing a page. */
+export type WriteStep =
+  | { kind: "upsert"; chunkIndex: number; withMarkers: boolean }
+  | { kind: "trim"; chunkIndices: number[] }
+  | { kind: "markers"; rewrite: boolean };
+
+/**
+ * The order a page is written in; the caller stops at the first step that
+ * fails.
+ *
+ * The markers — sitemap date and fingerprint — are what tell a later run the
+ * page is done, so they ride on the LAST step, after the stale-chunk trim.
+ * If anything before that fails, no chunk carries them and the next run does
+ * the page again instead of trusting a half-written one. When no chunk
+ * changed, the last step records the markers on their own; after a trim it
+ * rewrites them, because the row that carried them may be the one trimmed.
+ */
+export function planPageWrites(changed: number[], stale: number[]): WriteStep[] {
+  const steps = changed
+    .slice(0, -1)
+    .map((chunkIndex): WriteStep => ({ kind: "upsert", chunkIndex, withMarkers: false }));
+  if (stale.length > 0) steps.push({ kind: "trim", chunkIndices: stale });
+  const last = changed.at(-1);
+  steps.push(
+    last === undefined
+      ? { kind: "markers", rewrite: stale.length > 0 }
+      : { kind: "upsert", chunkIndex: last, withMarkers: true },
+  );
+  return steps;
 }
 
 /** Stored chunk indices this page no longer produces — heading or focused. */

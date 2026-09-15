@@ -5,9 +5,14 @@ import { getGoogleAuth } from "@eg/google/auth";
  * Per request. Neither the Drive calls nor the public export had a timeout,
  * and the weekly re-crawl fetches every indexed doc in turn: one export that
  * hung held the job until Vercel killed it. A doc with pasted screenshots
- * exports megabytes of base64, so this is generous — but it ends.
+ * exports megabytes of base64, which still takes seconds, not tens of them.
+ * `fetchGoogleDoc` can make five of these requests for one document (metadata,
+ * markdown, plain text, then both public exports), so this is also what bounds
+ * a single doc — which is why the Drive calls also turn retries off: googleapis
+ * enables them by default and gaxios retries a timed-out GET, tripling each.
  */
-const REQUEST_TIMEOUT_MS = 60_000;
+const REQUEST_TIMEOUT_MS = 30_000;
+const DRIVE_REQUEST = { timeout: REQUEST_TIMEOUT_MS, retry: false };
 
 /**
  * Fetch a Google Doc's content as markdown via Drive API (service account auth).
@@ -37,7 +42,7 @@ async function fetchViaServiceAccount(docId: string): Promise<{
       fields: "id, name, mimeType",
       supportsAllDrives: true,
     },
-    { timeout: REQUEST_TIMEOUT_MS },
+    DRIVE_REQUEST,
   );
 
   const title = meta.data.name || "Untitled";
@@ -50,13 +55,13 @@ async function fetchViaServiceAccount(docId: string): Promise<{
   try {
     const res = await drive.files.export(
       { fileId: docId, mimeType: "text/markdown" },
-      { responseType: "text", timeout: REQUEST_TIMEOUT_MS }
+      { ...DRIVE_REQUEST, responseType: "text" }
     );
     content = typeof res.data === "string" ? res.data : String(res.data);
   } catch {
     const res = await drive.files.export(
       { fileId: docId, mimeType: "text/plain" },
-      { responseType: "text", timeout: REQUEST_TIMEOUT_MS }
+      { ...DRIVE_REQUEST, responseType: "text" }
     );
     content = typeof res.data === "string" ? res.data : String(res.data);
   }

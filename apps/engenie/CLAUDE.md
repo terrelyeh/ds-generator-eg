@@ -66,7 +66,7 @@ src/
       api-keys/route.ts              # 對外 API key CRUD
       settings/route.ts, settings/models # LLM keys（app_settings）與模型目錄（存檔時對 OpenRouter 驗 id）
       ws-auth, demo-auth, chat-sessions
-      cron/reindex-web/route.ts      # 每週日 re-crawl web 來源（200s 時間預算，跑不完的留到下週；心跳每次都寫）
+      cron/reindex-web/route.ts      # 每週日 re-crawl web 來源（時間預算＋280s 硬停，跑不完的留到之後；心跳每次都寫）
       cron/reindex-products/route.ts # product_spec re-index：POST(spechub sync)/GET(每日 09:30 TW，順便清 90 天前的問題原文)
   components/
     layout/engenie-shell.tsx         # navbar(Ask/Knowledge/Settings) + footer + Toaster
@@ -147,6 +147,7 @@ scripts/index-internal-docs.ts       # internal_doc 整包匯入（只有 CLI）
 - **ingest 讀既有 chunk 一律分頁**（`selectAll()`，`lib/rag/select-all.ts`）——PostgREST 一次最多 1000 列、截斷不報錯。
 - **「消失的來源」只能在 run 真的列舉了整個宇宙時清**（pitfall #77）：手動給的網址清單（Add Article、逐列 Sync、cron 分批）不是宇宙；web 完全不清。
 - **GitBook 以批次邊做邊寫**；「這頁做完了」的標記（`last_modified`、`page_hash`）只在該頁最後一次寫入，規則與測試在 `lib/rag/gitbook-plan.ts`。
+  **Vision 暫時性失敗（timeout / 429 / 5xx）整頁不寫**，不要改回「少了描述照寫」。
 - **BYOK 的 key 一律是 OpenRouter key**，格式判斷只在 `lib/ask/byok-key.ts`。
 - **passcode 驗證只看 `passcode_hash`**；`passcode_encrypted`（00059）只給 admin 查看，解開後再用 hash 驗一次。
 - **每一題寫一列 `ask_requests`**（00060，在 `/api/ask` 串流結束、關閉前寫），回答的 metadata 帶 `request_id` 給 👍👎；`LOW_SIMILARITY`（TS）要和 00060 SQL 的預設值一致。
@@ -198,8 +199,9 @@ npm run build -w engenie
 
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，region **hnd1**（不要改）
 - Crons：`/api/cron/reindex-web` 週日、`/api/cron/reindex-products` 每日 09:30 TW（GET 順便跑 `ask_requests_redact()`，清掉 90 天前的問題原文）。
-  **`reindex-web` 在 2026-09-16 之前從沒跑完過**（9/6、9/13 都在 300s 被殺，pitfall #76）：現在 200s 後不再開始新來源、
-  沒做到的寫進心跳（`ok=false`，下週接著做），每個來源一行 log 說花了多久；`?only=` 窄化的手動 run 不寫心跳。
+  **`reindex-web` 在 2026-09-16 之前從沒跑完過**（9/6、9/13 都在 300s 被殺，pitfall #76）：現在 150s（GitBook 200s）後
+  不再開始新來源、**280s 硬停一定寫心跳**，沒做到的寫進心跳（`ok=false`，之後接著做），每個來源一行 log 說花了多久；
+  `?only=` 窄化的手動 run 不寫心跳。預算常數在 `lib/rag/reindex-web-run.ts`。
   **兩支都會在跑完時寫 `job_heartbeats`**（`recordHeartbeat` from `@eg/db/heartbeat`）——
   SpecHub 的 `/api/cron/health` 靠它判斷排程有沒有跑，而不是靠副作用（沒變更的 chunk
   不會被重寫，「沒事做」和「沒跑」在資料上一模一樣）。**新增排程時記得補一行心跳，

@@ -1,5 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { chunkList, requestedKinds, summarizeRun, type UnitOutcome } from "./reindex-web-run";
+import {
+  chunkList,
+  HARD_STOP_MS,
+  requestedKinds,
+  rotateForWeek,
+  START_CUTOFF_MS,
+  summarizeRun,
+  WORK_BUDGET_MS,
+  type UnitOutcome,
+} from "./reindex-web-run";
+
+const WEEK = 7 * 24 * 3_600_000;
+
+describe("budget", () => {
+  it("stops starting everything before the hard stop, and leaves GitBook the last stretch", () => {
+    for (const cutoff of Object.values(START_CUTOFF_MS)) {
+      expect(cutoff).toBeLessThanOrEqual(WORK_BUDGET_MS);
+    }
+    expect(START_CUTOFF_MS.gitbook).toBeGreaterThan(START_CUTOFF_MS.google_doc);
+    // Room for the heartbeat and the response before Vercel's 300s.
+    expect(HARD_STOP_MS).toBeLessThanOrEqual(285_000);
+    expect(HARD_STOP_MS).toBeGreaterThan(WORK_BUDGET_MS);
+  });
+});
+
+describe("rotateForWeek", () => {
+  it("starts from a different unit each week and covers them all", () => {
+    const units = ["a", "b", "c"];
+    const firsts = [0, 1, 2].map((w) => rotateForWeek(units, w * WEEK + 1)[0]);
+    expect(new Set(firsts)).toEqual(new Set(units));
+    expect(rotateForWeek(units, 4 * WEEK)).toEqual(["b", "c", "a"]);
+  });
+
+  it("keeps every unit, and copes with none", () => {
+    expect(rotateForWeek([1, 2, 3, 4], 123 * WEEK).sort()).toEqual([1, 2, 3, 4]);
+    expect(rotateForWeek([], Date.now())).toEqual([]);
+  });
+});
 
 function outcome(extra: Partial<UnitOutcome> & Pick<UnitOutcome, "kind">): UnitOutcome {
   return { target: "t", status: "done", errors: [], ms: 1000, processed: 0, deferredPages: 0, ...extra };
@@ -62,6 +99,22 @@ describe("summarizeRun", () => {
     expect(verdict.ok).toBe(false);
     expect(verdict.detail).toBe(
       "231s · google_doc 1/1, gitbook 1/2 · 0 chunk(s) written · left for next run (time budget): 1 source(s) + 37 GitBook page(s)",
+    );
+  });
+
+  it("names a unit still running at the hard stop, and is not ok", () => {
+    const verdict = summarizeRun(
+      [
+        outcome({ kind: "helpcenter", processed: 2 }),
+        outcome({ kind: "google_doc", target: "1AbC", status: "interrupted" }),
+        outcome({ kind: "gitbook", status: "deferred" }),
+      ],
+      280_000,
+    );
+    expect(verdict.ok).toBe(false);
+    expect(verdict.detail).toBe(
+      "280s · helpcenter 1/1, google_doc 0/1, gitbook 0/1 · 2 chunk(s) written · " +
+        "cut off at the 280s hard stop: google_doc 1AbC · left for next run (time budget): 1 source(s)",
     );
   });
 

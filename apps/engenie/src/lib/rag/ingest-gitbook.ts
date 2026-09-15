@@ -38,9 +38,10 @@ import {
   indexExistingPages,
   missingMarkers,
   pageFingerprint,
+  planPageWrites,
   selectPagesToFetch,
   staleChunkIndices,
-  visionCoverage,
+  visionState,
   type ExistingGitbookRow,
   type IndexedPage,
   type SitemapEntry,
@@ -470,11 +471,12 @@ async function ingestBatch(entries: SitemapEntry[], ctx: RunContext): Promise<vo
 
   // Describe
   let descriptions = new Map<string, string | null>();
+  let retry: { url: string; reason: string }[] = [];
   if (enableVision) {
     const imageUrls = [...new Set(pages.flatMap((p) => p.imageUrls))];
     if (imageUrls.length > 0) {
       try {
-        descriptions = await describeImages(imageUrls, VISION_CONCURRENCY, ctx.deadline);
+        ({ descriptions, retry } = await describeImages(imageUrls, VISION_CONCURRENCY, ctx.deadline));
       } catch (err) {
         // Writing these pages now would store them without descriptions.
         result.errors.push(`Vision API error: ${err instanceof Error ? err.message : String(err)}`);
@@ -483,20 +485,33 @@ async function ingestBatch(entries: SitemapEntry[], ctx: RunContext): Promise<vo
       for (const url of imageUrls) if (descriptions.get(url)) result.images_described++;
     }
   }
+  const retryUrls = new Set(retry.map((r) => r.url));
 
   // Chunk
   const planned: PlannedPage[] = [];
+  let heldBack = 0;
   for (const page of pages) {
-    const coverage = enableVision
-      ? visionCoverage(page.imageUrls, descriptions)
-      : { attempted: true, described: page.imageUrls.length === 0 };
-    if (!coverage.attempted) {
+    const state = enableVision ? visionState(page.imageUrls, descriptions, retryUrls) : "complete";
+    if (state === "deferred") {
       // Vision stopped at the deadline before reaching this page's images.
       // Written now, it would replace the descriptions it has with none.
       result.pages_deferred++;
       continue;
     }
-    planned.push(planPage(ctx, page, descriptions, coverage.described));
+    if (state === "retry") {
+      heldBack++;
+      continue;
+    }
+    // With Vision off, a page with images is stored undescribed, so it gets no
+    // fingerprint: a later run with Vision on must not skip it.
+    const fingerprinted = enableVision || page.imageUrls.length === 0;
+    planned.push(planPage(ctx, page, descriptions, fingerprinted));
+  }
+  if (heldBack > 0) {
+    result.errors.push(
+      `Vision failed for ${retry.length} image(s) (${retry[0].reason}); ` +
+        `${heldBack} page(s) left unwritten for the next run`,
+    );
   }
 
   // Embed
@@ -525,7 +540,7 @@ function planPage(
   ctx: RunContext,
   page: FetchedPage,
   descriptions: Map<string, string | null>,
-  fullyDescribed: boolean,
+  fingerprinted: boolean,
 ): PlannedPage {
   const { result, existing, force, tax } = ctx;
   const stored = existing.get(page.sourceId)?.hashes;
@@ -579,21 +594,16 @@ function planPage(
     produced,
     markers: {
       lastModified: page.lastModified,
-      // A page with an image that failed to describe gets no fingerprint, so
-      // the next run that fetches it describes that image again.
-      pageHash: fullyDescribed ? page.fingerprint : undefined,
+      pageHash: fingerprinted ? page.fingerprint : undefined,
     },
   };
 }
 
 /**
- * Write one page, or leave it exactly as it was.
- *
- * The markers — sitemap date and fingerprint — are what tell a later run the
- * page is done, so they go on the page's LAST write, after the stale-chunk
- * trim: if anything before that fails, no chunk carries them and the next
- * run does the page again instead of trusting a half-written one. The other
- * rewritten chunks carry no markers; freshness only needs one chunk to.
+ * Write one page in the order `planPageWrites` gives — changed chunks, the
+ * stale-chunk trim (written first, trimmed after, #71), and the markers last
+ * — stopping at the first step that fails, so a page is never marked done
+ * half-written.
  */
 async function writePage(
   ctx: RunContext,
@@ -605,36 +615,36 @@ async function writePage(
   // An embedding batch failed under part of this page (already reported).
   if (page.changed.some((chunk) => !vectors.has(chunk))) return;
 
-  const last = page.changed.at(-1);
-  for (const chunk of page.changed.slice(0, -1)) {
-    if (!(await upsertChunk(ctx, chunk, vectors.get(chunk)!, {}))) return;
-  }
+  const byIndex = new Map(page.changed.map((chunk) => [chunk.chunkIndex, chunk]));
+  const steps = planPageWrites(
+    page.changed.map((chunk) => chunk.chunkIndex),
+    // Chunks the page no longer produces: a tail it lost, or a focused table
+    // it no longer has.
+    staleChunkIndices(ctx.existing.get(page.sourceId), page.produced),
+  );
 
-  // Chunks the page no longer produces: a tail it lost, or a focused table
-  // it no longer has. Written first, trimmed after (#71).
-  const stale = staleChunkIndices(ctx.existing.get(page.sourceId), page.produced);
-  if (stale.length > 0) {
-    const trimmed = logIfDbError(
-      `gitbook stale chunks ${page.sourceId}`,
-      await supabase
-        .from("documents" as "products")
-        .delete()
-        .eq("source_type", "gitbook")
-        .eq("source_id", page.sourceId)
-        .in("chunk_index", stale),
-    );
-    if (!trimmed) {
-      result.errors.push(`Stale chunk trim failed: ${page.sourceId}`);
-      return;
+  for (const step of steps) {
+    if (step.kind === "upsert") {
+      const chunk = byIndex.get(step.chunkIndex)!;
+      const written = await upsertChunk(ctx, chunk, vectors.get(chunk)!, step.withMarkers ? page.markers : {});
+      if (!written) return;
+    } else if (step.kind === "trim") {
+      const trimmed = logIfDbError(
+        `gitbook stale chunks ${page.sourceId}`,
+        await supabase
+          .from("documents" as "products")
+          .delete()
+          .eq("source_type", "gitbook")
+          .eq("source_id", page.sourceId)
+          .in("chunk_index", step.chunkIndices),
+      );
+      if (!trimmed) {
+        result.errors.push(`Stale chunk trim failed: ${page.sourceId}`);
+        return;
+      }
+    } else {
+      await recordMarkers(ctx, page.sourceId, page.markers, step.rewrite);
     }
-  }
-
-  if (last) {
-    await upsertChunk(ctx, last, vectors.get(last)!, page.markers);
-  } else {
-    // After a trim the stored index is out of date — the markers may have
-    // been on a row that just went — so write them rather than look.
-    await recordMarkers(ctx, page.sourceId, page.markers, stale.length > 0);
   }
 }
 
