@@ -79,6 +79,9 @@ translation_mode, **confirmed**。
 - `app_settings` — key-value：API keys（LLM）、`typography_${locale}`、
   `custom_fonts_${locale}`、`pdf_lock_{model}_{lang}`、`pdf_lock_series_{line}_en`
   （**與 EnGenie 共用**；keys 管理 UI 在 EnGenie）
+- `website_checks`（migration `00061`）— 官網 datasheet 查詢每個 **(型號, 站台)** 的上次結果
+  （`verdict` + 當時的 SpecHub `baseline`）。model_name 是大寫、可以不在 products 裡（Fit AP）。
+  RLS 開、沒有 policy,只有 `website_check.view` 的 API 用 service role 讀寫
 - `profiles` — role TEXT CHECK (admin/editor/pm/viewer)；
   `email_whitelist` — 邀請制白名單
 

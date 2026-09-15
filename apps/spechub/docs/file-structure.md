@@ -12,6 +12,7 @@ src/
       product/[model]/page.tsx         # Product detail (sticky header, tabs: Detail/Translations)
       translations/[line]/page.tsx     # Per-product-line spec label translations
       battlecard/[line]/page.tsx       # Internal competitor battlecard (Cloud AP MVP)
+      website/page.tsx                 # 官網查詢（依型號 / 依站台）— website_check.view
       docs/sync/page.tsx
       settings/                        # hub + glossary / typography / users
     auth/                              # Google OAuth flow（與 engenie 各持一份）
@@ -31,6 +32,7 @@ src/
       settings/{providers,typography,fonts}/  # providers 與 engenie 各持一份
       products/[model]/layout-ack/
       battlecard/{value,matchup,resync,websearch,confirm-all}/  # 競品比較 CRUD + 抽取
+      website/{probe,check,categories,site-query}/  # 官網 datasheet 查詢（只讀五個區域 WordPress 站）
       notify/、users/*                  # Telegram 通知、admin user management
   proxy.ts                             # session refresh + auth gate + Puppeteer automation bypass
   components/
@@ -44,6 +46,8 @@ src/
                                        #   typography、locales/、qr.ts、radio-patterns.ts
     translate/                         # prompts + providers (claude/openai/gemini)
     battlecard/spec-mapping.ts         # dimension_key → EnGenius spec label 對應(自家值 seed 用)
+    website/                           # 官網查詢:sites/wp-client(讀取)、parse/compare(純函式,有測試)、
+                                       #   check(打官網)、baseline(SpecHub 那一側)
     notifications/
 packages/（repo root）
   db/    → @eg/db：supabase server/client/admin、settings(getApiKey)、DB types、supabase/migrations/
