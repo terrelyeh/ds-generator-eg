@@ -1,5 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@eg/db/server";
+import { createAdminClient } from "@eg/db/admin";
+import { can } from "@eg/auth/permissions";
 import { getCurrentUser, localesWithDesignatedReviewer } from "@eg/auth/session";
 import { ProductDetail } from "@/components/product/product-detail";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
@@ -104,11 +106,27 @@ export default async function ProductPage({
   // versions needs product.id (only known after the product fetch above),
   // so it stays as a second round trip. translationData was already
   // fetched in parallel above.
-  const { data: versionData } = await supabase
-    .from("versions")
-    .select("*")
-    .eq("product_id", product.id)
-    .order("generated_at", { ascending: false }) as { data: Version[] | null };
+  // The 官網 tab's number: issues from the last website check. website_checks
+  // has RLS with no policies, so it is read with the service role — and only
+  // for roles that can see the tab.
+  const [{ data: versionData }, websiteRows] = await Promise.all([
+    supabase
+      .from("versions")
+      .select("*")
+      .eq("product_id", product.id)
+      .order("generated_at", { ascending: false }) as unknown as Promise<{ data: Version[] | null }>,
+    can(role, "website_check.view")
+      ? (createAdminClient()
+          .from("website_checks")
+          .select("status, verdict")
+          .eq("model_name", product.model_name.toUpperCase()) as unknown as Promise<{
+          data: { status: string; verdict: { issues?: string[] } }[] | null;
+        }>)
+      : Promise.resolve({ data: null }),
+  ]);
+  const websiteIssueCount = websiteRows.data?.length
+    ? websiteRows.data.reduce((sum, row) => sum + (row.status === "fail" ? 0 : row.verdict.issues?.length ?? 0), 0)
+    : null;
 
   // Pre-compute layout overflow estimate for English + every enabled
   // translation locale. Each locale uses its own typography metrics
@@ -188,6 +206,7 @@ export default async function ProductPage({
         role={role}
         reviewLocales={user?.reviewLocales ?? null}
         reviewedLocales={reviewedLocales}
+        websiteIssueCount={websiteIssueCount}
       />
     </div>
   );

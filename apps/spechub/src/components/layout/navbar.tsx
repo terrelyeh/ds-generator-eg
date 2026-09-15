@@ -26,6 +26,8 @@ export function Navbar({ user }: NavbarProps) {
   // Tender Datasheets is admin/editor only — sales and PM shouldn't be
   // one click from a half-finished quote that looks like a real datasheet.
   const showProjects = can(role, "project_datasheet.view");
+  // Regional website datasheet check — admin/editor, the people who upload.
+  const showWebsite = can(role, "website_check.view");
 
   return (
     <header className="sticky top-0 z-50 bg-engenius-blue text-white shadow-md">
@@ -43,6 +45,18 @@ export function Navbar({ user }: NavbarProps) {
           Product SpecHub
         </span>
         <div className="ml-auto flex items-center gap-1">
+          {showWebsite && (
+            <Link
+              href="/website"
+              className="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium text-white/70 hover:text-white hover:bg-white/10 transition-colors"
+            >
+              <svg className="h-4 w-4" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden>
+                <circle cx="10" cy="10" r="7.2" />
+                <path d="M2.8 10h14.4M10 2.8c2 2 3 4.4 3 7.2s-1 5.2-3 7.2c-2-2-3-4.4-3-7.2s1-5.2 3-7.2z" />
+              </svg>
+              官網查詢
+            </Link>
+          )}
           {showProjects && (
             <Link
               href="/projects"
