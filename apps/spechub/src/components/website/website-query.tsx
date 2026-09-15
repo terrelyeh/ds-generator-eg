@@ -248,7 +248,7 @@ export function WebsiteQuery() {
                   className="overflow-hidden rounded-xl border border-slate-300 bg-white shadow-[0_1px_3px_rgba(16,24,40,0.10),0_1px_2px_rgba(16,24,40,0.06)]"
                 >
                   <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-slate-300 bg-slate-50 px-4 py-3 sm:px-5">
-                    <h2 className="font-heading text-lg font-bold text-slate-900">{model}</h2>
+                    <h2 className="font-heading text-xl font-bold text-slate-900">{model}</h2>
                     {entry.productModel ? (
                       <Link href={`/product/${encodeURIComponent(entry.productModel)}`} className="text-xs text-sky-700 hover:underline">
                         產品頁 →
