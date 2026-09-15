@@ -72,7 +72,9 @@ export type Permission =
   | "battlecard.edit"
   // project datasheet builder — on-demand project/tender datasheets
   | "project_datasheet.view"
-  | "project_datasheet.edit";
+  | "project_datasheet.edit"
+  // regional website datasheet check — reads the five WordPress sites
+  | "website_check.view";
 
 const PERMISSIONS: Record<Permission, Role[]> = {
   // Everyone can view product / dashboard / preview
@@ -137,6 +139,12 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   // circulating — the finished PDF is what gets handed over.
   "project_datasheet.view": ["admin", "editor"],
   "project_datasheet.edit": ["admin", "editor"],
+
+  // Website datasheet check. Staging drafts and not-yet-pushed files are
+  // internal, and the people who act on the result (MKT) are admin/editor.
+  // The person who pushes staging to production doesn't use SpecHub at all —
+  // they get a Telegram digest instead, so there is no reason to widen this.
+  "website_check.view": ["admin", "editor"],
 };
 
 /** Check if a role can perform an action. */
