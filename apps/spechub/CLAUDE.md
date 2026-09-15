@@ -150,6 +150,14 @@ EnGenie 就會開始跟人說我們有賣它;
 blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 14 格 TBD 不擋、
 一個沒來源的 IP67 擋。真正的產出是可以貼給業務／RD／ODM 的澄清訊息（`brief.ts`）。
 
+### 官網 Datasheet 查詢 → [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md)
+
+讀五個區域官網（EU/JP/TW/APAC/IN × 正式站/測試站）的 datasheet,對照 SpecHub 版本。產品頁「官網」分頁 +
+`/website`（依型號 / 依站台）,`website_check.view`（admin/editor）,`lib/website/`,表 `website_checks`（00061）。
+**改之前必讀該檔**,最容易踩的三條:① **只讀公開 REST,伺服器上沒有 WordPress 帳密**（實測十站都讀得到;
+網址 env 目前只在 Preview）;② **正式站是測試站手動整站覆寫的**,所以沒有上線時間、推送是整站一次、
+直接改正式站會被洗掉（`prodnewer` 最優先）;③ **檔案大小是指紋**（同版號 Regenerate 的舊檔靠它抓,不能比雜湊）。
+
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 
 內部競品比較(Cloud AP MVP)。`/battlecard/[line]`(gate `battlecard.view`)、API 在 `api/battlecard/`、
@@ -378,6 +386,7 @@ npm run lint
 - [`docs/next-steps.md`](docs/next-steps.md) — 各領域的待辦清單（做完就刪，不留歷史）
 - [`docs/brand-and-visual.md`](docs/brand-and-visual.md) — datasheet 的版型/字級規範頁、CJK 漂移偵測、logo、封面置中
 - [`docs/battlecard.md`](docs/battlecard.md) — 競品 battlecard:資料模型、抽取流程、關鍵雷
+- [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) — 官網 Datasheet 查詢:判斷規則、正式站覆寫、檔案大小指紋、讀取策略、1b 待辦
 - [`docs/product-line-onboarding.md`](docs/product-line-onboarding.md) — 新增產品線、sheet 契約、各 category datasheet 變體
 - [`docs/spanish-openrouter-review.md`](docs/spanish-openrouter-review.md) — **西文上線 / OpenRouter 遷移 / 花費帳本 / 翻譯審核**（2026-08-06~07）。
   **動這四塊之前先讀**——裡面有三個「看起來多餘、實際上不能拆」的設計（保留 `openai_api_key`、
