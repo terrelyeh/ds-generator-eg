@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-11。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-09-15。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -47,6 +47,7 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 架構支援**多 Solution 擴展**（`solutions` 表 + `/dashboard/[solution]` 路由;新增產線見
 下方 Architecture 的 product-line onboarding）。
 另含**內部競品比較 Battlecard**（`/battlecard/[line]`;Cloud AP / Camera / Switch / L3 Switch）。
+另含**官網 Datasheet 查詢**（產品頁「官網」分頁 + `/website`;讀五個區域官網的 datasheet 對照 SpecHub,**只讀不寫**）。
 
 功能清單與產品定位詳見 [README.md](README.md)。
 
@@ -155,7 +156,7 @@ blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 
 讀五個區域官網（EU/JP/TW/APAC/IN × 正式站/測試站）的 datasheet,對照 SpecHub 版本。產品頁「官網」分頁 +
 `/website`（依型號 / 依站台）,`website_check.view`（admin/editor）,`lib/website/`,表 `website_checks`（00061）。
 **改之前必讀該檔**,最容易踩的三條:① **只讀公開 REST,伺服器上沒有 WordPress 帳密**（實測十站都讀得到;
-網址 env 目前只在 Preview）;② **正式站是測試站手動整站覆寫的**,所以沒有上線時間、推送是整站一次、
+網址 env 在 Vercel Preview / Production 都已設）;② **正式站是測試站手動整站覆寫的**,所以沒有上線時間、推送是整站一次、
 直接改正式站會被洗掉（`prodnewer` 最優先）;③ **檔案大小是指紋**（同版號 Regenerate 的舊檔靠它抓,不能比雜湊）。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
@@ -286,14 +287,15 @@ auth.users → profiles ← email_whitelist.invited_by
 **🔴 Code review 的收尾（2026-09-04,詳見 memory `project-code-review-2026-09`）**：
 0a. **輪替 `app_settings` 的六把金鑰 + 重新產生 `VERCEL_AUTOMATION_BYPASS_SECRET`**
    —— 門關了但鑰匙沒換。金鑰在 EnGenie `/settings/api-keys` 改。
-0b. **手動按一次 Generate PDF、問 Ask 一題** —— 這兩條 headless 驗不了
-   （`gate()` 需要真 session）,是這幾波唯一沒有 production 佐證的改動。
-0c. **審查的 75 項全部關閉（PR #49–#67, migrations 00048–00055）。**
-   哪一項在哪一支 PR、以及每一個決定的理由，看 memory `project-code-review-2026-09`
-   或 `git log`。**這裡不留已完成清單** —— 它不影響下一個 session 怎麼寫程式。
-   刻意只做一半的三件事:去重只碰 auth 頁面與 `getGoogleAuth()`（`ui/` 各留一份是
-   拆分時的決定,品牌可分道）、passcode 是登入時才就地升級成 scrypt（沒人登入的
-   workspace 留著舊雜湊）、限流只有每分鐘沒有每日上限。
+0b. **在正式站問 Ask 一題** —— `gate()` 需要真 session,headless 驗不了。
+   Generate PDF 那半已有佐證（9/4 之後正式站產了 14 份）;Ask 到 2026-09-15 為止
+   `ask_requests` 還沒有任何一筆 answered。
+   審查刻意只做一半的三件事（不是待辦,是別當成漏做）:去重只碰 auth 頁面與 `getGoogleAuth()`
+   （`ui/` 各留一份是拆分時的決定）、passcode 登入時才就地升級成 scrypt、限流只有每分鐘沒有每日上限。
+
+**🔜 官網 Datasheet 查詢 1b**（1a 已上線,PR #92）：「可上架」標記、每日檢查、Telegram 提醒
+（推送提醒發**小群組**,那位同事不用 SpecHub → 訊息要自足）、記錄各站推送時間。
+設計結論與限制見 [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) 的「還沒做」。
 
 其餘待辦（產品線素材、多語言擴展、翻譯 feedback、Battlecard 競品資料、自動邀請信）
 按領域列在 [`docs/next-steps.md`](docs/next-steps.md)。**只有下面這幾條需要現在知道**：
@@ -321,7 +323,9 @@ npm run lint
   `GOOGLE_SERVICE_ACCOUNT_JSON`, `TELEGRAM_BOT_TOKEN/CHAT_ID`, `CRON_SECRET`（與 engenie 同值）,
   `VERCEL_AUTOMATION_BYPASS_SECRET`, `PDF_PREVIEW_BASE_URL`, **`ENGENIE_INTERNAL_URL`**,
   **`NEXT_PUBLIC_ENGENIE_URL`**, `API_KEY_ENC_SECRET`（讀共用加密設定時需要）,
-  **`FIRECRAWL_API_KEY`**（battlecard ↻sync / 🔍web 抓取用;Vercel prod/dev/preview 已設）
+  **`FIRECRAWL_API_KEY`**（battlecard ↻sync / 🔍web 抓取用;Vercel prod/dev/preview 已設）,
+  **`WP_{EU,JP,TW,APAC,IN}_URL` + `WP_*_STG_URL`**（官網查詢;**只有網址、沒有帳密**,名稱沿用
+  wp-ds-check skill 的 `.env`;Vercel preview/production 已設,本機要自己放 `.env.local`）
 - AI 翻譯 keys 在 EnGenie `/settings/api-keys` 設定（共用 app_settings），env 可覆蓋
 - **Vercel link（`.vercel/`）在 monorepo 根,不在 apps/spechub** — 跑 `vercel env` 等指令要在根目錄
 

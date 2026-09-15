@@ -1,6 +1,6 @@
 # 官網 Datasheet 查詢（website datasheet check）
 
-> 2026-09-15 建（branch `feat/website-datasheet-check`）。**動 `lib/website/`、`/api/website/*`、
+> 2026-09-15 上線（PR #92,1a 查詢）。**動 `lib/website/`、`/api/website/*`、
 > 產品頁「官網」分頁或 `/website` 之前先讀這份。**
 
 ## 做什麼
@@ -25,7 +25,8 @@
 所以**沒有放任何 Application Password**；代價是看不到草稿。`/api/website/probe` 可以隨時重跑這個檢查。
 
 - 設定只有網址：`WP_{EU,JP,TW,APAC,IN}_URL`、`WP_*_STG_URL`（名稱沿用 skill 的 `.env`）。
-  ⚠️ **2026-09-15 只加到 Vercel Preview（限這個 branch）**，merge 前 Production 要補
+  Vercel Preview 與 Production 都已設（Vercel 預設標成 Sensitive）；**本機開發要自己放進 `apps/spechub/.env.local`**，
+  不然每站都會回「還沒設定這個站的網址」
 - 五個正式站同在 `www.engeniustech.com`（路徑分區），測試站是 `www.stagingNN.engeniustech.com`
 - 每個請求 1–4 秒（測試站較慢）
 
