@@ -243,9 +243,15 @@ export function judgeSite(
       case "push":
         issues.push(`${at}測試站已是${label} ${shown(stg)}，正式站${prod ? `還是 ${shown(prod)}` : "還沒有"}，等推送`);
         break;
-      case "diff":
-        issues.push(`${at}${label} ${shown(prod)} 的檔案跟 SpecHub 目前那份不同（站上 ${megabytes(prod!.filesize!)}，SpecHub ${megabytes(hub!.filesize!)}），可能是 Regenerate 之前的舊檔`);
+      case "diff": {
+        const sizes = `站上 ${megabytes(prod!.filesize!)}，SpecHub ${megabytes(hub!.filesize!)}`;
+        const uploaded = prod!.uploadedAt?.slice(0, 10);
+        const generated = hub!.generatedAt?.slice(0, 10);
+        issues.push(uploaded && generated && prod!.uploadedAt! < hub!.generatedAt!
+          ? `${at}${label} ${shown(prod)} 還是舊檔：站上這份 ${uploaded} 上傳，比 SpecHub ${generated} 產生這一版還早（${sizes}）`
+          : `${at}${label} ${shown(prod)} 的檔案跟 SpecHub 目前那份不同（${sizes}），請確認上傳的是 SpecHub 目前這份`);
         break;
+      }
       case "prodnewer":
         issues.push(stg
           ? `${at}正式站是${label} ${shown(prod)}，測試站還是 ${shown(stg)}。下次推送會蓋回 ${shown(stg)}，推送前要先補傳到測試站`

@@ -181,3 +181,18 @@ describe("judgeSite", () => {
     expect(judgeSite("EU", "ECW212L", side([]), side([]), {}).issues).toEqual(["EU：產品頁沒有 Datasheet（正式站、測試站都沒有）"]);
   });
 });
+
+describe("judgeSite issue wording for a different file", () => {
+  it("calls a file uploaded before SpecHub made the version an old file", () => {
+    const old = sheet("v1.3", { filesize: 1_356_129, uploadedAt: "2024-08-30T03:43:53.000Z" });
+    const verdict = judgeSite("EU", "ECW536", side([old]), side([{ ...old }]), { en: { version: "1.3", generatedAt: "2026-08-06T06:07:20.000Z", filesize: 1_197_926 } });
+    expect(verdict.status).toBe("diff");
+    expect(verdict.issues).toEqual(["EU：英文 v1.3 還是舊檔：站上這份 2024-08-30 上傳，比 SpecHub 2026-08-06 產生這一版還早（站上 1.29 MB，SpecHub 1.14 MB）"]);
+  });
+
+  it("asks for a check when the different file was uploaded after SpecHub made it", () => {
+    const later = sheet("v1.3", { filesize: 1_356_129, uploadedAt: "2026-09-01T00:00:00.000Z" });
+    const verdict = judgeSite("EU", "ECW536", side([later]), side([{ ...later }]), { en: { version: "1.3", generatedAt: "2026-08-06T06:07:20.000Z", filesize: 1_197_926 } });
+    expect(verdict.issues[0]).toContain("請確認上傳的是 SpecHub 目前這份");
+  });
+});
