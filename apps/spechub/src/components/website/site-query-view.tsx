@@ -134,7 +134,7 @@ function GroupedIssueList({ groups }: { groups: [SiteCode, string[]][] }) {
               {site}
               <span className="text-xs font-normal tracking-normal text-slate-500">{lines.length} 件</span>
             </p>
-            <ol className="list-decimal space-y-2 pb-2.5 pl-9 pr-4 pt-1.5 text-sm leading-relaxed text-slate-700 marker:text-slate-400">
+            <ol className="list-decimal space-y-2 pb-2.5 pl-9 pr-4 pt-1.5 text-sm leading-relaxed text-slate-700 marker:text-slate-500">
               {lines.map((line) => (
                 <li key={line}>
                   <IssueText text={line} />
@@ -471,8 +471,8 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                               <span className="text-[13px] text-slate-500">{verdict.status === "nopage" ? "沒有產品頁" : "沒有 Datasheet"}</span>
                             )}
                           </td>
-                          <td className={version}>{row ? versionOf(row.production) : <span className="font-normal text-slate-400">—</span>}</td>
-                          <td className={version}>{row ? versionOf(row.staging) : <span className="font-normal text-slate-400">—</span>}</td>
+                          <td className={version}>{row ? versionOf(row.production) : <span className="font-normal text-slate-500">—</span>}</td>
+                          <td className={version}>{row ? versionOf(row.staging) : <span className="font-normal text-slate-500">—</span>}</td>
                           <td className={`${line} whitespace-nowrap px-3 py-3 align-top text-[13px] tabular-nums text-slate-600`}>
                             {formatDate(row ? [row.production?.uploadedAt, row.staging?.uploadedAt].filter(Boolean).sort().pop() : null)}
                           </td>
@@ -519,7 +519,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                             const verdict = entry.verdicts[site];
                             if (!verdict || verdict.status === "nopage") {
                               return (
-                                <td key={site} className={`${line} px-3.5 py-3 align-top text-xs text-slate-400`}>
+                                <td key={site} className={`${line} px-3.5 py-3 align-top text-xs text-slate-500`}>
                                   無產品頁
                                 </td>
                               );
@@ -554,7 +554,7 @@ export function SiteQueryView({ onOpenModel }: { onOpenModel: (model: string) =>
                                   <span className="mt-1.5 block">
                                     <StatusBadge status={verdict.status} />
                                   </span>
-                                  <span className={`mt-1.5 block whitespace-nowrap text-xs ${calm ? "text-slate-400" : "text-slate-600"}`}>
+                                  <span className={`mt-1.5 block whitespace-nowrap text-xs ${calm ? "text-slate-500" : "text-slate-600"}`}>
                                     {timeLine(site, verdict, entry.baseline)}
                                   </span>
                                 </button>

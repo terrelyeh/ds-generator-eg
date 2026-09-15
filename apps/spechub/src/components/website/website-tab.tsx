@@ -131,7 +131,7 @@ export function WebsiteTab({ model, onIssueCount }: { model: string; onIssueCoun
                     上次查詢 {formatDateTime(newest)}
                     {stale && `（${Math.floor((Date.now() - new Date(oldest!).getTime()) / DAY_MS)} 天前）`}
                   </span>
-                  <span className="text-slate-400"> · </span>正式站＋測試站
+                  <span className="text-slate-500"> · </span>正式站＋測試站
                 </>
               ) : (
                 "只讀取官網的公開資料，不會修改網站"

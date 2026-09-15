@@ -428,7 +428,7 @@ function ActiveList({
                 spells the consequence out. */}
             {can(u.role as Role, "review.approve") && (
               <div className="flex items-center gap-1" title="可審核的語言。指派後，該語言的翻譯就必須經過審核才能產生 PDF。">
-                <span className="text-[10px] uppercase tracking-wide text-slate-400">審核</span>
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">審核</span>
                 {SUPPORTED_LOCALES.filter((l) => l.value !== "en").map((l) => {
                   const all = u.review_locales === null;
                   const on = all || (u.review_locales?.includes(l.value) ?? false);
@@ -453,7 +453,7 @@ function ActiveList({
                       className={`rounded border px-1.5 py-0.5 text-[11px] transition disabled:opacity-40 ${
                         on
                           ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                          : "border-slate-200 text-slate-400 hover:border-slate-300"
+                          : "border-slate-200 text-slate-500 hover:border-slate-300"
                       }`}
                     >
                       {l.flag}
@@ -466,7 +466,7 @@ function ActiveList({
                     disabled={busy}
                     onClick={() => onReviewLocalesChange(u.id, null)}
                     title="改回不限語言"
-                    className="ml-0.5 text-[10px] text-slate-400 underline hover:text-slate-600 disabled:opacity-40"
+                    className="ml-0.5 text-[10px] text-slate-500 underline hover:text-slate-600 disabled:opacity-40"
                   >
                     全部
                   </button>

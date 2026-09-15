@@ -196,14 +196,14 @@ function SiteRows({ state, onRetry }: { state: SiteState; onRetry?: (site: SiteC
               <td className={cell}>
                 <span className="text-sm font-medium text-slate-800">沒有{LANGUAGE_LABEL[line.language]} Datasheet</span>
               </td>
-              <td className={`${cell} text-slate-400`}>—</td>
-              <td className={`${cell} text-slate-400`}>—</td>
+              <td className={`${cell} text-slate-500`}>—</td>
+              <td className={`${cell} text-slate-500`}>—</td>
               <td className={cell}>
                 <StatusBadge status={line.status} />
                 <span className="mt-1.5 block text-xs leading-snug text-slate-600">{line.why}</span>
               </td>
-              <td className={`${cell} text-slate-400`}>—</td>
-              <td className={`${cell} text-slate-400`}>—</td>
+              <td className={`${cell} text-slate-500`}>—</td>
+              <td className={`${cell} text-slate-500`}>—</td>
             </tr>
           );
         }
@@ -281,7 +281,7 @@ export function IssueList({ issues, title, failedSites = [] }: { issues: string[
           複製給行銷
         </Button>
       </div>
-      <ol className="list-decimal space-y-2 bg-white py-3 pl-9 pr-4 text-sm leading-relaxed text-slate-700 marker:text-slate-400">
+      <ol className="list-decimal space-y-2 bg-white py-3 pl-9 pr-4 text-sm leading-relaxed text-slate-700 marker:text-slate-500">
         {issues.map((issue) => (
           <li key={issue}>
             <IssueText text={issue} />
