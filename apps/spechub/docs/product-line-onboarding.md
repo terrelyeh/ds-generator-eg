@@ -42,6 +42,19 @@ Datasheet/`), so walk the tree before filling them in.
     `Pending` → pending.
   - `Headline`, `Single Overview`, `Key Feature Lists` (decorated labels
     tolerated, e.g. `(Headline)`).
+  - **`Spec Footnote`** — OPTIONAL. The `*Note: …` lines printed under the
+    spec table, into `products.spec_notes`. **One note per line** (Alt+Enter),
+    each starting with its own marker; the matching marker goes in the spec
+    VALUE on the Detail Specs tab (`6.8G*` — ESG510/ESG610 already do this).
+    Nothing generates or renumbers markers: the PM owns both ends.
+    Tolerated spellings: `Spec Footnotes` / `Spec Note(s)` / `規格備註`.
+    Empty cell = this model says nothing, and the datasheet falls back to
+    `product_lines.spec_footnote` (line-wide, SQL-only).
+    ⚠️ **Never put a note row on `Detail Specs`.** A row with text in column A
+    and empty model columns is a CATEGORY HEADER there, so the note would
+    silently swallow every spec below it.
+    ⚠️ The label must not contain `Overview` or `Key Feature` — those rows are
+    matched by substring and would claim it.
   - **`DS Feature Groups`** — OPTIONAL. Grouped marketing copy for
     chip-style datasheet covers, parsed into `products.ds_features`
     (`[{title, bullets[]}]`). Format:

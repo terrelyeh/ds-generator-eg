@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@eg/db/server";
 import { getSetting } from "@eg/db/settings";
 import { splitIntoPages, filterRenderableSections } from "@/lib/datasheet/pagination";
+import { estimateSpecNotesHeight, resolveSpecNotes } from "@/lib/datasheet/spec-notes";
 import { estimateCoverLayout, balanceFeatureColumns, FEATURES_MAX_HEIGHT } from "@/lib/datasheet/cover-layout";
 import { getDict } from "@/lib/datasheet/locales";
 import {
@@ -176,6 +177,7 @@ export default async function PreviewPage({
   let localeHardwareImage: string | null = null;
   let customQrLabel: string | null = null;
   let customQrUrl: string | null = null;
+  let translatedSpecNotes: string | null = null;
   const specLabelMap: Record<string, string> = {};
   const sectionLabelMap: Record<string, string> = {};
 
@@ -187,10 +189,10 @@ export default async function PreviewPage({
     // Per-product translation (overview + features)
     const { data: pt } = await supabase
       .from("product_translations")
-      .select("overview, features, translation_mode, headline, subtitle, hardware_image, qr_label, qr_url, confirmed")
+      .select("overview, features, translation_mode, headline, subtitle, hardware_image, qr_label, qr_url, spec_notes, confirmed")
       .eq("product_id", model)
       .eq("locale", lang)
-      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; subtitle: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null; confirmed: boolean } | null };
+      .single() as { data: { overview: string | null; features: string[] | null; translation_mode: string; headline: string | null; subtitle: string | null; hardware_image: string | null; qr_label: string | null; qr_url: string | null; spec_notes: string | null; confirmed: boolean } | null };
     translationConfirmed = pt?.confirmed ?? false;
 
     if (pt) {
@@ -201,6 +203,7 @@ export default async function PreviewPage({
       localeHardwareImage = pt.hardware_image;
       customQrLabel = pt.qr_label;
       customQrUrl = pt.qr_url;
+      translatedSpecNotes = pt.spec_notes;
     }
 
     // Per-product-line spec label translations (only if full mode)
@@ -224,6 +227,18 @@ export default async function PreviewPage({
     }
   }
 
+  // Spec footnotes: the model's own "Spec Footnote" cell from the sheet,
+  // falling back to the product line's. They print under both columns of the
+  // LAST spec page, so pagination has to hold that height back — the page is
+  // overflow:hidden and would otherwise cut them off in silence.
+  const specNotes = resolveSpecNotes({
+    productNotes: product.spec_notes,
+    translatedNotes: translatedSpecNotes,
+    lineFootnote: product.product_lines.spec_footnote,
+    lineFootnoteTranslations: product.product_lines.spec_footnote_translations as Record<string, string> | null,
+    locale: lang,
+  });
+
   // Data Center and Broadband lines use structurally different layouts,
   // rendered by dedicated components instead of threading more variants
   // through this page. Same URL, so generate-pdf / product page links stay
@@ -238,6 +253,7 @@ export default async function PreviewPage({
     return (
       <BroadbandPreview
         scope="model"
+        specNotes={specNotes}
         line={product.product_lines}
         lineContent={(ldRow as unknown as import("./broadband-preview").LineContent) ?? null}
         products={[product]}
@@ -287,6 +303,7 @@ export default async function PreviewPage({
     return (
       <EdgeAiSeriesPreview
         scope="model"
+        specNotes={specNotes}
         line={product.product_lines}
         content={ldRow as unknown as OrinSeriesContent}
         productImages={productImages}
@@ -316,6 +333,7 @@ export default async function PreviewPage({
     return (
       <DataCenterPreview
         product={product}
+        specNotes={specNotes}
         showToolbar={showToolbar}
         userRole={userRole}
         versionOverride={versionOverride ?? null}
@@ -356,7 +374,7 @@ export default async function PreviewPage({
   // Pagination is locale-aware — CJK fonts render with larger leading,
   // so JA / zh-TW need slightly taller row estimates to avoid clipping
   // the bottom row past BOTTOM_MARGIN.
-  const specPages = splitIntoPages(specSections, lang);
+  const specPages = splitIntoPages(specSections, lang, estimateSpecNotesHeight(specNotes));
 
   // --- Antennas Patterns page (only if any uploaded) ---
   // Slot shape is per-product (Cloud AP plots by band, Broadband EOC's CPEs
@@ -433,20 +451,6 @@ export default async function PreviewPage({
   // onto the last spec page instead. One product image, no hardware image.
   const isTransceiver = productLine.category === "Transceivers";
 
-  // Per-product-line spec footnote (e.g. "*Note: Performance figures…" for
-  // VPN Firewall). Shown once at the bottom of the LAST spec page only.
-  // Resolution: locale-specific override → EN fallback → null (no render).
-  // Fields are nullable (NULL = product line has no footnote).
-  const productLineExt = productLine as typeof productLine & {
-    spec_footnote: string | null;
-    spec_footnote_translations: Record<string, string> | null;
-    qr_url_template: string | null;
-  };
-  const specFootnote =
-    (lang !== "en" && productLineExt.spec_footnote_translations?.[lang]) ||
-    productLineExt.spec_footnote ||
-    null;
-
   // QR: custom per-product-translation > locale default.
   // Lines with no Quick Start Guide point the QR at Contact Us instead. This
   // asks lib/datasheet/qr rather than testing the category here — the local
@@ -469,7 +473,7 @@ export default async function PreviewPage({
     : dict.defaultQrUrl;
   const qrUrlTemplate =
     customQrUrl ||
-    productLineExt.qr_url_template ||
+    productLine.qr_url_template ||
     (contactUsQr ? contactUsQrFallback : dict.defaultQrUrl);
   const qsgUrl = qrUrlTemplate.replace("{model}", product.model_name.toLowerCase());
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qsgUrl)}`;
@@ -1177,8 +1181,12 @@ ${isCJK ? `
             {/* Per-product-line footnote on the LAST spec page only (e.g.
                 VPN Firewall asterisk disclaimer). Sits in flow below the
                 two columns, full width. */}
-            {pageIdx === specPages.length - 1 && specFootnote && (
-              <div className="spec-footnote">{specFootnote}</div>
+            {pageIdx === specPages.length - 1 && specNotes.length > 0 && (
+              <div className="spec-footnote">
+                {specNotes.map((note, i) => (
+                  <div key={i}>{note}</div>
+                ))}
+              </div>
             )}
           </div>
           {/* Transceivers have no hardware page, so the footer lives on the
