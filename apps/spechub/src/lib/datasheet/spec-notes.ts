@@ -86,6 +86,65 @@ const charWidth = (ch: string) => (/[　-鿿＀-￯]/.test(ch) ? 2 : 1);
  * `.page` is `overflow: hidden` — a block that outgrew the margin was cut off
  * with nothing reporting it (pitfall #69).
  */
+// ---------------------------------------------------------------------------
+// Do the markers in the notes and in the spec values agree?
+// ---------------------------------------------------------------------------
+
+/**
+ * What counts as a footnote marker: a run of asterisks or daggers.
+ *
+ * Numeric `(2)` deliberately does NOT count. Cloud AP spec values are full of
+ * "Four(4) spatial stream" and "one(1) two streams" — a first version of this
+ * check treated those as markers and reported 34 models as broken, none of
+ * which were.
+ */
+const MARKER = String.raw`\*{1,4}|†{1,2}|‡{1,2}`;
+
+/** The marker each note opens with, e.g. "** Wi-Fi 7 …" → "**". */
+export function markersInNotes(notes: string[]): string[] {
+  const seen = new Set<string>();
+  for (const note of notes) {
+    const match = new RegExp(`^(${MARKER})`).exec(note);
+    if (match) seen.add(match[1]);
+  }
+  return [...seen];
+}
+
+/**
+ * Markers hanging off the end of a spec value, e.g. "6.8G*" → "*".
+ *
+ * Has to be attached to the end of a word and followed by a break, so the
+ * asterisk inside "Four(4)"-style prose or a stray "*" on its own line isn't
+ * counted.
+ */
+export function markersInValues(values: string[]): string[] {
+  const pattern = new RegExp(`(?<=[\\p{L}\\p{N}%)\\]])(${MARKER})(?=[\\s,;)]|$)`, "gu");
+  const seen = new Set<string>();
+  for (const value of values) {
+    for (const line of value.split(/\r?\n/)) {
+      for (const match of line.matchAll(pattern)) seen.add(match[1]);
+    }
+  }
+  return [...seen];
+}
+
+/**
+ * Markers that don't line up: a value marked `**` with no note explaining it,
+ * or a note nobody points at. Both are silent in the PDF — the reader just
+ * sees an asterisk that leads nowhere.
+ */
+export function checkSpecNoteMarkers(input: { notes: string[]; values: string[] }): {
+  valuesWithoutNote: string[];
+  notesWithoutValue: string[];
+} {
+  const inNotes = markersInNotes(input.notes);
+  const inValues = markersInValues(input.values);
+  return {
+    valuesWithoutNote: inValues.filter((m) => !inNotes.includes(m)),
+    notesWithoutValue: inNotes.filter((m) => !inValues.includes(m)),
+  };
+}
+
 export function estimateSpecNotesHeight(notes: string[]): number {
   if (!notes.length) return 0;
   let lines = 0;

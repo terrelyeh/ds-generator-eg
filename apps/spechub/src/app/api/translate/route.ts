@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   } = body as {
     source: string;
     target_locale: string;
-    content_type: "headline" | "overview" | "features" | "spec_labels";
+    content_type: "headline" | "overview" | "features" | "spec_labels" | "spec_notes";
     product_line?: string;
     provider?: string;
     ref?: string;

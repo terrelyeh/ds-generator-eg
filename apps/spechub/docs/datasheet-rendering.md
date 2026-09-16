@@ -69,7 +69,9 @@ Cover page 用 **動態版面**：features 依內容高度浮動（max 320pt）�
   - 解析順序（`lib/datasheet/spec-notes.ts` 的 `resolveSpecNotes`）：該語系的 `product_translations.spec_notes` → 產品的英文 `products.spec_notes` → 產品線的 `spec_footnote[lang]` → 產品線的英文 `spec_footnote`。**產品有寫就整組取代產品線的**，不疊加。
   - `product_lines.spec_footnote` (+ `spec_footnote_translations`) 仍在，當作整線共用的預設值；只有 Cloud VPN Firewall 有值，且只能用 SQL 改。
   - ⚠️ **備註高度一定要進分頁預算**：頁面是 `overflow: hidden`，超出的備註會被無聲切掉、版面檢查也不會叫（pitfall #69）。`estimateSpecNotesHeight` 就是給分頁器用的，改 `.spec-footnote` 的字級或行高要同步改它。
-  - ⚠️ 翻譯編輯器目前**還沒有**備註欄位，`product_translations.spec_notes` 只有欄位沒有 UI，所以日文／繁中版現在會印英文備註（跟舊的 line footnote 行為一致）。
+  - **後台兩個入口**：產品頁 ▸ Detail ▸ Specifications 卡片最下方有唯讀的「規格備註」區塊（標明來自 sheet 或產品線共用），旁邊會檢查**記號一致性**——規格值標了 `**` 但沒有對應備註、或備註沒有任何值指向它，都會出現琥珀色提醒（`checkSpecNoteMarkers`）。
+  - **翻譯**：翻譯頁有「規格備註」卡（英文唯讀 + 該語系可編輯 + AI Translate），content type 是 `spec_notes`，prompt 明確要求**行首記號原樣保留**，回來之後前端再比對一次，掉了記號就 toast 警告但仍填入（比重譯一次好修）。空白＝印英文版。
+  - ⚠️ **記號只認 `*`／`†` 這一類，不認 `(2)`**：Cloud AP 的規格值滿是「Four(4) spatial stream」，第一版檢查把 34 台都報成有問題，實際上一台都沒有。
 - **`dc-spec-table.ts`**（版型 B 的規格表；跟上面版型 A 的 `pagination.ts` 是兩套）— 每個 spec group 一條 `#6b7580` 灰帶（跟版型 A 分類帶同一個色），**`General` 也印**：parser 把 sheet 的 `Technical Specifications` 列當起點吃掉，緊接其下的列歸 `General`，所有版型都照印。Model Name / Model Number 是**第一個印得出來的 group** 的前兩列；沒有任何可印的 group 就回空陣列，`canGenerate` 靠它判斷「沒有規格」。短 group 放不下就整段移頁，比一頁還長的至少帶第一列（灰帶不會落在頁尾）；斑馬紋每段重算，不用 `:nth-child`。**`VALUE_CHARS_PER_LINE = 96` 是實測校準的**（value 欄實際每行約 100 字；舊猜 86 讓長段落多算一行，SE210 因此多出一頁），首頁預算 630 / 續頁 655。改 B 規格表的字級、padding 或欄寬要重量：用 puppeteer 讀每列實際高度對估算值（2026-09-11 五台的估算／實際比 1.02–1.4）
 
 ### Multi-Language Datasheet

@@ -24,6 +24,7 @@ import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/datasheet/qr";
 import { radioPatternSlots, hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
+import { checkSpecNoteMarkers, parseSpecNotes } from "@/lib/datasheet/spec-notes";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
 
 interface LongFeature {
@@ -934,6 +935,18 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const productExt = product as typeof product & { hardware_image_2?: string | null };
   const hasHardwareImage2 =
     !!productExt.hardware_image_2 && !productExt.hardware_image_2.startsWith("cache/");
+  // Spec footnotes as the datasheet will print them: the model's own
+  // "Spec Footnote" cell from the sheet, otherwise the product line's. Shown
+  // read-only here, like Overview & Features — the sheet is where they are
+  // edited. The marker check is here because this is where both halves are on
+  // screen: the note and the spec value it belongs to.
+  const specNotes = parseSpecNotes(product.spec_notes);
+  const lineFootnote = parseSpecNotes(product.product_line.spec_footnote);
+  const shownNotes = specNotes.length > 0 ? specNotes : lineFootnote;
+  const markerIssues = checkSpecNoteMarkers({
+    notes: shownNotes,
+    values: product.spec_sections.flatMap((section) => section.items.map((item) => item.value)),
+  });
   const hasOverview = !!product.overview && product.overview.trim().length > 0;
   const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
   const hasSpecs = product.spec_sections.length > 0;
@@ -1452,6 +1465,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           modelName={product.model_name}
           productLineName={product.product_line.name}
           englishOverview={product.overview ?? ""}
+          englishSpecNotes={product.spec_notes ?? ""}
           englishFeatures={product.features ?? []}
           englishHeadline={product.headline || product.full_name}
           englishSubtitle={product.subtitle}
@@ -1465,6 +1479,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
             hardware_image: t.hardware_image,
             qr_label: t.qr_label,
             qr_url: t.qr_url,
+            spec_notes: t.spec_notes,
             confirmed: t.confirmed,
             review_status: t.review_status ?? (t.confirmed ? "approved" : "draft"),
           }))}
@@ -1767,6 +1782,43 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
               No specifications loaded yet. Run a sync to pull data from Google
               Sheets.
             </p>
+          )}
+          {(shownNotes.length > 0 ||
+            markerIssues.valuesWithoutNote.length > 0 ||
+            markerIssues.notesWithoutValue.length > 0) && (
+            <div className="rounded-lg border border-dashed bg-muted/30 px-4 py-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                規格備註
+                <span className="ml-2 font-normal normal-case tracking-normal">
+                  {specNotes.length > 0
+                    ? "來自 Google Sheet ▸ Web Overview ▸ Spec Footnote"
+                    : lineFootnote.length > 0
+                      ? `整條 ${product.product_line.label} 共用`
+                      : ""}
+                </span>
+              </h3>
+              {shownNotes.length > 0 ? (
+                <div className="mt-2 space-y-1 text-[13px] leading-relaxed text-slate-700">
+                  {shownNotes.map((note, i) => (
+                    <p key={i}>{note}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[13px] text-slate-700">這台還沒有備註。</p>
+              )}
+              {markerIssues.valuesWithoutNote.length > 0 && (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  規格值裡有「{markerIssues.valuesWithoutNote.join("」「")}」，但沒有對應的備註 ——
+                  datasheet 上會出現一個沒有說明的記號。到 Web Overview 的 Spec Footnote 列補一行。
+                </p>
+              )}
+              {markerIssues.notesWithoutValue.length > 0 && (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  備註用了「{markerIssues.notesWithoutValue.join("」「")}」，但沒有規格值標這個記號 ——
+                  讀者找不到它在講哪一項。
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>
