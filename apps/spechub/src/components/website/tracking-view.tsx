@@ -46,6 +46,10 @@ export function TrackingView({ data, reload }: { data: TrackingData | null; relo
   const rows = filter === "open" ? openRows : filter === "done" ? doneRows : data.tracked;
   const keyOf = (row: { productId: string; locale: string }) => `${row.productId}:${row.locale}`;
   const unmarkedShown = showAll ? data.unmarked : data.unmarked.slice(0, 20);
+  // Versions every site that takes their language already has: marking those 可上架
+  // states a fact rather than deciding anything, and they sit mixed in by date, so
+  // they get picked in one go instead of hunting for the green rows.
+  const greenEntries = data.unmarked.filter((u) => u.allLive);
 
   async function mark(entries: { productId: string; locale: MarkLocale }[], decision: "ready" | "skip") {
     if (!entries.length) return;
@@ -191,11 +195,27 @@ export function TrackingView({ data, reload }: { data: TrackingData | null; relo
       </section>
 
       <section className={card}>
-        <div className="border-b border-slate-300 bg-slate-50 px-4 py-3 sm:px-5">
-          <h2 className="text-[17px] font-bold text-slate-900">
-            還沒標記的最新版本 <span className="tabular-nums text-amber-700">{data.unmarked.length}</span>
-          </h2>
-          <p className="text-xs text-slate-600">Active 產品、產出超過 7 天，還沒標記可上架或不上架。站上已經是這一版的（綠字），可以直接勾起來一次標記。</p>
+        <div className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-300 bg-slate-50 px-4 py-3 sm:px-5">
+          <div>
+            <h2 className="text-[17px] font-bold text-slate-900">
+              還沒標記的最新版本 <span className="tabular-nums text-amber-700">{data.unmarked.length}</span>
+            </h2>
+            <p className="text-xs text-slate-600">Active 產品、產出超過 7 天，還沒標記可上架或不上架。站上已經是這一版的（綠字），可以直接勾起來一次標記。</p>
+          </div>
+          {data.canMark && greenEntries.length > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 shrink-0 border-emerald-400 bg-white font-semibold text-emerald-800 hover:bg-emerald-50"
+              disabled={busy}
+              onClick={() => {
+                setShowAll(true);
+                setPicked(new Set(greenEntries.map(keyOf)));
+              }}
+            >
+              勾選站上已是這一版的 {greenEntries.length} 份
+            </Button>
+          )}
         </div>
         <div className="flex flex-col gap-3 px-4 py-4 sm:px-5">
           {data.canMark && pickedEntries.length > 0 && (
