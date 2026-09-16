@@ -65,7 +65,11 @@ Cover page 用 **動態版面**：features 依內容高度浮動（max 320pt）�
 - **Layout warning UI**（`components/product/product-detail.tsx`）：`LayoutWarningBanner` 顯示 overflow + "Mark as Reviewed OK"；ack valid 時改顯示 `LayoutAckedNotice` 綠色細條 + Undo 按鈕。每 locale 獨立 banner
 - **空翻譯不檢查**：dashboard + product detail 在跑 per-locale layout check 前，先看 `t.overview` 和 `t.features` 是否都是 null/空。都空就 skip — 否則 EN fallback 內容被 CJK metrics 量到會假性紅燈
 - **Antennas Patterns 頁**（AP only）：`preview/[model]/page.tsx` 額外渲染一頁 polar plot grid，位於 spec pages 和 hardware overview 之間。偵測條件：`product_line.category === "APs"` 且有上傳任何 radio_pattern image。6GHz slots 由 Operating Frequency spec 含 `6 GHz` 自動加入。`.antenna-image img` 用**顯式 `width: 158pt; height: 158pt`**（has-6g 縮為 125pt），不用 max-width — 見 Common Pitfalls #31
-- **Spec footnote**（per-product-line, optional）：`product_lines.spec_footnote` (EN) + `spec_footnote_translations` (JSONB) 設定後，會在**最後一個 spec page** 的兩欄下方渲染（左對齊、6.5pt 灰字 + 頂部細線分隔）。VPN Firewall 用來標註效能數據是估計值。其他產品線 NULL 就不顯示。不需動 code，純 SQL 設定。Locale 解析：`translations[lang]` → EN fallback → 不顯示
+- **Spec footnote**（per-model，PM 在 sheet 維護）：`Web Overview` 的 `Spec Footnote` 列 → `products.spec_notes`，**一行一條**、記號（`*`、`**`）由 PM 自己寫在文字最前面，規格值那邊的記號也是 PM 自己打（`6.8G*`）。渲染在**最後一個 spec page** 的規格表下方，四種版型都有（A/B/C 由各自的分頁器**預留高度**，D 的規格表是固定單頁、沒有分頁器所以沒有預留）。
+  - 解析順序（`lib/datasheet/spec-notes.ts` 的 `resolveSpecNotes`）：該語系的 `product_translations.spec_notes` → 產品的英文 `products.spec_notes` → 產品線的 `spec_footnote[lang]` → 產品線的英文 `spec_footnote`。**產品有寫就整組取代產品線的**，不疊加。
+  - `product_lines.spec_footnote` (+ `spec_footnote_translations`) 仍在，當作整線共用的預設值；只有 Cloud VPN Firewall 有值，且只能用 SQL 改。
+  - ⚠️ **備註高度一定要進分頁預算**：頁面是 `overflow: hidden`，超出的備註會被無聲切掉、版面檢查也不會叫（pitfall #69）。`estimateSpecNotesHeight` 就是給分頁器用的，改 `.spec-footnote` 的字級或行高要同步改它。
+  - ⚠️ 翻譯編輯器目前**還沒有**備註欄位，`product_translations.spec_notes` 只有欄位沒有 UI，所以日文／繁中版現在會印英文備註（跟舊的 line footnote 行為一致）。
 - **`dc-spec-table.ts`**（版型 B 的規格表；跟上面版型 A 的 `pagination.ts` 是兩套）— 每個 spec group 一條 `#6b7580` 灰帶（跟版型 A 分類帶同一個色），**`General` 也印**：parser 把 sheet 的 `Technical Specifications` 列當起點吃掉，緊接其下的列歸 `General`，所有版型都照印。Model Name / Model Number 是**第一個印得出來的 group** 的前兩列；沒有任何可印的 group 就回空陣列，`canGenerate` 靠它判斷「沒有規格」。短 group 放不下就整段移頁，比一頁還長的至少帶第一列（灰帶不會落在頁尾）；斑馬紋每段重算，不用 `:nth-child`。**`VALUE_CHARS_PER_LINE = 96` 是實測校準的**（value 欄實際每行約 100 字；舊猜 86 讓長段落多算一行，SE210 因此多出一頁），首頁預算 630 / 續頁 655。改 B 規格表的字級、padding 或欄寬要重量：用 puppeteer 讀每列實際高度對估算值（2026-09-11 五台的估算／實際比 1.02–1.4）
 
 ### Multi-Language Datasheet

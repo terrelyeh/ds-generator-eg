@@ -76,8 +76,14 @@ export function EdgeAiSeriesPreview({
   showToolbar,
   userRole,
   versionOverride,
+  specNotes = [],
 }: {
   scope?: "model" | "series";
+  /** Spec footnotes for the focus model, resolved for the locale
+   *  (lib/datasheet/spec-notes). This layout's spec table is a single fixed
+   *  page with no paginator, so the notes ride in the space the table leaves
+   *  — the same deal the table itself has. */
+  specNotes?: string[];
   line: ProductLine;
   content: OrinSeriesContent;
   /** model_name → product_image, for the spec table's column thumbnails */
@@ -418,6 +424,8 @@ ${bulletDotCss(".feature-bullet .dot")}
   margin-top: 6pt;
 }
 .specs-table col.label-col { width: 118pt; }
+/* Spec footnote — under the table, same quiet grey as the other layouts. */
+.spec-footnote { margin-top: 16pt; font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; line-height: 1.55; color: #6f7073; }
 .specs-table td, .specs-table th {
   border: 0.5pt solid #d9d9d9; text-align: center; vertical-align: middle;
   padding: 3pt 5pt;
@@ -625,6 +633,13 @@ ${bulletDotCss(".feature-bullet .dot")}
               ))}
             </tbody>
           </table>
+          {specNotes.length > 0 && (
+            <div className="spec-footnote">
+              {specNotes.map((note, i) => (
+                <div key={i}>{note}</div>
+              ))}
+            </div>
+          )}
         </div>
         <div className="page-number">3</div>
       </div>

@@ -74,6 +74,17 @@ export interface Database {
            * array never reaches the print path.
            */
           cover_hero_options: string[];
+          /**
+           * Line-wide spec footnote, printed under the spec table when the
+           * product itself has no `spec_notes`. Set by hand in SQL since
+           * 2026-05-13; only Cloud VPN Firewall ever had one. PMs maintain
+           * per-model notes in the sheet instead — see products.spec_notes.
+           */
+          spec_footnote: string | null;
+          /** Locale → footnote text for the above. */
+          spec_footnote_translations: Record<string, string> | null;
+          /** Per-line QSG URL template, `{model}` replaced at render time. */
+          qr_url_template: string | null;
           solution: string;
           solution_id: string;
           last_synced_at: string | null;
@@ -83,7 +94,7 @@ export interface Database {
           Database["public"]["Tables"]["product_lines"]["Row"],
           "id" | "created_at"
         > &
-          Partial<Pick<Database["public"]["Tables"]["product_lines"]["Row"], "id" | "created_at">>;
+          Partial<Pick<Database["public"]["Tables"]["product_lines"]["Row"], "id" | "created_at" | "spec_footnote" | "spec_footnote_translations" | "qr_url_template">>;
         Update: Partial<Database["public"]["Tables"]["product_lines"]["Insert"]>;
       };
       products: {
@@ -100,6 +111,11 @@ export interface Database {
            *  Groups" sheet row) — [{title, bullets[]}]; null = use flat
            *  `features`. First consumer: Data Center navy layout. */
           ds_features: { title: string; bullets: string[] }[] | null;
+          /** Spec footnotes from the sheet's "Spec Footnote" row — one note
+           *  per line, each keeping the marker (*, **) that matches the one
+           *  in the spec value. null = this model says nothing, so the
+           *  datasheet falls back to product_lines.spec_footnote. */
+          spec_notes: string | null;
           product_image: string;
           hardware_image: string;
           /** Optional second hardware render ('' = none) — DC lines. */
@@ -126,7 +142,7 @@ export interface Database {
           Partial<
             Pick<
               Database["public"]["Tables"]["products"]["Row"],
-              "id" | "created_at" | "updated_at" | "subtitle" | "full_name" | "headline" | "overview" | "features" | "ds_features" | "product_image" | "hardware_image" | "hardware_image_2" | "current_version" | "sheet_last_modified" | "sheet_last_editor"
+              "id" | "created_at" | "updated_at" | "subtitle" | "full_name" | "headline" | "overview" | "features" | "ds_features" | "spec_notes" | "product_image" | "hardware_image" | "hardware_image_2" | "current_version" | "sheet_last_modified" | "sheet_last_editor"
             >
           >;
         Update: Partial<Database["public"]["Tables"]["products"]["Insert"]>;
@@ -335,6 +351,9 @@ export interface Database {
           hardware_image: string | null;
           qr_label: string | null;
           qr_url: string | null;
+          /** This locale's spec footnotes, same one-note-per-line shape as
+           *  products.spec_notes. null = print the English notes. */
+          spec_notes: string | null;
           /** Generated from review_status (migration 00034) — read-only. */
           confirmed: boolean;
           review_status: "draft" | "changes_requested" | "approved";
@@ -350,7 +369,7 @@ export interface Database {
           Database["public"]["Tables"]["product_translations"]["Row"],
           "id" | "translated_at" | "confirmed"
         > &
-          Partial<Pick<Database["public"]["Tables"]["product_translations"]["Row"], "id" | "translated_at" | "overview" | "features" | "translated_by" | "review_status" | "reviewed_by" | "reviewed_at">>;
+          Partial<Pick<Database["public"]["Tables"]["product_translations"]["Row"], "id" | "translated_at" | "overview" | "features" | "spec_notes" | "translated_by" | "review_status" | "reviewed_by" | "reviewed_at">>;
         Update: Partial<Database["public"]["Tables"]["product_translations"]["Insert"]>;
       };
       spec_label_translations: {

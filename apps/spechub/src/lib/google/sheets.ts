@@ -41,6 +41,11 @@ export interface SheetProduct {
    *  for chip-style datasheet covers (DC navy layout). null when the sheet
    *  has no such row; the layout then falls back to flat `features`. */
   ds_features: SeriesFeatureGroup[] | null;
+  /** From the optional "Spec Footnote" row — the "*Note: …" lines printed
+   *  under the spec table, one per line, marker included. "" when the sheet
+   *  has no such row or the model's cell is empty; the datasheet then falls
+   *  back to the product line's own footnote. */
+  spec_notes: string;
   spec_sections: SheetSpecSection[];
 }
 
@@ -297,15 +302,34 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
 // Parse overview data from Web Overview tab
 // ---------------------------------------------------------------------------
 
+/**
+ * Labels accepted for the spec footnote row. The row is optional and was added
+ * to fifteen sheets by hand, so spelling drifts — match on a normalised label
+ * rather than one exact string.
+ *
+ * ⚠️ None of these may contain "Overview", "Key Feature" or "DS Feature": the
+ * matches for those rows below are substring matches, and a label like
+ * "Spec Footnote (Overview)" would be read as the product's overview text.
+ */
+const SPEC_NOTE_LABELS = new Set([
+  "spec footnote",
+  "spec footnotes",
+  "spec note",
+  "spec notes",
+  "規格備註",
+  "規格註記",
+]);
+
 function parseOverviewData(
   rows: unknown[][],
   colIdx: number
-): { full_name: string; headline: string; overview: string; features: string[]; status: string; ds_features: SeriesFeatureGroup[] | null } {
+): { full_name: string; headline: string; overview: string; features: string[]; status: string; ds_features: SeriesFeatureGroup[] | null; spec_notes: string } {
   let full_name = "";
   let headline = "";
   let overview = "";
   let status = "active";
   let ds_features: SeriesFeatureGroup[] | null = null;
+  let spec_notes = "";
   const features: string[] = [];
 
   // Build label → row index map
@@ -406,7 +430,18 @@ function parseOverviewData(
     }
   }
 
-  return { full_name, headline, overview, features, status, ds_features };
+  // Spec Footnote — optional. One note per line, each carrying its own marker
+  // (`*`, `**`) to match the marker the PM typed into the spec value itself.
+  // Newlines are kept: the renderer prints one line per note.
+  for (const row of rows) {
+    const label = String(row?.[0] ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+    if (SPEC_NOTE_LABELS.has(label)) {
+      spec_notes = getCell(row, colIdx);
+      break;
+    }
+  }
+
+  return { full_name, headline, overview, features, status, ds_features, spec_notes };
 }
 
 // ---------------------------------------------------------------------------
@@ -526,7 +561,7 @@ export async function loadProductFromSheets(
   const spec_sections = parseSpecSections(detailRows, detailCol);
 
   // Parse overview
-  let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active", ds_features: null as import("./sheets-extra").SeriesFeatureGroup[] | null };
+  let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active", ds_features: null as import("./sheets-extra").SeriesFeatureGroup[] | null, spec_notes: "" };
   if (overviewCol !== null) {
     overviewData = parseOverviewData(overviewRows, overviewCol);
   }
@@ -540,6 +575,7 @@ export async function loadProductFromSheets(
     features: overviewData.features,
     status: overviewData.status,
     ds_features: overviewData.ds_features,
+    spec_notes: overviewData.spec_notes,
     spec_sections,
   };
 }
@@ -639,7 +675,7 @@ export async function loadAllProductsFromSheet(
 
     // Parse overview from cached overview data
     const overviewCol = findModelColumn(overviewRows, modelNum);
-    let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active", ds_features: null as import("./sheets-extra").SeriesFeatureGroup[] | null };
+    let overviewData = { full_name: "", headline: "", overview: "", features: [] as string[], status: "active", ds_features: null as import("./sheets-extra").SeriesFeatureGroup[] | null, spec_notes: "" };
     if (overviewCol !== null) {
       overviewData = parseOverviewData(overviewRows, overviewCol);
     }
@@ -653,6 +689,7 @@ export async function loadAllProductsFromSheet(
       features: overviewData.features,
       status: overviewData.status,
       ds_features: overviewData.ds_features,
+      spec_notes: overviewData.spec_notes,
       spec_sections,
     });
   }
