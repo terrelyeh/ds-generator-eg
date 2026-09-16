@@ -112,7 +112,13 @@ function GroupedIssueList({ groups }: { groups: [SiteCode, string[]][] }) {
   const total = groups.reduce((sum, [, lines]) => sum + lines.length, 0);
   if (!total) return <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">✓ 沒有發現問題</div>;
   async function copy() {
-    const text = groups.map(([site, lines]) => [`【${site}】`, ...lines.map((line, i) => `${i + 1}. ${line}`)].join("\n")).join("\n\n");
+    // Same first line as the per-model list: marketing reads this pasted into
+    // a chat with none of the page around it.
+    const header = `官網 datasheet 待處理 ${total} 件`;
+    const text = [
+      header,
+      ...groups.map(([site, lines]) => [`【${site}】`, ...lines.map((line, i) => `${i + 1}. ${line}`)].join("\n")),
+    ].join("\n\n");
     try {
       await navigator.clipboard.writeText(text);
       toast.success(`已複製 ${total} 件事`);

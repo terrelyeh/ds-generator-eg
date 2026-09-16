@@ -315,7 +315,7 @@ export function WebsiteQuery() {
                         五個站的正式站和測試站都找不到 {model} 的產品頁，SpecHub 也沒有這個型號。請確認型號拼寫；如果是還沒上市的新品，可能各站都還沒建立產品頁。
                       </p>
                     ) : (
-                      <ModelCheckView baseline={entry.baseline} sites={states} onRetry={(site) => void retrySite(model, site)} />
+                      <ModelCheckView model={model} baseline={entry.baseline} sites={states} onRetry={(site) => void retrySite(model, site)} />
                     )}
                   </div>
                 </section>
