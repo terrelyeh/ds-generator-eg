@@ -1444,10 +1444,11 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
             }`}
           >
             官網
-            {websiteIssues !== null && (
-              <span className={`ml-1.5 text-[13px] tabular-nums ${websiteIssues > 0 ? "font-semibold text-amber-700" : "text-muted-foreground"}`}>
-                {websiteIssues}
-              </span>
+            {/* Only when there is something to show. A grey "0" beside the tab
+                read as a broken counter — and it sat next to a detail list that
+                counts differently, so it looked like a contradiction too. */}
+            {websiteIssues !== null && websiteIssues > 0 && (
+              <span className="ml-1.5 text-[13px] font-semibold tabular-nums text-amber-700">{websiteIssues}</span>
             )}
           </button>
         )}

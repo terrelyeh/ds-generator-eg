@@ -326,7 +326,17 @@ export function WebsiteTab({ model, onCount }: { model: string; onCount?: (count
               <details className="rounded-lg border border-dashed border-slate-400 bg-slate-50 px-3.5 py-2.5">
                 <summary className="cursor-pointer text-sm font-semibold text-slate-800">明細：各站的檔名、版本、上傳時間，以及要轉給各區的問題清單</summary>
                 <div className="mt-3">
-                  <ModelCheckView baseline={data?.baseline} sites={states} onRetry={(site) => void checkSite(site)} showCards={false} />
+                  {/* The banner above counts sites for the versions marked 可上架;
+                      this list counts every difference from SpecHub, so it must
+                      not print a second, bigger "N 件事要處理" beside it. */}
+                  <ModelCheckView
+                    model={model}
+                    baseline={data?.baseline}
+                    sites={states}
+                    onRetry={(site) => void checkSite(site)}
+                    showCards={false}
+                    issuesNoun="件與 SpecHub 不同"
+                  />
                 </div>
               </details>
             </>

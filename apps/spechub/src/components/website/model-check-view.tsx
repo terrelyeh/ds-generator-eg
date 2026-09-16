@@ -255,7 +255,28 @@ function SiteRows({ state, onRetry }: { state: SiteState; onRetry?: (site: SiteC
   );
 }
 
-export function IssueList({ issues, title, failedSites = [] }: { issues: string[]; title?: string; failedSites?: string[] }) {
+export function IssueList({
+  issues,
+  title,
+  noun = "件事要處理",
+  subject,
+  checkedAt,
+  failedSites = [],
+}: {
+  issues: string[];
+  title?: string;
+  /** What the count counts, e.g. "件與 SpecHub 不同". */
+  noun?: string;
+  /**
+   * What the list is about — the model, normally. It goes in the FIRST LINE OF
+   * THE COPIED TEXT: marketing reads this in a chat message with none of the
+   * page around it, and every line starts with a site, so without a subject
+   * the paste says which sites are wrong about nothing in particular.
+   */
+  subject?: string;
+  checkedAt?: string | null;
+  failedSites?: string[];
+}) {
   if (!issues.length) {
     // A site that couldn't be read is not a site without problems.
     return failedSites.length ? (
@@ -267,8 +288,14 @@ export function IssueList({ issues, title, failedSites = [] }: { issues: string[
     );
   }
   async function copy() {
+    const header = [
+      subject ? `【${subject}】` : "",
+      `官網 datasheet 待處理 ${issues.length} 件`,
+      checkedAt ? `· ${formatDateTime(checkedAt)} 查詢` : "",
+    ].filter(Boolean).join(" ");
+    const numbered = issues.map((issue, i) => `${i + 1}. ${issue}`).join("\n");
     try {
-      await navigator.clipboard.writeText(issues.join("\n"));
+      await navigator.clipboard.writeText(`${header}\n${numbered}`);
       toast.success(`已複製 ${issues.length} 件事`);
     } catch {
       toast.error("瀏覽器不允許複製，請手動選取文字");
@@ -277,7 +304,7 @@ export function IssueList({ issues, title, failedSites = [] }: { issues: string[
   return (
     <div className="overflow-hidden rounded-lg border border-slate-400">
       <div className="flex items-center justify-between gap-3 border-b-2 border-slate-300 bg-slate-100 px-4 py-2.5">
-        <span className="text-[15px] font-bold text-slate-900">{title ?? `${issues.length} 件事要處理`}</span>
+        <span className="text-[15px] font-bold text-slate-900">{title ?? `${issues.length} ${noun}`}</span>
         <Button size="sm" variant="outline" className="h-7 bg-white" onClick={copy}>
           複製給行銷
         </Button>
@@ -296,14 +323,25 @@ export function IssueList({ issues, title, failedSites = [] }: { issues: string[
 export function ModelCheckView({
   baseline,
   sites,
+  model,
   onRetry,
   showCards = true,
+  issuesNoun,
 }: {
   baseline: SpecHubBaseline | undefined;
   sites: SiteState[];
+  /** The model this view is about — copied into the issue list's first line. */
+  model?: string;
   onRetry?: (site: SiteCode) => void;
   /** The product page's 官網 tab already shows every site above, so its detail view leaves the cards out. */
   showCards?: boolean;
+  /**
+   * What the issue count counts. The 官網 tab's own banner counts sites for the
+   * versions marked 可上架; this list counts every difference from SpecHub, so
+   * in that context it says so rather than showing a second, larger
+   * "N 件事要處理" next to the first.
+   */
+  issuesNoun?: string;
 }) {
   const ordered = SITE_CODES.map((code) => sites.find((s) => s.site === code) ?? { site: code, verdict: null, checkedAt: null, loading: false, error: null });
   const issues = ordered.flatMap((s) => s.verdict?.issues ?? []).filter((issue) => !issue.includes("查詢失敗"));
@@ -335,7 +373,13 @@ export function ModelCheckView({
         </table>
       </div>
       {!busy && anyChecked && (
-        <IssueList issues={issues} failedSites={ordered.filter((s) => s.error || s.verdict?.status === "fail").map((s) => s.site)} />
+        <IssueList
+          issues={issues}
+          subject={model}
+          checkedAt={ordered.map((s) => s.checkedAt).filter(Boolean).sort().pop() ?? null}
+          noun={issuesNoun}
+          failedSites={ordered.filter((s) => s.error || s.verdict?.status === "fail").map((s) => s.site)}
+        />
       )}
     </div>
   );
