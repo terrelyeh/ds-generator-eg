@@ -1095,8 +1095,10 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         );
       })}
 
-      {/* Sticky Header */}
-      <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
+      {/* Sticky Header. The negative top margin pulls it out of the page's
+          space-y-6 rhythm: breadcrumb, model, and "last edited" are one block
+          about the model, so they sit close together, not 36px apart. */}
+      <div className="sticky top-14 z-20 -mx-6 -mt-5 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
         <div className="flex items-center justify-between gap-6">
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">
@@ -1111,7 +1113,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                 No version
               </span>
             )}
-            <span className="hidden sm:inline text-sm text-muted-foreground/60 truncate">
+            <span className="hidden sm:inline text-[15px] text-muted-foreground truncate">
               {product.full_name}
             </span>
           </div>
@@ -1382,8 +1384,8 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         </div>
       </div>
 
-      {/* Sub-header info */}
-      <p className="-mt-4 text-xs text-muted-foreground">
+      {/* Sub-header info — part of the title block, so it sits under the model. */}
+      <p className="-mt-6 text-[13px] text-muted-foreground">
         Last edited{" "}
         {formatDate(product.sheet_last_modified ?? product.updated_at)}
         {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
@@ -1393,10 +1395,10 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
       <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
         <button
           onClick={() => setActiveTab("detail")}
-          className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+          className={`cursor-pointer rounded-md px-4 py-2 text-sm transition-all ${
             activeTab === "detail"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-black/5"
+              : "font-medium text-muted-foreground hover:bg-background/50 hover:text-foreground"
           }`}
         >
           Detail
@@ -1404,15 +1406,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         {roleCanTranslate && (
           <button
             onClick={() => setActiveTab("translations")}
-            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            className={`cursor-pointer rounded-md px-4 py-2 text-sm transition-all ${
               activeTab === "translations"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-black/5"
+                : "font-medium text-muted-foreground hover:bg-background/50 hover:text-foreground"
             }`}
           >
             Translations
             {translations.length > 0 && (
-              <span className="ml-1.5 tabular-nums text-muted-foreground/50">{translations.length}</span>
+              <span className="ml-1.5 text-[13px] tabular-nums text-muted-foreground">{translations.length}</span>
             )}
           </button>
         )}
@@ -1422,15 +1424,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         {roleCanCheckWebsite && (
           <button
             onClick={() => setActiveTab("website")}
-            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            className={`cursor-pointer rounded-md px-4 py-2 text-sm transition-all ${
               activeTab === "website"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-black/5"
+                : "font-medium text-muted-foreground hover:bg-background/50 hover:text-foreground"
             }`}
           >
             官網
             {websiteIssues !== null && (
-              <span className={`ml-1.5 tabular-nums ${websiteIssues > 0 ? "font-semibold text-amber-700" : "text-muted-foreground/50"}`}>
+              <span className={`ml-1.5 text-[13px] tabular-nums ${websiteIssues > 0 ? "font-semibold text-amber-700" : "text-muted-foreground"}`}>
                 {websiteIssues}
               </span>
             )}
@@ -1509,13 +1511,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           {/* Radio Pattern placeholders (AP only) */}
           {showRadioPatterns && (
             <div className="mt-6">
-              <div className="mb-3 flex items-start justify-between gap-4">
+              {/* The hint used to sit right-aligned opposite the heading, where
+                  three ragged lines of mixed CJK and Latin read as broken. */}
+              <div className="mb-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Radio Patterns
                 </h4>
-                <div className="text-[11px] leading-relaxed text-muted-foreground max-w-md text-right">
-                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長邊 ≥ 800px</strong>。<strong className="text-foreground">比例不拘、四周留白會自動裁掉</strong>，PDF 會把圖放大到欄寬（2 頻段最大 259pt 寬；含 6GHz 為三排，高度上限 170pt）——所以圖愈大愈清楚，長邊 800px 以下列印會略糊。
-                </div>
+                <p className="mt-1.5 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
+                  📐 建議上傳 <strong className="font-semibold text-foreground">PNG / JPG，長邊 ≥ 800px</strong>。<strong className="font-semibold text-foreground">比例不拘、四周留白會自動裁掉</strong>，PDF 會把圖放大到欄寬（2 頻段最大 259pt 寬；含 6GHz 為三排，高度上限 170pt）——所以圖愈大愈清楚，長邊 800px 以下列印會略糊。
+                </p>
               </div>
               <div className="flex flex-wrap gap-4">
                 {patternSlots.map((slot) => {

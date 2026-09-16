@@ -199,7 +199,7 @@ export function WebsiteQuery() {
               role="tab"
               aria-selected={mode === key}
               onClick={() => switchMode(key)}
-              className={`rounded-md px-4 py-1.5 text-xs font-medium transition-all ${mode === key ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+              className={`rounded-md px-4 py-2 text-sm transition-all ${mode === key ? "bg-white font-semibold text-slate-900 shadow-sm ring-1 ring-black/5" : "font-medium text-slate-600 hover:bg-white/60 hover:text-slate-900"}`}
             >
               {MODE_LABEL[key]}
               {todo > 0 && <span className="ml-1.5 font-semibold tabular-nums text-amber-700">{todo}</span>}
