@@ -323,9 +323,32 @@ export function WebsiteTab({ model, onCount }: { model: string; onCount?: (count
                 )}
               </div>
 
-              <details className="rounded-lg border border-dashed border-slate-400 bg-slate-50 px-3.5 py-2.5">
-                <summary className="cursor-pointer text-sm font-semibold text-slate-800">明細：各站的檔名、版本、上傳時間，以及要轉給各區的問題清單</summary>
-                <div className="mt-3">
+              {/* Colleagues kept missing this — a grey dashed strip reads as a
+                  caption, not a control. Tinted, with a chevron that turns and
+                  the word 點開, so it looks like something you press. The amber
+                  is deliberately paler than the warning banner above (which is
+                  amber-300 on amber-50 with amber-900 text): noticeable, but
+                  not claiming to be a problem. */}
+              <details className="group rounded-lg border border-amber-200 bg-amber-50/70 transition-colors hover:bg-amber-50 [&[open]]:bg-amber-50/40">
+                <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-sm font-semibold text-slate-800 marker:content-none [&::-webkit-details-marker]:hidden">
+                  <svg
+                    className="h-3.5 w-3.5 flex-none text-amber-700 transition-transform group-open:rotate-90 motion-reduce:transition-none"
+                    viewBox="0 0 12 12"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden
+                  >
+                    <path d="M4 2l5 4-5 4" />
+                  </svg>
+                  <span className="min-w-0">明細：各站的檔名、版本、上傳時間，以及要轉給各區的問題清單</span>
+                  <span className="ml-auto flex-none rounded-md border border-amber-300 bg-white px-2 py-0.5 text-xs font-medium text-amber-800 group-open:hidden">
+                    點開
+                  </span>
+                </summary>
+                <div className="px-3.5 pb-3.5">
                   {/* The banner above counts sites for the versions marked 可上架;
                       this list counts every difference from SpecHub, so it must
                       not print a second, bigger "N 件事要處理" beside it. */}
