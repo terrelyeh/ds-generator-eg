@@ -85,7 +85,11 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ### Datasheet PDF
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
-- **規格表備註區**（per-product-line, optional）— VPN Firewall 等產品線可在最後一頁 spec 下方放免責備註（如 `*Note: Performance figures are estimates…`），支援多語言
+- **規格備註**（每個型號可多條，2026-09-16 起在 Google Sheet 維護）— PM 在 `Web Overview` 的 `Spec Footnote` 列一行寫一條，
+  行首的記號（`*`、`**`）對應規格值後面的同一個記號（例如 `6.8G*`）。印在最後一頁規格表下方，**四種版型都有**；
+  分頁會為它預留高度（放不下就多開一頁，不會被裁掉）。日文／繁中在翻譯頁的「規格備註」卡維護，AI 翻譯會保留記號；
+  沒填就印英文。產品頁 ▸ Detail ▸ Specifications 最下方可以看到內容與**記號一致性提醒**。
+  產品線層級的共用備註仍在（型號沒填時才用）
 - **Antennas Patterns**（Cloud AP / Broadband）— 上傳 radio pattern 圖後 PDF 自動新增一頁。
   繪製維度依產品推導：Cloud AP 用頻段（2.4G / 5G / 6G），Broadband CPE 用天線埠（Port1 / Port2），
   各含 H-Plane & E-Plane polar plots

@@ -145,14 +145,21 @@ SpecHub 那一側的大小來自 Storage（`lib/website/baseline.ts`）；
 - **還沒標記的最新版本**（`unmarkedLatest`）：Active 產品、SpecHub 產生、超過 7 天、那一版沒有任何標記。
   「站上現況」讀存下來的檢查（`describeSites`），站上已經是這一版的顯示綠字，可以勾選多份一次標記
 
-### 上線前要做的
+### 上線狀態（2026-09-16）
 
-- 套用 migration 00062（兩張新表，不動既有資料）
-- 建兩個 Telegram 群組、把 `@engenius_ds_bot` 加進去，用 `getUpdates` 拿 chat id，設到 Vercel Production
+- migration 00062 已套用；1b 已 merge（PR #96）並上正式站
+- **兩個 Telegram 群組已建好、chat id 已設在 Vercel Production**
+  （推送：「EG-DS官網推送提醒」／行銷：「EG-DS官網上架提醒」；機器人 `@engenius_ds_bot`，
+  privacy mode 開著所以要在群組裡對它送過一次 `/start`）
+  ⚠️ 群組改成公開、或打開「新成員可看聊天紀錄」會**升級成超級群組並換掉 chat id**，
+  提醒就會發不出去（心跳會變 `ok=false`，隔天健康檢查會叫）
+- **第一次排程 09:31 就跑了**：245 個型號、兩則訊息都發出（推送：APAC 的 S11/S21；行銷：77 份未標記）
 - ⚠️ **SpecHub 的 proxy 在 2026-09-16 之前沒放行 `/api/cron/*`**：`/api/cron/health` 一直被導到登入頁，
-  健康檢查**從來沒跑過**（`job_heartbeats` 沒有 `health` 列）。1b 的 PR 把 `/api/cron` 加進 `SERVICE_PATHS`，
-  上線後健康檢查才第一次跑，可能會先報 `reindex-web` 從沒回報過
+  健康檢查**從來沒跑過**（`job_heartbeats` 沒有 `health` 列）。1b 的 PR 把 `/api/cron` 加進 `SERVICE_PATHS`
 
 ## 還沒做
 
+- **36 份最新版還沒標記**（上線時 77 份，各站已是這一版的 41 份已標為可上架）。
+  沒歸零之前，行銷群組每個工作日都會收到那一行提醒 —— 「上架追蹤」的
+  「勾選站上已是這一版的 N 份」按鈕就是為了清這一批
 - 上傳者目前只有 WordPress user id，要換成名字要多查 users
