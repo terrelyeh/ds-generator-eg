@@ -43,22 +43,31 @@ interface ProductRow {
 export interface SpecHubModel {
   /** SpecHub's own spelling of the model number (ECW201L-PoE), for links. Null when SpecHub doesn't have it. */
   modelName: string | null;
+  /** products.id, for marks. Null when SpecHub doesn't have the model. */
+  productId: string | null;
   baseline: SpecHubBaseline;
 }
 
+/**
+ * Which version to judge each language against. A language marked 可上架 is
+ * judged against the marked version, which can be older than SpecHub's latest
+ * (v1.4 made but not ready yet); everything else against the latest.
+ */
+export type BaselineTargets = Partial<Record<DocLanguage, string>>;
+
 /** Null baseline when SpecHub has no product with this model number. */
-export async function loadBaseline(supabase: SupabaseClient, model: string): Promise<SpecHubModel> {
+export async function loadBaseline(supabase: SupabaseClient, model: string, targets?: BaselineTargets): Promise<SpecHubModel> {
   const { data: product } = (await supabase
     .from("products")
     .select("id, model_name, current_versions")
     .ilike("model_name", model.replace(/[%_\\]/g, "\\$&"))
     .maybeSingle()) as { data: ProductRow | null };
-  if (!product) return { modelName: null, baseline: null };
+  if (!product) return { modelName: null, productId: null, baseline: null };
   const { data: rows } = (await supabase
     .from("versions")
     .select("version, locale, generated_at, pdf_storage_path")
     .eq("product_id", product.id)) as { data: VersionRow[] | null };
-  return { modelName: product.model_name, baseline: await baselineFrom(supabase, product, rows ?? []) };
+  return { modelName: product.model_name, productId: product.id, baseline: await baselineFrom(supabase, product, rows ?? [], targets) };
 }
 
 /**
@@ -66,7 +75,11 @@ export async function loadBaseline(supabase: SupabaseClient, model: string): Pro
  * products read, one versions read, and a Storage listing per PDF.
  * Keyed by the upper-cased model number the sites use.
  */
-export async function loadBaselines(supabase: SupabaseClient, models: string[]): Promise<Map<string, SpecHubModel>> {
+export async function loadBaselines(
+  supabase: SupabaseClient,
+  models: string[],
+  targetsFor?: (productId: string) => BaselineTargets | undefined,
+): Promise<Map<string, SpecHubModel>> {
   const wanted = new Set(models.map((m) => m.toUpperCase()));
   const { data: products } = (await supabase.from("products").select("id, model_name, current_versions")) as { data: ProductRow[] | null };
   const matched = (products ?? []).filter((p) => wanted.has(p.model_name.toUpperCase()));
@@ -76,17 +89,21 @@ export async function loadBaselines(supabase: SupabaseClient, models: string[]):
         .select("product_id, version, locale, generated_at, pdf_storage_path")
         .in("product_id", matched.map((p) => p.id))) as { data: (VersionRow & { product_id: string })[] | null })
     : { data: [] };
-  const result = new Map<string, SpecHubModel>([...wanted].map((m) => [m, { modelName: null, baseline: null }]));
+  const result = new Map<string, SpecHubModel>([...wanted].map((m) => [m, { modelName: null, productId: null, baseline: null }]));
   await Promise.all(
     matched.map(async (product) => {
       const mine = (rows ?? []).filter((r) => r.product_id === product.id);
-      result.set(product.model_name.toUpperCase(), { modelName: product.model_name, baseline: await baselineFrom(supabase, product, mine) });
+      result.set(product.model_name.toUpperCase(), {
+        modelName: product.model_name,
+        productId: product.id,
+        baseline: await baselineFrom(supabase, product, mine, targetsFor?.(product.id)),
+      });
     }),
   );
   return result;
 }
 
-async function baselineFrom(supabase: SupabaseClient, product: ProductRow, rows: VersionRow[]): Promise<SpecHubBaseline> {
+async function baselineFrom(supabase: SupabaseClient, product: ProductRow, rows: VersionRow[], targets?: BaselineTargets): Promise<SpecHubBaseline> {
   const baseline: Partial<Record<DocLanguage, SpecHubVersion>> = {};
   const current = product.current_versions ?? {};
   await Promise.all(
@@ -99,7 +116,7 @@ async function baselineFrom(supabase: SupabaseClient, product: ProductRow, rows:
       }, null);
       // current_versions also holds numbers detected from Drive for PDFs made
       // before SpecHub; those have no row, no date and no file to compare.
-      const version = current[locale] ?? newest?.version;
+      const version = targets?.[language] ?? current[locale] ?? newest?.version;
       if (!version) return;
       const row = mine.find((r) => compareVersions(parseVersion(r.version) ?? [], parseVersion(version) ?? []) === 0) ?? null;
       baseline[language] = {

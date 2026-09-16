@@ -74,7 +74,9 @@ export type Permission =
   | "project_datasheet.view"
   | "project_datasheet.edit"
   // regional website datasheet check — reads the five WordPress sites
-  | "website_check.view";
+  | "website_check.view"
+  // marking a language version 可上架 / 不上架, which is what reminders track
+  | "website_check.mark";
 
 const PERMISSIONS: Record<Permission, Role[]> = {
   // Everyone can view product / dashboard / preview
@@ -145,6 +147,9 @@ const PERMISSIONS: Record<Permission, Role[]> = {
   // The person who pushes staging to production doesn't use SpecHub at all —
   // they get a Telegram digest instead, so there is no reason to widen this.
   "website_check.view": ["admin", "editor"],
+  // Marking says "this PDF may go on the sites" — the call of whoever makes
+  // and uploads the PDFs (MKT), same people who can see the check.
+  "website_check.mark": ["admin", "editor"],
 };
 
 /** Check if a role can perform an action. */

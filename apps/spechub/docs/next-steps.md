@@ -23,12 +23,10 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
-**官網 Datasheet 查詢**（1a 已上線 PR #92;設計見 [`website-datasheet-check.md`](website-datasheet-check.md)）：
-8a. **1b** — 版本列的「可上架」標記（提醒只追蹤標記過的版本）、每日檢查、Telegram 提醒
-   （推送提醒發**小群組**:負責推送的同事 + Terrel;上架提醒發行銷;現有通知只有一個 `TELEGRAM_CHAT_ID`,要另開）、
-   記錄各站推送時間（正式站整批變成跟測試站一樣的那天）
+**官網 Datasheet 查詢**（1a 已上線 PR #92；1b 做完 2026-09-16，設計見 [`website-datasheet-check.md`](website-datasheet-check.md)）：
+8a. **1b 上線前設定** — 套 migration 00062、建推送小群組與行銷群組並把 `@engenius_ds_bot` 加進去、
+   設 `TELEGRAM_WEBSITE_PUSH_CHAT_ID` / `TELEGRAM_WEBSITE_MKT_CHAT_ID`；上線後手動跑一次 `/api/cron/website-check` 補第一筆心跳
 8b. **上傳者名字** — 目前只有 WordPress user id,要多查 `/wp/v2/users`
-8c. **skill 同步** — `wp-ds-check` 的連字號型號（ECW201L-POE）與硬體版本（EWS357APv3）判斷,這邊修了、skill 還沒
 
 **多語言（2026-08-07 現況）**：
 9. **日文規格標籤只翻了 Cloud AP** — `spec_label_translations` 是**產品線層級**;

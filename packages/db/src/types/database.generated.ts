@@ -1517,6 +1517,66 @@ export type Database = {
         }
         Relationships: []
       }
+      website_marks: {
+        Row: {
+          decision: string
+          generated_at: string | null
+          locale: string
+          marked_at: string
+          marked_by: string | null
+          product_id: string
+          version: string
+        }
+        Insert: {
+          decision: string
+          generated_at?: string | null
+          locale: string
+          marked_at?: string
+          marked_by?: string | null
+          product_id: string
+          version: string
+        }
+        Update: {
+          decision?: string
+          generated_at?: string | null
+          locale?: string
+          marked_at?: string
+          marked_by?: string | null
+          product_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      website_site_state: {
+        Row: {
+          checked_at: string
+          last_push_at: string | null
+          pending: Json
+          production_modified: string | null
+          push_detected: boolean
+          site: string
+          staging_modified: string | null
+        }
+        Insert: {
+          checked_at?: string
+          last_push_at?: string | null
+          pending?: Json
+          production_modified?: string | null
+          push_detected?: boolean
+          site: string
+          staging_modified?: string | null
+        }
+        Update: {
+          checked_at?: string
+          last_push_at?: string | null
+          pending?: Json
+          production_modified?: string | null
+          push_detected?: boolean
+          site?: string
+          staging_modified?: string | null
+        }
+        Relationships: []
+      }
       versions: {
         Row: {
           changes: string

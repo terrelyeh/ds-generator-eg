@@ -57,7 +57,8 @@
   **同一份指南的版型那一節也有護欄**：`npm run check:guide-layouts` 比對
   `PROJECT_LAYOUTS` 與頁面上的 `data-layout` / `data-hex`——改個顏色是一行，
   而那一節連截圖都會過期。
-- **有一支每日健康檢查**（spechub `/api/cron/health`,10:00 TW）。它讀 `job_heartbeats`
+- **有一支每日健康檢查**（spechub `/api/cron/health`,10:00 TW;🔴 **2026-09-16 才真的開始跑** —— 之前 spechub 的 proxy
+  沒放行 `/api/cron/*`,Vercel Cron 被導到登入頁,`job_heartbeats` 從沒出現過 `health` 列）。它讀 `job_heartbeats`
   （migration 00054,三支排程各自在跑完時寫一列）、**主動探測向量檢索**、並比對知識庫的
   chunk 數量;有問題發 Telegram。**為什麼不看副作用**:Smart Sync 跳過的線不會更新
   `last_synced_at`、沒變的 chunk 不會被重寫,所以「沒事做」和「沒跑」長得一模一樣——

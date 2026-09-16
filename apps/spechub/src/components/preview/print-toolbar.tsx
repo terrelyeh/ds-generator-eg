@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { can, type Role } from "@eg/auth/permissions";
+import { useRegenerateGuard } from "@/components/website/regenerate-guard";
 
 interface PrintToolbarProps {
   model: string;
@@ -49,8 +50,17 @@ export function PrintToolbar({
   const showGenerateButton = roleAllowsGenerate;
   const generateDisabled = generating || !canGenerate || isDraftLocale;
 
-  async function handleGenerate(mode: "regenerate" | "new") {
+  const { confirmRegenerate, dialog: regenerateDialog } = useRegenerateGuard();
+
+  async function handleGenerate(requested: "regenerate" | "new") {
     setShowMenu(false);
+    let mode = requested;
+    // Same guard as the product page: a version marked 可上架 may already be on the regional sites.
+    if (mode === "regenerate" && !series) {
+      const choice = await confirmRegenerate(model, locale, currentVersion);
+      if (choice === "cancel") return;
+      if (choice === "new") mode = "new";
+    }
     setGenerating(true);
     const toastId = toast.loading("Generating PDF…", {
       description: `${model}${locale !== "en" ? ` · ${locale.toUpperCase()}` : ""}`,
@@ -164,6 +174,7 @@ export function PrintToolbar({
         boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
       }}
     >
+      {regenerateDialog}
       <span>
         Preview: <strong>{model}</strong>
         {locale !== "en" && (

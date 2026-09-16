@@ -25,7 +25,11 @@ import { createServerClient } from "@supabase/ssr";
 // Routes accessible without a session.
 const PUBLIC_PATH_PREFIXES = ["/auth/", "/api/auth/"];
 // Routes accessible without enforcing whitelist (cron uses CRON_SECRET).
-const SERVICE_PATHS = ["/api/sync"];
+// Every handler under /api/cron checks the bearer itself (requireCron). It was
+// missing here until 2026-09-16, so Vercel Cron's call to /api/cron/health got
+// redirected to the sign-in page and the health check never once ran — which
+// is also why job_heartbeats has no "health" row.
+const SERVICE_PATHS = ["/api/sync", "/api/cron"];
 /**
  * Individually published pages — world-readable, no account needed.
  *

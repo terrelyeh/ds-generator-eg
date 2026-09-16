@@ -10,6 +10,7 @@ const healthy = (): HealthInput => ({
     { job: "sync", last_run_at: hoursAgo(1), ok: true, detail: "15 lines" },
     { job: "reindex-products", last_run_at: hoursAgo(1), ok: true, detail: null },
     { job: "reindex-web", last_run_at: hoursAgo(30), ok: true, detail: null },
+    { job: "website-check", last_run_at: hoursAgo(1), ok: true, detail: null },
   ],
   retrievalOk: true,
   retrievalError: null,
@@ -97,5 +98,21 @@ describe("evaluateHealth", () => {
     const report = evaluateHealth(input, MONDAY);
     expect(report.allClear).toBe(false);
     expect(formatHealthMessage(report, MONDAY)).toContain("🔴");
+  });
+});
+
+describe("the weekday website check", () => {
+  it("is not late on Monday morning after Friday's run", () => {
+    const input = healthy();
+    const fridayRun = new Date("2026-09-04T01:30:00Z").toISOString();
+    input.heartbeats = input.heartbeats.map((h) => (h.job === "website-check" ? { ...h, last_run_at: fridayRun } : { ...h, last_run_at: hoursAgo(1, MONDAY) }));
+    expect(evaluateHealth(input, MONDAY).alerts).toEqual([]);
+  });
+
+  it("is late when a weekday run is missed", () => {
+    const input = healthy();
+    const thursdayRun = new Date("2026-09-03T01:30:00Z").toISOString();
+    input.heartbeats = input.heartbeats.map((h) => (h.job === "website-check" ? { ...h, last_run_at: thursdayRun } : { ...h, last_run_at: hoursAgo(1, MONDAY) }));
+    expect(evaluateHealth(input, MONDAY).alerts.map((a) => a.title)).toEqual(["官網 Datasheet 每日檢查 已經 4 天 沒有跑完"]);
   });
 });

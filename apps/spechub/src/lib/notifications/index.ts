@@ -264,3 +264,36 @@ export async function sendOpsMessage(text: string): Promise<NotifyResult> {
   }
   return result;
 }
+
+/**
+ * Send an HTML-formatted message to one specific Telegram chat, with the same
+ * bot. For audiences other than the ops chat: the website datasheet reminders
+ * go to a small push group and a marketing group (see lib/website/daily.ts).
+ *
+ * `chatId` undefined means that audience isn't set up yet — reported as
+ * skipped, not as an error, so the daily check can run before the groups exist.
+ */
+export async function sendTelegramHtml(
+  chatId: string | undefined,
+  html: string,
+): Promise<{ status: "sent" | "skipped" | "failed"; detail?: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || !chatId) return { status: "skipped", detail: !token ? "TELEGRAM_BOT_TOKEN not set" : "chat id not set" };
+  // Telegram's limit is 4096 characters. Cut at a line break so no HTML tag is left open.
+  let text = html;
+  if (text.length > 4000) {
+    const cut = text.lastIndexOf("\n", 3800);
+    text = `${text.slice(0, cut > 0 ? cut : 3800)}\n\n…訊息太長，其餘請到 SpecHub 看`;
+  }
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text, parse_mode: "HTML", disable_web_page_preview: true }),
+    });
+    if (!res.ok) return { status: "failed", detail: `${res.status} ${(await res.text()).slice(0, 200)}` };
+    return { status: "sent" };
+  } catch (err) {
+    return { status: "failed", detail: err instanceof Error ? err.message : String(err) };
+  }
+}

@@ -194,7 +194,8 @@ export interface WpFile {
 }
 
 /** "2024-08-30 03:13:01" (GMT, as ACF returns attachment dates) → ISO. */
-function gmtToIso(value: unknown): string | null {
+/** A WordPress GMT timestamp ("2026-09-15 03:34:54") as ISO, or null. */
+export function gmtToIso(value: unknown): string | null {
   const text = asString(value).trim();
   if (!/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}/.test(text)) return null;
   const date = new Date(`${text.replace(" ", "T").slice(0, 19)}Z`);
