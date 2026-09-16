@@ -26,6 +26,7 @@ import { usesTwoHardwareImages } from "@/lib/datasheet/qr";
 import { LineCoverButton } from "@/components/dashboard/line-cover-button";
 import { COVER_PHOTO_CATEGORIES } from "@/lib/datasheet/cover-photo";
 import { hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
+import { formatDate } from "@/lib/format-date";
 
 interface ProductSummary {
   id: string;
@@ -59,15 +60,6 @@ interface DashboardContentProps {
   productLines: ProductLine[];
   products: ProductSummary[];
   role?: Role;
-}
-
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 /** Colored dot status indicator */
