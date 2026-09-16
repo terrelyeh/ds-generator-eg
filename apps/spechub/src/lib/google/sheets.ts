@@ -303,22 +303,25 @@ function parseSpecSections(rows: unknown[][], colIdx: number): SheetSpecSection[
 // ---------------------------------------------------------------------------
 
 /**
- * Labels accepted for the spec footnote row. The row is optional and was added
- * to fifteen sheets by hand, so spelling drifts — match on a normalised label
- * rather than one exact string.
+ * Phrases that mark the spec footnote row.
+ *
+ * Matched as a SUBSTRING of the normalised label, because these sheets label
+ * rows bilingually on two lines inside one cell — the real label is
+ * "Spec Footnote\n規格備註", and an exact match found nothing in all fifteen
+ * sheets. Other labels in the tab are annotated the same way
+ * ("Key Feature Lists\n(條列式功能，最多12項)").
  *
  * ⚠️ None of these may contain "Overview", "Key Feature" or "DS Feature": the
- * matches for those rows below are substring matches, and a label like
- * "Spec Footnote (Overview)" would be read as the product's overview text.
+ * matchers for those rows are substring matches too, and whichever runs first
+ * would claim the row.
  */
-const SPEC_NOTE_LABELS = new Set([
-  "spec footnote",
-  "spec footnotes",
-  "spec note",
-  "spec notes",
-  "規格備註",
-  "規格註記",
-]);
+const SPEC_NOTE_LABELS = ["spec footnote", "spec note", "規格備註", "規格註記"];
+
+/** True when this column-A label is the spec footnote row. */
+export function isSpecFootnoteLabel(label: string): boolean {
+  const normalised = label.trim().toLowerCase().replace(/\s+/g, " ");
+  return SPEC_NOTE_LABELS.some((phrase) => normalised.includes(phrase));
+}
 
 function parseOverviewData(
   rows: unknown[][],
@@ -434,8 +437,7 @@ function parseOverviewData(
   // (`*`, `**`) to match the marker the PM typed into the spec value itself.
   // Newlines are kept: the renderer prints one line per note.
   for (const row of rows) {
-    const label = String(row?.[0] ?? "").trim().toLowerCase().replace(/\s+/g, " ");
-    if (SPEC_NOTE_LABELS.has(label)) {
+    if (isSpecFootnoteLabel(String(row?.[0] ?? ""))) {
       spec_notes = getCell(row, colIdx);
       break;
     }
