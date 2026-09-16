@@ -32,6 +32,18 @@ You are translating a list of product features (bullet points).
 - Output format: one feature per line, separated by newlines
 - Return EXACTLY the same number of lines as the input`,
 
+  spec_notes: `## Content Type: Spec Footnotes
+
+You are translating the footnotes printed under a datasheet's spec table.
+- Each line is one note and starts with a marker: *, **, *** (or a dagger)
+- **Copy each marker EXACTLY as it appears and keep it at the start of the line** —
+  the same marker is printed next to a value in the spec table, and a changed,
+  translated or dropped marker leaves the reader with a mark that points nowhere
+- Keep one note per line, in the same order
+- Return EXACTLY the same number of lines as the input
+- Keep the register of a technical disclaimer: plain, factual, no marketing
+- Leave units, model numbers, protocol names and standards in their original form`,
+
   spec_labels: `## Content Type: Specification Labels
 
 You are translating technical specification labels (short noun phrases).

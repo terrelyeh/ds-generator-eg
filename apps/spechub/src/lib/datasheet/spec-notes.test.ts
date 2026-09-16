@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { estimateSpecNotesHeight, parseSpecNotes, resolveSpecNotes } from "./spec-notes";
+import {
+  checkSpecNoteMarkers,
+  estimateSpecNotesHeight,
+  markersInNotes,
+  markersInValues,
+  parseSpecNotes,
+  resolveSpecNotes,
+} from "./spec-notes";
 
 describe("parseSpecNotes", () => {
   it("splits a cell into one note per line and keeps the markers", () => {
@@ -74,5 +81,50 @@ describe("estimateSpecNotesHeight", () => {
 
   it("adds up several notes", () => {
     expect(estimateSpecNotesHeight(["*One", "**Two", "***Three"])).toBe(16 + 3 * 11);
+  });
+});
+
+describe("marker checking", () => {
+  it("reads the marker each note opens with", () => {
+    expect(markersInNotes(["* Estimates only.", "** Needs a Wi-Fi 7 client.", "No marker here"])).toEqual(["*", "**"]);
+  });
+
+  it("finds markers attached to the end of a spec value", () => {
+    expect(markersInValues(["6.8G*", "1.5G*", "700 M**", "2 x 2.5GbE"])).toEqual(["*", "**"]);
+  });
+
+  it("does NOT read numbers in prose as markers", () => {
+    // The check's first version called 34 Cloud APs broken over these.
+    const values = [
+      "Four(4) spatial stream Single User (SU) MIMO for up to 1,400 Mbps",
+      "Two(2) spatial streams SU-MIMO for 2.4GHz and two(2) streams for 5GHz",
+      "1 x 2.5GE Port (PoE+)\n1 x DC Jack",
+    ];
+    expect(markersInValues(values)).toEqual([]);
+  });
+
+  it("pairs up what the values use with what the notes explain", () => {
+    expect(
+      checkSpecNoteMarkers({ notes: ["* Estimates only.", "** Syslog."], values: ["6.8G*", "logs**"] }),
+    ).toEqual({ valuesWithoutNote: [], notesWithoutValue: [] });
+  });
+
+  it("flags a marked value with nothing to explain it", () => {
+    const result = checkSpecNoteMarkers({ notes: ["* Estimates only."], values: ["6.8G*", "logs**"] });
+    expect(result.valuesWithoutNote).toEqual(["**"]);
+    expect(result.notesWithoutValue).toEqual([]);
+  });
+
+  it("flags a note no value points at", () => {
+    const result = checkSpecNoteMarkers({ notes: ["* Estimates only.", "** Syslog."], values: ["6.8G*"] });
+    expect(result.valuesWithoutNote).toEqual([]);
+    expect(result.notesWithoutValue).toEqual(["**"]);
+  });
+
+  it("says nothing when a product has neither", () => {
+    expect(checkSpecNoteMarkers({ notes: [], values: ["2 x 2.5GbE", "N/A"] })).toEqual({
+      valuesWithoutNote: [],
+      notesWithoutValue: [],
+    });
   });
 });

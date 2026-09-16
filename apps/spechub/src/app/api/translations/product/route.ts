@@ -22,12 +22,13 @@ export async function POST(request: Request) {
   if (denied) return denied;
   const user = await getCurrentUser();
   const body = await request.json();
-  const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, translated_by, confirm } = body as {
+  const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, spec_notes, translated_by, confirm } = body as {
     product_id: string;
     locale: string;
     translation_mode: "light" | "full";
     overview: string | null;
     features: string[] | null;
+    spec_notes?: string | null;
     headline?: string | null;
     subtitle?: string | null;
     hardware_image?: string | null;
@@ -74,6 +75,8 @@ export async function POST(request: Request) {
     subtitle: subtitle?.trim() || null,
     overview: overview?.trim() || null,
     features: alignedFeatures,
+    // Spec footnotes for this locale; null prints the English ones.
+    spec_notes: spec_notes?.trim() || null,
     hardware_image: hardware_image?.trim() || null,
     qr_label: qr_label?.trim() || null,
     qr_url: qr_url?.trim() || null,
