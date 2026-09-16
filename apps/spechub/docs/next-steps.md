@@ -20,13 +20,15 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
    （`scale.ts` 只涵蓋 en/es;ja/zh-TW 在 `app_settings`、刻意較大,要不要一起收斂是獨立決定）。
    2026-09-11 Data Center 規格表改版（#79 / #82:分組灰帶、型號改成一般列）同理,
    5 份 DC PDF 要 Regenerate 才是新版。
+   2026-09-16 的**規格備註**（#99/#100）也一樣:ESG320 / ESG510 / ESG610 / ESG620 的備註已經進系統,
+   但要 Regenerate 才會印在 PDF 上,官網上的檔案還要重新上傳。
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
-**官網 Datasheet 查詢**（1a 已上線 PR #92；1b 做完 2026-09-16，設計見 [`website-datasheet-check.md`](website-datasheet-check.md)）：
-8a. **1b 上線前設定** — 套 migration 00062、建推送小群組與行銷群組並把 `@engenius_ds_bot` 加進去、
-   設 `TELEGRAM_WEBSITE_PUSH_CHAT_ID` / `TELEGRAM_WEBSITE_MKT_CHAT_ID`；上線後手動跑一次 `/api/cron/website-check` 補第一筆心跳
+**官網 Datasheet 查詢**（1a + 1b 都已上線,設計見 [`website-datasheet-check.md`](website-datasheet-check.md)）：
 8b. **上傳者名字** — 目前只有 WordPress user id,要多查 `/wp/v2/users`
+8c. **77 份未標記的清理** — 1b 上線時有 77 份最新版沒有可上架／不上架標記,已標 41 份（各站都已是這一版的）,
+   剩 36 份要行銷判斷。沒歸零之前,行銷群組每個工作日都會收到那一行提醒
 
 **多語言（2026-08-07 現況）**：
 9. **日文規格標籤只翻了 Cloud AP** — `spec_label_translations` 是**產品線層級**;

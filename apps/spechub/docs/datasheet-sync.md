@@ -12,6 +12,9 @@
 - `Status` → `products.status`（Active / Upcoming / Pending）
 - `Single Overview` → `products.overview`
 - `Key Feature Lists` → `products.features` (JSON array, 自動 strip bullet 前綴)
+- `Spec Footnote／規格備註` → `products.spec_notes`（選填；一行一條，記號在行首。
+  **標籤是中英雙行的一個儲存格**，所以比對用正規化後的子字串，不是精確字串——
+  精確比對曾讓 15 條線全部讀不到）
 
 ### Product Status
 

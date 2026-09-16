@@ -125,7 +125,10 @@ metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet
 (en/ja/zh-TW/**es**、**四態審核**(`draft`→`pending_review`→`approved`/`changes_requested`,
 `draft` = 還沒送審、`pending_review` = 已送審待審,佇列只撈後者;`confirmed` 是
 `review_status='approved'` 的 generated column)、per-locale typography **四語系皆可調**、**6 層 AI 翻譯 prompt**
-——第 6 層是從原文算出的行數預算,防止譯文變長把封面擠爆)。**改 PDF/版面/翻譯前先讀該檔。**
+——第 6 層是從原文算出的行數預算,防止譯文變長把封面擠爆)、**規格備註**(sheet 的
+`Spec Footnote` 列 → `products.spec_notes`,一行一條、記號由 PM 自己配對;四種版型都印在
+最後一頁規格表下方,**A/B/C 的分頁器會預留備註高度** —— 頁面是 `overflow:hidden`,沒預留就是
+無聲切掉;產品頁與翻譯頁各有一個入口,記號對不上會提醒)。**改 PDF/版面/翻譯前先讀該檔。**
 
 ### Authentication & RBAC → [`docs/auth-rbac.md`](docs/auth-rbac.md)
 
@@ -183,7 +186,10 @@ Station navy)、**新版型先量參考稿再決定要不要開組件**(Station 
 參考圖內建文字要裁掉、footer 綁最後一頁而非某個 section)。
 **關鍵雷**:① sync 只匯入「Web Overview 有列」的型號,漏列 = 靜默不同步;
 ② **category 判斷一律精確比對且集中在 `lib/datasheet/qr.ts`**(pitfall #61);
-③ Drive 各線/各語言資料夾**自動建**,但 `drive_folder_id`/`ds_images_folder_id` 常填反。
+③ Drive 各線/各語言資料夾**自動建**,但 `drive_folder_id`/`ds_images_folder_id` 常填反;
+④ **Detail Specs 上「A 欄有字、型號欄全空」= 新的規格分類** —— 規格備註因此只能放
+`Web Overview`,放錯分頁會把後面所有規格吃進一個叫「*Note…」的分類且不報錯。
+Web Overview 的列標籤是**中英雙行**,比對要用正規化子字串。
 
 ## Brand & Visual System
 
@@ -290,15 +296,14 @@ auth.users → profiles ← email_whitelist.invited_by
 **🔴 Code review 的收尾（2026-09-04,詳見 memory `project-code-review-2026-09`）**：
 0a. **輪替 `app_settings` 的六把金鑰 + 重新產生 `VERCEL_AUTOMATION_BYPASS_SECRET`**
    —— 門關了但鑰匙沒換。金鑰在 EnGenie `/settings/api-keys` 改。
+   🔴 **另外要輪替 Google 服務帳號金鑰**（`datasheet-sync-723@…`）—— 2026-09-16 一支
+   本機腳本把 base64 的 `GOOGLE_SERVICE_ACCOUNT_JSON` 丟進 `JSON.parse`,Node 把整串
+   （含私鑰）印進了錯誤訊息。**讀 env 的值要先確認編碼,且不要讓原值進到錯誤訊息**。
 0b. **在正式站問 Ask 一題** —— `gate()` 需要真 session,headless 驗不了。
    Generate PDF 那半已有佐證（9/4 之後正式站產了 14 份）;Ask 到 2026-09-15 為止
    `ask_requests` 還沒有任何一筆 answered。
    審查刻意只做一半的三件事（不是待辦,是別當成漏做）:去重只碰 auth 頁面與 `getGoogleAuth()`
    （`ui/` 各留一份是拆分時的決定）、passcode 登入時才就地升級成 scrypt、限流只有每分鐘沒有每日上限。
-
-**🔜 官網 Datasheet 1b 上線前設定**（程式 2026-09-16 做完）：套 migration 00062、建推送小群組與行銷群組
-（`@engenius_ds_bot`）並設 `TELEGRAM_WEBSITE_PUSH_CHAT_ID` / `TELEGRAM_WEBSITE_MKT_CHAT_ID`。
-細節見 [`docs/website-datasheet-check.md`](docs/website-datasheet-check.md) 的「上線前要做的」。
 
 其餘待辦（產品線素材、多語言擴展、翻譯 feedback、Battlecard 競品資料、自動邀請信）
 按領域列在 [`docs/next-steps.md`](docs/next-steps.md)。**只有下面這幾條需要現在知道**：
