@@ -59,6 +59,8 @@ images（`series_*` 圖）。
 ### products
 status, current_version, **current_versions** (JSONB: `{"en":"1.1","ja":"1.0"}`)、
 **ds_features** (JSONB `[{title, bullets[]}]`，選填的分組行銷文案)、
+**spec_notes**（規格表下方的備註，sheet 的 `Spec Footnote` 列，一行一條、記號在行首；
+NULL = 這台沒寫，改用 `product_lines.spec_footnote`）、
 product_image / hardware_image / **hardware_image_2**。
 
 ⚠️ 三個 image 欄位是 **`NOT NULL DEFAULT ''`** —— 要清空寫 `""` 不是 `null`
@@ -71,7 +73,7 @@ version, **locale**, pdf_storage_path, changes。
 ### product_translations
 per-product per-locale：headline, **subtitle**, overview, features,
 hardware_image（此欄 nullable，清空用 `null` 才對）, qr_label, qr_url,
-translation_mode, **confirmed**。
+**spec_notes**（該語系的規格備註，NULL = 印英文）, translation_mode, **confirmed**。
 
 ### 其他
 - `spec_label_translations` — per-line per-locale label 翻譯；

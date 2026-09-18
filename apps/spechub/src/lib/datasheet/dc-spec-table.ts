@@ -116,6 +116,9 @@ export function paginateDcSpecBlocks(
   blocks: DcSpecBlock[],
   firstPageBudget: number,
   restPageBudget: number,
+  /** Printed height of the spec footnote, which sits under the table on the
+   *  last page (`estimateSpecNotesHeight`). 0 = no notes, no reserve. */
+  notesHeight = 0,
 ): DcSpecBlock[][] {
   const pages: DcSpecBlock[][] = [];
   let current: DcSpecBlock[] = [];
@@ -134,6 +137,24 @@ export function paginateDcSpecBlocks(
     used += h;
   });
   if (current.length > 0) pages.push(current);
+
+  // The footnote prints under the table on the LAST page, so that page needs
+  // room for it. Move trailing rows onto a new page until it fits — and take
+  // any section header that ends up last with them, so a category title never
+  // sits alone at the bottom of a page. The page is overflow:hidden, so
+  // without this the notes are simply cut off and nothing says so.
+  while (notesHeight > 0 && pages.length < 20) {
+    const last = pages[pages.length - 1];
+    const budget = (pages.length === 1 ? firstPageBudget : restPageBudget) - notesHeight;
+    const heightOf = (page: DcSpecBlock[]) => page.reduce((h, b) => h + estimateDcBlockHeight(b), 0);
+    if (last.length <= 1 || heightOf(last) <= budget) break;
+    const moved: DcSpecBlock[] = [];
+    while (last.length > 1 && heightOf(last) > budget) moved.unshift(last.pop()!);
+    while (last.length > 1 && last[last.length - 1].kind === "section") moved.unshift(last.pop()!);
+    if (moved.length === 0) break;
+    pages.push(moved);
+  }
+
   return pages;
 }
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  AVAILABLE_HEIGHT,
   CATEGORY_HEADER_HEIGHT,
   HARD_COLUMN_LIMIT,
   SECTION_GAP,
@@ -94,5 +95,51 @@ describe("splitIntoPages — no column may exceed the hard limit", () => {
       expect(columnHeight(page.left, "zh-TW")).toBeLessThanOrEqual(HARD_COLUMN_LIMIT);
       expect(columnHeight(page.right, "zh-TW")).toBeLessThanOrEqual(HARD_COLUMN_LIMIT);
     }
+  });
+});
+
+describe("splitIntoPages — room for the spec footnote", () => {
+  /** As many sections as fit on one page, derived rather than assumed. */
+  function fillsOnePage(): Section[] {
+    const out: Section[] = [];
+    for (let i = 0; i < 40; i++) {
+      if (splitIntoPages([...out, smallSection(i)]).length > 1) break;
+      out.push(smallSection(i));
+    }
+    return out;
+  }
+
+  it("lays out exactly as before when the product has no notes", () => {
+    const sections = fillsOnePage();
+    expect(splitIntoPages(sections, undefined, 0)).toEqual(splitIntoPages(sections));
+  });
+
+  it("leaves the notes' height clear under the last page's columns", () => {
+    const notesHeight = 120;
+    const pages = splitIntoPages(fillsOnePage(), undefined, notesHeight);
+    const last = pages[pages.length - 1];
+    const tallest = Math.max(columnHeight(last.left), columnHeight(last.right));
+    expect(tallest + notesHeight).toBeLessThanOrEqual(AVAILABLE_HEIGHT);
+  });
+
+  it("opens another page rather than printing the notes over the specs", () => {
+    const sections = fillsOnePage();
+    expect(splitIntoPages(sections)).toHaveLength(1);
+    expect(splitIntoPages(sections, undefined, 200).length).toBeGreaterThan(1);
+  });
+
+  it("keeps every section, in order, when it spills", () => {
+    const sections = fillsOnePage();
+    const flat = splitIntoPages(sections, undefined, 200).flatMap((p) => [...p.left, ...p.right]);
+    expect(flat.map((s) => s.category)).toEqual(sections.map((s) => s.category));
+  });
+
+  it("holds the line on the last page of a multi-page sheet too", () => {
+    const notesHeight = 150;
+    const sections = Array.from({ length: 60 }, (_, i) => smallSection(i));
+    const pages = splitIntoPages(sections, undefined, notesHeight);
+    expect(pages.length).toBeGreaterThan(1);
+    const last = pages[pages.length - 1];
+    expect(Math.max(columnHeight(last.left), columnHeight(last.right)) + notesHeight).toBeLessThanOrEqual(AVAILABLE_HEIGHT);
   });
 });

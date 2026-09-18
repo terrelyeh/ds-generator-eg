@@ -279,7 +279,7 @@ export async function POST(request: Request) {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
             .from("products")
-            .select("id, subtitle, full_name, headline, overview, features, ds_features, status, product_image, hardware_image, hardware_image_2, current_versions")
+            .select("id, subtitle, full_name, headline, overview, features, ds_features, spec_notes, status, product_image, hardware_image, hardware_image_2, current_versions")
             .eq("model_name", modelName)
             .single();
 
@@ -325,6 +325,18 @@ export async function POST(request: Request) {
               JSON.stringify(sheetData.ds_features ?? null)
             ) {
               details.push({ field: "DS Feature Groups", from: "(previous)", to: "(updated)", type: "modified" });
+            }
+
+            // Spec footnote. Same reason as above: an edit that only touches
+            // the "Spec Footnote" row has to be visible to hasChanges, or
+            // Smart Sync skips the product and the note never reaches the DB.
+            if ((existing.spec_notes ?? "") !== (sheetData.spec_notes ?? "")) {
+              details.push({
+                field: "Spec Footnote",
+                from: existing.spec_notes || null,
+                to: sheetData.spec_notes || null,
+                type: !existing.spec_notes ? "added" : !sheetData.spec_notes ? "removed" : "modified",
+              });
             }
 
             // Spec-level diff
@@ -462,6 +474,7 @@ export async function POST(request: Request) {
                 overview: sheetData.overview,
                 features: sheetData.features,
                 ds_features: sheetData.ds_features,
+                spec_notes: sheetData.spec_notes || null,
                 status: sheetData.status,
                 sheet_last_modified: metadata.last_modified,
                 sheet_last_editor: metadata.last_editor,

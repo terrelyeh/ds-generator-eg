@@ -540,7 +540,26 @@ function columnHeight(col: Section[], locale?: string): number {
   return sections + Math.max(0, col.length - 1) * SECTION_GAP;
 }
 
-export function splitIntoPages(sections: Section[], locale?: string): SpecPage[] {
+/**
+ * Split the spec sections into printed pages.
+ *
+ * `notesHeight` is the printed height of the spec footnote
+ * (`estimateSpecNotesHeight`), which sits under BOTH columns of the last page.
+ * Passing 0 (or nothing) reproduces the behaviour from before notes existed.
+ *
+ * Reserving that space can't be done by repacking with a smaller budget for
+ * "the last page": which page is last depends on the packing, and a layout
+ * that exactly fills one page then oscillates — reserve on page 0 and it
+ * spills to two, reserve on page 1 and page 0 swallows everything again. So
+ * the rule is applied where the answer is known: the moment the queue empties,
+ * this page is the last one, and if the notes don't fit under it the trailing
+ * sections go back on the queue and take a page of their own.
+ */
+export function splitIntoPages(
+  sections: Section[],
+  locale?: string,
+  notesHeight = 0,
+): SpecPage[] {
   if (!sections.length) return [{ left: [], right: [] }];
 
   const pages: SpecPage[] = [];
@@ -552,6 +571,8 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
   const MAX_PAGES = 20;
 
   while (queue.length > 0 && pages.length < MAX_PAGES) {
+    const available = AVAILABLE_HEIGHT;
+    const hardLimit = HARD_COLUMN_LIMIT;
     const left: Section[] = [];
     const right: Section[] = [];
     let leftH = 0;
@@ -559,7 +580,7 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
 
     // Fill left column — split sections that don't fit
     while (queue.length > 0) {
-      const remaining = AVAILABLE_HEIGHT - leftH;
+      const remaining = available - leftH;
       const nextSection = queue[0];
       // Opening a column costs no gap; every section after it does.
       const gap = left.length === 0 ? 0 : SECTION_GAP;
@@ -610,7 +631,7 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
 
     // Fill right column — same logic
     while (queue.length > 0) {
-      const remaining = AVAILABLE_HEIGHT - rightH;
+      const remaining = available - rightH;
       const nextSection = queue[0];
       // Opening a column costs no gap; every section after it does.
       const gap = right.length === 0 ? 0 : SECTION_GAP;
@@ -661,12 +682,12 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
     // whole right one, so anything spilled from the left has to take the
     // right column with it or the specs come back in the wrong sequence.
     const spill: Section[] = [];
-    while (right.length > 1 && columnHeight(right, locale) > HARD_COLUMN_LIMIT) {
+    while (right.length > 1 && columnHeight(right, locale) > hardLimit) {
       spill.unshift(right.pop()!);
     }
-    if (left.length > 1 && columnHeight(left, locale) > HARD_COLUMN_LIMIT) {
+    if (left.length > 1 && columnHeight(left, locale) > hardLimit) {
       while (right.length > 0) spill.unshift(right.pop()!);
-      while (left.length > 1 && columnHeight(left, locale) > HARD_COLUMN_LIMIT) {
+      while (left.length > 1 && columnHeight(left, locale) > hardLimit) {
         spill.unshift(left.pop()!);
       }
     }
@@ -676,6 +697,30 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
       splitOccurred = true;
     }
 
+    // Queue empty = this is the last page, which is where the spec footnote
+    // prints. If the notes don't fit under the columns, push trailing sections
+    // onto the next page rather than let the block run past the trim edge —
+    // `.page` is overflow:hidden, so an overlong note is silently cut, and
+    // nothing downstream reports it (pitfall #69). Same order rule as above:
+    // anything spilled from the left column takes the right column with it.
+    if (notesHeight > 0 && queue.length === 0) {
+      const budget = AVAILABLE_HEIGHT - notesHeight;
+      const notesSpill: Section[] = [];
+      while (right.length > 1 && columnHeight(right, locale) > budget) {
+        notesSpill.unshift(right.pop()!);
+      }
+      if (left.length > 1 && columnHeight(left, locale) > budget) {
+        while (right.length > 0) notesSpill.unshift(right.pop()!);
+        while (left.length > 1 && columnHeight(left, locale) > budget) {
+          notesSpill.unshift(left.pop()!);
+        }
+      }
+      if (notesSpill.length > 0) {
+        queue.unshift(...notesSpill);
+        splitOccurred = true;
+      }
+    }
+
     pages.push({ left, right });
   }
 
@@ -683,6 +728,9 @@ export function splitIntoPages(sections: Section[], locale?: string): SpecPage[]
   // aesthetic symmetry between the two columns. If a split did occur,
   // keep the fitSection-driven layout — rebalancing would blow the
   // column heights.
+  // Rebalancing a single page is safe with notes too: it only ever evens the
+  // two columns out, so the tallest column can't grow past what the packer
+  // already accepted with the notes' space held back.
   if (pages.length === 1 && !splitOccurred) {
     return [balanceColumns(sections, locale)];
   }

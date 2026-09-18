@@ -6,6 +6,7 @@ import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { COVER_PHOTO_POLICIES } from "@/lib/datasheet/cover-photo";
 import { PT, WT, LADDER } from "@/lib/datasheet/scale";
 import { buildDcSpecBlocks, paginateDcSpecBlocks, withStripes } from "@/lib/datasheet/dc-spec-table";
+import { estimateSpecNotesHeight } from "@/lib/datasheet/spec-notes";
 import type {
   Product,
   ProductLine,
@@ -193,6 +194,7 @@ export function DataCenterPreview({
   locale = "en",
   translation,
   translationConfirmed = true,
+  specNotes = [],
 }: {
   product: DcQueryRow;
   showToolbar: boolean;
@@ -207,6 +209,10 @@ export function DataCenterPreview({
     hardware_image: string | null;
   } | null;
   translationConfirmed?: boolean;
+  /** Spec footnotes for this model, already resolved for the locale
+   *  (lib/datasheet/spec-notes). Printed under the table on the last
+   *  spec page. */
+  specNotes?: string[];
 }) {
   const dict = getDict(locale);
   const line = product.product_lines;
@@ -240,7 +246,12 @@ export function DataCenterPreview({
   // First spec page: title(70) + title band(22) → ~630pt of blocks. The two
   // identity rows are blocks now, so they come out of this budget instead of
   // the 40pt it used to set aside for them.
-  const specPages = paginateDcSpecBlocks(specBlocks, 630, 655).map(withStripes);
+  const specPages = paginateDcSpecBlocks(
+    specBlocks,
+    630,
+    655,
+    estimateSpecNotesHeight(specNotes),
+  ).map(withStripes);
 
   // Locales carry their own hardware render — its callouts are translated
   // in the image itself.
@@ -526,6 +537,9 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
 .spec-row td { font-size: ${PT.table}pt; line-height: 1.4; }
 .spec-row td.spec-label { color: #231f20; font-weight: ${WT.regular}; }
 .spec-row td.spec-value { color: #525355; white-space: pre-line; }
+/* Spec footnote — same treatment as the standard layout: under the table on
+   the last spec page, quiet grey, one line per note. */
+.spec-footnote { margin-top: 16pt; font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; line-height: 1.55; color: #6f7073; }
 .spec-row.alt td { background: #eff0f0; }
 /* A spec group ("General", "High-Performance AI & Graphics Acceleration").
    Layout A's category grey, set left and one weight up, so it reads as a
@@ -703,6 +717,13 @@ ${bulletDotCss(".flat-bullet .dot", PRIMARY)}
                 )}
               </tbody>
             </table>
+            {pi === specPages.length - 1 && specNotes.length > 0 && (
+              <div className="spec-footnote">
+                {specNotes.map((note, i) => (
+                  <div key={i}>{note}</div>
+                ))}
+              </div>
+            )}
           </div>
           <div className="page-number">{pad(3 + pi)}</div>
         </div>
