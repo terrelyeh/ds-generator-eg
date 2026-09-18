@@ -31,7 +31,7 @@ import {
   hasSubstantialContent,
 } from "./gitbook-fetcher";
 import { describeImages } from "./vision";
-import { selectAll } from "./select-all";
+import { loadExistingChunks } from "./gitbook-check";
 import {
   FOCUSED_CHUNK_INDEX,
   gitbookSourceId,
@@ -42,7 +42,6 @@ import {
   selectPagesToFetch,
   staleChunkIndices,
   visionState,
-  type ExistingGitbookRow,
   type IndexedPage,
   type SitemapEntry,
 } from "./gitbook-plan";
@@ -328,41 +327,6 @@ function focusedLedTable(
     };
   }
   return null;
-}
-
-/**
- * Every chunk already stored under this space's path — paged, because the
- * old unpaged read of all gitbook rows stopped at 1000 (see select-all).
- *
- * Scoped by source_id prefix rather than `metadata->>space_url`: a source_id
- * is the page's URL path, so the prefix reaches every row a page of this
- * space can own, whatever its metadata says. It also picks up a nested
- * space's rows (…/manual/jp under …/manual); no page of this space maps to
- * those ids, so they only cost the read.
- */
-async function loadExistingChunks(
-  supabase: ReturnType<typeof createAdminClient>,
-  baseUrl: string,
-): Promise<ExistingGitbookRow[]> {
-  let prefix = "";
-  try {
-    prefix = new URL(baseUrl).pathname.replace(/^\/+|\/+$/g, "");
-  } catch {
-    // An unparsable space URL fetched no sitemap either; read the whole type.
-  }
-  return selectAll<ExistingGitbookRow>((from, to) => {
-    let query = supabase
-      .from("documents" as "products")
-      .select(
-        "source_id, chunk_index, content_hash, last_modified:metadata->>last_modified, page_hash:metadata->>page_hash",
-      )
-      .eq("source_type", "gitbook");
-    if (prefix) query = query.like("source_id", `${prefix}%`);
-    return query.order("id").range(from, to) as unknown as PromiseLike<{
-      data: ExistingGitbookRow[] | null;
-      error: unknown;
-    }>;
-  }, "gitbook existing chunks");
 }
 
 /**

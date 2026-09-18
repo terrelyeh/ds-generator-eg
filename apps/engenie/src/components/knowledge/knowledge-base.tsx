@@ -1,15 +1,18 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaxonomyBadges, fetchTaxonomy } from "./taxonomy-picker";
 import {
+  type GitbookCheck,
   type SourceItem,
   type SourceTypeStats,
   formatDate,
   formatTokens,
+  pendingPages,
+  postGitbookCheck,
   postIngest,
 } from "./shared";
 import { GitbookDialog } from "./dialogs/gitbook-dialog";
@@ -64,6 +67,11 @@ export function KnowledgeBase() {
   const [syncingSourceId, setSyncingSourceId] = useState<string | null>(null);
   const [syncingSpace, setSyncingSpace] = useState<string | null>(null);
   const [reindexingLine, setReindexingLine] = useState<string | null>(null);
+  // The GitBook update check: which spaces have pages nobody has synced yet.
+  // Stored server-side by the weekly job, so the page opens with it already
+  // answered; the Check Updates button re-runs it on demand.
+  const [gitbookCheck, setGitbookCheck] = useState<GitbookCheck | null>(null);
+  const [checkingGitbook, setCheckingGitbook] = useState(false);
   const [plIdByName, setPlIdByName] = useState<Map<string, string>>(new Map());
 
   // Which modal is open. Each dialog component owns its own form state, so the
@@ -89,12 +97,53 @@ export function KnowledgeBase() {
       if (data.ok) {
         setStats(data.stats ?? {});
         setSources(data.sources ?? []);
+        setGitbookCheck(data.gitbook_check ?? null);
       }
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  /** space URL (no trailing slash) → what the last check found there. */
+  const pendingBySpace = useMemo(() => {
+    const m = new Map<string, GitbookCheck["spaces"][number]>();
+    for (const sp of gitbookCheck?.spaces ?? []) m.set(sp.spaceUrl.replace(/\/$/, ""), sp);
+    return m;
+  }, [gitbookCheck]);
+
+  const gitbookPendingTotal = (gitbookCheck?.spaces ?? []).reduce(
+    (sum, sp) => sum + (sp.error ? 0 : pendingPages(sp)),
+    0,
+  );
+
+  /** Re-run the update check. Reads sitemaps only — crawls nothing. */
+  async function handleGitbookCheck() {
+    setCheckingGitbook(true);
+    try {
+      const data = await postGitbookCheck();
+      if (data.ok && data.gitbook_check) {
+        const check = data.gitbook_check as GitbookCheck;
+        setGitbookCheck(check);
+        const total = check.spaces.reduce((sum, sp) => sum + (sp.error ? 0 : pendingPages(sp)), 0);
+        const failed = check.spaces.filter((sp) => sp.error).length;
+        toast.success(
+          total > 0
+            ? `${total} 頁有更新 — 按該 space 的 Sync 重新索引`
+            : failed > 0
+            ? "已檢查，但有 space 讀不到"
+            : "每個 space 都是最新的",
+        );
+        if (failed > 0) toast.error(`${failed} 個 space 檢查失敗（把游標移到標籤上看原因）`);
+      } else {
+        toast.error(`Check failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Check failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setCheckingGitbook(false);
+    }
+  }
 
   // Product line name → id, for per-line re-index (taxonomy is module-cached).
   useEffect(() => {
@@ -176,8 +225,11 @@ export function KnowledgeBase() {
           `${data.skipped} unchanged`,
           `${data.pages_fetched} pages fetched`,
           data.pages_skipped && data.pages_skipped > 0 ? `${data.pages_skipped} pages skipped` : null,
+          // The crawl has a deadline now that it is the only one there is.
+          data.pages_deferred && data.pages_deferred > 0 ? `${data.pages_deferred} pages left — press Sync again` : null,
         ].filter(Boolean);
         toast.success(`${spaceLabel}: ${parts.join(", ")}`);
+        if (data.gitbook_check) setGitbookCheck(data.gitbook_check as GitbookCheck);
         fetchData();
       } else {
         toast.error(`Sync failed: ${data.error}`);
@@ -424,12 +476,29 @@ export function KnowledgeBase() {
                           ) : config.status === "planned" ? (
                             <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">Coming Soon</span>
                           ) : null}
+                          {/* The update check's headline, on the card itself:
+                              GitBook is only re-crawled when somebody presses
+                              Sync, so this is the thing that has to be seen
+                              without expanding anything. */}
+                          {config.id === "gitbook" && gitbookPendingTotal > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 ring-1 ring-amber-300">
+                              {gitbookPendingTotal} 頁待更新
+                            </span>
+                          )}
                         </CardTitle>
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {config.description}
                           {typeStat?.last_updated && (
                             <span className="ml-2 text-muted-foreground">
                               — Last indexed: {formatDate(typeStat.last_updated)}
+                            </span>
+                          )}
+                          {config.id === "gitbook" && typeStat && (
+                            <span className="ml-2 text-muted-foreground">
+                              — 更新檢查（每週自動）：
+                              {gitbookCheck
+                                ? `${gitbookPendingTotal > 0 ? `${gitbookPendingTotal} 頁待手動 Sync` : "全部最新"}，${formatDate(gitbookCheck.checked_at)}`
+                                : "還沒跑過"}
                             </span>
                           )}
                         </p>
@@ -440,6 +509,18 @@ export function KnowledgeBase() {
                       {typeStat && (
                         <Button variant="outline" size="sm" onClick={() => setExpandedType(isExpanded ? null : config.id)} className="text-xs">
                           {isExpanded ? "Hide" : "Details"}
+                        </Button>
+                      )}
+                      {config.id === "gitbook" && typeStat && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleGitbookCheck}
+                          disabled={checkingGitbook || !!ingesting}
+                          className="text-xs"
+                          title="讀每個 space 的 sitemap，看有沒有新頁面。只是檢查，不會重新索引。"
+                        >
+                          {checkingGitbook ? "Checking…" : "Check Updates"}
                         </Button>
                       )}
                       {config.canIngest && config.id === "gitbook" && (
@@ -524,7 +605,36 @@ export function KnowledgeBase() {
                             <tbody>
                               {spaces.map(([label, info]) => (
                                 <tr key={label} className="border-t hover:bg-muted/30 transition-colors">
-                                  <td className="px-3 py-2 font-medium">{label}</td>
+                                  <td className="px-3 py-2 font-medium">
+                                    <div className="flex items-center gap-2">
+                                      <span>{label}</span>
+                                      {(() => {
+                                        const p = pendingBySpace.get((info.url || "").replace(/\/$/, ""));
+                                        if (!p) return null;
+                                        if (p.error) {
+                                          return (
+                                            <span title={p.error} className="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-medium text-red-700 ring-1 ring-red-200">
+                                              檢查失敗
+                                            </span>
+                                          );
+                                        }
+                                        const n = pendingPages(p);
+                                        const when = `${formatDate(p.checkedAt)} 檢查`;
+                                        return n > 0 ? (
+                                          <span
+                                            title={`${p.changed} 頁內容有更新、${p.added} 頁是新的${p.undated > 0 ? `、${p.undated} 頁 sitemap 沒給日期` : ""} · ${when}`}
+                                            className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-300"
+                                          >
+                                            {n} 頁待更新
+                                          </span>
+                                        ) : (
+                                          <span title={`${p.total} 頁都跟官方文件一致 · ${when}`} className="text-[10px] text-muted-foreground">
+                                            最新
+                                          </span>
+                                        );
+                                      })()}
+                                    </div>
+                                  </td>
                                   <td className="px-3 py-2 text-center tabular-nums">{info.pages}</td>
                                   <td className="px-3 py-2 text-center tabular-nums">{info.chunks}</td>
                                   <td className="px-3 py-2 text-center tabular-nums text-muted-foreground">{formatTokens(info.tokens)}</td>
