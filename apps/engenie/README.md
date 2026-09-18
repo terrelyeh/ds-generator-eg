@@ -47,7 +47,7 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 ### Knowledge Base — 知識索引管理（`/knowledge`）
 - **11 種來源類型**：
   - **Product Specs** — 從 DB 自動 tag taxonomy 的產品規格（overview + 規格）
-  - **Gitbook Docs** — 含 Vision API 圖片描述；QSG 自動抽出 LED behavior table
+  - **Gitbook Docs** — 含 Vision API 圖片描述；QSG 自動抽出 LED behavior table。**每週自動檢查有沒有新頁面**（卡片上顯示「N 頁待更新」、每個 space 一個標記），**重新索引由人按該 space 的 Sync**（增量，只抓有變的頁）
   - **Help Center** — Intercom 技術文章
   - **Google Docs** — Drive API 或公開連結，per-row 一鍵重抓
   - **WiFi Regulations** — 各國 WiFi 法規（頻段、頻道、功率、DFS），來自 EnGenius WiFi RegHub
@@ -61,6 +61,7 @@ EnGenius 公司知識平台 — 把產品規格、技術文件、法規等知識
 - **Product Specs 分組瀏覽** — 型號清單依 **Solution ▸ Product Line 折疊分組**、可搜尋（型號 / 標題）、**每條產品線各自 Re-index**，量大也好管理
 - **Edit Taxonomy** — 每個來源都能事後補 tag，不用重跑 ingest
 - **Re-index / Force Re-index / Delete** — 按來源類型或產品線管理；每個來源顯示最後索引時間
+- **Check Updates（Gitbook）** — 讀各 space 的 sitemap 比對索引，回報哪個 space 有幾頁待更新；只是檢查，不會重新索引
 
 ### 對外 RAG Search API（其他部門串接）
 - **`POST /api/v1/search`** — 讓其他部門的 app 查詢知識庫、取得最相關片段，接進自己的 LLM

@@ -20,15 +20,18 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
    （`scale.ts` 只涵蓋 en/es;ja/zh-TW 在 `app_settings`、刻意較大,要不要一起收斂是獨立決定）。
    2026-09-11 Data Center 規格表改版（#79 / #82:分組灰帶、型號改成一般列）同理,
    5 份 DC PDF 要 Regenerate 才是新版。
-   2026-09-16 的**規格備註**（#99/#100）也一樣:ESG320 / ESG510 / ESG610 / ESG620 的備註已經進系統,
-   但要 Regenerate 才會印在 PDF 上,官網上的檔案還要重新上傳。
+   2026-09-16 的**規格備註**（#99/#100）也一樣:ESG320 / ESG510 / ESG610 / ESG620 的備註已經進系統
+   （2026-09-18 起 ja / zh-TW 也有,5 列,已在 prod 的 print preview 驗過兩條備註都印得出來）,
+   但要 Regenerate 才會印在 PDF 上,官網上的檔案還要重新上傳。**這四份由 Terrel 自己重產**（2026-09-18 說的）。
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 
 **官網 Datasheet 查詢**（1a + 1b 都已上線,設計見 [`website-datasheet-check.md`](website-datasheet-check.md)）：
 8b. **上傳者名字** — 目前只有 WordPress user id,要多查 `/wp/v2/users`
-8c. **77 份未標記的清理** — 1b 上線時有 77 份最新版沒有可上架／不上架標記,已標 41 份（各站都已是這一版的）,
-   剩 36 份要行銷判斷。沒歸零之前,行銷群組每個工作日都會收到那一行提醒
+8c. **未標記的清理** — 1b 上線時有 77 份最新版沒有可上架／不上架標記,用「只勾綠字」的按鈕標掉一批,
+   剩下的要行銷判斷。**沒歸零之前,行銷群組每個工作日都會收到那一行提醒**。
+   數量看「上架追蹤」頁籤（那裡的定義才是準的;2026-09-18 直接查 DB 粗算是 92 份最新版、40 份已標記,
+   比上線時多是因為之後又產了新版,而新版本身是未標記的）
 
 **多語言（2026-08-07 現況）**：
 9. **日文規格標籤只翻了 Cloud AP** — `spec_label_translations` 是**產品線層級**;
@@ -36,6 +39,14 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
    Broadband EOC 連繁中都沒有（那條線從沒開過標籤編輯器）。
    補法:`/translations/[line]` → Japanese → AI Translate Empty Fields,每條線約 $0.006。
    **產 PDF 寫死 `mode=full`,所以沒翻就是印英文。**
+9b. **VPN Firewall 的語系覆蓋不完整（2026-09-18 補備註時發現）** — ESG510 的 zh-TW、
+   ESG610 的 ja 與 zh-TW **根本沒有翻譯列**,所以那三個組合印的是英文。
+   刻意沒有直接建列:建一列等於替那台開啟該語系,而 overview / features 還是英文,
+   畫面上會變成一個沒做完的語系 —— 要不要開由 PM 決定。
+   另外 **ESG320 的 ja 還是 `draft`**,`generate-pdf` 會擋在 `confirmed` 上,要先 Save 定案。
+   ⚠️ 補備註這種資料時要顧**記號對稱**:四台的備註是兩條（`*` 效能估計、`**` syslog 轉送）,
+   而 `product_lines.spec_footnote_translations` 只翻了第一條 —— 直接沿用會讓規格表裡的 `**` 指向不存在的備註。
+
 10. **`product_translations.translation_mode` 欄位沒有人讀** — 編輯器的 Light/Full
    下拉已於 2026-08-07 移除（它什麼都沒改變）,存檔固定寫 `full`。欄位本身還在,
    要清掉是另一個 migration。
