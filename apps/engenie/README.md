@@ -130,7 +130,7 @@ npm run dev -w engenie
 
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，function region 釘 **`hnd1`（東京）— 不要改**（Supabase 在 ap-northeast-1，跨區每 query +170ms）
 - **部署走 Vercel 原生 Git 整合**，`main` 一推就上 prod（2026-08-06 起；先前的 GitHub Actions 部署已移除）。PR 與 push 會在 GitHub Actions 跑 CI：兩個 app 的型別檢查、lint、測試，以及資料寫入等護欄
-- **Crons**：`/api/cron/reindex-web`（每週日 re-crawl web 來源）、`/api/cron/reindex-products`（每日 09:30 台灣時間，全量備援；SpecHub sync 完成後也會即時 POST 觸發窄域 re-index；這支每天也會清掉 90 天前的 Ask 問題原文）
+- **Crons**：`/api/cron/reindex-web`（每週日 re-crawl web 來源；**GitBook 只檢查有沒有更新，重新索引改由人在 Knowledge 頁按 Sync**）、`/api/cron/reindex-products`（每日 09:30 台灣時間，全量備援；SpecHub sync 完成後也會即時 POST 觸發窄域 re-index；這支每天也會清掉 90 天前的 Ask 問題原文）
 
 ## Environment Variables
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  classifyPending,
   FOCUSED_CHUNK_INDEX,
   gitbookSourceId,
   indexExistingPages,
+  pendingPageCount,
   missingMarkers,
   pageFingerprint,
   planPageWrites,
@@ -71,6 +73,67 @@ describe("selectPagesToFetch", () => {
   it("fetches a URL the sitemap lists twice only once", () => {
     const plan = selectPagesToFetch([{ url }, { url: `${url}/` }], new Map(), false);
     expect(plan.toFetch).toEqual([{ url }]);
+  });
+});
+
+describe("classifyPending", () => {
+  const OLD = "2026-06-01T00:00:00.000Z";
+  const NEW = "2026-08-19T02:04:36.354Z";
+  const edited = `${SPACE}/wireless/ssid`;
+  const current = `${SPACE}/switch/vlan`;
+  const brandNew = `${SPACE}/wireless/mesh`;
+  const undated = `${SPACE}/appendix`;
+
+  const pages = indexExistingPages([
+    row(gitbookSourceId(edited), 0, { last_modified: OLD }),
+    row(gitbookSourceId(current), 0, { last_modified: NEW }),
+    row(gitbookSourceId(undated), 0, { last_modified: OLD }),
+  ]);
+  const sitemap = [
+    { url: edited, lastModified: NEW },
+    { url: current, lastModified: NEW },
+    { url: brandNew, lastModified: NEW },
+    { url: undated },
+  ];
+
+  it("splits what a sync would fetch into changed, added and undated", () => {
+    expect(classifyPending(sitemap, pages)).toEqual({
+      total: 4,
+      changed: 1,
+      added: 1,
+      undated: 1,
+      unchanged: 1,
+    });
+    // The badge counts what is KNOWN to be new: the undated page is fetched
+    // too, but it would never stop being counted.
+    expect(pendingPageCount(classifyPending(sitemap, pages))).toBe(2);
+  });
+
+  it("partitions exactly the pages the crawl would go and fetch", () => {
+    // Three buckets, no page in two of them and none missing — otherwise the
+    // number shown and the number fetched drift apart silently.
+    const c = classifyPending(sitemap, pages);
+    expect(c.changed + c.added + c.undated).toBe(selectPagesToFetch(sitemap, pages, false).toFetch.length);
+    expect(c.total).toBe(new Set(sitemap.map((e) => gitbookSourceId(e.url))).size);
+  });
+
+  it("does not keep a badge lit for pages the sitemap never dates", () => {
+    // Cloud Licensing has four such pages: every sync fetches them, the
+    // fingerprint writes nothing, and the count would never go down.
+    const onlyUndated = classifyPending([{ url: undated }], pages);
+    expect(onlyUndated).toMatchObject({ undated: 1, changed: 0, added: 0 });
+    expect(pendingPageCount(onlyUndated)).toBe(0);
+  });
+
+  it("says nothing is waiting when every page carries the sitemap's date", () => {
+    const counts = classifyPending([{ url: current, lastModified: NEW }], pages);
+    expect(counts).toEqual({ total: 1, changed: 0, added: 0, undated: 0, unchanged: 1 });
+    expect(pendingPageCount(counts)).toBe(0);
+  });
+
+  it("counts a URL the sitemap lists twice once, and an empty index as all added", () => {
+    expect(classifyPending([{ url: current }, { url: `${current}/` }], pages).total).toBe(1);
+    expect(classifyPending(sitemap, new Map())).toMatchObject({ added: 4, changed: 0, unchanged: 0 });
   });
 });
 

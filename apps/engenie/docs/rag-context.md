@@ -22,7 +22,7 @@
 | Type | Pipeline | 備註 |
 |---|---|---|
 | `product_spec` | `ingest-products.ts` | 每 product 2 chunks (overview + specs)。taxonomy 從 product_lines.solution_id FK 自動帶入 |
-| `gitbook` | `ingest-gitbook.ts` | sitemap → fetch → chunk → Vision describe images。QSG 額外產出 focused LED chunks (chunk_index ≥ 10000) |
+| `gitbook` | `ingest-gitbook.ts` | sitemap → fetch → chunk → Vision describe images。QSG 額外產出 focused LED chunks (chunk_index ≥ 10000)。**重爬是手動的**（Knowledge 頁每個 space 的 Sync）；每週 cron 只跑 `gitbook-check.ts` 的更新檢查 |
 | `helpcenter` | `ingest-helpcenter.ts` | Intercom SPA fallback 用 `KNOWN_ARTICLES` |
 | `google_doc` | `ingest-google-doc.ts` | Service Account Drive API → public export fallback。Tab split by `\[vX.X\]` markers |
 | `wifi_regulation` | `ingest-wifi-regulations.ts` | WiFi RegHub API → 1 chunk per country (ISO code = source_id)，markdown 已預格式化 |

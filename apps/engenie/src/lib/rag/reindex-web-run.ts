@@ -12,22 +12,29 @@
 export type SourceKind = "helpcenter" | "google_doc" | "web" | "gitbook";
 
 /**
- * Run order. The kinds that cannot stop part-way through a unit go first,
- * while the budget is whole. GitBook goes last: it writes as it goes and
- * picks up next week wherever it stopped, so it is the one that can absorb
- * whatever time is left.
+ * Run order. GitBook goes FIRST, and it is the only kind that does not
+ * re-crawl: its unit is the update check (lib/rag/gitbook-check.ts), a few
+ * seconds that say which spaces have new pages for somebody to sync. It runs
+ * first because it is cheap and because its answer is the one thing here
+ * nobody can recover later — the crawls can be picked up next week, but
+ * "what changed" is only true on the day it was asked.
+ *
+ * It used to run last, on whatever time was left, as a real crawl: four
+ * spaces never fit in 300s, so every week ended with some of them half done.
  */
-export const SOURCE_KINDS: readonly SourceKind[] = ["helpcenter", "google_doc", "web", "gitbook"];
+export const SOURCE_KINDS: readonly SourceKind[] = ["gitbook", "helpcenter", "google_doc", "web"];
 
 /**
  * The time budget, counted from the start of the request (maxDuration 300s).
  *
- * START_CUTOFF_MS — no unit of that kind starts after this. The kinds that
- * cannot stop part-way stop starting first, so GitBook always has some room
- * and a slow run of docs cannot take every week's budget.
+ * START_CUTOFF_MS — no unit of that kind starts after this. Every kind stops
+ * starting at the same point now: none of them can stop part-way through a
+ * unit, so there is no longer a kind that wants the last stretch to itself.
  *
- * WORK_BUDGET_MS — the deadline handed to GitBook, which stops between page
- * batches when it passes.
+ * WORK_BUDGET_MS — the deadline handed to a unit that can stop part-way and
+ * resume. Only GitBook's crawl ever could, and that crawl now runs from the
+ * Knowledge page (which sets its own deadline), so nothing in this run reads
+ * it; it stays as the contract a resumable unit would be given.
  *
  * HARD_STOP_MS — the run records its heartbeat and answers at this point no
  * matter what is still running. Starting nothing late is not enough on its
@@ -39,10 +46,10 @@ export const SOURCE_KINDS: readonly SourceKind[] = ["helpcenter", "google_doc", 
  * first and marks pages done last.
  */
 export const START_CUTOFF_MS: Readonly<Record<SourceKind, number>> = {
+  gitbook: 150_000,
   helpcenter: 150_000,
   google_doc: 150_000,
   web: 150_000,
-  gitbook: 200_000,
 };
 export const WORK_BUDGET_MS = 200_000;
 export const HARD_STOP_MS = 280_000;
@@ -94,8 +101,17 @@ export interface UnitOutcome {
   ms: number;
   /** Chunks written. */
   processed: number;
-  /** GitBook pages a space left for the next run when the deadline passed. */
+  /**
+   * GitBook pages a space left for the next run when the deadline passed.
+   * Only a crawl running inside this job produces these, and the weekly run
+   * only checks GitBook now — so this is 0 unless the crawl comes back.
+   */
   deferredPages: number;
+  /**
+   * GitBook pages the update check found waiting for a manual Sync. Not work
+   * this job deferred: work it is not the one doing.
+   */
+  pendingPages: number;
 }
 
 export interface RunVerdict {
@@ -116,8 +132,9 @@ const ERROR_EXCERPT = 180;
  * A unit the run DECLINED to start, because the budget was spent, is ok. The
  * first real run (2026-09-18) refreshed Help Center and all 17 Google Docs
  * and got through two of four GitBook spaces in 206s with no errors; two
- * sources and 22 pages waited for the next run, which is the steady state
- * with four spaces and a 300s cap, not a fault. Reporting that as failure
+ * sources and 22 pages waited for the next run, which was the steady state
+ * with four spaces and a 300s cap, not a fault. (That is also why GitBook is
+ * now checked here and crawled by hand.) Reporting that as failure
  * every week would put a permanent warning in the health check, and a
  * warning that is always on is one nobody reads. The count stays in the
  * detail, so the backlog is still visible — and it stops being merely
@@ -155,6 +172,12 @@ export function summarizeRun(outcomes: UnitOutcome[], elapsedMs: number, fatal?:
     ].filter(Boolean);
     parts.push(`left for next run (time budget): ${left.join(" + ")}`);
   }
+
+  // The check's whole output. Still ok: these pages are somebody's queue on
+  // the Knowledge page, not something this job failed to do — and a number
+  // that is nearly always above zero would make `ok` mean nothing.
+  const pending = outcomes.reduce((sum, o) => sum + o.pendingPages, 0);
+  if (pending > 0) parts.push(`${pending} GitBook page(s) changed — waiting for a manual sync`);
 
   const errors = outcomes.flatMap((o) => o.errors.map((e) => `${o.kind}: ${e}`));
   if (errors.length > 0) {

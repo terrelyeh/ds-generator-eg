@@ -105,6 +105,62 @@ export function selectPagesToFetch(
   return { toFetch, unchanged };
 }
 
+/** What a check found waiting in one space. */
+export interface PendingCounts {
+  /** Distinct pages in the sitemap. */
+  total: number;
+  /** Indexed pages whose sitemap date is not one the index holds. */
+  changed: number;
+  /** Sitemap pages with no chunk at all — added since the last crawl. */
+  added: number;
+  /** Sitemap pages with no `<lastmod>`: only fetching one can tell. */
+  undated: number;
+  /** Pages the crawl would skip. */
+  unchanged: number;
+}
+
+/**
+ * How much work a space is holding, without fetching a single page.
+ *
+ * This is what the weekly job reports and what the Sync button's badge shows
+ * (see gitbook-check.ts). It is deliberately built ON TOP of
+ * `selectPagesToFetch` rather than beside it: two implementations of "is this
+ * page current?" would drift the first time one of them was fixed, and this
+ * file exists because those rules already broke silently once. The three
+ * buckets partition exactly what a crawl would fetch.
+ */
+export function classifyPending(
+  entries: SitemapEntry[],
+  pages: Map<string, IndexedPage>,
+): PendingCounts {
+  const { toFetch, unchanged } = selectPagesToFetch(entries, pages, false);
+  let changed = 0;
+  let added = 0;
+  let undated = 0;
+  for (const entry of toFetch) {
+    if (!pages.has(gitbookSourceId(entry.url))) added++;
+    else if (!entry.lastModified) undated++;
+    else changed++;
+  }
+  return { total: toFetch.length + unchanged, changed, added, undated, unchanged };
+}
+
+/**
+ * Pages that are KNOWN to be new or changed — the number shown to a person.
+ *
+ * `undated` is left out, although a crawl does fetch those pages. A sitemap
+ * entry with no `<lastmod>` cannot be judged without fetching it (the page
+ * fingerprint decides, and almost always decides to write nothing), so it
+ * never leaves that bucket: counting it would give four of the real spaces a
+ * badge that stays lit after a sync, and a number that cannot be cleared is a
+ * number nobody acts on. The count is still reported separately, and the
+ * partition is what keeps it honest: changed + added + undated is exactly
+ * what the crawl fetches.
+ */
+export function pendingPageCount(p: PendingCounts): number {
+  return p.changed + p.added;
+}
+
 /**
  * GitBook's relative "Last updated 26 days ago", on its own line.
  *

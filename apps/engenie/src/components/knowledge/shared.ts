@@ -28,6 +28,15 @@ export interface SourceTypeStats {
   last_updated: string | null;
 }
 
+/**
+ * The stored GitBook update check, as the page reads it.
+ *
+ * `import type` on purpose: the module it comes from talks to the database,
+ * and a value import here would pull the admin client into the browser
+ * bundle. The shape is defined once, in lib/rag/gitbook-check.ts.
+ */
+export type { GitbookCheck, SpacePending } from "@/lib/rag/gitbook-check";
+
 /** Loose shape of POST /api/documents ingest responses (fields vary by type). */
 export interface IngestResponse {
   ok: boolean;
@@ -37,6 +46,8 @@ export interface IngestResponse {
   chunks?: number;
   pages_fetched?: number;
   pages_skipped?: number;
+  /** GitBook pages a crawl left when its deadline passed — press Sync again. */
+  pages_deferred?: number;
   images_described?: number;
   articles_fetched?: number;
   tabs_found?: number;
@@ -50,6 +61,17 @@ export interface IngestResponse {
 export function formatDate(dateStr: string | null) {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Pages known to be new or changed in a GitBook space.
+ *
+ * Mirrors `pendingPageCount` in lib/rag/gitbook-plan.ts, which cannot be
+ * imported here: that module reaches for node:crypto and this one runs in the
+ * browser. `undated` is deliberately not counted — see that comment.
+ */
+export function pendingPages(s: { changed: number; added: number }): number {
+  return s.changed + s.added;
 }
 
 export function formatTokens(tokens: number) {
@@ -86,6 +108,20 @@ export async function postIngest(body: Record<string, unknown>): Promise<IngestR
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action: "ingest", ...body }),
+  });
+  return res.json();
+}
+
+/**
+ * Ask for a fresh GitBook update check — reads each space's sitemap, crawls
+ * nothing. The weekly job runs the same check; this is the button for when
+ * somebody wants the answer now.
+ */
+export async function postGitbookCheck(): Promise<IngestResponse> {
+  const res = await fetch("/api/documents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "check", source_type: "gitbook" }),
   });
   return res.json();
 }
