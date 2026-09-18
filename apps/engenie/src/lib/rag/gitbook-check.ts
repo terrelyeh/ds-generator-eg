@@ -212,8 +212,12 @@ export function describeCheck(spaces: SpacePending[]): string {
     .filter((s) => !s.error && pendingPageCount(s) > 0)
     .map((s) => `${s.spaceLabel} ${pendingPageCount(s)}`);
   const failed = spaces.filter((s) => s.error).length;
+  const undated = spaces.reduce((sum, s) => sum + s.undated, 0);
   const parts = [`${spaces.length} space(s) checked`];
   parts.push(withWork.length > 0 ? `changed: ${withWork.join(", ")}` : "all current");
+  // Said, not counted: these are re-fetched by every sync and written by
+  // almost none, so they belong in the log and not in anybody's total.
+  if (undated > 0) parts.push(`${undated} page(s) the sitemap does not date`);
   if (failed > 0) parts.push(`${failed} could not be checked`);
   return parts.join(", ");
 }

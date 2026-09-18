@@ -64,15 +64,14 @@ export function formatDate(dateStr: string | null) {
 }
 
 /**
- * Pages a Sync of this space would fetch.
+ * Pages known to be new or changed in a GitBook space.
  *
  * Mirrors `pendingPageCount` in lib/rag/gitbook-plan.ts, which cannot be
  * imported here: that module reaches for node:crypto and this one runs in the
- * browser. Three fields, added up; if a fourth kind of pending page ever
- * appears, both places count it.
+ * browser. `undated` is deliberately not counted — see that comment.
  */
-export function pendingPages(s: { changed: number; added: number; undated: number }): number {
-  return s.changed + s.added + s.undated;
+export function pendingPages(s: { changed: number; added: number }): number {
+  return s.changed + s.added;
 }
 
 export function formatTokens(tokens: number) {

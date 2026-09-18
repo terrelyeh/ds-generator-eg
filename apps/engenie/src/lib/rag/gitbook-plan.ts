@@ -124,11 +124,10 @@ export interface PendingCounts {
  *
  * This is what the weekly job reports and what the Sync button's badge shows
  * (see gitbook-check.ts). It is deliberately built ON TOP of
- * `selectPagesToFetch` rather than beside it: the number a person is shown
- * has to be the number of pages the Sync then actually goes and gets, and two
- * implementations of "is this page current?" would drift the first time one
- * of them was fixed — this file exists because those rules already broke
- * silently once.
+ * `selectPagesToFetch` rather than beside it: two implementations of "is this
+ * page current?" would drift the first time one of them was fixed, and this
+ * file exists because those rules already broke silently once. The three
+ * buckets partition exactly what a crawl would fetch.
  */
 export function classifyPending(
   entries: SitemapEntry[],
@@ -146,9 +145,20 @@ export function classifyPending(
   return { total: toFetch.length + unchanged, changed, added, undated, unchanged };
 }
 
-/** Pages a Sync of this space would fetch — the badge's number. */
+/**
+ * Pages that are KNOWN to be new or changed — the number shown to a person.
+ *
+ * `undated` is left out, although a crawl does fetch those pages. A sitemap
+ * entry with no `<lastmod>` cannot be judged without fetching it (the page
+ * fingerprint decides, and almost always decides to write nothing), so it
+ * never leaves that bucket: counting it would give four of the real spaces a
+ * badge that stays lit after a sync, and a number that cannot be cleared is a
+ * number nobody acts on. The count is still reported separately, and the
+ * partition is what keeps it honest: changed + added + undated is exactly
+ * what the crawl fetches.
+ */
 export function pendingPageCount(p: PendingCounts): number {
-  return p.changed + p.added + p.undated;
+  return p.changed + p.added;
 }
 
 /**
