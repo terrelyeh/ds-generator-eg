@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-16。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-09-18。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -128,7 +128,10 @@ metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet
 ——第 6 層是從原文算出的行數預算,防止譯文變長把封面擠爆)、**規格備註**(sheet 的
 `Spec Footnote` 列 → `products.spec_notes`,一行一條、記號由 PM 自己配對;四種版型都印在
 最後一頁規格表下方,**A/B/C 的分頁器會預留備註高度** —— 頁面是 `overflow:hidden`,沒預留就是
-無聲切掉;產品頁與翻譯頁各有一個入口,記號對不上會提醒)。**改 PDF/版面/翻譯前先讀該檔。**
+無聲切掉;產品頁與翻譯頁各有一個入口,記號對不上會提醒;
+語系版本存 `product_translations.spec_notes`,**編輯器的 Save 和 Preview 共用同一個
+`editorPayload()`** —— Preview 曾因為 payload 少一個欄位就把剛翻好的備註清成 null,見 #79)。
+**改 PDF/版面/翻譯前先讀該檔。**
 
 ### Authentication & RBAC → [`docs/auth-rbac.md`](docs/auth-rbac.md)
 
@@ -299,9 +302,8 @@ auth.users → profiles ← email_whitelist.invited_by
    🔴 **另外要輪替 Google 服務帳號金鑰**（`datasheet-sync-723@…`）—— 2026-09-16 一支
    本機腳本把 base64 的 `GOOGLE_SERVICE_ACCOUNT_JSON` 丟進 `JSON.parse`,Node 把整串
    （含私鑰）印進了錯誤訊息。**讀 env 的值要先確認編碼,且不要讓原值進到錯誤訊息**。
-0b. **在正式站問 Ask 一題** —— `gate()` 需要真 session,headless 驗不了。
-   Generate PDF 那半已有佐證（9/4 之後正式站產了 14 份）;Ask 到 2026-09-15 為止
-   `ask_requests` 還沒有任何一筆 answered。
+（0b「在正式站問 Ask 一題」**已結案**:`ask_requests` 在 2026-09-15 有 3 筆 `outcome='answered'`,
+   Generate PDF 那半也有佐證（9/4 之後正式站產了 14 份）。）
    審查刻意只做一半的三件事（不是待辦,是別當成漏做）:去重只碰 auth 頁面與 `getGoogleAuth()`
    （`ui/` 各留一份是拆分時的決定）、passcode 登入時才就地升級成 scrypt、限流只有每分鐘沒有每日上限。
 

@@ -1,6 +1,6 @@
 # CLAUDE.md — EnGenie (apps/engenie)
 
-> Last updated: 2026-09-12。monorepo 拆分全部完成，prod `engenie-eg` 在拆分後架構；
+> Last updated: 2026-09-18。monorepo 拆分全部完成，prod `engenie-eg` 在拆分後架構；
 > 本檔承接原 spechub CLAUDE.md 的 RAG / Ask / Knowledge context。
 >
 > 🔴 2026-09-03~04 全專案 code review 的教訓散在下方各條——檢索排除改在 SQL 做、沒有 passcode 就沒有
@@ -178,7 +178,7 @@ scripts/index-internal-docs.ts       # internal_doc 整包匯入（只有 CLI）
 
 ## Common Pitfalls
 
-全部 24 條（編號沿用 spechub、不重排）在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。最常踩的：
+全部 25 條（編號沿用 spechub、不重排）在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。最常踩的：
 
 - **#54** `useChatStream` 的 POST body 一律 `...getParams()` 展開——寫死欄位清單會靜默丟掉 workspace／userKey。
 - **#59** 檢索的 embedding 只用「當前問題」，不串對話歷史。
@@ -190,6 +190,7 @@ scripts/index-internal-docs.ts       # internal_doc 整包匯入（只有 CLI）
 - **#70** 沒有 passcode 的 workspace，`ws-auth` 會發 token 給任何人——新增 workspace 時要決定的是 passcode。
 - **#72** 陌生人能編輯、又會餵給模型的文字，加上邊界之前都是指令通道。
 - **#74** engenie 的測試跑在 spechub 的 vitest config 裡——被測模組內部用相對 import。
+- **#78** 一份永遠塞不完的工作量不要硬留在排程裡「盡量做」——把「檢查」和「做」拆開（GitBook 就是這樣變成每週檢查 + 手動重爬）。
 
 ## Deployment
 
