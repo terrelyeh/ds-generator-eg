@@ -109,10 +109,19 @@ const ERROR_EXCERPT = 180;
 /**
  * Whether the run did everything it set out to, and a line saying what.
  *
- * Not ok when anything errored or threw — and not ok when work was left for
- * next time. A run cut short by its budget did finish, which is why it
- * writes a heartbeat at all, but it did not refresh every source; saying ok
- * would hide exactly the slow creep that let this job time out unnoticed.
+ * Not ok when anything errored or threw, and not ok when a unit was still
+ * running at the hard stop — that one is the slow creep this job died of,
+ * and it has to keep ringing.
+ *
+ * A unit the run DECLINED to start, because the budget was spent, is ok. The
+ * first real run (2026-09-18) refreshed Help Center and all 17 Google Docs
+ * and got through two of four GitBook spaces in 206s with no errors; two
+ * sources and 22 pages waited for the next run, which is the steady state
+ * with four spaces and a 300s cap, not a fault. Reporting that as failure
+ * every week would put a permanent warning in the health check, and a
+ * warning that is always on is one nobody reads. The count stays in the
+ * detail, so the backlog is still visible — and it stops being merely
+ * visible the moment a unit is cut off mid-flight.
  */
 export function summarizeRun(outcomes: UnitOutcome[], elapsedMs: number, fatal?: string): RunVerdict {
   const parts: string[] = [`${Math.round(elapsedMs / 1000)}s`];
@@ -154,13 +163,7 @@ export function summarizeRun(outcomes: UnitOutcome[], elapsedMs: number, fatal?:
 
   const failed = outcomes.some((o) => o.status === "failed");
   return {
-    ok:
-      !fatal &&
-      !failed &&
-      interrupted.length === 0 &&
-      errors.length === 0 &&
-      deferredUnits === 0 &&
-      deferredPages === 0,
+    ok: !fatal && !failed && interrupted.length === 0 && errors.length === 0,
     detail: parts.join(" · "),
   };
 }

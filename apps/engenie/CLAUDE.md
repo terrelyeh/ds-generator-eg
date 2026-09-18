@@ -200,7 +200,8 @@ npm run build -w engenie
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，region **hnd1**（不要改）
 - Crons：`/api/cron/reindex-web` 週日、`/api/cron/reindex-products` 每日 09:30 TW（GET 順便跑 `ask_requests_redact()`，清掉 90 天前的問題原文）。
   **`reindex-web` 在 2026-09-16 之前從沒跑完過**（9/6、9/13 都在 300s 被殺，pitfall #76）：現在 150s（GitBook 200s）後
-  不再開始新來源、**280s 硬停一定寫心跳**，沒做到的寫進心跳（`ok=false`，之後接著做），每個來源一行 log 說花了多久；
+  不再開始新來源、**280s 硬停一定寫心跳**，沒做到的量寫進心跳的 detail、之後接著做，每個來源一行 log 說花了多久；
+  ⚠️ **`ok` 的分界是「有沒有錯」而不是「有沒有做完」**（2026-09-18 改）：預算用完而**沒開始**的來源算 ok（四個 GitBook space 配 300s 上限，每週剩一點是常態，報成失敗會讓健康檢查掛著一個永遠亮的警告）；**在硬停時還在跑的單位算 not ok**——那才是這支排程當初死掉的慢性落後。剩下的量一律留在 detail 裡；
   `?only=` 窄化的手動 run 不寫心跳。預算常數在 `lib/rag/reindex-web-run.ts`。
   **兩支都會在跑完時寫 `job_heartbeats`**（`recordHeartbeat` from `@eg/db/heartbeat`）——
   SpecHub 的 `/api/cron/health` 靠它判斷排程有沒有跑，而不是靠副作用（沒變更的 chunk
