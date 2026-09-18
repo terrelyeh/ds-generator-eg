@@ -87,7 +87,7 @@ describe("summarizeRun", () => {
     expect(verdict.detail).toContain("1 error(s), first — gitbook: Fetch failed: Error: HTTP 404");
   });
 
-  it("is not ok when the budget left work for next week, and says how much", () => {
+  it("is ok when the budget left work for next week, and says how much", () => {
     const verdict = summarizeRun(
       [
         outcome({ kind: "google_doc" }),
@@ -96,7 +96,9 @@ describe("summarizeRun", () => {
       ],
       231_000,
     );
-    expect(verdict.ok).toBe(false);
+    // Declining to start a unit is the plan working, not a failure — the
+    // health check would otherwise carry a warning every single week.
+    expect(verdict.ok).toBe(true);
     expect(verdict.detail).toBe(
       "231s · google_doc 1/1, gitbook 1/2 · 0 chunk(s) written · left for next run (time budget): 1 source(s) + 37 GitBook page(s)",
     );
@@ -116,6 +118,13 @@ describe("summarizeRun", () => {
       "280s · helpcenter 1/1, google_doc 0/1, gitbook 0/1 · 2 chunk(s) written · " +
         "cut off at the 280s hard stop: google_doc 1AbC · left for next run (time budget): 1 source(s)",
     );
+  });
+
+  it("separates work declined from work cut off: only the cut-off one is not ok", () => {
+    const declined = summarizeRun([outcome({ kind: "gitbook", status: "deferred" })], 210_000);
+    const cutOff = summarizeRun([outcome({ kind: "gitbook", status: "interrupted" })], 280_000);
+    expect(declined.ok).toBe(true);
+    expect(cutOff.ok).toBe(false);
   });
 
   it("treats a source that threw as not done", () => {
