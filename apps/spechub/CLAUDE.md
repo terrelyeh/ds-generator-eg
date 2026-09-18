@@ -341,7 +341,7 @@ npm run lint
 
 ## Common Pitfalls
 
-> **這裡只留「改任何東西都可能踩到」的七條。** 其餘只有動到特定東西才需要,
+> **這裡只留「改任何東西都可能踩到」的八條。** 其餘只有動到特定東西才需要,
 > 全文在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 
 45. **Supabase 的 write 不 throw** — 回 `{ data, error }`，沒人讀 `error` 的寫入是隱形的：
@@ -378,6 +378,15 @@ npm run lint
 
 75. **只記「值」的快取在並行下會把副作用做兩次** —— 串行改並行時,每個「先查快取、
     沒有就做」都要重看;記 promise 不記值,失敗的要踢掉。
+
+79. **一張表有兩個以上的寫入者時,「整列覆寫」的語意就是個陷阱**（2026-09-18,規格備註
+    上線隔天就踩到）—— 翻譯編輯器的 **Save 和 Preview 都會寫同一列**
+    （預覽畫的是已存的內容）,而 Preview 的 payload 比規格備註早寫好、從來沒加上
+    `spec_notes`;API 當時每個欄位都寫一次,於是把「沒給」讀成「設成 null」。
+    結果是**翻好日文備註、按 Preview 就把它刪掉**,PDF 退回印英文,全程零錯誤零 log,
+    畫面上那段日文還在(state 沒變)。修法兩層:編輯器只有一個 `editorPayload()`,
+    API 改成**「body 沒提到的欄位就不寫」**(`lib/translate/product-upsert.ts`)——
+    後者才是不會再被忘記的那層。**新欄位只會加到你當下在看的那個呼叫端。**
 
 > 以上每條的全文、以及只有動到特定東西才需要的
 > #50（分頁常數）/ #60（NOT NULL 圖片欄位）/ #61（category 精確比對）/ #63（版型 locale prop）/

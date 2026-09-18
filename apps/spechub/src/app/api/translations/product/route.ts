@@ -2,10 +2,14 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@eg/db/admin";
 import { gate, getCurrentUser, localeHasDesignatedReviewer } from "@eg/auth/session";
 import { can } from "@eg/auth/permissions";
+import { translationFields } from "@/lib/translate/product-upsert";
 
 /**
  * POST /api/translations/product
  * Save product-level translations (overview + features).
+ *
+ * Only the columns the body names are written — a field left out keeps
+ * whatever is stored (lib/translate/product-upsert.ts says why).
  *
  * Body: {
  *   product_id: string (model_name),
@@ -21,22 +25,17 @@ export async function POST(request: Request) {
   const denied = await gate("translation.edit");
   if (denied) return denied;
   const user = await getCurrentUser();
-  const body = await request.json();
-  const { product_id, locale, translation_mode, overview, features, headline, subtitle, hardware_image, qr_label, qr_url, spec_notes, translated_by, confirm } = body as {
-    product_id: string;
-    locale: string;
-    translation_mode: "light" | "full";
-    overview: string | null;
-    features: string[] | null;
-    spec_notes?: string | null;
-    headline?: string | null;
-    subtitle?: string | null;
-    hardware_image?: string | null;
-    qr_label?: string | null;
-    qr_url?: string | null;
+  // The content columns are read straight off `body` by translationFields,
+  // which has to tell an absent field from a null one — destructuring them
+  // here would lose exactly that difference.
+  const body = (await request.json()) as Record<string, unknown> & {
+    product_id?: string;
+    locale?: string;
+    features?: string[] | null;
     translated_by?: string | null;
     confirm?: boolean;
   };
+  const { product_id, locale, features, translated_by, confirm } = body;
 
   if (!product_id || !locale) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -67,21 +66,15 @@ export async function POST(request: Request) {
     }
   }
 
+  // Only the columns this caller named — see lib/translate/product-upsert.ts
+  // for why an absent field must not be written as null.
   const upsertData: Record<string, unknown> = {
-    product_id,
-    locale,
-    translation_mode: translation_mode || "light",
-    headline: headline?.trim() || null,
-    subtitle: subtitle?.trim() || null,
-    overview: overview?.trim() || null,
-    features: alignedFeatures,
-    // Spec footnotes for this locale; null prints the English ones.
-    spec_notes: spec_notes?.trim() || null,
-    hardware_image: hardware_image?.trim() || null,
-    qr_label: qr_label?.trim() || null,
-    qr_url: qr_url?.trim() || null,
+    ...translationFields(body),
     translated_at: new Date().toISOString(),
   };
+  if ("features" in body) {
+    upsertData.features = alignedFeatures;
+  }
 
   // Only stamp when the client actually ran a translation this session —
   // a hand-edit shouldn't relabel the row as machine-produced, and an
@@ -133,7 +126,7 @@ export async function POST(request: Request) {
     // the old comment about keystrokes was protecting against.
     const { data: current } = (await supabase
       .from("product_translations" as "products")
-      .select("review_status, headline, subtitle, overview, features")
+      .select("review_status, headline, subtitle, overview, features, spec_notes")
       .eq("product_id", product_id)
       .eq("locale", locale)
       .maybeSingle()) as {
@@ -143,15 +136,23 @@ export async function POST(request: Request) {
         subtitle: string | null;
         overview: string | null;
         features: string[] | null;
+        spec_notes: string | null;
       } | null;
     };
 
+    // A column this call does not write cannot have changed, so compare only
+    // what is in the payload. The footnote counts as text: it prints under
+    // the spec table, and its markers pair with values in it.
+    const unchanged = (column: string, stored: unknown) =>
+      !(column in upsertData) || stored === upsertData[column];
     const sameText =
       current !== null &&
-      current.headline === upsertData.headline &&
-      current.subtitle === upsertData.subtitle &&
-      current.overview === upsertData.overview &&
-      JSON.stringify(current.features ?? null) === JSON.stringify(upsertData.features ?? null);
+      unchanged("headline", current.headline) &&
+      unchanged("subtitle", current.subtitle) &&
+      unchanged("overview", current.overview) &&
+      unchanged("spec_notes", current.spec_notes) &&
+      (!("features" in upsertData) ||
+        JSON.stringify(current.features ?? null) === JSON.stringify(upsertData.features ?? null));
 
     if (current?.review_status === "approved" && !sameText) {
       upsertData.review_status = "draft";

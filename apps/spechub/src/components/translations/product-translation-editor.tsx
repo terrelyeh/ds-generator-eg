@@ -431,27 +431,40 @@ export function ProductTranslationEditor({
     }
   }
 
+  /**
+   * The row as the editor holds it right now.
+   *
+   * Save and Preview both REPLACE the stored translation (the preview renders
+   * what is stored), so they have to send the same fields. Preview's body was
+   * written before spec footnotes existed and never gained `spec_notes`: the
+   * API read the absent field as null, so translating a Japanese footnote and
+   * then pressing Preview deleted the translation and printed the English one
+   * (2026-09-18, found by MKT). One builder, so the next locale-specific
+   * field cannot land in one caller and be missed in the other.
+   */
+  function editorPayload() {
+    return {
+      product_id: modelName,
+      locale: activeLocale,
+      translation_mode: mode,
+      headline: headlineTrans || null,
+      subtitle: subtitleTrans || null,
+      overview: overview || null,
+      features: features.some((f) => f.trim()) ? features : null,
+      spec_notes: specNotes.trim() || null,
+      hardware_image: hwImage || null,
+      qr_label: qrLabel || null,
+      qr_url: qrUrl || null,
+    };
+  }
+
   async function handleSave() {
     setSaving(true);
     try {
       const res = await fetch("/api/translations/product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_id: modelName,
-          locale: activeLocale,
-          translation_mode: mode,
-          headline: headlineTrans || null,
-          subtitle: subtitleTrans || null,
-          overview: overview || null,
-          features: features.some((f) => f.trim()) ? features : null,
-          spec_notes: specNotes.trim() || null,
-          hardware_image: hwImage || null,
-          qr_label: qrLabel || null,
-          qr_url: qrUrl || null,
-          translated_by: lastModel,
-          confirm: true,
-        }),
+        body: JSON.stringify({ ...editorPayload(), translated_by: lastModel, confirm: true }),
       });
       const data = await res.json();
       if (data.ok) {
@@ -516,18 +529,8 @@ export function ProductTranslationEditor({
       const res = await fetch("/api/translations/product", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          product_id: modelName,
-          locale: activeLocale,
-          translation_mode: mode,
-          headline: headlineTrans || null,
-          subtitle: subtitleTrans || null,
-          overview: overview || null,
-          features: features.some((f) => f.trim()) ? features : null,
-          hardware_image: hwImage || null,
-          qr_label: qrLabel || null,
-          qr_url: qrUrl || null,
-        }),
+        // No `confirm`: a preview is not a submission.
+        body: JSON.stringify(editorPayload()),
       });
       if (!res.ok) {
         // The preview renders what is SAVED. Opening it after a failed save
