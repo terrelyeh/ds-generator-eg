@@ -25,6 +25,7 @@ import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/da
 import { radioPatternSlots, hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
 import { checkSpecNoteMarkers, parseSpecNotes } from "@/lib/datasheet/spec-notes";
+import { formatDate } from "@/lib/format-date";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
 
 interface LongFeature {
@@ -364,15 +365,6 @@ function LayoutIssueBlock({
       </div>
     </div>
   );
-}
-
-function formatDate(dateStr: string | null) {
-  if (!dateStr) return "—";
-  return new Date(dateStr).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
 }
 
 function ImageUploadButton({
