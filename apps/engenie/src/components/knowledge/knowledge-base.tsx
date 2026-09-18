@@ -619,16 +619,21 @@ export function KnowledgeBase() {
                                           );
                                         }
                                         const n = pendingPages(p);
+                                        // Pages the sitemap never dates cannot be judged without
+                                        // fetching them, so they are explained, never counted —
+                                        // a badge that a sync cannot clear is one nobody acts on.
+                                        const undatedNote =
+                                          p.undated > 0 ? `；另有 ${p.undated} 頁 sitemap 沒給日期，每次 Sync 都會重抓確認` : "";
                                         const when = `${formatDate(p.checkedAt)} 檢查`;
                                         return n > 0 ? (
                                           <span
-                                            title={`${p.changed} 頁內容有更新、${p.added} 頁是新的${p.undated > 0 ? `、${p.undated} 頁 sitemap 沒給日期` : ""} · ${when}`}
+                                            title={`${p.changed} 頁內容有更新、${p.added} 頁是新的${undatedNote} · ${when}`}
                                             className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-300"
                                           >
                                             {n} 頁待更新
                                           </span>
                                         ) : (
-                                          <span title={`${p.total} 頁都跟官方文件一致 · ${when}`} className="text-[10px] text-muted-foreground">
+                                          <span title={`${p.total} 頁都跟官方文件一致${undatedNote} · ${when}`} className="text-[10px] text-muted-foreground">
                                             最新
                                           </span>
                                         );
