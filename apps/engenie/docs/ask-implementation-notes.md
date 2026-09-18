@@ -167,8 +167,43 @@
   ⑨ `parseFollowUps` 只在最後一條 `---` 之後**全部都像追問**時才切；Stop / 斷線路徑不切。
   以前答案裡的水平線（拓撲 prompt 還要求要有）會把後面整段當成追問然後丟掉。
   ⑩ **整個消失的來源會被清掉**（PR #64，`deleteVanishedSources`）：google-doc 以 `docId/` 前綴為宇宙、
-  helpcenter 以整站為宇宙**但任何一篇抓取失敗就跳過**、web 以 `label` 為宇宙**沒有 label 就不清**。
+  helpcenter **只有每一個 collection 頁都解析出文章**才清，而且宇宙只是**歸在那些 collection 底下的文章**
+  （任何一篇抓取失敗就跳過）、**web 不清**。
   「產出集合」必須是這次 run **看到的**每一個來源（不是重嵌的那些）——那正是 gitbook 曾經刪掉活頁面的錯。
+  🔴 **2026-09-16 修正：宇宙是這次 run 真的列舉出來的集合，不是「這一類的全部」**（pitfall #77）。
+  原本 helpcenter 拿整站、web 拿整個 label 當宇宙，但 Knowledge 頁的「Add Article」只傳**一篇**、
+  web 的逐列 Sync 只傳**一頁**、每週 cron 分批送——照原本的邏輯，加一篇文章會刪掉其他所有文章。
+  helpcenter 的 fallback（寫死在程式裡的 `KNOWN_ARTICLES`）也不是宇宙：UI 加的文章不在裡面。
+  **只解析出一部分也不是**：Intercom 是 SPA，`parseCollectionPage` 解析不到會回 `[]` 而不是失敗，
+  所以一個 collection 空了多半是沒解析到，不是真的清空了。
+  被下架的頁面會抓取失敗，而抓取失敗本來就不准刪，所以 web 的清理沒有任何正當的觸發點，拿掉了。
+- **每週 re-crawl（`/api/cron/reindex-web`）在 2026-09-16 之前從沒跑完過**：9/6、9/13 兩次排程都在 300s
+  被 Vercel 殺掉（log 只有一行 `Task timed out after 300 seconds`），`job_heartbeats` 沒有 `reindex-web` 列。
+  就算跑完，心跳也永遠寫「0 error(s)」——它數的 `errors` 欄位 route 根本沒放進 summary。修法（pitfall #76）：
+  ① **時間預算**（`lib/rag/reindex-web-run.ts`）：Help Center / Google Doc / web 150s 後不再開始、GitBook 200s；
+  同一類裡的順序**每週輪替**，免得排在後面的永遠輪不到。**280s 硬停**：不管還有什麼在跑，都寫心跳、回應——
+  「不再開始」不夠，一個已經在跑的來源就能拖過 300s（Drive 匯出卡住、網頁三個引擎都 timeout）。
+  沒做到的寫進心跳、`ok=false`，之後的 run 接著做。**心跳每次都寫**（窄化的 `?only=` 手動 run 例外，免得冒充排程）。
+  ② **GitBook 邊做邊寫**：以前是「全部抓完 → 全部 Vision → 全部 embed → 才寫」，一個太大的 space 被殺就什麼都沒存，
+  下週從同一處開始、同樣被殺。現在五頁一批寫完才抓下一批，`deadline` 讓它在批次之間停手。
+  ③ **GitBook 的「這頁做完了」標記**（sitemap 日期 `last_modified`、頁面指紋 `page_hash`）**只寫在該頁最後一次寫入**、
+  在 stale trim 之後——前面任何一步失敗，沒有 chunk 帶標記，下次就重做，不會信任寫一半的頁。
+  新鮮度判斷是「**任一** chunk 帶著 sitemap 的日期」（原本取第一列，編輯過一次的頁會永遠被重抓）。
+  ④ **頁面指紋**（文字＋圖片網址＋圖在哪一節）相同就跳過 Vision——沒有 `<lastmod>` 的頁（EDCC 手冊 31 頁有 29 頁）
+  以前每週重新描述每一張圖。GitBook 頁尾的「Last updated 26 days ago」（/jp 是「最終更新 8 か月前」）會每天自己變，抓頁時先拿掉。
+  **Vision 的失敗分兩種**（`vision.ts`）：timeout / 429 / 5xx / 沒設 key → **整頁不寫、不記日期**，下次重來
+  （以前是少了那段描述照寫、還記上日期，一次限流就讓 LED 表格消失到有人改那頁為止）；
+  圖片 4xx、Gemini 400/413、沒有文字回來 → 下次也一樣，照寫並記指紋，不會每週重試。
+  ⑤ **ingest 讀既有 chunk 一律分頁**（`lib/rag/select-all.ts`）——PostgREST 一次最多 1000 列、不報錯
+  （spechub pitfall #23）；GitBook 以前讀全部 gitbook 列，超過的頁沒有日期、每週被當成新頁。
+  ⑥ LED 表格的 focused chunk 固定在 `chunk_index` 10000（以前是跨頁計數，且 stale 清理不認得它，每次重抓那頁就被刪）。
+  ⑦ 對外呼叫補上 timeout：Vision（抓圖 15s、生成 40s）、Drive / 公開匯出每個請求 30s（一份 doc 最多五個請求；
+  **Drive 呼叫關掉重試**——googleapis 預設開、gaxios 會重試 timeout 的 GET，一次變三次）、Firecrawl / Jina 30s、embedding 每次嘗試 30s。
+  ⑧ cron 重新整理 Help Center 時**帶上每篇存著的 collection 名稱**（`collectionByUrl`）——它在每個 chunk 的文字裡
+  （`[collection > title]`），不帶的話每次都被改名、整篇重嵌。
+  ⚠️ 已知的殘留：舊程式被砍在「寫到一半」的頁（或某批 embedding 失敗的頁），可能已經有 chunk 帶著新日期，
+  新規則會把它當成最新而不再重抓。兩次排程都死在 Vision 階段（那時還沒寫任何東西）的機率較高，但若懷疑，
+  用 `scripts/sync-gitbook-space.mts <space> "<label>" --force` 對該 space 重跑一次（沒有時間限制，但會重新描述每張圖）。
 - **`/api/ask` 對內部使用者每人每分鐘 30 題、passcode demo 每 IP 20 題**（PR #63；#62 只進了
   helper 檔沒接線）—— `gateWithRateLimit` / `rateLimitAllowed`，底層同 `auth_rate_check`；
   workspace 走自己的配額（`ask_workspace_touch`）不受此影響。

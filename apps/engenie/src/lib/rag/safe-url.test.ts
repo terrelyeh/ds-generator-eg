@@ -1,5 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { isSafePublicUrl } from "./safe-url";
+import { isSafePublicUrl, isTransientHttpStatus } from "./safe-url";
+
+describe("isTransientHttpStatus", () => {
+  it("retries timeouts, rate limits and server errors", () => {
+    for (const s of [408, 425, 429, 500, 502, 503, 504]) expect(isTransientHttpStatus(s), String(s)).toBe(true);
+  });
+
+  it("does not retry what will fail the same way next time", () => {
+    for (const s of [400, 401, 403, 404, 410, 413, 415]) expect(isTransientHttpStatus(s), String(s)).toBe(false);
+  });
+});
 
 describe("isSafePublicUrl", () => {
   it("allows ordinary public pages", () => {

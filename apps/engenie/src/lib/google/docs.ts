@@ -2,6 +2,19 @@ import { google } from "googleapis";
 import { getGoogleAuth } from "@eg/google/auth";
 
 /**
+ * Per request. Neither the Drive calls nor the public export had a timeout,
+ * and the weekly re-crawl fetches every indexed doc in turn: one export that
+ * hung held the job until Vercel killed it. A doc with pasted screenshots
+ * exports megabytes of base64, which still takes seconds, not tens of them.
+ * `fetchGoogleDoc` can make five of these requests for one document (metadata,
+ * markdown, plain text, then both public exports), so this is also what bounds
+ * a single doc — which is why the Drive calls also turn retries off: googleapis
+ * enables them by default and gaxios retries a timed-out GET, tripling each.
+ */
+const REQUEST_TIMEOUT_MS = 30_000;
+const DRIVE_REQUEST = { timeout: REQUEST_TIMEOUT_MS, retry: false };
+
+/**
  * Fetch a Google Doc's content as markdown via Drive API (service account auth).
  *
  * Works for private docs as long as the doc is shared with the service account
@@ -23,11 +36,14 @@ async function fetchViaServiceAccount(docId: string): Promise<{
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
-  const meta = await drive.files.get({
-    fileId: docId,
-    fields: "id, name, mimeType",
-    supportsAllDrives: true,
-  });
+  const meta = await drive.files.get(
+    {
+      fileId: docId,
+      fields: "id, name, mimeType",
+      supportsAllDrives: true,
+    },
+    DRIVE_REQUEST,
+  );
 
   const title = meta.data.name || "Untitled";
 
@@ -39,13 +55,13 @@ async function fetchViaServiceAccount(docId: string): Promise<{
   try {
     const res = await drive.files.export(
       { fileId: docId, mimeType: "text/markdown" },
-      { responseType: "text" }
+      { ...DRIVE_REQUEST, responseType: "text" }
     );
     content = typeof res.data === "string" ? res.data : String(res.data);
   } catch {
     const res = await drive.files.export(
       { fileId: docId, mimeType: "text/plain" },
-      { responseType: "text" }
+      { ...DRIVE_REQUEST, responseType: "text" }
     );
     content = typeof res.data === "string" ? res.data : String(res.data);
   }
@@ -69,13 +85,13 @@ async function fetchViaPublicExport(docId: string): Promise<{
   // Try markdown first — Google Docs now supports md export
   let res = await fetch(
     `https://docs.google.com/document/d/${docId}/export?format=md`,
-    { redirect: "follow" }
+    { redirect: "follow", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }
   );
   let format: "md" | "txt" = "md";
   if (!res.ok) {
     res = await fetch(
       `https://docs.google.com/document/d/${docId}/export?format=txt`,
-      { redirect: "follow" }
+      { redirect: "follow", signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) }
     );
     format = "txt";
   }

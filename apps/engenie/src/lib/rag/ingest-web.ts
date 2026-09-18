@@ -16,17 +16,25 @@
  */
 
 import { createAdminClient } from "@eg/db/admin";
-import { trimStaleChunks, deleteVanishedSources } from "./replace-chunks";
+import { trimStaleChunks } from "./replace-chunks";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { hasSubstantialContent } from "./gitbook-fetcher";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
 import { isSafePublicUrl, safeFetch, UnsafeUrlError } from "./safe-url";
 import { stripHiddenHtml } from "./html-clean";
+import { selectAll } from "./select-all";
 
 const MAX_CHUNK_CHARS = 5000;
 const MIN_CHUNK_CHARS = 50;
 const EMBED_BATCH_SIZE = 20;
 const FETCH_CONCURRENCY = 3;
+/**
+ * Per extractor. Firecrawl and Jina render JavaScript and can be slow, but
+ * neither call had a timeout at all — one page that never answered held the
+ * whole crawl, and the weekly cron with it, until the function was killed.
+ * A timeout is a miss like any other: the cascade moves to the next engine.
+ */
+const EXTRACT_TIMEOUT_MS = 30_000;
 
 export interface IngestWebOptions {
   /** Page URLs to index (each indexed as its own source). */
@@ -92,6 +100,7 @@ async function extractWithFirecrawl(url: string): Promise<ExtractResult | null> 
   try {
     const res = await fetch("https://api.firecrawl.dev/v1/scrape", {
       method: "POST",
+      signal: AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${key}` },
       body: JSON.stringify({ url, formats: ["markdown"], onlyMainContent: true }),
     });
@@ -120,7 +129,10 @@ async function extractWithJina(url: string): Promise<ExtractResult | null> {
     };
     if (process.env.JINA_API_KEY) headers.Authorization = `Bearer ${process.env.JINA_API_KEY}`;
 
-    const res = await fetch(`https://r.jina.ai/${url}`, { headers });
+    const res = await fetch(`https://r.jina.ai/${url}`, {
+      headers,
+      signal: AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const text = await res.text();
     if (!text || text.trim().length < MIN_CHUNK_CHARS) return null;
@@ -296,16 +308,28 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
     }
   }
 
-  // Step 2 — load existing hashes for change detection
+  // Step 2 — load existing hashes for change detection (paged: an unpaged
+  // read stops at 1000 rows and every chunk past it looks changed)
   const supabase = createAdminClient();
-  const { data: existingDocs } = (await supabase
-    .from("documents" as "products")
-    .select("source_id, chunk_index, content_hash")
-    .eq("source_type", "web")) as {
-    data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
-  };
+  let existingDocs: { source_id: string; chunk_index: number; content_hash: string }[];
+  try {
+    existingDocs = await selectAll((from, to) =>
+      supabase
+        .from("documents" as "products")
+        .select("source_id, chunk_index, content_hash")
+        .eq("source_type", "web")
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{
+        data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
+        error: unknown;
+      }>,
+    "web existing chunks");
+  } catch (err) {
+    errors.push(err instanceof Error ? err.message : String(err));
+    return { processed: 0, skipped: 0, pages_fetched: fetched.size, pages_skipped: pagesSkipped, errors, methods };
+  }
   const hashMap = new Map<string, string>();
-  for (const d of existingDocs ?? []) hashMap.set(`${d.source_id}:${d.chunk_index}`, d.content_hash);
+  for (const d of existingDocs) hashMap.set(`${d.source_id}:${d.chunk_index}`, d.content_hash);
 
   // Step 3 — build chunks
   let skipped = 0;
@@ -321,17 +345,6 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
 
   /** Chunks each source has NOW, so a source that shrank can lose its tail. */
   const chunkCounts = new Map<string, number>();
-  // Only a labelled crawl has a universe ("every page under this label");
-  // and only a clean one may delete — a page that timed out is still live.
-  const fetchFailures = errors.length;
-  const cleanupSkipReason = !label ? "no label (universe undefined)" : fetchFailures > 0 ? `${fetchFailures} fetch failure(s)` : "no pages produced";
-  const labelUniverse = label
-    ? ((await supabase
-        .from("documents" as "products")
-        .select("source_id")
-        .eq("source_type", "web")
-        .eq("metadata->>web_label", label)) as { data: { source_id: string }[] | null }).data ?? []
-    : [];
   for (const [url, page] of fetched) {
     if (!hasSubstantialContent(page.content)) {
       pagesSkipped++;
@@ -420,14 +433,14 @@ export async function ingestWeb(options: IngestWebOptions): Promise<IngestWebRes
     await trimStaleChunks(supabase, "web", sourceId, count);
   }
 
-  // A source that disappeared entirely — a tab deleted, an article
-  // unpublished, a page removed — kept every chunk it ever had, and those
-  // chunks stayed retrievable with nothing to say they were gone. A crawl is scoped by its label, so the universe is every web chunk carrying it — and only a labelled, failure-free run may delete.
-  if (!!label && fetchFailures === 0 && chunkCounts.size > 0) {
-    await deleteVanishedSources(supabase, "web", labelUniverse.map((d) => d.source_id), new Set(chunkCounts.keys()));
-  } else {
-    console.warn(`[web] skipping vanished-source cleanup: ${cleanupSkipReason}`);
-  }
+  // No vanished-source cleanup here, deliberately. It used to treat "every
+  // page under this label" as the universe, but every call to this function
+  // is a hand-given list of pages, not a crawl of the label: the per-row Sync
+  // button sends ONE page, and the weekly cron sends batches. Each of those
+  // deleted the label's other pages. The case the cleanup existed for — a
+  // page that was taken down — fails its fetch instead, and a failed fetch
+  // was never allowed to delete anything. Removing a page is the Knowledge
+  // page's delete action.
 
   return { processed, skipped, pages_fetched: fetched.size, pages_skipped: pagesSkipped, errors, methods };
 }

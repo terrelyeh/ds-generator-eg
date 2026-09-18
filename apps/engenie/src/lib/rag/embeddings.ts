@@ -4,6 +4,8 @@ import { getApiKey, API_KEY_MAP } from "@eg/db/settings";
 
 const EMBEDDING_MODEL = "text-embedding-3-small";
 const EMBEDDING_DIMENSIONS = 1536;
+/** Per attempt, for the batch (ingest) path — see generateEmbeddings. */
+const INGEST_EMBED_TIMEOUT_MS = 30_000;
 
 /**
  * Get an OpenAI client using the stored API key (DB first, env fallback).
@@ -60,11 +62,17 @@ export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
 
   const client = await getOpenAIClient();
-  const response = await client.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: texts,
-    dimensions: EMBEDDING_DIMENSIONS,
-  });
+  const response = await client.embeddings.create(
+    {
+      model: EMBEDDING_MODEL,
+      input: texts,
+      dimensions: EMBEDDING_DIMENSIONS,
+    },
+    // The SDK's default is ten minutes per attempt, retried twice. A batch of
+    // twenty takes a second or two; every ingest waits on these one after
+    // another, and the weekly re-crawl has 300s for all of them.
+    { timeout: INGEST_EMBED_TIMEOUT_MS },
+  );
 
   // Sort by index to ensure order matches input
   return response.data

@@ -11,6 +11,7 @@ import { createAdminClient } from "@eg/db/admin";
 import { trimStaleChunks, deleteVanishedSources } from "./replace-chunks";
 import { generateEmbeddings, contentHash, estimateTokens, capForEmbedding } from "./embeddings";
 import { normalizeTaxonomy, type TaxonomyMeta } from "./taxonomy";
+import { selectAll } from "./select-all";
 
 /** Max characters per chunk — keep well under 8192 token limit */
 const MAX_CHUNK_CHARS = 3000;
@@ -226,16 +227,33 @@ export async function ingestGoogleDoc(
   // Step 2: Build chunks from all tabs
   const supabase = createAdminClient();
 
-  // Fetch existing hashes
-  const { data: existingDocs } = await supabase
-    .from("documents" as "products")
-    .select("source_id, chunk_index, content_hash")
-    .eq("source_type", "google_doc") as {
-    data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
-  };
+  // Fetch existing hashes — this document's tabs only, and paged. The old
+  // read took every google_doc row in one response, which stops at 1000, so
+  // past that some tabs' hashes were missing and their chunks re-embedded on
+  // every refresh. (`_` in a Drive id is a LIKE wildcard; the startsWith
+  // below drops the extra rows it can match.)
+  let existingDocs: { source_id: string; chunk_index: number; content_hash: string }[];
+  try {
+    existingDocs = (
+      await selectAll((from, to) =>
+        supabase
+          .from("documents" as "products")
+          .select("source_id, chunk_index, content_hash")
+          .eq("source_type", "google_doc")
+          .like("source_id", `${docId}/%`)
+          .order("id")
+          .range(from, to) as unknown as PromiseLike<{
+          data: { source_id: string; chunk_index: number; content_hash: string }[] | null;
+          error: unknown;
+        }>,
+      "google_doc existing chunks")
+    ).filter((d) => d.source_id.startsWith(`${docId}/`));
+  } catch (err) {
+    return { processed: 0, skipped: 0, tabs_found: tabs.length, errors: [err instanceof Error ? err.message : String(err)] };
+  }
 
   const hashMap = new Map<string, string>();
-  for (const doc of existingDocs ?? []) {
+  for (const doc of existingDocs) {
     hashMap.set(`${doc.source_id}:${doc.chunk_index}`, doc.content_hash);
   }
 
@@ -350,7 +368,7 @@ export async function ingestGoogleDoc(
   // unpublished, a page removed — kept every chunk it ever had, and those
   // chunks stayed retrievable with nothing to say they were gone. One document per run, so the universe is its own `docId/` prefix; the fetch succeeded or we would not be here.
   if (chunkCounts.size > 0) {
-    await deleteVanishedSources(createAdminClient(), "google_doc", (existingDocs ?? []).map((d) => d.source_id).filter((id) => id.startsWith(`${docId}/`)), new Set(chunkCounts.keys()));
+    await deleteVanishedSources(createAdminClient(), "google_doc", existingDocs.map((d) => d.source_id), new Set(chunkCounts.keys()));
   } else {
     console.warn(`[google_doc] skipping vanished-source cleanup: ${cleanupSkipReason}`);
   }

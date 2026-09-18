@@ -271,6 +271,12 @@ function htmlToText(html: string): string {
   text = text.replace(/<div[^>]*class="[^"]*banner[^"]*"[\s\S]*?<\/div>/gi, "");
   // Remove SVG icons
   text = text.replace(/<svg[\s\S]*?<\/svg>/gi, "");
+  // GitBook's page footer: `<p>Last updated <time dateTime="…">26 days ago</time></p>`,
+  // or `最終更新 … 8 か月前` in the /jp spaces — a short label and a <time>,
+  // nothing else. Relative, so it is wrong the day after indexing, and it
+  // changes daily on its own, which made an untouched page read as edited
+  // (see gitbook-plan).
+  text = text.replace(/<p\b[^>]*>[^<]{0,40}<time\b[^>]*\bdatetime="[^"]*"[^>]*>[^<]*<\/time>\s*<\/p>/gi, "");
 
   // Extract main content area if available (Gitbook wraps content in <main> or <article>)
   const mainMatch = text.match(/<main[\s\S]*?>([\s\S]*)<\/main>/i) ||

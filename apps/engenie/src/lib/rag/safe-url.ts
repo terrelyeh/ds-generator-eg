@@ -93,6 +93,16 @@ function isSafeIpv6(host: string): boolean {
   return true;
 }
 
+/**
+ * Would the same request plausibly work on a later try?
+ *
+ * Timeouts, rate limits and server errors pass; a 404 or 403 on an image is
+ * the image, and will be the same next week.
+ */
+export function isTransientHttpStatus(status: number): boolean {
+  return status === 408 || status === 425 || status === 429 || status >= 500;
+}
+
 export class UnsafeUrlError extends Error {
   constructor(url: string) {
     super(`Blocked non-public URL: ${url}`);
