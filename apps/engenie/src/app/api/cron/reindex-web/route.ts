@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { recordHeartbeat } from "@eg/db/heartbeat";
 import { createAdminClient } from "@eg/db/admin";
 import { gateOrCron } from "@eg/auth/session";
-import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
+import { describeCheck, listGitbookSpaces, runGitbookCheck, totalPending } from "@/lib/rag/gitbook-check";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 import { ingestWeb } from "@/lib/rag/ingest-web";
@@ -21,8 +21,8 @@ import {
 } from "@/lib/rag/reindex-web-run";
 import type { TaxonomyMeta } from "@/lib/rag/taxonomy";
 
-// The budget inside it — start cutoffs, GitBook's deadline, the hard stop
-// that guarantees the heartbeat — is in lib/rag/reindex-web-run.ts.
+// The budget inside it — start cutoffs, the hard stop that guarantees the
+// heartbeat — is in lib/rag/reindex-web-run.ts.
 export const maxDuration = 300;
 
 /**
@@ -37,11 +37,12 @@ const WEB_PAGES_PER_UNIT = 5;
 /**
  * Weekly re-crawl of the WEB knowledge sources so Ask SpecHub stays fresh.
  *
+ *   - gitbook      → CHECK ONLY: which spaces have pages the index does not
+ *                    have. The crawl itself is the Knowledge page's per-space
+ *                    Sync button (see lib/rag/gitbook-check.ts for why)
  *   - helpcenter   → re-fetch the known article URLs
  *   - google_doc   → re-fetch each known doc (content updates)
  *   - web          → re-fetch each indexed page (Firecrawl → Jina → fetch)
- *   - gitbook      → incremental (only pages whose sitemap lastModified changed;
- *                    NEW pages in an existing space are auto-discovered)
  *
  * product_spec is intentionally EXCLUDED — it already auto-reindexes on every
  * /api/sync (daily). NEW sources (a new GitBook space, a new Google Doc, a new
@@ -54,11 +55,12 @@ const WEB_PAGES_PER_UNIT = 5;
  *
  * Budgeted: each source is a unit, units run one at a time, none starts after
  * its kind's cutoff, and the order within a kind rotates weekly. What did not
- * fit is named in the heartbeat and done another week — GitBook resumes page
- * by page, because it writes as it goes. At the hard stop the run records its
- * heartbeat and answers even if a unit is still running. The heartbeat is
- * written on every run that gets past auth, including one that ran out of
- * time or hit errors; `ok` says whether it did everything.
+ * fit is named in the heartbeat and done another week. At the hard stop the
+ * run records its heartbeat and answers even if a unit is still running. The
+ * heartbeat is written on every run that gets past auth, including one that
+ * ran out of time or hit errors; `ok` says whether it did everything — and
+ * GitBook pages waiting for a manual Sync are reported without spoiling it,
+ * because they are somebody's queue, not this job's backlog.
  *
  * Auth: CRON_SECRET bearer (what Vercel Cron sends) / editor+admin.
  * `?only=gitbook,helpcenter` narrows it for a manual run — and a narrowed run
@@ -85,7 +87,12 @@ type Supabase = ReturnType<typeof createAdminClient>;
 interface Unit {
   kind: SourceKind;
   target: string;
-  run: (deadline: number) => Promise<{ processed: number; errors: string[]; deferredPages?: number }>;
+  run: (deadline: number) => Promise<{
+    processed: number;
+    errors: string[];
+    deferredPages?: number;
+    pendingPages?: number;
+  }>;
 }
 
 /**
@@ -110,33 +117,38 @@ function firstChunks<T>(supabase: Supabase, sourceType: string, columns: string,
 const TAX_COLUMNS =
   "solution:metadata->>solution, product_lines:metadata->product_lines, models:metadata->models";
 
+/**
+ * GitBook is CHECKED here, not crawled — one unit for all spaces.
+ *
+ * The crawl lives on the Knowledge page's per-space Sync button; this reads
+ * each space's sitemap and reports how many pages are waiting for it. One
+ * unit rather than one per space because the whole thing takes a few seconds
+ * and because the stored answer (which the page reads) should be the complete
+ * picture, not whichever spaces a rotation happened to reach.
+ *
+ * Why the taxonomy read is gone: it existed so a re-crawl would not wipe
+ * manually-assigned tags. Nothing here writes a document any more.
+ */
 async function gitbookUnits(supabase: Supabase): Promise<Unit[]> {
-  const rows = await firstChunks<{ space_url: string | null; space_label: string | null } & TaxRow>(
-    supabase,
-    "gitbook",
-    `space_url:metadata->>space_url, space_label:metadata->>space_label, ${TAX_COLUMNS}`,
-    "gitbook spaces",
-  );
-  const spaces = new Map<string, { label: string; tax: Partial<TaxonomyMeta> }>();
-  for (const r of rows) {
-    if (!r.space_url || spaces.has(r.space_url)) continue;
-    spaces.set(r.space_url, { label: r.space_label || r.space_url, tax: taxFrom(r) });
-  }
-  return [...spaces].map(([spaceUrl, { label, tax }]) => ({
-    kind: "gitbook" as const,
-    target: spaceUrl,
-    run: async (deadline: number) => {
-      const r = await ingestGitbook({
-        spaceUrl,
-        spaceLabel: label,
-        force: false,
-        enableVision: true,
-        taxonomy: tax,
-        deadline,
-      });
-      return { processed: r.processed, errors: r.errors, deferredPages: r.pages_deferred };
+  const spaces = await listGitbookSpaces(supabase);
+  if (spaces.length === 0) return [];
+  return [
+    {
+      kind: "gitbook" as const,
+      target: `${spaces.length} space(s)`,
+      run: async () => {
+        const check = await runGitbookCheck(spaces);
+        console.info(`[reindex-web] gitbook check — ${describeCheck(check.spaces)}`);
+        return {
+          processed: 0,
+          // A space whose sitemap is unreachable is a real fault: nobody will
+          // ever be told it has new pages.
+          errors: check.spaces.flatMap((s) => (s.error ? [`${s.spaceLabel}: ${s.error}`] : [])),
+          pendingPages: totalPending(check.spaces),
+        };
+      },
     },
-  }));
+  ];
 }
 
 async function googleDocUnits(supabase: Supabase): Promise<Unit[]> {
@@ -285,6 +297,7 @@ async function runUnit(unit: Unit, deadline: number): Promise<UnitOutcome> {
       ms: Date.now() - startedAt,
       processed: r.processed,
       deferredPages: r.deferredPages ?? 0,
+      pendingPages: r.pendingPages ?? 0,
     };
     // One line per unit, so the next slow run shows where its time went —
     // the two that timed out left nothing but the timeout.
@@ -298,12 +311,21 @@ async function runUnit(unit: Unit, deadline: number): Promise<UnitOutcome> {
   } catch (err) {
     const ms = Date.now() - startedAt;
     console.error(`[reindex-web] ${unit.kind} ${unit.target}: failed after ${(ms / 1000).toFixed(1)}s — ${messageOf(err)}`);
-    return { kind: unit.kind, target: unit.target, status: "failed", errors: [messageOf(err)], ms, processed: 0, deferredPages: 0 };
+    return {
+      kind: unit.kind,
+      target: unit.target,
+      status: "failed",
+      errors: [messageOf(err)],
+      ms,
+      processed: 0,
+      deferredPages: 0,
+      pendingPages: 0,
+    };
   }
 }
 
 function notRun(unit: Unit, status: "deferred" | "interrupted"): UnitOutcome {
-  return { kind: unit.kind, target: unit.target, status, errors: [], ms: 0, processed: 0, deferredPages: 0 };
+  return { kind: unit.kind, target: unit.target, status, errors: [], ms: 0, processed: 0, deferredPages: 0, pendingPages: 0 };
 }
 
 async function handle(request: Request) {
@@ -324,7 +346,16 @@ async function handle(request: Request) {
       try {
         units.push(...rotateForWeek(await DISCOVER[kind](supabase), startedAt));
       } catch (err) {
-        outcomes.push({ kind, target: "source list", status: "failed", errors: [messageOf(err)], ms: 0, processed: 0, deferredPages: 0 });
+        outcomes.push({
+          kind,
+          target: "source list",
+          status: "failed",
+          errors: [messageOf(err)],
+          ms: 0,
+          processed: 0,
+          deferredPages: 0,
+          pendingPages: 0,
+        });
       }
     }
 

@@ -105,6 +105,52 @@ export function selectPagesToFetch(
   return { toFetch, unchanged };
 }
 
+/** What a check found waiting in one space. */
+export interface PendingCounts {
+  /** Distinct pages in the sitemap. */
+  total: number;
+  /** Indexed pages whose sitemap date is not one the index holds. */
+  changed: number;
+  /** Sitemap pages with no chunk at all — added since the last crawl. */
+  added: number;
+  /** Sitemap pages with no `<lastmod>`: only fetching one can tell. */
+  undated: number;
+  /** Pages the crawl would skip. */
+  unchanged: number;
+}
+
+/**
+ * How much work a space is holding, without fetching a single page.
+ *
+ * This is what the weekly job reports and what the Sync button's badge shows
+ * (see gitbook-check.ts). It is deliberately built ON TOP of
+ * `selectPagesToFetch` rather than beside it: the number a person is shown
+ * has to be the number of pages the Sync then actually goes and gets, and two
+ * implementations of "is this page current?" would drift the first time one
+ * of them was fixed — this file exists because those rules already broke
+ * silently once.
+ */
+export function classifyPending(
+  entries: SitemapEntry[],
+  pages: Map<string, IndexedPage>,
+): PendingCounts {
+  const { toFetch, unchanged } = selectPagesToFetch(entries, pages, false);
+  let changed = 0;
+  let added = 0;
+  let undated = 0;
+  for (const entry of toFetch) {
+    if (!pages.has(gitbookSourceId(entry.url))) added++;
+    else if (!entry.lastModified) undated++;
+    else changed++;
+  }
+  return { total: toFetch.length + unchanged, changed, added, undated, unchanged };
+}
+
+/** Pages a Sync of this space would fetch — the badge's number. */
+export function pendingPageCount(p: PendingCounts): number {
+  return p.changed + p.added + p.undated;
+}
+
 /**
  * GitBook's relative "Last updated 26 days ago", on its own line.
  *

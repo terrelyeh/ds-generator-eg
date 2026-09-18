@@ -180,11 +180,25 @@
 - **每週 re-crawl（`/api/cron/reindex-web`）在 2026-09-16 之前從沒跑完過**：9/6、9/13 兩次排程都在 300s
   被 Vercel 殺掉（log 只有一行 `Task timed out after 300 seconds`），`job_heartbeats` 沒有 `reindex-web` 列。
   就算跑完，心跳也永遠寫「0 error(s)」——它數的 `errors` 欄位 route 根本沒放進 summary。修法（pitfall #76）：
-  ① **時間預算**（`lib/rag/reindex-web-run.ts`）：Help Center / Google Doc / web 150s 後不再開始、GitBook 200s；
+  ① **時間預算**（`lib/rag/reindex-web-run.ts`）：每一類 150s 後就不再開始新來源；
   同一類裡的順序**每週輪替**，免得排在後面的永遠輪不到。**280s 硬停**：不管還有什麼在跑，都寫心跳、回應——
   「不再開始」不夠，一個已經在跑的來源就能拖過 300s（Drive 匯出卡住、網頁三個引擎都 timeout）。
   沒做到的量寫進心跳的 detail，之後的 run 接著做。**心跳每次都寫**（窄化的 `?only=` 手動 run 例外，免得冒充排程）。
   `ok` 的分界（2026-09-18 調整）：**錯誤、拋出、或硬停時還在跑的單位** → `ok=false`；**預算用完而沒開始的來源** → 仍是 `ok`。第一次真的跑完的那一輪（206s、helpcenter 3/3、google_doc 17/17、gitbook 2/4、零錯誤、剩 2 個來源 + 22 頁）就是後者：那是四個 space 配 300s 的常態，報成失敗等於在健康檢查上掛一個每週都亮的警告，而永遠亮的警告沒人看。慢性落後的訊號改由「被硬停切斷」承擔。
+- **GitBook 改成「每週只檢查、重爬靠人按」**（2026-09-18，`lib/rag/gitbook-check.ts`）。
+  上面那輪 206s 的數字就是理由：四個 space 配 300s，永遠只過得了兩個，剩下的每週換人剩（輪替只是換順序）。
+  一個永遠做一半的爬取沒人能推理，所以：
+  **爬取**移到 Knowledge 頁每個 space 的 Sync（同一支 `ingestGitbook`、增量邏輯完全沒變，`/api/documents` 給它 270s deadline，
+  停手時回報「還剩 N 頁，再按一次」）；**排程只留檢查**——讀 sitemap、比對索引裡的 `last_modified`，
+  算出每個 space 有幾頁待更新，存進 `app_settings.gitbook_update_check`，Knowledge 頁一開就看得到
+  （卡片上一顆琥珀色的「N 頁待更新」、每個 space 一個 badge、還有 Check Updates 可以現在重算）。
+  它不抓頁、不叫 Vision、不 embed、不寫任何 document，四個 space 幾秒鐘就跑完，所以**排在第一個**：
+  「現在有什麼變了」是這支排程裡唯一沒辦法留到下週補的答案。
+  ⚠️ 兩個刻意的判斷：**待 Sync 的頁數不讓 `ok` 變 false**（那是人的待辦；否則健康檢查每週都亮），
+  **sitemap 讀不到就是錯誤**（那代表「這個 space 有新頁」永遠不會有人被通知）。
+  badge 的數字**是 `selectPagesToFetch` 算的**，不是另寫一套判斷——不然按下去抓的頁數會跟顯示的不一樣，
+  而那兩套規則裡的任何一邊被修好時，另一邊會靜靜漂掉。
+- **舊的（GitBook 還在排程裡爬的時候）幾件事仍然適用於手動那條路**：
   ② **GitBook 邊做邊寫**：以前是「全部抓完 → 全部 Vision → 全部 embed → 才寫」，一個太大的 space 被殺就什麼都沒存，
   下週從同一處開始、同樣被殺。現在五頁一批寫完才抓下一批，`deadline` 讓它在批次之間停手。
   ③ **GitBook 的「這頁做完了」標記**（sitemap 日期 `last_modified`、頁面指紋 `page_hash`）**只寫在該頁最後一次寫入**、

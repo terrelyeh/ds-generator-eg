@@ -67,6 +67,7 @@ src/
       settings/route.ts, settings/models # LLM keys（app_settings）與模型目錄（存檔時對 OpenRouter 驗 id）
       ws-auth, demo-auth, chat-sessions
       cron/reindex-web/route.ts      # 每週日 re-crawl web 來源（時間預算＋280s 硬停，跑不完的留到之後；心跳每次都寫）
+                                     #   ⚠️ GitBook 在這裡**只檢查不重爬**（lib/rag/gitbook-check.ts）
       cron/reindex-products/route.ts # product_spec re-index：POST(spechub sync)/GET(每日 09:30 TW，順便清 90 天前的問題原文)
   components/
     layout/engenie-shell.tsx         # navbar(Ask/Knowledge/Settings) + footer + Toaster
@@ -199,8 +200,16 @@ npm run build -w engenie
 
 - Vercel 專案 `engenie-eg`，Root Directory `apps/engenie`，region **hnd1**（不要改）
 - Crons：`/api/cron/reindex-web` 週日、`/api/cron/reindex-products` 每日 09:30 TW（GET 順便跑 `ask_requests_redact()`，清掉 90 天前的問題原文）。
-  **`reindex-web` 在 2026-09-16 之前從沒跑完過**（9/6、9/13 都在 300s 被殺，pitfall #76）：現在 150s（GitBook 200s）後
+  **`reindex-web` 在 2026-09-16 之前從沒跑完過**（9/6、9/13 都在 300s 被殺，pitfall #76）：現在 150s 後
   不再開始新來源、**280s 硬停一定寫心跳**，沒做到的量寫進心跳的 detail、之後接著做，每個來源一行 log 說花了多久；
+  🔴 **GitBook 在這支排程裡只做「更新檢查」，不重爬**（2026-09-18 改，`lib/rag/gitbook-check.ts`）：
+  四個 space 永遠塞不進 300s——第一次真的跑完那輪只過了兩個、留下 22 頁，那是常態不是壞週。
+  重爬移到 Knowledge 頁**每個 space 的 Sync 按鈕**（`/api/documents` 的 `action: "ingest"`，帶 270s deadline），
+  排程只讀 sitemap 比對索引裡的日期、算出「哪個 space 有幾頁待更新」，存進 `app_settings.gitbook_update_check`，
+  頁面一開就看得到（也有 `action: "check"` 的 Check Updates 按鈕可以馬上重算）。
+  **待 Sync 的頁數不會讓 `ok` 變 false**——那是人的待辦，不是排程沒做完；但 **sitemap 讀不到算錯誤**，
+  因為那代表「這個 space 有新頁」這件事永遠不會有人被通知。GitBook 的檢查**排在第一個**跑：
+  它只花幾秒，而且「現在有什麼變了」是這支排程裡唯一沒辦法留到下週補的答案。
   ⚠️ **`ok` 的分界是「有沒有錯」而不是「有沒有做完」**（2026-09-18 改）：預算用完而**沒開始**的來源算 ok（四個 GitBook space 配 300s 上限，每週剩一點是常態，報成失敗會讓健康檢查掛著一個永遠亮的警告）；**在硬停時還在跑的單位算 not ok**——那才是這支排程當初死掉的慢性落後。剩下的量一律留在 detail 裡；
   `?only=` 窄化的手動 run 不寫心跳。預算常數在 `lib/rag/reindex-web-run.ts`。
   **兩支都會在跑完時寫 `job_heartbeats`**（`recordHeartbeat` from `@eg/db/heartbeat`）——

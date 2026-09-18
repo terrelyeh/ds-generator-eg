@@ -4,6 +4,7 @@ import { logIfDbError } from "@eg/db/errors";
 import { gate } from "@eg/auth/session";
 import { ingestProducts } from "@/lib/rag/ingest-products";
 import { ingestGitbook } from "@/lib/rag/ingest-gitbook";
+import { readGitbookCheck, recheckSpace, runGitbookCheck } from "@/lib/rag/gitbook-check";
 import { ingestHelpcenter } from "@/lib/rag/ingest-helpcenter";
 import { ingestGoogleDoc } from "@/lib/rag/ingest-google-doc";
 import { ingestWifiRegulations } from "@/lib/rag/ingest-wifi-regulations";
@@ -22,6 +23,17 @@ function snippetSourceId(title: string): string {
 
 // Allow up to 300s for Gitbook ingestion (many pages + Vision API)
 export const maxDuration = 300;
+
+/**
+ * Deadline for a GitBook crawl, measured from the start of the request.
+ *
+ * The weekly job used to be the only caller with a clock. Now that the crawl
+ * is manual, this is the only place it runs — and a big space still outlasts
+ * 300s. ingestGitbook stops between page batches once this passes and says
+ * how many pages it left (press Sync again to carry on), instead of being
+ * killed mid-batch with nothing reported.
+ */
+const CRAWL_BUDGET_MS = 270_000;
 
 /**
  * GET /api/documents?source_type=product_spec
@@ -137,7 +149,11 @@ export async function GET(request: Request) {
 
   const total = rowsArr.reduce((sum, r) => sum + r.chunks, 0);
 
-  return NextResponse.json({ ok: true, stats, sources, total });
+  // The stored GitBook update check (weekly, or whenever someone pressed
+  // 「檢查更新」) — the page shows it per space next to the Sync button.
+  const gitbookCheck = !sourceType || sourceType === "gitbook" ? await readGitbookCheck() : null;
+
+  return NextResponse.json({ ok: true, stats, sources, total, gitbook_check: gitbookCheck });
 }
 
 /**
@@ -148,6 +164,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const denied = await gate("knowledge.edit");
   if (denied) return denied;
+  const startedAt = Date.now();
   const body = await request.json();
   const {
     action,
@@ -164,6 +181,16 @@ export async function POST(request: Request) {
     force?: boolean;
     taxonomy?: Partial<TaxonomyMeta>;
   };
+
+  // An update CHECK, not a crawl: which spaces have pages the index does not
+  // have. GitBook is only checked automatically now (weekly), so the page
+  // needs a way to ask for a fresher answer without starting a crawl.
+  if (action === "check") {
+    if (source_type !== "gitbook") {
+      return NextResponse.json({ error: `No update check for "${source_type}"` }, { status: 400 });
+    }
+    return NextResponse.json({ ok: true, gitbook_check: await runGitbookCheck() });
+  }
 
   if (action !== "ingest") {
     return NextResponse.json({ error: "Unknown action" }, { status: 400 });
@@ -204,11 +231,17 @@ export async function POST(request: Request) {
       force,
       enableVision: enable_vision ?? true,
       taxonomy,
+      deadline: startedAt + CRAWL_BUDGET_MS,
     });
+
+    // The crawl just moved this space's pending count; re-check that one
+    // space so the badge is not still showing what was true before the click.
+    const check = await recheckSpace(space_url, space_label || space_url).catch(() => null);
 
     return NextResponse.json({
       ok: true,
       ...result,
+      gitbook_check: check,
     });
   }
 

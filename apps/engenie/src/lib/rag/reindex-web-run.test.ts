@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chunkList,
   HARD_STOP_MS,
+  SOURCE_KINDS,
   requestedKinds,
   rotateForWeek,
   START_CUTOFF_MS,
@@ -13,14 +14,19 @@ import {
 const WEEK = 7 * 24 * 3_600_000;
 
 describe("budget", () => {
-  it("stops starting everything before the hard stop, and leaves GitBook the last stretch", () => {
+  it("stops starting everything well before the hard stop", () => {
     for (const cutoff of Object.values(START_CUTOFF_MS)) {
       expect(cutoff).toBeLessThanOrEqual(WORK_BUDGET_MS);
     }
-    expect(START_CUTOFF_MS.gitbook).toBeGreaterThan(START_CUTOFF_MS.google_doc);
     // Room for the heartbeat and the response before Vercel's 300s.
     expect(HARD_STOP_MS).toBeLessThanOrEqual(285_000);
     expect(HARD_STOP_MS).toBeGreaterThan(WORK_BUDGET_MS);
+  });
+
+  it("checks GitBook before spending the budget on crawls", () => {
+    // The check is seconds, and its answer — which spaces changed — is the
+    // one thing in this run that cannot be picked up next week.
+    expect(SOURCE_KINDS[0]).toBe("gitbook");
   });
 });
 
@@ -39,16 +45,16 @@ describe("rotateForWeek", () => {
 });
 
 function outcome(extra: Partial<UnitOutcome> & Pick<UnitOutcome, "kind">): UnitOutcome {
-  return { target: "t", status: "done", errors: [], ms: 1000, processed: 0, deferredPages: 0, ...extra };
+  return { target: "t", status: "done", errors: [], ms: 1000, processed: 0, deferredPages: 0, pendingPages: 0, ...extra };
 }
 
 describe("requestedKinds", () => {
   it("runs everything, in budget order, when nothing is narrowed", () => {
-    expect(requestedKinds(null)).toEqual(["helpcenter", "google_doc", "web", "gitbook"]);
+    expect(requestedKinds(null)).toEqual(["gitbook", "helpcenter", "google_doc", "web"]);
   });
 
   it("keeps run order and drops names it does not know", () => {
-    expect(requestedKinds("gitbook, helpcenter,typo")).toEqual(["helpcenter", "gitbook"]);
+    expect(requestedKinds("helpcenter, gitbook,typo")).toEqual(["gitbook", "helpcenter"]);
     expect(requestedKinds("typo")).toEqual([]);
   });
 });
@@ -70,7 +76,7 @@ describe("summarizeRun", () => {
       ],
       64_400,
     );
-    expect(verdict).toEqual({ ok: true, detail: "64s · helpcenter 1/1, gitbook 2/2 · 15 chunk(s) written" });
+    expect(verdict).toEqual({ ok: true, detail: "64s · gitbook 2/2, helpcenter 1/1 · 15 chunk(s) written" });
   });
 
   it("counts the errors an ingest reports without throwing — the old summary never saw them", () => {
@@ -100,7 +106,7 @@ describe("summarizeRun", () => {
     // health check would otherwise carry a warning every single week.
     expect(verdict.ok).toBe(true);
     expect(verdict.detail).toBe(
-      "231s · google_doc 1/1, gitbook 1/2 · 0 chunk(s) written · left for next run (time budget): 1 source(s) + 37 GitBook page(s)",
+      "231s · gitbook 1/2, google_doc 1/1 · 0 chunk(s) written · left for next run (time budget): 1 source(s) + 37 GitBook page(s)",
     );
   });
 
@@ -115,7 +121,7 @@ describe("summarizeRun", () => {
     );
     expect(verdict.ok).toBe(false);
     expect(verdict.detail).toBe(
-      "280s · helpcenter 1/1, google_doc 0/1, gitbook 0/1 · 2 chunk(s) written · " +
+      "280s · gitbook 0/1, helpcenter 1/1, google_doc 0/1 · 2 chunk(s) written · " +
         "cut off at the 280s hard stop: google_doc 1AbC · left for next run (time budget): 1 source(s)",
     );
   });
@@ -125,6 +131,26 @@ describe("summarizeRun", () => {
     const cutOff = summarizeRun([outcome({ kind: "gitbook", status: "interrupted" })], 280_000);
     expect(declined.ok).toBe(true);
     expect(cutOff.ok).toBe(false);
+  });
+
+  it("reports the pages waiting for a manual GitBook sync, and stays ok", () => {
+    // The weekly job only CHECKS GitBook now. Pages it found are a person's
+    // queue on the Knowledge page; making them a failure would leave the
+    // health check permanently orange for doing exactly what it should.
+    const verdict = summarizeRun(
+      [outcome({ kind: "gitbook", target: "4 space(s)", pendingPages: 22 }), outcome({ kind: "helpcenter", processed: 5 })],
+      41_000,
+    );
+    expect(verdict.ok).toBe(true);
+    expect(verdict.detail).toBe(
+      "41s · gitbook 1/1, helpcenter 1/1 · 5 chunk(s) written · 22 GitBook page(s) changed — waiting for a manual sync",
+    );
+  });
+
+  it("says nothing about pending pages when every space is current", () => {
+    const verdict = summarizeRun([outcome({ kind: "gitbook", target: "4 space(s)" })], 9_000);
+    expect(verdict.ok).toBe(true);
+    expect(verdict.detail).not.toContain("manual sync");
   });
 
   it("treats a source that threw as not done", () => {
