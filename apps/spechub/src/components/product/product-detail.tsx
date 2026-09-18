@@ -18,11 +18,13 @@ import {
 } from "@/components/ui/table";
 import { ProductTranslationEditor } from "@/components/translations/product-translation-editor";
 import { WebsiteTab } from "@/components/website/website-tab";
+import { useRegenerateGuard } from "@/components/website/regenerate-guard";
 import { can, type Role } from "@eg/auth/permissions";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { CONTACT_US_URL, usesContactUsQr, usesTwoHardwareImages } from "@/lib/datasheet/qr";
 import { radioPatternSlots, hasRadioPatterns } from "@/lib/datasheet/radio-patterns";
 import { looksLikeUnseparatedList, isTBD } from "@/lib/datasheet/pagination";
+import { checkSpecNoteMarkers, parseSpecNotes } from "@/lib/datasheet/spec-notes";
 import type { ProductWithSpecs, Version, ProductTranslation } from "@eg/db/types";
 
 interface LongFeature {
@@ -95,7 +97,8 @@ interface ProductDetailProps {
   role?: Role;
   /** Issues found by the last website datasheet check, for the 官網 tab label.
    *  Null when this model has never been checked or the role can't see the tab. */
-  websiteIssueCount?: number | null;
+  /** Sites that need something for this model's 可上架 versions, from the last check. Null = never checked. */
+  websiteTodoCount?: number | null;
 }
 
 function LayoutWarningBanner({
@@ -801,7 +804,7 @@ function QsgUrlCard({
   );
 }
 
-export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [], websiteIssueCount = null }: ProductDetailProps) {
+export function ProductDetail({ product, solutionSlug = "cloud", versions, translations = [], layoutReport, localizedLayoutReports = [], englishAcked = false, role, reviewLocales = null, reviewedLocales = [], websiteTodoCount = null }: ProductDetailProps) {
   // Role-derived flags. Prefixed `roleCan` to avoid collision with the
   // existing `canGenerate` that signals "all required fields are filled
   // (Product Image, Hardware Image, Overview, Features)".
@@ -812,7 +815,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const roleCanTranslate = can(role, "translation.edit");
   const roleCanCheckWebsite = can(role, "website_check.view");
   const [activeTab, setActiveTab] = useState<"detail" | "translations" | "website">("detail");
-  const [websiteIssues, setWebsiteIssues] = useState<number | null>(websiteIssueCount);
+  const [websiteIssues, setWebsiteIssues] = useState<number | null>(websiteTodoCount);
   const router = useRouter();
   const [generating, setGenerating] = useState(false);
   const [resyncing, setResyncing] = useState(false);
@@ -932,6 +935,18 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
   const productExt = product as typeof product & { hardware_image_2?: string | null };
   const hasHardwareImage2 =
     !!productExt.hardware_image_2 && !productExt.hardware_image_2.startsWith("cache/");
+  // Spec footnotes as the datasheet will print them: the model's own
+  // "Spec Footnote" cell from the sheet, otherwise the product line's. Shown
+  // read-only here, like Overview & Features — the sheet is where they are
+  // edited. The marker check is here because this is where both halves are on
+  // screen: the note and the spec value it belongs to.
+  const specNotes = parseSpecNotes(product.spec_notes);
+  const lineFootnote = parseSpecNotes(product.product_line.spec_footnote);
+  const shownNotes = specNotes.length > 0 ? specNotes : lineFootnote;
+  const markerIssues = checkSpecNoteMarkers({
+    notes: shownNotes,
+    values: product.spec_sections.flatMap((section) => section.items.map((item) => item.value)),
+  });
   const hasOverview = !!product.overview && product.overview.trim().length > 0;
   const hasFeatures = Array.isArray(product.features) && product.features.length > 0;
   const hasSpecs = product.spec_sections.length > 0;
@@ -957,9 +972,19 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
     .filter((l) => currentVersions[l] && !localesWithHistory.has(l))
     .sort((a, b) => (a === "en" ? -1 : b === "en" ? 1 : a.localeCompare(b)));
 
-  async function handleGeneratePdf(mode: "regenerate" | "new", locale = "en") {
+  const { confirmRegenerate, dialog: regenerateDialog } = useRegenerateGuard();
+
+  async function handleGeneratePdf(requested: "regenerate" | "new", locale = "en") {
     setShowGenMenu(false);
     setShowLangMenu(false);
+    let mode = requested;
+    // A version marked 可上架 may already be on the regional sites; ask before
+    // overwriting it under the same number.
+    if (mode === "regenerate") {
+      const choice = await confirmRegenerate(product.model_name, locale, locale === "en" ? currentVer : currentVersions[locale] ?? "");
+      if (choice === "cancel") return;
+      if (choice === "new") mode = "new";
+    }
     setGenerating(true);
     const toastId = toast.loading("Generating PDF…", {
       description: `${product.model_name}${locale !== "en" ? ` · ${locale.toUpperCase()}` : ""}`,
@@ -1018,6 +1043,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
 
   return (
     <div className="space-y-6">
+      {regenerateDialog}
       {/* Breadcrumb */}
       <nav className="flex items-center gap-1.5 text-sm">
         <Link
@@ -1082,8 +1108,10 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         );
       })}
 
-      {/* Sticky Header */}
-      <div className="sticky top-14 z-20 -mx-6 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
+      {/* Sticky Header. The negative top margin pulls it out of the page's
+          space-y-6 rhythm: breadcrumb, model, and "last edited" are one block
+          about the model, so they sit close together, not 36px apart. */}
+      <div className="sticky top-14 z-20 -mx-6 -mt-5 bg-background/95 backdrop-blur-sm border-b border-transparent [&.is-stuck]:border-border px-6 py-3">
         <div className="flex items-center justify-between gap-6">
           <div className="flex items-center gap-3 min-w-0">
             <h1 className="text-2xl font-bold tracking-tight">
@@ -1098,7 +1126,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
                 No version
               </span>
             )}
-            <span className="hidden sm:inline text-sm text-muted-foreground/60 truncate">
+            <span className="hidden sm:inline text-[15px] text-muted-foreground truncate">
               {product.full_name}
             </span>
           </div>
@@ -1369,8 +1397,8 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         </div>
       </div>
 
-      {/* Sub-header info */}
-      <p className="-mt-4 text-xs text-muted-foreground">
+      {/* Sub-header info — part of the title block, so it sits under the model. */}
+      <p className="-mt-6 text-[13px] text-muted-foreground">
         Last edited{" "}
         {formatDate(product.sheet_last_modified ?? product.updated_at)}
         {product.sheet_last_editor && ` by ${product.sheet_last_editor}`}
@@ -1380,10 +1408,10 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
       <div className="flex gap-1 rounded-lg bg-muted p-1 w-fit">
         <button
           onClick={() => setActiveTab("detail")}
-          className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+          className={`cursor-pointer rounded-md px-4 py-2 text-sm transition-all ${
             activeTab === "detail"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+              ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-black/5"
+              : "font-medium text-muted-foreground hover:bg-background/50 hover:text-foreground"
           }`}
         >
           Detail
@@ -1391,34 +1419,36 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
         {roleCanTranslate && (
           <button
             onClick={() => setActiveTab("translations")}
-            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            className={`cursor-pointer rounded-md px-4 py-2 text-sm transition-all ${
               activeTab === "translations"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-black/5"
+                : "font-medium text-muted-foreground hover:bg-background/50 hover:text-foreground"
             }`}
           >
             Translations
             {translations.length > 0 && (
-              <span className="ml-1.5 tabular-nums text-muted-foreground/50">{translations.length}</span>
+              <span className="ml-1.5 text-[13px] tabular-nums text-muted-foreground">{translations.length}</span>
             )}
           </button>
         )}
         {/* Where this model's datasheet stands on the five regional sites.
-            The number is what the last check found; no number = never checked. */}
+            The number is how many sites need something for the versions marked
+            可上架 (the same count as the tab's headline); no number = never checked. */}
         {roleCanCheckWebsite && (
           <button
             onClick={() => setActiveTab("website")}
-            className={`cursor-pointer rounded-md px-4 py-1.5 text-xs font-medium transition-all ${
+            className={`cursor-pointer rounded-md px-4 py-2 text-sm transition-all ${
               activeTab === "website"
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-background font-semibold text-foreground shadow-sm ring-1 ring-black/5"
+                : "font-medium text-muted-foreground hover:bg-background/50 hover:text-foreground"
             }`}
           >
             官網
-            {websiteIssues !== null && (
-              <span className={`ml-1.5 tabular-nums ${websiteIssues > 0 ? "font-semibold text-amber-700" : "text-muted-foreground/50"}`}>
-                {websiteIssues}
-              </span>
+            {/* Only when there is something to show. A grey "0" beside the tab
+                read as a broken counter — and it sat next to a detail list that
+                counts differently, so it looked like a contradiction too. */}
+            {websiteIssues !== null && websiteIssues > 0 && (
+              <span className="ml-1.5 text-[13px] font-semibold tabular-nums text-amber-700">{websiteIssues}</span>
             )}
           </button>
         )}
@@ -1427,7 +1457,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
       <Separator />
 
       {activeTab === "website" && roleCanCheckWebsite && (
-        <WebsiteTab model={product.model_name} onIssueCount={setWebsiteIssues} />
+        <WebsiteTab model={product.model_name} onCount={setWebsiteIssues} />
       )}
 
       {/* Translations tab */}
@@ -1436,6 +1466,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           modelName={product.model_name}
           productLineName={product.product_line.name}
           englishOverview={product.overview ?? ""}
+          englishSpecNotes={product.spec_notes ?? ""}
           englishFeatures={product.features ?? []}
           englishHeadline={product.headline || product.full_name}
           englishSubtitle={product.subtitle}
@@ -1449,6 +1480,7 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
             hardware_image: t.hardware_image,
             qr_label: t.qr_label,
             qr_url: t.qr_url,
+            spec_notes: t.spec_notes,
             confirmed: t.confirmed,
             review_status: t.review_status ?? (t.confirmed ? "approved" : "draft"),
           }))}
@@ -1495,13 +1527,15 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
           {/* Radio Pattern placeholders (AP only) */}
           {showRadioPatterns && (
             <div className="mt-6">
-              <div className="mb-3 flex items-start justify-between gap-4">
+              {/* The hint used to sit right-aligned opposite the heading, where
+                  three ragged lines of mixed CJK and Latin read as broken. */}
+              <div className="mb-3">
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Radio Patterns
                 </h4>
-                <div className="text-[11px] leading-relaxed text-muted-foreground max-w-md text-right">
-                  📐 建議上傳 <strong className="text-foreground">PNG / JPG，長邊 ≥ 800px</strong>。<strong className="text-foreground">比例不拘、四周留白會自動裁掉</strong>，PDF 會把圖放大到欄寬（2 頻段最大 259pt 寬；含 6GHz 為三排，高度上限 170pt）——所以圖愈大愈清楚，長邊 800px 以下列印會略糊。
-                </div>
+                <p className="mt-1.5 max-w-3xl text-[12px] leading-relaxed text-muted-foreground">
+                  📐 建議上傳 <strong className="font-semibold text-foreground">PNG / JPG，長邊 ≥ 800px</strong>。<strong className="font-semibold text-foreground">比例不拘、四周留白會自動裁掉</strong>，PDF 會把圖放大到欄寬（2 頻段最大 259pt 寬；含 6GHz 為三排，高度上限 170pt）——所以圖愈大愈清楚，長邊 800px 以下列印會略糊。
+                </p>
               </div>
               <div className="flex flex-wrap gap-4">
                 {patternSlots.map((slot) => {
@@ -1749,6 +1783,43 @@ export function ProductDetail({ product, solutionSlug = "cloud", versions, trans
               No specifications loaded yet. Run a sync to pull data from Google
               Sheets.
             </p>
+          )}
+          {(shownNotes.length > 0 ||
+            markerIssues.valuesWithoutNote.length > 0 ||
+            markerIssues.notesWithoutValue.length > 0) && (
+            <div className="rounded-lg border border-dashed bg-muted/30 px-4 py-3">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                規格備註
+                <span className="ml-2 font-normal normal-case tracking-normal">
+                  {specNotes.length > 0
+                    ? "來自 Google Sheet ▸ Web Overview ▸ Spec Footnote"
+                    : lineFootnote.length > 0
+                      ? `整條 ${product.product_line.label} 共用`
+                      : ""}
+                </span>
+              </h3>
+              {shownNotes.length > 0 ? (
+                <div className="mt-2 space-y-1 text-[13px] leading-relaxed text-slate-700">
+                  {shownNotes.map((note, i) => (
+                    <p key={i}>{note}</p>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-[13px] text-slate-700">這台還沒有備註。</p>
+              )}
+              {markerIssues.valuesWithoutNote.length > 0 && (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  規格值裡有「{markerIssues.valuesWithoutNote.join("」「")}」，但沒有對應的備註 ——
+                  datasheet 上會出現一個沒有說明的記號。到 Web Overview 的 Spec Footnote 列補一行。
+                </p>
+              )}
+              {markerIssues.notesWithoutValue.length > 0 && (
+                <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                  備註用了「{markerIssues.notesWithoutValue.join("」「")}」，但沒有規格值標這個記號 ——
+                  讀者找不到它在講哪一項。
+                </p>
+              )}
+            </div>
           )}
         </CardContent>
       </Card>

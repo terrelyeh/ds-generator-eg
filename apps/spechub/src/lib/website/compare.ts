@@ -96,6 +96,12 @@ export interface SiteVerdict {
   rows: Row[];
   /** Expected languages with nothing on the site, e.g. TW has no Chinese sheet. */
   missing: { language: DocLanguage; status: Status; why: string }[];
+  /**
+   * The verdict per language this site was judged on. Reminders track one
+   * language version at a time, and the site's overall status can come from
+   * another language. Absent on checks saved before it existed.
+   */
+  languages?: Partial<Record<DocLanguage, { status: Status; why: string }>>;
   issues: string[];
 }
 
@@ -324,7 +330,15 @@ export function judgeSite(
   if (!production.pageFound && staging.pageFound) statuses.push("push");
   const status = STATUS_PRIORITY.find((s) => statuses.includes(s)) ?? (rows.length ? "skip" : "notyet");
 
-  return { site, status, summary: summarize(status, languageStatus, rows), rows, missing, issues: [...new Set(issues)] };
+  return {
+    site,
+    status,
+    summary: summarize(status, languageStatus, rows),
+    rows,
+    missing,
+    languages: Object.fromEntries(languageStatus),
+    issues: [...new Set(issues)],
+  };
 }
 
 function summarize(status: Status, languages: Map<DocLanguage, { status: Status; why: string }>, rows: Row[]): string {

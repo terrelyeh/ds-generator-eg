@@ -704,6 +704,9 @@ export type Database = {
           name: string
           overview_gid: string | null
           revision_log_gid: string | null
+          qr_url_template: string | null
+          spec_footnote: string | null
+          spec_footnote_translations: Json | null
           sheet_id: string | null
           solution: string | null
           solution_id: string
@@ -727,6 +730,9 @@ export type Database = {
           name: string
           overview_gid?: string | null
           revision_log_gid?: string | null
+          qr_url_template?: string | null
+          spec_footnote?: string | null
+          spec_footnote_translations?: Json | null
           sheet_id?: string | null
           solution?: string | null
           solution_id: string
@@ -750,6 +756,9 @@ export type Database = {
           name?: string
           overview_gid?: string | null
           revision_log_gid?: string | null
+          qr_url_template?: string | null
+          spec_footnote?: string | null
+          spec_footnote_translations?: Json | null
           sheet_id?: string | null
           solution?: string | null
           solution_id?: string
@@ -776,6 +785,7 @@ export type Database = {
           overview: string | null
           product_id: string
           qr_label: string | null
+          spec_notes: string | null
           qr_url: string | null
           review_status: string
           reviewed_at: string | null
@@ -795,6 +805,7 @@ export type Database = {
           overview?: string | null
           product_id: string
           qr_label?: string | null
+          spec_notes?: string | null
           qr_url?: string | null
           review_status?: string
           reviewed_at?: string | null
@@ -814,6 +825,7 @@ export type Database = {
           overview?: string | null
           product_id?: string
           qr_label?: string | null
+          spec_notes?: string | null
           qr_url?: string | null
           review_status?: string
           reviewed_at?: string | null
@@ -851,6 +863,7 @@ export type Database = {
           product_image: string
           product_line_id: string
           sheet_last_editor: string | null
+          spec_notes: string | null
           sheet_last_modified: string | null
           status: string | null
           subtitle: string
@@ -873,6 +886,7 @@ export type Database = {
           product_image?: string
           product_line_id: string
           sheet_last_editor?: string | null
+          spec_notes?: string | null
           sheet_last_modified?: string | null
           status?: string | null
           subtitle?: string
@@ -895,6 +909,7 @@ export type Database = {
           product_image?: string
           product_line_id?: string
           sheet_last_editor?: string | null
+          spec_notes?: string | null
           sheet_last_modified?: string | null
           status?: string | null
           subtitle?: string
@@ -1514,6 +1529,66 @@ export type Database = {
           site?: string
           status?: string
           verdict?: Json
+        }
+        Relationships: []
+      }
+      website_marks: {
+        Row: {
+          decision: string
+          generated_at: string | null
+          locale: string
+          marked_at: string
+          marked_by: string | null
+          product_id: string
+          version: string
+        }
+        Insert: {
+          decision: string
+          generated_at?: string | null
+          locale: string
+          marked_at?: string
+          marked_by?: string | null
+          product_id: string
+          version: string
+        }
+        Update: {
+          decision?: string
+          generated_at?: string | null
+          locale?: string
+          marked_at?: string
+          marked_by?: string | null
+          product_id?: string
+          version?: string
+        }
+        Relationships: []
+      }
+      website_site_state: {
+        Row: {
+          checked_at: string
+          last_push_at: string | null
+          pending: Json
+          production_modified: string | null
+          push_detected: boolean
+          site: string
+          staging_modified: string | null
+        }
+        Insert: {
+          checked_at?: string
+          last_push_at?: string | null
+          pending?: Json
+          production_modified?: string | null
+          push_detected?: boolean
+          site: string
+          staging_modified?: string | null
+        }
+        Update: {
+          checked_at?: string
+          last_push_at?: string | null
+          pending?: Json
+          production_modified?: string | null
+          push_detected?: boolean
+          site?: string
+          staging_modified?: string | null
         }
         Relationships: []
       }

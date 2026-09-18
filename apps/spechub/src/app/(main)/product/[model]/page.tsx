@@ -4,6 +4,9 @@ import { createAdminClient } from "@eg/db/admin";
 import { can } from "@eg/auth/permissions";
 import { getCurrentUser, localesWithDesignatedReviewer } from "@eg/auth/session";
 import { ProductDetail } from "@/components/product/product-detail";
+import type { SiteVerdict } from "@/lib/website/compare";
+import { loadMarks, toMark } from "@/lib/website/marks";
+import { countTodo, LOCALE_LANGUAGE } from "@/lib/website/reminders";
 import { checkProductLayout } from "@/lib/datasheet/layout-check";
 import { filterRenderableSections } from "@/lib/datasheet/pagination";
 import {
@@ -106,26 +109,38 @@ export default async function ProductPage({
   // versions needs product.id (only known after the product fetch above),
   // so it stays as a second round trip. translationData was already
   // fetched in parallel above.
-  // The 官網 tab's number: issues from the last website check. website_checks
-  // has RLS with no policies, so it is read with the service role — and only
-  // for roles that can see the tab.
-  const [{ data: versionData }, websiteRows] = await Promise.all([
+  // The 官網 tab's number: sites that need something for this model's
+  // 可上架 versions, read from the last saved checks. website_checks and
+  // website_marks have RLS with no policies, so they are read with the
+  // service role — and only for roles that can see the tab.
+  const canSeeWebsite = can(role, "website_check.view");
+  const [{ data: versionData }, websiteRows, websiteMarks] = await Promise.all([
     supabase
       .from("versions")
       .select("*")
       .eq("product_id", product.id)
       .order("generated_at", { ascending: false }) as unknown as Promise<{ data: Version[] | null }>,
-    can(role, "website_check.view")
+    canSeeWebsite
       ? (createAdminClient()
           .from("website_checks")
-          .select("status, verdict")
+          .select("site, checked_at, verdict")
           .eq("model_name", product.model_name.toUpperCase()) as unknown as Promise<{
-          data: { status: string; verdict: { issues?: string[] } }[] | null;
+          data: { site: string; checked_at: string; verdict: SiteVerdict }[] | null;
         }>)
       : Promise.resolve({ data: null }),
+    canSeeWebsite ? loadMarks(createAdminClient(), [product.id]).catch(() => []) : Promise.resolve([]),
   ]);
-  const websiteIssueCount = websiteRows.data?.length
-    ? websiteRows.data.reduce((sum, row) => sum + (row.status === "fail" ? 0 : row.verdict.issues?.length ?? 0), 0)
+  const websiteTodoCount = canSeeWebsite
+    ? countTodo({
+        model: product.model_name,
+        marks: websiteMarks.map(toMark),
+        available: new Set(
+          (["en", "ja", "zh-TW"] as const)
+            .filter((locale) => (product.current_versions as Record<string, string> | null)?.[locale])
+            .map((locale) => LOCALE_LANGUAGE[locale]),
+        ),
+        checks: Object.fromEntries((websiteRows.data ?? []).map((row) => [row.site, { verdict: row.verdict, checkedAt: row.checked_at }])),
+      })
     : null;
 
   // Pre-compute layout overflow estimate for English + every enabled
@@ -206,7 +221,7 @@ export default async function ProductPage({
         role={role}
         reviewLocales={user?.reviewLocales ?? null}
         reviewedLocales={reviewedLocales}
-        websiteIssueCount={websiteIssueCount}
+        websiteTodoCount={websiteTodoCount}
       />
     </div>
   );

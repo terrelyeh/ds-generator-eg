@@ -44,14 +44,19 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - **競品管理**：可自行新增競品品牌 / 型號 / 對戰機型 / tier / datasheet 連結，改 tier 或移除
 - 純內部使用，不會印在對外 datasheet 上
 
-### 官網 Datasheet 查詢
-- **五個區域官網（EU / JP / TW / APAC / IN）的 datasheet 現在是哪一版**，正式站和測試站都查，對照 SpecHub 目前的版本
-- **產品頁「官網」分頁**：這個型號在五站的狀況，分頁上的數字是上次查到的問題數；按「重新查詢」才會去讀官網
-- **官網查詢頁**（`/website`）：依型號（一次查好幾個，不在 SpecHub 的型號也能查），或依站台（可複選站台、選類別和 Wi-Fi 世代）
+### 官網 Datasheet 查詢與上架提醒
+- **五個區域官網（EU / JP / TW / APAC / IN）的 datasheet 現在是哪一版**，正式站和測試站都查，對照 SpecHub 的版本
+- **產品頁「官網」分頁**：一個區塊「語言版本 → 上架的站台」——每個語言版本一列，右邊是這一版要上的站（英文版上 EU / APAC / IN、日文版上 JP、繁中版上 TW）。
+  最上面一行寫「N 件事要處理」，分頁上的數字就是這個；檔名、上傳時間等明細收在下面
+- **可上架標記**：產出確認沒問題後，在分頁按「標記可上架」，之後每日檢查才會追蹤、提醒；確定不上官網的版本按「不上架」。
+  已標記的版本要 Regenerate 時會先跳確認框，列出哪幾站要換檔，並建議改出新版本
+- **官網查詢頁**（`/website`）：依型號（一次查好幾個，不在 SpecHub 的型號也能查）、依站台（可複選站台、選類別和 Wi-Fi 世代），
+  以及 **上架追蹤**——各站要處理幾件、待推送幾件、上次推送日期；標記版本在各站的進度；還沒標記的最新版本可以一次勾選標記
+- **每個工作日 09:30 自動檢查**，有待辦才發 Telegram：推送提醒發給負責推送的小群組（哪站可以推、哪站要先等），
+  上架提醒發給行銷群組（還沒上測試站、站上是舊檔、還有幾份沒標記）
 - 狀態分成**已是最新 / 待推送 / 待上架 / 檔案不同 / 站上較新 / 正式站較新**：
   「檔案不同」是版號一樣但檔案大小跟 SpecHub 的 PDF 不同（多半是 Regenerate 之前的舊檔）；
   「正式站較新」代表有人直接改了正式站，下次從測試站推送會被蓋掉
-- 問題清單寫成可以直接轉給各區行銷的句子，一鍵複製；依站台時按站台分組，待推送每站收成一條
 - **只讀取官網的公開資料，不會修改網站**；只有 Admin / Editor 看得到
 
 ### Tender Datasheets（標案 datasheet）
@@ -80,7 +85,11 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 ### Datasheet PDF
 - Cover page：產品圖、Overview、Features（**動態版面** — features 依內容浮動，overview 自動吃剩下空間）
 - Technical Specifications（自動分頁，2 欄按高度平衡；同一 category 跨欄不重複 header；規格 value 太長自動切行並加 "(cont.)" 續接）
-- **規格表備註區**（per-product-line, optional）— VPN Firewall 等產品線可在最後一頁 spec 下方放免責備註（如 `*Note: Performance figures are estimates…`），支援多語言
+- **規格備註**（每個型號可多條，2026-09-16 起在 Google Sheet 維護）— PM 在 `Web Overview` 的 `Spec Footnote` 列一行寫一條，
+  行首的記號（`*`、`**`）對應規格值後面的同一個記號（例如 `6.8G*`）。印在最後一頁規格表下方，**四種版型都有**；
+  分頁會為它預留高度（放不下就多開一頁，不會被裁掉）。日文／繁中在翻譯頁的「規格備註」卡維護，AI 翻譯會保留記號；
+  沒填就印英文。產品頁 ▸ Detail ▸ Specifications 最下方可以看到內容與**記號一致性提醒**。
+  產品線層級的共用備註仍在（型號沒填時才用）
 - **Antennas Patterns**（Cloud AP / Broadband）— 上傳 radio pattern 圖後 PDF 自動新增一頁。
   繪製維度依產品推導：Cloud AP 用頻段（2.4G / 5G / 6G），Broadband CPE 用天線埠（Port1 / Port2），
   各含 H-Plane & E-Plane polar plots

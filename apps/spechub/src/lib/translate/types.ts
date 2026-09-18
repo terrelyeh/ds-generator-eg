@@ -1,7 +1,7 @@
 export interface TranslateRequest {
   source: string | string[];
   targetLocale: string;
-  contentType: "overview" | "features" | "spec_labels";
+  contentType: "overview" | "features" | "spec_labels" | "spec_notes";
   productLine?: string;
 }
 

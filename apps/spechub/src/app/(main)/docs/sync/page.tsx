@@ -728,6 +728,18 @@ Total: 6 product(s) updated + 1 comparison
                   </td>
                 </tr>
                 <tr>
+                  <td className="border border-border px-3 py-2">Spec Footnote</td>
+                  <td className="border border-border px-3 py-2">
+                    規格表下方的備註，一行一條，記號（*、**）自己寫在最前面；
+                    規格值的記號打在 Detail Specs 的值後面。留空就沿用產品線的共用備註。
+                  </td>
+                  <td className="border border-border px-3 py-2">
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-sm text-engenius-blue">
+                      products.spec_notes
+                    </code>
+                  </td>
+                </tr>
+                <tr>
                   <td className="border border-border px-3 py-2">Headline</td>
                   <td className="border border-border px-3 py-2">
                     封面大標題（fallback full_name）

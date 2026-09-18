@@ -222,7 +222,7 @@ async function buildSystemPrompt(
 export async function previewSystemPrompt(opts: {
   source: string;
   targetLocale: string;
-  contentType: "headline" | "overview" | "features" | "spec_labels";
+  contentType: "headline" | "overview" | "features" | "spec_labels" | "spec_notes";
   productLine?: string;
 }): Promise<string> {
   return buildSystemPrompt(
@@ -236,7 +236,7 @@ export async function previewSystemPrompt(opts: {
 export async function translate(opts: {
   source: string;
   targetLocale: string;
-  contentType: "headline" | "overview" | "features" | "spec_labels";
+  contentType: "headline" | "overview" | "features" | "spec_labels" | "spec_notes";
   productLine?: string;
   /** OpenRouter slug. Omit to use the catalog's translate default. */
   providerId?: string;

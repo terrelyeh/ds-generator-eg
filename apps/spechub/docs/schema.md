@@ -59,6 +59,8 @@ images（`series_*` 圖）。
 ### products
 status, current_version, **current_versions** (JSONB: `{"en":"1.1","ja":"1.0"}`)、
 **ds_features** (JSONB `[{title, bullets[]}]`，選填的分組行銷文案)、
+**spec_notes**（規格表下方的備註，sheet 的 `Spec Footnote` 列，一行一條、記號在行首；
+NULL = 這台沒寫，改用 `product_lines.spec_footnote`）、
 product_image / hardware_image / **hardware_image_2**。
 
 ⚠️ 三個 image 欄位是 **`NOT NULL DEFAULT ''`** —— 要清空寫 `""` 不是 `null`
@@ -71,7 +73,7 @@ version, **locale**, pdf_storage_path, changes。
 ### product_translations
 per-product per-locale：headline, **subtitle**, overview, features,
 hardware_image（此欄 nullable，清空用 `null` 才對）, qr_label, qr_url,
-translation_mode, **confirmed**。
+**spec_notes**（該語系的規格備註，NULL = 印英文）, translation_mode, **confirmed**。
 
 ### 其他
 - `spec_label_translations` — per-line per-locale label 翻譯；
@@ -82,6 +84,11 @@ translation_mode, **confirmed**。
 - `website_checks`（migration `00061`）— 官網 datasheet 查詢每個 **(型號, 站台)** 的上次結果
   （`verdict` + 當時的 SpecHub `baseline`）。model_name 是大寫、可以不在 products 裡（Fit AP）。
   RLS 開、沒有 policy,只有 `website_check.view` 的 API 用 service role 讀寫
+- `website_marks`（migration `00062`）— 每個 **(product_id, locale)** 一列「可上架／不上架」標記:
+  `decision` ready/skip、標記時的 `version` 與那份 PDF 的 `generated_at`（看得出之後重產過）、`marked_by`。
+  locale 只有 en / ja / zh-TW（西文沒有官網）
+- `website_site_state`（migration `00062`）— 每站一列,每日檢查改寫:正式站與測試站最新內容的 `modified`、
+  `last_push_at` + `push_detected`（false = 還只是下限）、`pending`（測試站上比正式站新的 datasheet,JSON）
 - `profiles` — role TEXT CHECK (admin/editor/pm/viewer)；
   `email_whitelist` — 邀請制白名單
 

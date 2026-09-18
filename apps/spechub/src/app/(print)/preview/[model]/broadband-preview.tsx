@@ -5,6 +5,7 @@ import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
 import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT, LADDER, BROADBAND_HEADLINE } from "@/lib/datasheet/scale";
+import { estimateSpecNotesHeight } from "@/lib/datasheet/spec-notes";
 import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@eg/db/types";
 
 /**
@@ -74,7 +75,15 @@ interface SpecRow {
   values: string[];
 }
 
-function paginate(rows: SpecRow[], valueWidth: number, first: number, rest: number): SpecRow[][] {
+function paginate(
+  rows: SpecRow[],
+  valueWidth: number,
+  first: number,
+  rest: number,
+  /** Height of the spec footnote, which prints under the table on the last
+   *  page. Trailing rows move to a new page until it fits. */
+  notesHeight = 0,
+): SpecRow[][] {
   const pages: SpecRow[][] = [];
   let cur: SpecRow[] = [];
   let used = 0;
@@ -95,6 +104,20 @@ function paginate(rows: SpecRow[], valueWidth: number, first: number, rest: numb
     used += h;
   }
   if (cur.length) pages.push(cur);
+
+  const rowHeight = (r: SpecRow) =>
+    Math.max(estRows(r.label, 96), ...r.values.map((v) => estRows(v, valueWidth))) * 9.6 + 8;
+  while (notesHeight > 0 && pages.length < 20) {
+    const last = pages[pages.length - 1];
+    const budget = (pages.length === 1 ? first : rest) - notesHeight;
+    const heightOf = (page: SpecRow[]) => page.reduce((h, r) => h + rowHeight(r), 0);
+    if (last.length <= 1 || heightOf(last) <= budget) break;
+    const moved: SpecRow[] = [];
+    while (last.length > 1 && heightOf(last) > budget) moved.unshift(last.pop()!);
+    if (!moved.length) break;
+    pages.push(moved);
+  }
+
   return pages;
 }
 
@@ -110,6 +133,7 @@ export function BroadbandPreview({
   locale = "en",
   translation,
   translationConfirmed = true,
+  specNotes = [],
 }: {
   scope: "model" | "series";
   line: ProductLine;
@@ -123,6 +147,10 @@ export function BroadbandPreview({
   versionOverride: string | null;
   /** "en" | "ja" | "zh-TW" — series datasheets stay English for now. */
   locale?: string;
+  /** Spec footnotes for the focus model, resolved for the locale
+   *  (lib/datasheet/spec-notes). Series datasheets pass none — their
+   *  line-wide note already prints on the cover. */
+  specNotes?: string[];
   /** Resolved product_translations row for `locale`, when non-English. */
   translation?: {
     headline: string | null;
@@ -228,7 +256,7 @@ export function BroadbandPreview({
     .filter((r) => !/^model\s*(name|#|number)/i.test(r.label.trim()));
 
   const valueWidth = isSeries ? Math.max(70, 440 / Math.max(1, columns.length)) : 440;
-  const specPages = paginate(specRows, valueWidth, 560, 640);
+  const specPages = paginate(specRows, valueWidth, 560, 640, estimateSpecNotesHeight(specNotes));
 
   // ── per-model pages ─────────────────────────────────────────────────
   const viewProducts = isSeries ? orderedProducts : focusModel ? [focusModel] : [];
@@ -499,6 +527,9 @@ body {
 ${bulletDotCss(".benefit .dot")}
 .benefit b { font-weight: ${WT.bold}; color: #4a4a4a; }
 .benefits-note { font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; color: #a7a9ac; margin-top: 8pt; }
+/* Spec footnote — under the table on the last spec page, same quiet grey as
+   the other layouts. The cover's line-wide note is a different thing. */
+.spec-footnote { margin-top: 16pt; font-size: ${PT.tableSm}pt; font-weight: ${WT.light}; line-height: 1.55; color: #6f7073; }
 .deploy { margin-top: 16pt; display: flex; justify-content: center; }
 .deploy img { width: 100%; height: auto; max-height: 320pt; object-fit: contain; }
 /* per-model p2 shares the page with the full feature list; the diagram
@@ -758,6 +789,13 @@ ${bulletDotCss(".benefit .dot")}
                 ))}
               </tbody>
             </table>
+            {pi === specPages.length - 1 && specNotes.length > 0 && (
+              <div className="spec-footnote">
+                {specNotes.map((note, i) => (
+                  <div key={i}>{note}</div>
+                ))}
+              </div>
+            )}
           </div>
           {lastSection === "specs" && pi === specPages.length - 1 && <Footer />}
           <div className="page-number">{nextPage()}</div>

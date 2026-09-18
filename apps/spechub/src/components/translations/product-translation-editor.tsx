@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { markersInNotes, parseSpecNotes } from "@/lib/datasheet/spec-notes";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -96,6 +97,7 @@ interface TranslationData {
   hardware_image: string | null;
   qr_label: string | null;
   qr_url: string | null;
+  spec_notes: string | null;
   confirmed: boolean;
   review_status?: ReviewStatus;
 }
@@ -107,6 +109,8 @@ interface ProductTranslationEditorProps {
   productLineName: string;
   englishOverview: string;
   englishFeatures: string[];
+  /** products.spec_notes — the sheet's Spec Footnote cell for this model. */
+  englishSpecNotes: string;
   existingTranslations: TranslationData[];
   role?: Role;
   /** Locales this user may approve; null = all. */
@@ -126,6 +130,7 @@ export function ProductTranslationEditor({
   productLineName,
   englishOverview,
   englishFeatures,
+  englishSpecNotes,
   existingTranslations,
   role,
   reviewLocales = null,
@@ -185,6 +190,8 @@ export function ProductTranslationEditor({
   const [headlineTrans, setHeadlineTrans] = useState(existing?.headline ?? "");
   const [subtitleTrans, setSubtitleTrans] = useState(existing?.subtitle ?? "");
   const [overview, setOverview] = useState(existing?.overview ?? "");
+  const [specNotes, setSpecNotes] = useState(existing?.spec_notes ?? "");
+  const [translatingSpecNotes, setTranslatingSpecNotes] = useState(false);
   // Always as long as the CURRENT English list. A stored translation can be
   // longer — features get deleted from the sheet after it was written — and
   // the rows below only iterate englishFeatures, so a stale tail would sit
@@ -208,6 +215,7 @@ export function ProductTranslationEditor({
     setHeadlineTrans(t?.headline ?? "");
     setSubtitleTrans(t?.subtitle ?? "");
     setOverview(t?.overview ?? "");
+    setSpecNotes(t?.spec_notes ?? "");
     setFeatures(alignToSource(t?.features));
     setHwImage(t?.hardware_image ?? "");
     setQrLabel(t?.qr_label ?? "");
@@ -324,6 +332,54 @@ export function ProductTranslationEditor({
     }
   }
 
+  async function handleAiTranslateSpecNotes() {
+    if (!englishSpecNotes.trim()) return;
+    setTranslatingSpecNotes(true);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: englishSpecNotes,
+          target_locale: activeLocale,
+          content_type: "spec_notes",
+          product_line: productLineName,
+          provider: selectedProvider,
+          ref: modelName,
+        }),
+      });
+      const data = await safeJson(res);
+      if (data.ok) {
+        const translated = String(data.translated ?? "");
+        setSpecNotes(translated);
+        setDirty(true);
+        if (data.model) setLastModel(data.model);
+        // The markers carry the meaning: the same `*` is printed next to a
+        // value in the spec table. A model that drops or translates one leaves
+        // the reader with a mark that points nowhere, so check rather than
+        // trust the prompt. The text is still filled in — it is easier to fix
+        // a marker by hand than to translate the note again.
+        const lost = markersInNotes(parseSpecNotes(englishSpecNotes)).filter(
+          (marker) => !markersInNotes(parseSpecNotes(translated)).includes(marker),
+        );
+        if (lost.length > 0) {
+          toast.warning(`翻譯後少了記號「${lost.join("」「")}」`, {
+            description: "已填入，請把行首的記號補回去再存。",
+            duration: 8000,
+          });
+        } else {
+          toast.success(`規格備註已由 ${data.provider} 翻譯`);
+        }
+      } else {
+        toast.error(`Translation failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Translation failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setTranslatingSpecNotes(false);
+    }
+  }
+
   async function handleAiTranslateFeatures() {
     if (englishFeatures.length === 0) return;
     setTranslatingFeatures(true);
@@ -389,6 +445,7 @@ export function ProductTranslationEditor({
           subtitle: subtitleTrans || null,
           overview: overview || null,
           features: features.some((f) => f.trim()) ? features : null,
+          spec_notes: specNotes.trim() || null,
           hardware_image: hwImage || null,
           qr_label: qrLabel || null,
           qr_url: qrUrl || null,
@@ -1001,6 +1058,61 @@ export function ProductTranslationEditor({
           {featuresNotes && <TranslationNotes notes={featuresNotes} onDismiss={() => setFeaturesNotes("")} className="mt-4" />}
         </CardContent>
       </Card>
+
+      {/* Spec footnotes — the "*Note: …" lines under the spec table. The
+          English side is read-only: it comes from the sheet's Spec Footnote
+          row, like Overview and Features. */}
+      {englishSpecNotes.trim() && (
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0">
+            <CardTitle className="text-base">規格備註</CardTitle>
+            <Button
+              size="sm"
+              onClick={handleAiTranslateSpecNotes}
+              disabled={translatingSpecNotes || !hasAnyProvider}
+              className={`text-xs transition-all ${
+                translatingSpecNotes ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse" : ""
+              }`}
+            >
+              {translatingSpecNotes ? (
+                <span className="flex items-center gap-1.5">
+                  <svg className="h-3 w-3 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M8 1a7 7 0 1 0 7 7" />
+                  </svg>
+                  正在翻譯中...
+                </span>
+              ) : (
+                "AI Translate"
+              )}
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">English (source)</label>
+              <p className="mt-1 whitespace-pre-line rounded-md bg-muted/50 px-3 py-2 text-sm leading-relaxed text-muted-foreground">
+                {englishSpecNotes}
+              </p>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-muted-foreground">
+                {currentLocaleInfo?.flag} {currentLocaleInfo?.label}
+              </label>
+              <textarea
+                value={specNotes}
+                onChange={(e) => { setSpecNotes(e.target.value); setDirty(true); }}
+                placeholder="一行一條，行首的記號（*、**）要跟英文版一樣"
+                rows={Math.max(3, parseSpecNotes(englishSpecNotes).length + 1)}
+                className={`mt-1 w-full rounded-md border px-3 py-2 text-sm shadow-xs transition-colors focus:outline-none focus:ring-2 focus:ring-engenius-blue/30 ${
+                  translatingSpecNotes ? "border-amber-300 bg-amber-50" : "border-input bg-background"
+                }`}
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                空白就印英文版。記號要保持原樣 —— 它跟規格表裡的記號是一對的。
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Hardware Image (locale-specific) */}
       <Card className="shadow-sm">

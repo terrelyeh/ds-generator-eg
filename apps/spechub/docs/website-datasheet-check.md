@@ -1,7 +1,7 @@
 # 官網 Datasheet 查詢（website datasheet check）
 
-> 2026-09-15 上線（PR #92,1a 查詢）。**動 `lib/website/`、`/api/website/*`、
-> 產品頁「官網」分頁或 `/website` 之前先讀這份。**
+> 2026-09-15 上線 1a 查詢（PR #92）；2026-09-16 做完 1b 標記與提醒（見文末）。
+> **動 `lib/website/`、`/api/website/*`、`/api/cron/website-check`、產品頁「官網」分頁或 `/website` 之前先讀這份。**
 
 ## 做什麼
 
@@ -63,12 +63,13 @@ SpecHub 那一側的大小來自 Storage（`lib/website/baseline.ts`）；
 版本以**後台版本欄位優先、檔名其次**（跟 skill 一樣：產品頁 Downloads 表顯示的是欄位，客戶看到的是它）；
 兩者不一致會另外列成問題。語言則是**檔名優先**（欄位常填錯）。
 
-## 跟 skill 刻意不同的兩處（`lib/website/parse.ts`，有測試）
+## 型號與版號的兩條細節（`lib/website/parse.ts`，有測試）
 
-1. **連字號型號**：`ECW201L-POE` 本身是型號時，不再把 `ECW201L` 也算進去。skill 會把它自己的 datasheet 判成系列
-2. **硬體版本**：`EWS357APv3_…pdf` 的 `v3` 是第三版硬體，不是 datasheet 版號（EU 真實資料抓到的）
+1. **連字號型號**：`ECW201L-POE` 本身是型號時，不再把 `ECW201L` 也算進去，否則它自己的 datasheet 會被判成系列
+2. **硬體版本**：`EWS357APv3_…pdf` 的 `v3` 是第三版硬體，不是 datasheet 版號。五個正式站實際會踩到的只有
+   EWS2910Pv2、EWS357APv3、ENH500v3 三種檔名；沒有「型號直接接版號」（ECW536v1.3）的檔名
 
-skill 若要一致，這兩處要回頭改 skill。
+2026-09-16 起線下 skill（`wp-ds-check`，`wp-ds-upload` / `wp-launch-check` 共用它的 `file_version`）也改成同一套規則。
 
 ## 讀取策略（`lib/website/check.ts`）
 
@@ -89,10 +90,76 @@ skill 若要一致，這兩處要回頭改 skill。
 一站一列是因為產品頁五站並行查、各自寫入。RLS 開、沒有 policy，只有 `website_check.view` 的 API 用 service role 讀寫。
 `baseline` 留著是為了發現「查詢之後 SpecHub 又出了新版本」。
 
-## 還沒做（1b）
+## 1b：可上架標記、每日檢查、Telegram 提醒（2026-09-16）
 
-- 「可上架」標記（版本列），提醒只追蹤標記過的版本
-- 每日檢查 + Telegram：**推送提醒發小群組（推送的同事 + Terrel），訊息要自足、不放要登入的連結**；
-  上架提醒發行銷。現有通知只有一個 `TELEGRAM_CHAT_ID`，要另開一個
-- 記錄各站推送時間（正式站整批變成跟測試站一樣的那天）
+**流程**：行銷產完 PDF → 產品頁「官網」分頁把那個語言版本標「可上架」→ 每個工作日 09:30 檢查 →
+行銷群組收到待上架、推送的小群組收到可以推的站 → 推送後隔天看到正式站跟上，就算上線、記下推送日期。
+
+### 標記（`website_marks`，migration 00062；`lib/website/marks.ts`）
+
+- **一個產品一個語言一列**：`decision` = `ready`（可上架）或 `skip`（不上架），附上**當時的版本和那份 PDF 的 generated_at**
+- **標記一律是那個語言「現在的最新版」**（`applyMarks` 自己讀 `current_versions`），而且**只能標 SpecHub 產生的版本**
+  （從 Drive 偵測到的版號沒有 PDF，會回 422）。`website_check.mark`（admin / editor）
+- **比對基準改成標記的版本**：`loadBaseline(…, targets)` / `targetsFromMarks()`。沒標記的語言照舊跟最新版比，
+  產品頁顯示「未標記 · 不會提醒」。手動查詢（`POST /api/website/check`）和每日檢查用同一套，兩邊不會打架
+- **v1.4 產了但沒標記**時，`ready` 的 v1.3 照樣追蹤；`skip` 只對它標的那一版有效
+- **重產已標記的版本**：`components/website/regenerate-guard.tsx` 在產品頁和預覽工具列的 Regenerate 前先問，
+  列出這一版在各站的狀況，提供「改出新版本」。**標記保留**（通常是修正），重產後站上舊檔靠檔案大小抓出來
+  → 行銷提醒的「站上是舊檔」會標「標記後重產過」
+
+### 誰該處理（`lib/website/reminders.ts`，純函式有測試）
+
+- **每個站只吃一種語言**（`siteLanguage`：EU/APAC/IN 英文、JP 日文、TW 繁中，沒有繁中版時 TW 看英文），
+  所以一個語言版本對到固定幾站、每站剛好出現一次 → 產品頁是「語言版本 → 上架的站台」一個區塊
+- `stageOf`：`ok`/`newer` = 已上線；`push` = 等推送的人；`todo` = 行銷上傳；`diff`/`prodnewer`/`mismatch`/`wrong_model` = 要先處理；
+  `nopage` = 那站沒有產品頁、不追蹤；`fail` / 沒查過 = 不知道
+- **語言各自判**：`SiteVerdict.languages`（1b 加的欄位）。之前存的結果沒有這欄，`languageVerdict()` 會退回用 `missing` / `rows` 推
+- **產品頁分頁上的數字** = 標記版本需要處理的站數（`countTodo`，跟分頁頂端「N 件事要處理」同一個數）
+
+### 每日檢查（`/api/cron/website-check`，`lib/website/daily.ts`）
+
+- Vercel Cron `30 1 * * 1-5`（台灣週一到週五 09:30），`requireCron`；`?dry=1` 只讀不寫、不發 Telegram，回傳兩則訊息全文
+- **一次批次讀全部產品頁**（`querySites(SITE_CODES, { category: "all" })`，跟依站台同一套），實測 5 站 245 款約 45 秒；
+  SpecHub 有的型號結果寫回 `website_checks`（產品頁和追蹤頁打開就是今天早上的狀態）。**批次讀不搜沒掛在產品頁的檔案**，
+  所以「已上傳但沒顯示」只有手動查詢會列
+- **推送偵測**（`lib/website/site-state.ts` + `nextPushState`）：正式站只會被測試站覆寫，所以**正式站最新內容
+  （file、product_model 的 `modified`）往前跳 = 推過一次**，日期取「上次檢查」和「新內容時間」較晚者，顯示「約 9/15」；
+  還沒看過跳動前只是下限，顯示「9/11 之後」。存在 `website_site_state`
+- **待推送清單**：測試站上 `modified` 晚於正式站最新內容的已發佈 datasheet（包含沒標記、不在 SpecHub 的）。
+  ⚠️ **`modified_after` 在這些站不理 `dates_are_gmt`**（實測回傳比 cutoff 早的檔），所以提前一天查、自己比 GMT 欄位
+- **推送前先處理**：所有型號（不只標記的）任一語言是 `prodnewer`，因為推送會蓋掉每一台
+- 心跳 `website-check`，健康檢查容許 74 小時（週五 09:30 到週一 10:00 是 72.5 小時）
+
+### Telegram（`sendTelegramHtml`，HTML 格式）
+
+- **推送提醒** → `TELEGRAM_WEBSITE_PUSH_CHAT_ID`（小群組：推送的同事 + Terrel）。那位同事不用 SpecHub，**訊息要自足、不放登入連結**：
+  先列「推 X 之前先等一下」，再列每站會上線的 datasheet 和等了幾天、上次推送日期
+- **行銷提醒** → `TELEGRAM_WEBSITE_MKT_CHAT_ID`（行銷群組）：先補傳到測試站 → 還沒上測試站（標記後幾天）→ 站上是舊檔 →
+  資料問題 → 「另有 N 份最新版超過 7 天沒標記」→ 上架追蹤連結（`VERCEL_PROJECT_PRODUCTION_URL/website?tab=tracking`）
+- **有待辦才發**；chat id 沒設就記成 skipped，不算失敗
+
+### 上架追蹤（`/website?tab=tracking`，`GET /api/website/tracking`）
+
+- 各站：要行銷處理幾件、待推送幾件（整站，含沒標記的）、上次推送
+- 追蹤中的版本：預設只看未完成（全部站已上線或沒有產品頁才算完成；完成的仍每天檢查，站上被換掉會重新出現）
+- **還沒標記的最新版本**（`unmarkedLatest`）：Active 產品、SpecHub 產生、超過 7 天、那一版沒有任何標記。
+  「站上現況」讀存下來的檢查（`describeSites`），站上已經是這一版的顯示綠字，可以勾選多份一次標記
+
+### 上線狀態（2026-09-16）
+
+- migration 00062 已套用；1b 已 merge（PR #96）並上正式站
+- **兩個 Telegram 群組已建好、chat id 已設在 Vercel Production**
+  （推送：「EG-DS官網推送提醒」／行銷：「EG-DS官網上架提醒」；機器人 `@engenius_ds_bot`，
+  privacy mode 開著所以要在群組裡對它送過一次 `/start`）
+  ⚠️ 群組改成公開、或打開「新成員可看聊天紀錄」會**升級成超級群組並換掉 chat id**，
+  提醒就會發不出去（心跳會變 `ok=false`，隔天健康檢查會叫）
+- **第一次排程 09:31 就跑了**：245 個型號、兩則訊息都發出（推送：APAC 的 S11/S21；行銷：77 份未標記）
+- ⚠️ **SpecHub 的 proxy 在 2026-09-16 之前沒放行 `/api/cron/*`**：`/api/cron/health` 一直被導到登入頁，
+  健康檢查**從來沒跑過**（`job_heartbeats` 沒有 `health` 列）。1b 的 PR 把 `/api/cron` 加進 `SERVICE_PATHS`
+
+## 還沒做
+
+- **36 份最新版還沒標記**（上線時 77 份，各站已是這一版的 41 份已標為可上架）。
+  沒歸零之前，行銷群組每個工作日都會收到那一行提醒 —— 「上架追蹤」的
+  「勾選站上已是這一版的 N 份」按鈕就是為了清這一批
 - 上傳者目前只有 WordPress user id，要換成名字要多查 users
