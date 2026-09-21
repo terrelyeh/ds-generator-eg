@@ -1,41 +1,25 @@
 "use client";
 
-import { useState, useMemo, useRef } from "react";
-import {
-  useReactTable,
-  getCoreRowModel,
-  getFilteredRowModel,
-  getSortedRowModel,
-  flexRender,
-  type ColumnDef,
-  type SortingState,
-  type ColumnFiltersState,
-  type VisibilityState,
-} from "@tanstack/react-table";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
+import { Check, ChevronDown, Download, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface CategoryData {
-  name: string;
-  rows: { label: string; values: Record<string, string> }[];
-}
-
-/** Flat row for TanStack Table */
-interface SpecRow {
-  category: string;
-  label: string;
-  [model: string]: string; // dynamic model columns
-}
+import {
+  countRows,
+  filterMatrix,
+  isCheckValue,
+  rowDiffers,
+  type SpecCategory,
+} from "@/lib/compare/spec-matrix";
+import { exportComparisonXlsx } from "@/lib/compare/export-xlsx";
 
 interface CompareTableProps {
+  /** Product line label — used for the export file name. */
+  title: string;
   models: string[];
-  categories: CategoryData[];
+  categories: SpecCategory[];
 }
 
 // ---------------------------------------------------------------------------
@@ -64,133 +48,87 @@ function HighlightText({
   );
 }
 
+function ValueCell({ value, query }: { value: string | undefined; query: string }) {
+  if (isCheckValue(value)) {
+    return (
+      <Check
+        className="h-4 w-4 text-engenius-blue"
+        strokeWidth={2.75}
+        aria-label="Supported"
+      />
+    );
+  }
+  if (!value || value.trim() === "") {
+    return <span className="text-muted-foreground/30">—</span>;
+  }
+  return (
+    <span className="break-words whitespace-pre-line">
+      <HighlightText text={value} query={query} />
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
 
-export function CompareTable({ models, categories }: CompareTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+/**
+ * Spec rows grouped under a full-width band per category. The Spec column is
+ * the only sticky one and wraps instead of overflowing — the old layout pinned
+ * a fixed-width Category badge column plus a Spec column at a hard-coded
+ * `left: 120`, so long names spilled under their neighbours.
+ */
+export function CompareTable({ title, models, categories }: CompareTableProps) {
+  const [query, setQuery] = useState("");
+  const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
+  const [onlyDifferences, setOnlyDifferences] = useState(false);
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showColumnPicker, setShowColumnPicker] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const [exporting, setExporting] = useState(false);
 
-  // Flatten categories into rows
-  const data = useMemo<SpecRow[]>(() => {
-    const rows: SpecRow[] = [];
-    for (const cat of categories) {
-      for (const row of cat.rows) {
-        const specRow: SpecRow = {
-          category: cat.name,
-          label: row.label,
-        };
-        for (const m of models) {
-          specRow[m] = row.values[m] ?? "";
-        }
-        rows.push(specRow);
-      }
-    }
-    return rows;
-  }, [categories, models]);
-
-  // Build columns
-  const columns = useMemo<ColumnDef<SpecRow>[]>(() => {
-    const cols: ColumnDef<SpecRow>[] = [
-      {
-        accessorKey: "category",
-        header: "Category",
-        cell: ({ getValue }) => (
-          <Badge
-            variant="outline"
-            className="text-[11px] px-1.5 py-0 font-semibold uppercase tracking-wider border-engenius-blue/30 text-engenius-blue bg-engenius-blue/5 whitespace-nowrap"
-          >
-            {getValue<string>()}
-          </Badge>
-        ),
-        enableSorting: true,
-        size: 120,
-      },
-      {
-        accessorKey: "label",
-        header: "Spec",
-        cell: ({ getValue }) => (
-          <span className="font-medium text-muted-foreground whitespace-nowrap">
-            <HighlightText text={getValue<string>()} query={globalFilter} />
-          </span>
-        ),
-        enableSorting: true,
-        size: 180,
-      },
-      ...models.map<ColumnDef<SpecRow>>((model) => ({
-        accessorKey: model,
-        header: () => (
-          <Link
-            href={`/product/${model}`}
-            className="text-engenius-blue hover:underline font-semibold"
-          >
-            {model}
-          </Link>
-        ),
-        cell: ({ getValue }) => {
-          const val = getValue<string>();
-          if (!val) return <span className="text-muted-foreground/25">—</span>;
-          return (
-            <span className="break-words whitespace-pre-line">
-              <HighlightText text={val} query={globalFilter} />
-            </span>
-          );
-        },
-        enableSorting: true,
-        size: 140,
-      })),
-    ];
-    return cols;
-  }, [models, globalFilter]);
-
-  // Custom global filter: search across label + all model values
-  const globalFilterFn = useMemo(
-    () =>
-      (
-        row: { getValue: (id: string) => unknown },
-        _columnId: string,
-        filterValue: string
-      ) => {
-        if (!filterValue) return true;
-        const q = filterValue.toLowerCase();
-        const label = String(row.getValue("label") ?? "").toLowerCase();
-        if (label.includes(q)) return true;
-        const cat = String(row.getValue("category") ?? "").toLowerCase();
-        if (cat.includes(q)) return true;
-        for (const m of models) {
-          const val = String(row.getValue(m) ?? "").toLowerCase();
-          if (val.includes(q)) return true;
-        }
-        return false;
-      },
-    [models]
+  const visibleModels = useMemo(
+    () => models.filter((m) => !hiddenModels.has(m)),
+    [models, hiddenModels]
   );
 
-  const table = useReactTable({
-    data,
-    columns,
-    state: {
-      sorting,
-      globalFilter,
-      columnVisibility,
-      columnFilters,
-    },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilter,
-    onColumnVisibilityChange: setColumnVisibility,
-    onColumnFiltersChange: setColumnFilters,
-    globalFilterFn,
-    getCoreRowModel: getCoreRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-  });
+  const filtered = useMemo(
+    () => filterMatrix(categories, { models: visibleModels, query, onlyDifferences }),
+    [categories, visibleModels, query, onlyDifferences]
+  );
 
-  const visibleRows = table.getRowModel().rows;
+  const totalRows = useMemo(() => countRows(categories), [categories]);
+  const shownRows = countRows(filtered);
+  const colCount = visibleModels.length + 1;
+
+  function toggleModel(m: string) {
+    setHiddenModels((prev) => {
+      const next = new Set(prev);
+      if (next.has(m)) next.delete(m);
+      else next.add(m);
+      return next;
+    });
+  }
+
+  function toggleCategory(name: string) {
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  }
+
+  async function handleExport() {
+    setExporting(true);
+    try {
+      await exportComparisonXlsx({ title, models: visibleModels, categories: filtered });
+    } catch (err) {
+      console.error(err);
+      toast.error("Export failed");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -213,44 +151,51 @@ export function CompareTable({ models, categories }: CompareTableProps) {
           </svg>
           <Input
             placeholder="Search specs, values..."
-            value={globalFilter}
-            onChange={(e) => setGlobalFilter(e.target.value)}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
             className="pl-8 h-8 text-xs"
           />
         </div>
 
         {/* Result count */}
         <span className="text-xs text-muted-foreground tabular-nums">
-          {visibleRows.length} / {data.length} rows
+          {shownRows} / {totalRows} rows
         </span>
 
+        {/* Only differences */}
+        <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={onlyDifferences}
+            onChange={(e) => setOnlyDifferences(e.target.checked)}
+            className="rounded border-border"
+          />
+          Only differences
+        </label>
+
         {/* Column visibility toggle */}
-        <div className="relative" ref={pickerRef}>
+        <div className="relative">
           <Button
             variant="outline"
             size="sm"
             className="h-8 text-xs"
             onClick={() => setShowColumnPicker(!showColumnPicker)}
           >
-            Columns ({models.length - Object.values(columnVisibility).filter((v) => v === false).length}/{models.length})
+            Columns ({visibleModels.length}/{models.length})
           </Button>
           {showColumnPicker && (
-            <div className="absolute right-0 top-full mt-1 z-50 w-56 max-h-[320px] overflow-y-auto rounded-lg border bg-card p-2 shadow-lg">
+            <div className="absolute left-0 top-full mt-1 z-50 w-56 max-h-[320px] overflow-y-auto rounded-lg border bg-card p-2 shadow-lg">
               <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5 px-1">
                 Toggle Models
               </p>
               <button
                 className="w-full text-left px-2 py-1 text-xs text-engenius-blue hover:bg-muted rounded mb-1"
-                onClick={() => {
-                  const allVisible: VisibilityState = {};
-                  models.forEach((m) => (allVisible[m] = true));
-                  setColumnVisibility(allVisible);
-                }}
+                onClick={() => setHiddenModels(new Set())}
               >
                 Show All
               </button>
               {models.map((m) => {
-                const isVisible = columnVisibility[m] !== false;
+                const isVisible = !hiddenModels.has(m);
                 return (
                   <label
                     key={m}
@@ -259,12 +204,7 @@ export function CompareTable({ models, categories }: CompareTableProps) {
                     <input
                       type="checkbox"
                       checked={isVisible}
-                      onChange={() =>
-                        setColumnVisibility((prev) => ({
-                          ...prev,
-                          [m]: !isVisible,
-                        }))
-                      }
+                      onChange={() => toggleModel(m)}
                       className="rounded border-border"
                     />
                     <span className={isVisible ? "text-foreground" : "text-muted-foreground"}>
@@ -278,133 +218,152 @@ export function CompareTable({ models, categories }: CompareTableProps) {
         </div>
 
         {/* Clear filters */}
-        {(globalFilter || sorting.length > 0) && (
+        {(query || onlyDifferences) && (
           <Button
             variant="ghost"
             size="sm"
             className="h-8 text-xs text-muted-foreground"
             onClick={() => {
-              setGlobalFilter("");
-              setSorting([]);
+              setQuery("");
+              setOnlyDifferences(false);
             }}
           >
             Clear
           </Button>
         )}
+
+        {/* Export */}
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 text-xs ml-auto gap-1.5"
+          onClick={handleExport}
+          disabled={exporting || shownRows === 0 || visibleModels.length === 0}
+          title="Export the rows and models currently shown"
+        >
+          {exporting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Download className="h-3.5 w-3.5" />
+          )}
+          Export Excel
+        </Button>
       </div>
 
       {/* Table */}
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-240px)]">
-          <table className="min-w-max text-xs border-collapse">
-            <thead className="sticky top-0 z-10">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <tr key={headerGroup.id} className="border-b-2 border-foreground/12 bg-muted">
-                  {headerGroup.headers.map((header, idx) => {
-                    const isSorted = header.column.getIsSorted();
-                    const isPinned = idx <= 1; // pin Category + Spec columns
-                    return (
-                      <th
-                        key={header.id}
-                        className={`px-3 py-2.5 text-left font-semibold select-none transition-colors ${
-                          isPinned
-                            ? "sticky z-20 bg-muted"
-                            : "bg-muted"
-                        } ${
-                          header.column.getCanSort()
-                            ? "cursor-pointer hover:text-engenius-blue"
-                            : ""
-                        }`}
-                        style={{
-                          left: isPinned
-                            ? idx === 0
-                              ? 0
-                              : 120
-                            : undefined,
-                          minWidth: header.column.getSize(),
-                          maxWidth: idx <= 1 ? header.column.getSize() : 200,
-                          boxShadow:
-                            idx === 1
-                              ? "2px 0 4px -2px rgba(0,0,0,0.08)"
-                              : undefined,
-                        }}
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        <div className="flex items-center gap-1">
-                          {flexRender(
-                            header.column.columnDef.header,
-                            header.getContext()
-                          )}
-                          {header.column.getCanSort() && (
-                            <span className="text-[11px] ml-0.5">
-                              {isSorted === "asc"
-                                ? "↑"
-                                : isSorted === "desc"
-                                  ? "↓"
-                                  : "↕"}
-                            </span>
-                          )}
-                        </div>
-                      </th>
-                    );
-                  })}
-                </tr>
-              ))}
+          <table className="min-w-full text-xs border-separate border-spacing-0">
+            <thead className="sticky top-0 z-20">
+              <tr>
+                <th className="sticky left-0 z-30 bg-muted border-b-2 border-r border-border px-3 py-2.5 text-left font-semibold w-[220px] min-w-[220px] max-w-[220px]">
+                  Spec
+                </th>
+                {visibleModels.map((m) => (
+                  <th
+                    key={m}
+                    className="bg-muted border-b-2 border-border px-3 py-2.5 text-left font-semibold min-w-[160px] max-w-[240px]"
+                  >
+                    <Link
+                      href={`/product/${m}`}
+                      className="text-engenius-blue hover:underline"
+                    >
+                      {m}
+                    </Link>
+                  </th>
+                ))}
+              </tr>
             </thead>
             <tbody>
-              {visibleRows.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={columns.length}
+                    colSpan={colCount}
                     className="px-4 py-12 text-center text-sm text-muted-foreground"
                   >
-                    No matching specs found.
+                    {onlyDifferences && !query
+                      ? "These models share every spec."
+                      : "No matching specs found."}
                   </td>
                 </tr>
               ) : (
-                visibleRows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b border-border/40 hover:bg-engenius-blue/[0.06] transition-colors"
-                  >
-                    {row.getVisibleCells().map((c, idx) => {
-                      const isPinned = idx <= 1;
-                      return (
+                filtered.map((cat) => {
+                  const isCollapsed = collapsed.has(cat.name);
+                  return (
+                    <Fragment key={cat.name}>
+                      <tr>
+                        {/* Band cell is sticky so the label stays put while the models scroll */}
                         <td
-                          key={c.id}
-                          className={`px-3 py-1.5 ${
-                            isPinned
-                              ? "sticky z-[1] bg-card"
-                              : ""
-                          }`}
-                          style={{
-                            left: isPinned
-                              ? idx === 0
-                                ? 0
-                                : 120
-                              : undefined,
-                            minWidth: c.column.getSize(),
-                            maxWidth: idx <= 1 ? c.column.getSize() : 200,
-                            boxShadow:
-                              idx === 1
-                                ? "2px 0 4px -2px rgba(0,0,0,0.08)"
-                                : undefined,
-                          }}
+                          colSpan={colCount}
+                          className="bg-engenius-blue/[0.07] border-b border-engenius-blue/20 p-0"
                         >
-                          {flexRender(
-                            c.column.columnDef.cell,
-                            c.getContext()
-                          )}
+                          <button
+                            onClick={() => toggleCategory(cat.name)}
+                            className="sticky left-0 flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-engenius-blue-dark hover:text-engenius-blue"
+                          >
+                            <ChevronDown
+                              className={`h-3.5 w-3.5 transition-transform ${
+                                isCollapsed ? "-rotate-90" : ""
+                              }`}
+                            />
+                            <HighlightText text={cat.name} query={query} />
+                            <span className="font-medium text-muted-foreground tabular-nums">
+                              {cat.rows.length}
+                            </span>
+                          </button>
                         </td>
-                      );
-                    })}
-                  </tr>
-                ))
+                      </tr>
+                      {!isCollapsed &&
+                        cat.rows.map((row, i) => {
+                          const differs = rowDiffers(row, visibleModels);
+                          const zebra = i % 2 === 1;
+                          return (
+                            <tr
+                              key={`${cat.name}::${row.label}`}
+                              className="group"
+                            >
+                              <td
+                                className={`sticky left-0 z-10 border-b border-r border-border/60 px-3 py-2 align-top font-medium text-foreground/80 w-[220px] min-w-[220px] max-w-[220px] break-words group-hover:bg-muted ${
+                                  // Opaque on purpose: the model cells scroll underneath this one
+                                  zebra ? "bg-[color-mix(in_oklab,var(--muted)_60%,var(--card))]" : "bg-card"
+                                }`}
+                              >
+                                <div className="flex items-start gap-1.5">
+                                  <span
+                                    className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${
+                                      differs ? "bg-amber-400" : "bg-transparent"
+                                    }`}
+                                    title={differs ? "Values differ across models" : undefined}
+                                  />
+                                  <HighlightText text={row.label} query={query} />
+                                </div>
+                              </td>
+                              {visibleModels.map((m) => (
+                                <td
+                                  key={m}
+                                  className={`border-b border-border/60 px-3 py-2 align-top min-w-[160px] max-w-[240px] group-hover:bg-engenius-blue/[0.06] ${
+                                    zebra ? "bg-muted/30" : ""
+                                  }`}
+                                >
+                                  <ValueCell value={row.values[m]} query={query} />
+                                </td>
+                              ))}
+                            </tr>
+                          );
+                        })}
+                    </Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        Values differ across the models shown
+      </p>
     </div>
   );
 }

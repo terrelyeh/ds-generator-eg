@@ -87,7 +87,11 @@ export default async function ComparePage({
       </div>
 
       {comparisons.length > 0 ? (
-        <CompareTable models={models} categories={categories} />
+        <CompareTable
+          title={productLine.label}
+          models={models}
+          categories={categories}
+        />
       ) : (
         <div className="rounded-lg border bg-card py-16 text-center text-sm text-muted-foreground shadow-sm">
           No comparison data available for this product line.
