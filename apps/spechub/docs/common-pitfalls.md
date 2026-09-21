@@ -505,3 +505,24 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
 **新欄位只會加到你當下在看的那個呼叫端**。要嘛只有一個地方組 payload，
 要嘛讓 API 分得出「沒給」和「給 null」。
 只用 `.update({ 單一欄位 })` 的寫入者（`upload-image` 的 `hardware_image`）本來就安全。
+
+## 80. 凍結的 `<thead>` 裡放好幾列，捲動時底下的列會從列縫透出來（2026-09-21，已修）
+
+比較表把釘選的列放進 `sticky` 的 `<thead>`。每一格都是**不透明**底色，elementsFromPoint
+也確認 thead 的格子疊在最上面——但在表格裡往下捲，底下的文字還是會在**每一列的上緣**
+淡淡透出來。原因是列高換算成實際像素時，列與列之間有次像素的縫，縫裡沒有任何東西在畫。
+藍色版（#111）就已經有，只是淡藍色看不出來，換成黃色才被發現。
+
+**修法**：`<thead>` 本身加 `bg-card`——row group 的底色會把縫填滿。
+**驗法**：在表格**內部**捲動後放大截圖看列的交界；只看靜止畫面、或只查 computed
+background 都看不出來。
+
+## 81. Tailwind v4 的色彩變數只有「被某個 class 用到」才會輸出（2026-09-21）
+
+想在 arbitrary value 裡寫 `color-mix(in_oklab,var(--color-amber-300)_14%,var(--card))`——
+但整個專案沒有任何 class 用到 `amber-300`，Tailwind v4 就不會輸出 `--color-amber-300`，
+`var()` 解析失敗，整個 `background-color` 失效 → 格子變**透明**。在凍結位置就是底下的列透出來，
+而且不會有任何錯誤。
+
+**做法**：arbitrary value 裡的顏色直接寫 hex（`#fcd34d`），或只引用確定有被用到的變數
+（`--card`、`--muted`、`--color-engenius-blue` 這種 `@theme` 裡自己定義的）。

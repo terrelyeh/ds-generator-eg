@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-18。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-09-21。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -82,7 +82,7 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 ## Tech Stack
 
 - **Framework**: Next.js 16 (App Router) + TypeScript
-- **UI**: Tailwind CSS v4 + shadcn/ui；**Table**: @tanstack/react-table（Compare 頁）
+- **UI**: Tailwind CSS v4 + shadcn/ui（`@tanstack/react-table` 還在 package.json,但 2026-09-21 起已沒有任何地方 import,可以拿掉）
 - **Backend**: Supabase via `@eg/db`（Postgres + Storage + Auth via Google OAuth）
 - **Auth**: `@eg/auth` — @supabase/ssr + Google OAuth + DB whitelist + 4-role RBAC
 - **Deployment**: Vercel（專案 `ds-generator-eg`，Root Directory `apps/spechub`）+ Vercel Cron
@@ -167,6 +167,16 @@ blocking 的分界是「文件會不會寫錯」而不是「缺多少」,所以 
 ③ **檔案大小是指紋**（同版號 Regenerate 的舊檔靠它抓,不能比雜湊）;④ **標記的語言跟標記的版本比、其他語言跟最新版比**
 （`targetsFromMarks`,手動查詢和每日檢查共用）;⑤ 每個站只吃一種語言（`siteLanguage`）,判斷一律用 `SiteVerdict.languages`,
 不要拿站的整體狀態。
+
+### Spec Comparison（`/compare/[line]`）
+
+`components/compare/compare-table.tsx` 是純 `<table>`（不用 TanStack）:分類是跨整列的可收合標題列,
+凍結欄只有 Spec（220px、會換行）。篩選 / 差異判斷 / 釘選拆分都在 **`lib/compare/spec-matrix.ts`**（純函式、有測試）,
+**畫面和 Excel 匯出（`lib/compare/export-xlsx.ts`,exceljs 點了才 dynamic import）共用同一份** —— 改篩選規則只改這裡。
+① 「有此功能」的記號各線不同:Cloud Camera 用 `V`、Cloud AP 用 `●`,都在 `isCheckValue()` 裡,新線用別的記號要加進去;
+② 釘選的列放在**凍結的 `<thead>` 裡**,key = `分類::規格`,存在網址 `?pin=`（`history.replaceState`,不走 router）,上限 8 列
+（thead 不能獨立捲動）;③ 凍結位置的格子一律用**不透明**底色（`color-mix(... var(--card))`）,thead 本身也要 `bg-card`,
+見 pitfall #80、#81。
 
 ### Competitor Battlecard → [`docs/battlecard.md`](docs/battlecard.md)
 
