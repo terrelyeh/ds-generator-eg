@@ -16,6 +16,8 @@ import { isCheckValue, type SpecCategory } from "./spec-matrix";
 
 const BRAND = "FF03A9F4";
 const BRAND_TINT = "FFE1F5FE";
+const PINNED_TINT = "FFFEF3C7";
+const PINNED_TEXT = "FF92400E";
 const HEADER_FILL = "FFF1F3F5";
 const TEXT = "FF2C3345";
 const MUTED = "FF9AA0AC";
@@ -24,10 +26,18 @@ const BORDER = "FFD9DDE3";
 export interface ExportInput {
   title: string;
   models: string[];
+  /** Rows the reader pinned; exported first, in their own amber band. */
+  pinned?: SpecCategory["rows"];
   categories: SpecCategory[];
 }
 
-export async function exportComparisonXlsx({ title, models, categories }: ExportInput): Promise<void> {
+export async function exportComparisonXlsx({
+  title,
+  models,
+  pinned = [],
+  categories: rest,
+}: ExportInput): Promise<void> {
+  const categories = pinned.length > 0 ? [{ name: "Pinned", rows: pinned }, ...rest] : rest;
   const ExcelJS = (await import("exceljs")).default;
   const wb = new ExcelJS.Workbook();
   wb.created = new Date();
@@ -48,12 +58,17 @@ export async function exportComparisonXlsx({ title, models, categories }: Export
     cell.border = border;
   });
 
-  for (const cat of categories) {
+  for (const [i, cat] of categories.entries()) {
+    const isPinned = i === 0 && pinned.length > 0;
     const band = ws.addRow([`${cat.name.toUpperCase()}  (${cat.rows.length})`]);
     ws.mergeCells(band.number, 1, band.number, models.length + 1);
     const bandCell = band.getCell(1);
-    bandCell.font = { bold: true, color: { argb: BRAND } };
-    bandCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: BRAND_TINT } };
+    bandCell.font = { bold: true, color: { argb: isPinned ? PINNED_TEXT : BRAND } };
+    bandCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: isPinned ? PINNED_TINT : BRAND_TINT },
+    };
     bandCell.alignment = { vertical: "middle" };
     bandCell.border = border;
     band.height = 20;
