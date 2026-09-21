@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { filterMatrix, isCheckValue, rowDiffers, type SpecCategory } from "./spec-matrix";
+import { filterMatrix, isCheckValue, rowDiffers, rowKey, splitPinned, type SpecCategory } from "./spec-matrix";
 
 const models = ["A", "B", "C"];
 
@@ -73,5 +73,25 @@ describe("filterMatrix", () => {
   it("matches values only in the shown models", () => {
     expect(filterMatrix(categories, { models, query: "4k", onlyDifferences: false })).toHaveLength(1);
     expect(filterMatrix(categories, { models: ["A", "B"], query: "4k", onlyDifferences: false })).toHaveLength(0);
+  });
+});
+
+describe("splitPinned", () => {
+  it("lifts pinned rows out in pin order and drops emptied categories", () => {
+    const { pinned, rest } = splitPinned(categories, [
+      rowKey("Advanced AI Analytics", "Facial Recognition"),
+      rowKey("Optics", "Resolution"),
+      rowKey("Optics", "Field of View"),
+    ]);
+    expect(pinned.map((r) => r.label)).toEqual(["Facial Recognition", "Resolution", "Field of View"]);
+    expect(pinned[0].category).toBe("Advanced AI Analytics");
+    expect(rest.map((c) => c.name)).toEqual(["Advanced AI Analytics"]);
+    expect(rest[0].rows.map((r) => r.label)).toEqual(["Room Occupation"]);
+  });
+
+  it("ignores keys that match no row", () => {
+    const { pinned, rest } = splitPinned(categories, [rowKey("Optics", "Gone"), rowKey("Audio", "Resolution")]);
+    expect(pinned).toEqual([]);
+    expect(rest).toEqual(categories);
   });
 });

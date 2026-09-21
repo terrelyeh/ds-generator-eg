@@ -2,7 +2,7 @@
 
 import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronDown, Download, Loader2 } from "lucide-react";
+import { Check, ChevronDown, Download, Loader2, Pin, PinOff } from "lucide-react";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,10 @@ import {
   filterMatrix,
   isCheckValue,
   rowDiffers,
+  rowKey,
+  splitPinned,
   type SpecCategory,
+  type SpecRow,
 } from "@/lib/compare/spec-matrix";
 import { exportComparisonXlsx } from "@/lib/compare/export-xlsx";
 
@@ -20,7 +23,22 @@ interface CompareTableProps {
   title: string;
   models: string[];
   categories: SpecCategory[];
+  /** Row keys from `?pin=`, so a shared link opens with the same rows pinned. */
+  initialPinned?: string[];
 }
+
+/**
+ * Pinned rows live in the sticky header, which cannot scroll on its own —
+ * past this many they would crowd out the rows they are meant to be compared
+ * against.
+ */
+const MAX_PINNED = 8;
+
+const SPEC_COL = "w-[220px] min-w-[220px] max-w-[220px]";
+const MODEL_COL = "min-w-[160px] max-w-[240px]";
+/** Opaque tints: cells in sticky positions have content scrolling underneath. */
+const ZEBRA_BG = "bg-[color-mix(in_oklab,var(--muted)_60%,var(--card))]";
+const PINNED_BG = "bg-[color-mix(in_oklab,var(--color-engenius-blue)_6%,var(--card))]";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -68,6 +86,81 @@ function ValueCell({ value, query }: { value: string | undefined; query: string 
   );
 }
 
+function SpecRowView({
+  row,
+  models,
+  query,
+  zebra,
+  pinned,
+  pinDisabled,
+  onTogglePin,
+}: {
+  row: SpecRow;
+  models: string[];
+  query: string;
+  zebra: boolean;
+  pinned: boolean;
+  pinDisabled: boolean;
+  onTogglePin: () => void;
+}) {
+  const differs = rowDiffers(row, models);
+  const specBg = pinned ? PINNED_BG : zebra ? ZEBRA_BG : "bg-card";
+  const valueBg = pinned ? PINNED_BG : zebra ? "bg-muted/30" : "";
+  return (
+    <tr className="group">
+      <td
+        className={`sticky left-0 z-10 border-b border-r border-border/60 px-3 py-2 align-top font-medium text-foreground/80 ${SPEC_COL} break-words ${specBg} ${
+          pinned ? "" : "group-hover:bg-muted"
+        }`}
+      >
+        <div className="flex items-start gap-1.5">
+          <span
+            className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${
+              differs ? "bg-amber-400" : "bg-transparent"
+            }`}
+            title={differs ? "Values differ across models" : undefined}
+          />
+          <span className="flex-1">
+            <HighlightText text={row.label} query={query} />
+          </span>
+          <button
+            onClick={onTogglePin}
+            disabled={pinDisabled}
+            title={
+              pinned
+                ? "Unpin"
+                : pinDisabled
+                  ? `Up to ${MAX_PINNED} rows can be pinned`
+                  : "Pin to top"
+            }
+            className={`-my-0.5 shrink-0 rounded p-0.5 transition-opacity disabled:cursor-not-allowed ${
+              pinned
+                ? "text-engenius-blue hover:text-engenius-blue-dark"
+                : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-engenius-blue disabled:hover:text-muted-foreground"
+            }`}
+          >
+            {pinned ? (
+              <PinOff className="h-3.5 w-3.5" />
+            ) : (
+              <Pin className="h-3.5 w-3.5" />
+            )}
+          </button>
+        </div>
+      </td>
+      {models.map((m) => (
+        <td
+          key={m}
+          className={`border-b border-border/60 px-3 py-2 align-top ${MODEL_COL} ${valueBg} ${
+            pinned ? "" : "group-hover:bg-engenius-blue/[0.06]"
+          }`}
+        >
+          <ValueCell value={row.values[m]} query={query} />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Main Component
 // ---------------------------------------------------------------------------
@@ -78,26 +171,42 @@ function ValueCell({ value, query }: { value: string | undefined; query: string 
  * a fixed-width Category badge column plus a Spec column at a hard-coded
  * `left: 120`, so long names spilled under their neighbours.
  */
-export function CompareTable({ title, models, categories }: CompareTableProps) {
+export function CompareTable({
+  title,
+  models,
+  categories,
+  initialPinned = [],
+}: CompareTableProps) {
   const [query, setQuery] = useState("");
   const [hiddenModels, setHiddenModels] = useState<Set<string>>(new Set());
   const [onlyDifferences, setOnlyDifferences] = useState(false);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [pinnedKeys, setPinnedKeys] = useState<string[]>(() =>
+    initialPinned.slice(0, MAX_PINNED)
+  );
 
   const visibleModels = useMemo(
     () => models.filter((m) => !hiddenModels.has(m)),
     [models, hiddenModels]
   );
 
+  // Pinned rows are exempt from search and "only differences": the reader
+  // chose them, so a filter should never hide them.
+  const { pinned, rest } = useMemo(
+    () => splitPinned(categories, pinnedKeys),
+    [categories, pinnedKeys]
+  );
+
   const filtered = useMemo(
-    () => filterMatrix(categories, { models: visibleModels, query, onlyDifferences }),
-    [categories, visibleModels, query, onlyDifferences]
+    () => filterMatrix(rest, { models: visibleModels, query, onlyDifferences }),
+    [rest, visibleModels, query, onlyDifferences]
   );
 
   const totalRows = useMemo(() => countRows(categories), [categories]);
-  const shownRows = countRows(filtered);
+  const shownRows = pinned.length + countRows(filtered);
+  const pinLimitReached = pinned.length >= MAX_PINNED;
   const colCount = visibleModels.length + 1;
 
   function toggleModel(m: string) {
@@ -107,6 +216,24 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
       else next.add(m);
       return next;
     });
+  }
+
+  function updatePinned(next: string[]) {
+    setPinnedKeys(next);
+    // Keep the pins in the URL so a reload or a shared link keeps them.
+    // replaceState, not the router: nothing on the server depends on it.
+    const url = new URL(window.location.href);
+    url.searchParams.delete("pin");
+    for (const k of next) url.searchParams.append("pin", k);
+    window.history.replaceState(null, "", url);
+  }
+
+  function togglePin(key: string) {
+    // Start from the rows actually found, so keys from a stale link are
+    // dropped here instead of lingering in the URL and the pin count.
+    const current = pinned.map((r) => r.key);
+    if (current.includes(key)) updatePinned(current.filter((k) => k !== key));
+    else if (current.length < MAX_PINNED) updatePinned([...current, key]);
   }
 
   function toggleCategory(name: string) {
@@ -121,7 +248,8 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
   async function handleExport() {
     setExporting(true);
     try {
-      await exportComparisonXlsx({ title, models: visibleModels, categories: filtered });
+      const sections = pinned.length > 0 ? [{ name: "Pinned", rows: pinned }, ...filtered] : filtered;
+      await exportComparisonXlsx({ title, models: visibleModels, categories: sections });
     } catch (err) {
       console.error(err);
       toast.error("Export failed");
@@ -172,6 +300,11 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
           />
           Only differences
         </label>
+
+        <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+          <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+          Values differ
+        </span>
 
         {/* Column visibility toggle */}
         <div className="relative">
@@ -252,17 +385,18 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
 
       {/* Table */}
       <div className="rounded-lg border bg-card shadow-sm overflow-hidden">
-        <div className="overflow-auto max-h-[calc(100vh-240px)]">
+        {/* Tall enough to fill the viewport once the page title scrolls away */}
+        <div className="overflow-auto max-h-[calc(100dvh-140px)]">
           <table className="min-w-full text-xs border-separate border-spacing-0">
             <thead className="sticky top-0 z-20">
               <tr>
-                <th className="sticky left-0 z-30 bg-muted border-b-2 border-r border-border px-3 py-2.5 text-left font-semibold w-[220px] min-w-[220px] max-w-[220px]">
+                <th className={`sticky left-0 z-30 bg-muted border-b-2 border-r border-border px-3 py-2.5 text-left font-semibold ${SPEC_COL}`}>
                   Spec
                 </th>
                 {visibleModels.map((m) => (
                   <th
                     key={m}
-                    className="bg-muted border-b-2 border-border px-3 py-2.5 text-left font-semibold min-w-[160px] max-w-[240px]"
+                    className={`bg-muted border-b-2 border-border px-3 py-2.5 text-left font-semibold ${MODEL_COL}`}
                   >
                     <Link
                       href={`/product/${m}`}
@@ -273,6 +407,44 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
                   </th>
                 ))}
               </tr>
+              {pinned.length > 0 && (
+                <>
+                  <tr>
+                    <td colSpan={colCount} className={`${PINNED_BG} border-b border-engenius-blue/25 p-0`}>
+                      <div className="sticky left-0 flex w-max items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-engenius-blue-dark">
+                        <Pin className="h-3.5 w-3.5" />
+                        Pinned
+                        <span className="font-medium text-muted-foreground tabular-nums">
+                          {pinned.length}
+                          {pinLimitReached && ` / ${MAX_PINNED} max`}
+                        </span>
+                        <button
+                          onClick={() => updatePinned([])}
+                          className="ml-1 font-medium normal-case tracking-normal text-muted-foreground hover:text-foreground"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {pinned.map((row) => (
+                    <SpecRowView
+                      key={row.key}
+                      row={row}
+                      models={visibleModels}
+                      query={query}
+                      zebra={false}
+                      pinned
+                      pinDisabled={false}
+                      onTogglePin={() => togglePin(row.key)}
+                    />
+                  ))}
+                  {/* Heavier rule so the pinned block reads as separate from what scrolls under it */}
+                  <tr aria-hidden>
+                    <td colSpan={colCount} className="h-0 p-0 border-b-2 border-engenius-blue/40" />
+                  </tr>
+                </>
+              )}
             </thead>
             <tbody>
               {filtered.length === 0 ? (
@@ -315,40 +487,18 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
                       </tr>
                       {!isCollapsed &&
                         cat.rows.map((row, i) => {
-                          const differs = rowDiffers(row, visibleModels);
-                          const zebra = i % 2 === 1;
+                          const key = rowKey(cat.name, row.label);
                           return (
-                            <tr
-                              key={`${cat.name}::${row.label}`}
-                              className="group"
-                            >
-                              <td
-                                className={`sticky left-0 z-10 border-b border-r border-border/60 px-3 py-2 align-top font-medium text-foreground/80 w-[220px] min-w-[220px] max-w-[220px] break-words group-hover:bg-muted ${
-                                  // Opaque on purpose: the model cells scroll underneath this one
-                                  zebra ? "bg-[color-mix(in_oklab,var(--muted)_60%,var(--card))]" : "bg-card"
-                                }`}
-                              >
-                                <div className="flex items-start gap-1.5">
-                                  <span
-                                    className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${
-                                      differs ? "bg-amber-400" : "bg-transparent"
-                                    }`}
-                                    title={differs ? "Values differ across models" : undefined}
-                                  />
-                                  <HighlightText text={row.label} query={query} />
-                                </div>
-                              </td>
-                              {visibleModels.map((m) => (
-                                <td
-                                  key={m}
-                                  className={`border-b border-border/60 px-3 py-2 align-top min-w-[160px] max-w-[240px] group-hover:bg-engenius-blue/[0.06] ${
-                                    zebra ? "bg-muted/30" : ""
-                                  }`}
-                                >
-                                  <ValueCell value={row.values[m]} query={query} />
-                                </td>
-                              ))}
-                            </tr>
+                            <SpecRowView
+                              key={key}
+                              row={row}
+                              models={visibleModels}
+                              query={query}
+                              zebra={i % 2 === 1}
+                              pinned={false}
+                              pinDisabled={pinLimitReached}
+                              onTogglePin={() => togglePin(key)}
+                            />
                           );
                         })}
                     </Fragment>
@@ -359,11 +509,6 @@ export function CompareTable({ title, models, categories }: CompareTableProps) {
           </table>
         </div>
       </div>
-
-      <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-        Values differ across the models shown
-      </p>
     </div>
   );
 }

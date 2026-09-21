@@ -14,10 +14,14 @@ interface ComparisonRow {
 
 export default async function ComparePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ line: string }>;
+  searchParams: Promise<{ pin?: string | string[] }>;
 }) {
   const { line } = await params;
+  const { pin } = await searchParams;
+  const initialPinned = pin === undefined ? [] : Array.isArray(pin) ? pin : [pin];
   const decodedLine = decodeURIComponent(line);
   const supabase = await createClient();
 
@@ -91,6 +95,7 @@ export default async function ComparePage({
           title={productLine.label}
           models={models}
           categories={categories}
+          initialPinned={initialPinned}
         />
       ) : (
         <div className="rounded-lg border bg-card py-16 text-center text-sm text-muted-foreground shadow-sm">
