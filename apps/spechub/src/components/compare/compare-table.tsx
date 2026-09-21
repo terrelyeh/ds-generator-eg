@@ -38,7 +38,12 @@ const SPEC_COL = "w-[220px] min-w-[220px] max-w-[220px]";
 const MODEL_COL = "min-w-[160px] max-w-[240px]";
 /** Opaque tints: cells in sticky positions have content scrolling underneath. */
 const ZEBRA_BG = "bg-[color-mix(in_oklab,var(--muted)_60%,var(--card))]";
-const PINNED_BG = "bg-[color-mix(in_oklab,var(--color-engenius-blue)_6%,var(--card))]";
+/**
+ * Pinned rows are warm on purpose: blue is already the category bands, and a
+ * blue pinned block read as just another category.
+ */
+const PINNED_BG = "bg-[color-mix(in_oklab,#fcd34d_14%,var(--card))]";
+const PINNED_BAND_BG = "bg-[color-mix(in_oklab,#fcd34d_28%,var(--card))]";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -135,7 +140,7 @@ function SpecRowView({
             }
             className={`-my-0.5 shrink-0 rounded p-0.5 transition-opacity disabled:cursor-not-allowed ${
               pinned
-                ? "text-engenius-blue hover:text-engenius-blue-dark"
+                ? "text-amber-700 hover:text-amber-900"
                 : "text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:text-engenius-blue disabled:hover:text-muted-foreground"
             }`}
           >
@@ -248,8 +253,7 @@ export function CompareTable({
   async function handleExport() {
     setExporting(true);
     try {
-      const sections = pinned.length > 0 ? [{ name: "Pinned", rows: pinned }, ...filtered] : filtered;
-      await exportComparisonXlsx({ title, models: visibleModels, categories: sections });
+      await exportComparisonXlsx({ title, models: visibleModels, pinned, categories: filtered });
     } catch (err) {
       console.error(err);
       toast.error("Export failed");
@@ -388,7 +392,9 @@ export function CompareTable({
         {/* Tall enough to fill the viewport once the page title scrolls away */}
         <div className="overflow-auto max-h-[calc(100dvh-140px)]">
           <table className="min-w-full text-xs border-separate border-spacing-0">
-            <thead className="sticky top-0 z-20">
+            {/* The thead's own background fills the sub-pixel seams between its rows;
+                without it the rows scrolling underneath ghost through the pinned block. */}
+            <thead className="sticky top-0 z-20 bg-card">
               <tr>
                 <th className={`sticky left-0 z-30 bg-muted border-b-2 border-r border-border px-3 py-2.5 text-left font-semibold ${SPEC_COL}`}>
                   Spec
@@ -410,8 +416,8 @@ export function CompareTable({
               {pinned.length > 0 && (
                 <>
                   <tr>
-                    <td colSpan={colCount} className={`${PINNED_BG} border-b border-engenius-blue/25 p-0`}>
-                      <div className="sticky left-0 flex w-max items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-engenius-blue-dark">
+                    <td colSpan={colCount} className={`${PINNED_BAND_BG} border-b border-amber-400/40 p-0`}>
+                      <div className="sticky left-0 flex w-max items-center gap-2 px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-800">
                         <Pin className="h-3.5 w-3.5" />
                         Pinned
                         <span className="font-medium text-muted-foreground tabular-nums">
@@ -441,7 +447,7 @@ export function CompareTable({
                   ))}
                   {/* Heavier rule so the pinned block reads as separate from what scrolls under it */}
                   <tr aria-hidden>
-                    <td colSpan={colCount} className="h-0 p-0 border-b-2 border-engenius-blue/40" />
+                    <td colSpan={colCount} className="h-0 p-0 border-b-2 border-amber-400/70" />
                   </tr>
                 </>
               )}
