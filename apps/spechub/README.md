@@ -30,9 +30,11 @@ EnGenius 產品規格管理與 Datasheet 自動化系統。從 Google Sheets 同
 - Generate PDF 前置條件檢查（需 Product Image + Overview + Features + Hardware Image；**Transceiver 無 Hardware Image，不檢查**）
 
 ### Spec Comparison
-- 跨 model 規格比較表（支援 24+ model 橫向滾動）
-- 全域搜尋、欄位排序、Column 顯示/隱藏
-- Sticky header + pinned Category/Spec 欄位
+- 跨 model 規格比較表（支援 24+ model 橫向滾動），規格依分類分組，分類可收合
+- Spec 欄固定在左邊、長名稱自動換行；「有此功能」顯示成勾勾，值不同的列前面有琥珀色小點
+- 全域搜尋、Column（型號）顯示/隱藏、**Only differences**（只看各型號不一樣的規格）
+- **釘選規格**：滑鼠移到任一列點圖釘，該列移到最上方的黃色 PINNED 區、捲動時一直看得到；最多 8 列，釘選狀態寫在網址裡，可以直接分享連結
+- **匯出 Excel**：匯出畫面上目前的內容（含搜尋、隱藏型號、只顯示差異、釘選），首列與 Spec 欄凍結
 
 ### Competitor Battlecard（內部競品比較）
 - **EnGenius 機型 vs 競品 並排比較表**，供業務/PM 內部參考（Cloud AP / Camera / Switch / L3 Switch）
