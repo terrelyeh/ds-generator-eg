@@ -148,7 +148,7 @@ defines slots — missing plots show placeholders, same as Product Views.
 |---|---|---|
 | **Cloud (default)** | APs, Switches, Cameras, NVS, Firewalls… | blue `#03a9f4`; two-column cover; spec pages; Hardware Overview + footer |
 | **Gray** | Unmanaged Switches, Extenders | as above, `#58595B` |
-| **Transceiver** | Transceivers | green `#2F855A`; `tx-cover` (image centred, overview full-width); **no hardware page** (footer moves to the last spec page); Contact-Us QR; list drops HW column, Model Name → Description |
+| **Transceiver** | Transceivers | green `#2F855A`; standard cover (overview left, image right — same as Cloud); **no hardware page** (footer moves to the last spec page); Contact-Us QR; list drops HW column, Model Name → Description |
 | **Data Center** | Edge Network Appliances, AI Servers | dedicated component `preview/[model]/datacenter-preview.tsx`; photo hero (`HERO_PHOTO`, shared by both lines) + 8 chip features, shared EDCC page, full-width spec table (primary title band, then a `#6b7580` band per spec group as in layout A — `General` first, opened by Model Name / Model Number), 2 hardware renders, Contact-Us QR |
 | **Broadband** | Broadband APs | `preview/[model]/broadband-preview.tsx`, steel `#1e6796`; renders BOTH scopes (see §5); cover hero art, Features & Benefits, spec table (single or comparison), Product Views, Antenna Patterns |
 | **Edge AI** | Edge AI Computers | `preview/series/[line]/edge-ai-series-preview.tsx`, `#09909d`; **series only** — 5 fixed pages: cover / Software Architecture / curated comparison table / Hardware Overview per variant group |
