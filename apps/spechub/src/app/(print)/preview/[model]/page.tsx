@@ -446,9 +446,9 @@ export default async function PreviewPage({
   });
   const productLine = product.product_lines;
   const theme = getTheme(productLine.category);
-  // Transceivers use a distinct cover (image centered below the title, overview
-  // full-width below it) and have NO hardware-overview page — the footer moves
-  // onto the last spec page instead. One product image, no hardware image.
+  // Transceivers share the standard cover (overview left, image right) but have
+  // NO hardware-overview page — the footer moves onto the last spec page
+  // instead. One product image, no hardware image.
   const isTransceiver = productLine.category === "Transceivers";
 
   // QR: custom per-product-translation > locale default.
@@ -756,25 +756,6 @@ body {
   font-weight: ${WT.regular}; font-size: ${PT.body}pt; color: #6f6f6f; line-height: 1.35;
 }
 
-/* Transceiver cover: product image centered directly below the title, with the
-   overview full-width BELOW the image (no image beside the overview). */
-.tx-cover .product-image-container {
-  position: absolute; left: 36pt; right: 36pt; top: 200pt;
-  height: 150pt; width: auto;
-  display: flex; align-items: center; justify-content: center;
-}
-/* Transceivers keep natural sizing: their cover is a different layout and
-   wasn't part of the cover-scale fix above. The width/height auto pair is
-   load bearing — it opts out of the fill rule, which would otherwise
-   stretch these across the full-width tx container. */
-.tx-cover .product-image-container img {
-  width: auto; height: auto;
-  max-width: 340pt; max-height: 150pt; object-fit: contain;
-}
-.tx-cover .overview-section {
-  left: 36pt; right: 36pt; top: 365pt; width: auto;
-}
-
 .features-wrapper {
   position: absolute; left: 36pt; right: 36pt; bottom: 36pt;
   /* Hard cap to match the designer's implicit limit — beyond this,
@@ -1033,7 +1014,7 @@ ${isCJK ? `
       />
 
       {/* PAGE 1: COVER */}
-      <div className={`page${isTransceiver ? " tx-cover" : ""}`}>
+      <div className="page">
         <div className="top-bar-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img

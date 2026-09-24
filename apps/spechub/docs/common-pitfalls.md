@@ -162,7 +162,7 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     ⚠️ 同一支還埋了**寫死的 4pt 重疊**:`.overview-section` 到 x306pt,舊容器卻從 x292pt 起,
     只要圖寬到撞上限就一定壓到文字（五台實測都是精準 4.0pt）。**改共用版面 CSS 前先去量
     InDesign 原稿**（`pymupdf` 抽 image bbox）,不要憑感覺調。
-    Transceiver 用 `width/height:auto` opt-out —— tx-cover 是另一種構圖,別讓它繼承填滿規則。
+    （Transceiver 曾用 `tx-cover` 另一種構圖 opt-out;2026-09-24 起改回跟 Cloud 同版,也走填滿規則。）
     hardware 圖已於 `7edc4b7` 收編（`width:530pt` + `max-height` 只當保險）。
 
     **（2026-08-05 補：Cloud AP 天線圖是第三個受害者,而且反過來踩）** —— 天線圖寫的是
