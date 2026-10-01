@@ -25,6 +25,9 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
    但要 Regenerate 才會印在 PDF 上,官網上的檔案還要重新上傳。**這四份由 Terrel 自己重產**（2026-09-18 說的）。
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
+8a. **標案編輯器有一顆 outline 按鈕沒有外框** — `components/project/project-editor.tsx:538` 直接用了
+   `buttonVariants({ variant: "outline" })` 沒經過 `cn()`,跟 #117 修掉的 Glossary 同一個問題（見 CLAUDE.md Conventions）。
+   一行的事,當時刻意沒順手改別的頁面
 
 **官網 Datasheet 查詢**（1a + 1b 都已上線,設計見 [`website-datasheet-check.md`](website-datasheet-check.md)）：
 8b. **上傳者名字** — 目前只有 WordPress user id,要多查 `/wp/v2/users`

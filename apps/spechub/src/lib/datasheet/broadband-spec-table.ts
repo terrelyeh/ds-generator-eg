@@ -1,5 +1,5 @@
 /**
- * Layout D's spec table (Broadband): which rows print, in what order, and —
+ * Layout C's spec table (Broadband): which rows print, in what order, and —
  * the part that has to happen last — in which language.
  *
  * One row per distinct spec label across the columns (a series sheet has one
