@@ -44,7 +44,10 @@ src/
   lib/
     google/{auth,sheets,sheets-extra,drive-versions,drive-images}.ts
     datasheet/                         # cover-layout、pagination、layout-check、layout-ack、
-                                       #   typography、locales/、qr.ts、radio-patterns.ts
+                                       #   typography、locales/、qr.ts、radio-patterns.ts、spec-notes、
+                                       #   dc-spec-table（B）、broadband-spec-table（C）——純函式,有測試
+    unsaved-changes.ts                 # 離開前提醒的判斷（leavesPage / sameContent,純函式,有測試）
+    use-unsaved-changes.ts             # useUnsavedChanges(dirty) —— 每個要按儲存的編輯器都接
     translate/                         # prompts + providers (claude/openai/gemini)
     battlecard/spec-mapping.ts         # dimension_key → EnGenius spec label 對應(自家值 seed 用)
     website/                           # 官網查詢:sites/wp-client(讀取)、parse/compare/reminders(純函式,有測試)、

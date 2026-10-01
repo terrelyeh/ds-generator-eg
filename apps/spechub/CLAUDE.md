@@ -273,6 +273,13 @@ auth.users → profiles ← email_whitelist.invited_by
   不是模組級——模組級會讓下一次 run 看到 PM 上傳之前的清單）。產品之間不共用任何列所以
   可以重疊;**新增會跨產品共用的狀態時要問「並行下會不會做兩次」**（pitfall #75）
 - **PDF gen UX**: 兩條路徑都用 `toast.loading` → `toast.success` + `Open PDF` action button（pitfall #47）
+- **「改完要按儲存」的編輯器一律接 `useUnsavedChanges(dirty)`**（`lib/use-unsaved-changes.ts`,2026-10-01 起）——
+  離開或關分頁前會先問。`dirty` 要跟 Save 送出的內容用**同一份**計算;跟伺服器回來的資料比用
+  `sameContent()`（jsonb 會重排 key,`JSON.stringify` 會讓剛存完就被判成有修改）;hook 不能放在 early return 後面。
+  瀏覽器的上一頁攔不到（pitfall #81）
+- **連結要長得像按鈕就用 `cn(buttonVariants(...))`**,不要直接把 `buttonVariants()` 塞進 className ——
+  基底的 `border-transparent` 和 outline 的 `border-border` 會同時存在,透明的贏,外框就不見了
+  （`<Button>` 內部本來就有過 `cn`,所以只有手寫連結會中）
 
 ### Dashboard UI Conventions
 
@@ -298,7 +305,8 @@ auth.users → profiles ← email_whitelist.invited_by
 - **改 datasheet 版型之前,先看同一份 sheet 在版型 A 怎麼印**,再用 prod 頁面做 mockup
   （puppeteer + bypass header,只改 DOM 截圖）跟使用者確認才動程式。2026-09-11 的 DC 規格表
   因為自行決定「`General` 不印分類帶」而跟所有 AP/Switch 版型不一致,重做了一次（#79 → #82）;
-  B 的分組/分頁規則在 `lib/datasheet/dc-spec-table.ts`（細節見 datasheet-rendering.md）
+  B 的分組/分頁規則在 `lib/datasheet/dc-spec-table.ts`、C 的規格列在 `lib/datasheet/broadband-spec-table.ts`
+  （兩者都含規格標籤翻譯,**過濾之後、分頁之前才翻**,見 #80;細節見 datasheet-rendering.md）
 
 ## Current Status
 
