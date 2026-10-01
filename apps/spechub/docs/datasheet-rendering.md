@@ -80,7 +80,7 @@ Cover page 用 **動態版面**：features 依內容高度浮動（max 320pt）�
 
 **架構要點**：
 - 翻譯分兩層：per-product（`product_translations`：headline/subtitle/overview/features/HW image/QR）+ per-product-line（`spec_label_translations`：spec labels 共用）
-- 兩種模式：**Light**（只翻標題+內容）vs **Full**（+規格表 label）
+- **規格標籤的顯示規則**（2026-10-01 起，所有版型一致）：**一條一條算，有翻譯就印當地語言，沒翻或空白就印英文**，分組標題同一套。以前的 Light / Full 兩種模式已不存在（下拉 2026-08-07 拿掉，預覽網址的 `?mode=` 2026-10-01 起照收不讀）。預設版型在組 section 時翻；**專用版型（Broadband、Data Center）在最後才翻** —— Broadband 用英文標籤辨認列（丟掉表內的 Model Number、`radioPatternSlots` 決定天線頁），分頁器又要量實際印出的字，所以翻譯在過濾之後、分頁之前（`lib/datasheet/broadband-spec-table.ts`，有測試）。Edge AI（Orin Box）與所有 series 版只有英文。預覽頁加新的語系資料時，**每個提早 return 的專用版型都要接**（pitfall #80）
 - **Draft / Confirmed 流程**：Enable → 翻譯 → Preview（auto-save 為 Draft）→ Save & Confirm → Generate PDF。Save & Confirm 按鈕條件是「有內容 AND (Draft OR dirty)」— Draft 狀態下永遠可按避免使用者按 Preview 後卡死。Draft 時按鈕用 amber + pulse 動畫強調。Preview 對 Draft locale 跳 toast 提醒「請按 Save & Confirm」（pitfall #49）
 - 版本獨立：`products.current_versions` JSONB 存各語言版本（`{"en":"1.1","ja":"1.0"}`）
 - Drive 資料夾：PDF 在 `<lineName>_<locale>/DS_Cloud_<model>_<locale>/`，圖片在 `<lineName>_<locale>/DS Images/{model}_hardware_<locale>.ext`（`getLocaleSuffix()` 負責 zh-TW → zh 映射；日文統一用 `ja`，舊的 `_jp` 命名已於 2026-04-15 全部改掉）
