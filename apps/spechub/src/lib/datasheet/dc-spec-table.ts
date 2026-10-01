@@ -40,6 +40,16 @@ function printable(value: string): boolean {
 export function buildDcSpecBlocks(
   sections: SectionInput[],
   identity: { label: string; value: string }[] = [],
+  /**
+   * Per-line translations for the printed locale (English → this locale),
+   * from `spec_label_translations` — row labels and band titles kept apart,
+   * the way layout A keeps them (`label_type`), so a group and a spec that
+   * happen to share a name can translate differently. Applied to the finished
+   * blocks, after the rules above decide what prints; the reasoning is at
+   * length in broadband-spec-table.ts. An empty string is not a translation:
+   * the editor stores a row for every label whether or not it was filled in.
+   */
+  labels: { rows?: Record<string, string>; sections?: Record<string, string> } = {},
 ): DcSpecBlock[] {
   const identityRows = identity
     .filter((r) => printable(r.value))
@@ -57,7 +67,17 @@ export function buildDcSpecBlocks(
     if (opensTable) blocks.push(...identityRows);
     blocks.push(...rows);
   }
-  return blocks;
+  const rowLabels = labels.rows ?? {};
+  const sectionTitles = labels.sections ?? {};
+  return blocks.map((b) =>
+    b.kind === "section"
+      ? sectionTitles[b.title]?.trim()
+        ? { ...b, title: sectionTitles[b.title] }
+        : b
+      : rowLabels[b.label]?.trim()
+        ? { ...b, label: rowLabels[b.label] }
+        : b,
+  );
 }
 
 /** Rough line count for text in a column that holds `charsPerLine` characters. */

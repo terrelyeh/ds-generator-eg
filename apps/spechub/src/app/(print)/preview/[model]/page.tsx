@@ -262,6 +262,7 @@ export default async function PreviewPage({
         userRole={userRole}
         versionOverride={versionOverride ?? null}
         locale={lang}
+        specLabels={specLabelMap}
         translation={
           isTranslated
             ? {
@@ -334,6 +335,8 @@ export default async function PreviewPage({
       <DataCenterPreview
         product={product}
         specNotes={specNotes}
+        specLabels={specLabelMap}
+        sectionLabels={sectionLabelMap}
         showToolbar={showToolbar}
         userRole={userRole}
         versionOverride={versionOverride ?? null}
