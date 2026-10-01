@@ -33,12 +33,17 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
    數量看「上架追蹤」頁籤（那裡的定義才是準的;2026-09-18 直接查 DB 粗算是 92 份最新版、40 份已標記,
    比上線時多是因為之後又產了新版,而新版本身是未標記的）
 
-**多語言（2026-08-07 現況）**：
-9. **日文規格標籤只翻了 Cloud AP** — `spec_label_translations` 是**產品線層級**;
-   Cloud Camera / L3 Switch / VPN Firewall / AI-NVS 有日文產品但標籤是英文,
-   Broadband EOC 連繁中都沒有（那條線從沒開過標籤編輯器）。
-   補法:`/translations/[line]` → Japanese → AI Translate Empty Fields,每條線約 $0.006。
-   **產 PDF 寫死 `mode=full`,所以沒翻就是印英文。**
+**多語言**：
+9. **規格標籤的規則（2026-10-01 起所有版型一致）**:`spec_label_translations` 是**產品線層級**,
+   **一條一條算 —— 有翻譯就印當地語言,沒翻或空白就印英文**,分組標題同一套。
+   翻一半的產品線會印出中英混合的表,看 `/translations/[line]` 的進度條。
+   以前只在網址帶 `?mode=full` 時才載入,而且 Broadband / Data Center 版型根本沒接 —— 兩個都修了（#115）。
+   **目前覆蓋**:ja = EOC、Cloud AP、Camera、L3 Switch、Switch、VPN FW、Transceiver;
+   zh-TW = 上面除了 EOC 以外 + AI-NVS、PDU、Station AP;es = Cloud Switch。
+   **完全沒有標籤翻譯**:AI Server、Edge Network Appliance、Orin Box、Switch Extender、Unmanaged Switch。
+   補法:`/translations/[line]` → 選語言 → AI Translate Empty Fields,每條線約 $0.006。
+   ⚠️ EOC 的日文 `MTBF` 被翻成 `MBTF`（字母反了）,待 PM 在標籤翻譯頁改。
+   **還是只有英文的**:Orin Box（Edge AI 版型整份沒有語系）、所有 **series** 版 datasheet（路由沒有語系參數）。
 9b. **VPN Firewall 的語系覆蓋不完整（2026-09-18 補備註時發現）** — ESG510 的 zh-TW、
    ESG610 的 ja 與 zh-TW **根本沒有翻譯列**,所以那三個組合印的是英文。
    刻意沒有直接建列:建一列等於替那台開啟該語系,而 overview / features 還是英文,
@@ -49,7 +54,7 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
 
 10. **`product_translations.translation_mode` 欄位沒有人讀** — 編輯器的 Light/Full
    下拉已於 2026-08-07 移除（它什麼都沒改變）,存檔固定寫 `full`。欄位本身還在,
-   要清掉是另一個 migration。
+   要清掉是另一個 migration。預覽網址上的 `?mode=` 也在 2026-10-01 起不讀了（照收,不影響舊連結）。
 11. 🔴 **審核流程目前休眠（2026-08-12 Terrel 主動關掉,說是「先」移除）** —— 程式全在,
    但**沒有任何語系被指定**,所以每個語系都是 MKT 一鍵 Confirm。
    **看到 review 相關程式碼不要以為它在跑**;要重開就回 `/settings/users` 點語言旗標。
