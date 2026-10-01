@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-09-21。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-10-01。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -124,7 +124,7 @@ locale 未核准阻擋)、動態 cover 版面 + spec 2 欄分頁(`lib/datasheet/
 metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet
 (en/ja/zh-TW/**es**、**四態審核**(`draft`→`pending_review`→`approved`/`changes_requested`,
 `draft` = 還沒送審、`pending_review` = 已送審待審,佇列只撈後者;`confirmed` 是
-`review_status='approved'` 的 generated column)、per-locale typography **四語系皆可調**、**6 層 AI 翻譯 prompt**
+`review_status='approved'` 的 generated column)、per-locale typography **四語系皆可調**、**規格標籤有翻譯就印當地語言**(產品線層級、一條一條算、所有版型一致;專用版型最後才翻,見 #80)、**6 層 AI 翻譯 prompt**
 ——第 6 層是從原文算出的行數預算,防止譯文變長把封面擠爆)、**規格備註**(sheet 的
 `Spec Footnote` 列 → `products.spec_notes`,一行一條、記號由 PM 自己配對;四種版型都印在
 最後一頁規格表下方,**A/B/C 的分頁器會預留備註高度** —— 頁面是 `overflow:hidden`,沒預留就是
