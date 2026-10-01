@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -66,6 +67,9 @@ export function GapReview({
   const [brief, setBrief] = useState("");
   const [answering, setAnswering] = useState<string | null>(null);
   const [answerText, setAnswerText] = useState("");
+  // The answer being typed counts; the brief does not — it is generated text
+  // people tweak and copy to the clipboard, never saved, so never "unsaved".
+  useUnsavedChanges(answering !== null && answerText.trim() !== "");
   // The rules an answer implies, waiting to be ticked. Never applied on the
   // way in: an answer arrives as one line of chat and is no more trustworthy
   // than the note that raised the question.

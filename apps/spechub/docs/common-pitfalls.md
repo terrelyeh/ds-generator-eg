@@ -549,3 +549,22 @@ Model Number 列、`radioPatternSlots` 讀標籤決定有哪些天線頁），�
 在主路徑加了什麼，要一個分支一個分支問「它有沒有拿到」。
 新增語系相關的欄位時，用 Broadband 的 EOC 日文版和 Data Center 各看一次，不要只看 Cloud AP。
 
+## 81. 編輯器沒有「離開前提醒」，改了沒存的東西會靜靜消失（2026-10-01，已修）
+
+PM 改了規格標籤翻譯裡一個錯字（`MBTF` → `MTBF`），說「早改好了」，一小時後資料庫裡還是舊的。
+那一頁只有按 Save All 才會存，而它只在**切換語言**時提醒未存修改——關分頁、點側欄、
+點麵包屑都會直接丟掉，沒有任何提示。當時查了一下，**SpecHub 沒有任何一個編輯器有離開提醒**。
+
+現在有一支共用的 `useUnsavedChanges(dirty)`（`lib/use-unsaved-changes.ts`，判斷規則在
+`lib/unsaved-changes.ts` 有測試），12 個地方都接上了。**新的編輯器也要接**。幾個寫法上的坑：
+
+- **`dirty` 要跟 Save 寫進去的東西用同一份計算**。圖片標註編輯器把「Save 會送出的 patch」
+  抽成 `pending`，Save 送它、dirty 也拿它比——各算各的，總有一天會出現「按了儲存還說沒存」。
+- **跟伺服器回來的資料比，要用 `sameContent()`**，不能用 `JSON.stringify`：jsonb 欄位回來時
+  key 會被 Postgres 重新排序，剛存完就會被判成「有修改」。會一直誤報的提醒，大家很快就會無腦按確定。
+- **只算「人打的、會被存的」**：缺口回覆的 brief 是產生出來、複製用、從來不存的文字，算進去就是每次都問。
+- **hook 不能放在 early return 後面**（型號設定編輯器原本在「讀取中」return 之後才算 dirty，要往前搬）。
+- **攔不到瀏覽器的上一頁**：App Router 的上一頁是同一份文件裡的 history 移動，沒有能取消的事件，
+  硬去攔 popstate 會跟 Next 自己的路由打架。攔得到的是：點任何 `<a>`（含 next/link，在 window 的
+  capture 階段，比 React 掛在 document 上的監聽早）、關分頁、重新整理、在網址列打新網址。
+

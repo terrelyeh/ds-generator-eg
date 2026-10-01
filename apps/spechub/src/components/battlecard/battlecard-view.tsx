@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback, useRef } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ function Cell({
   const [draft, setDraft] = useState(state.value);
   const [draftSource, setDraftSource] = useState(state.sourceUrl ?? "");
   const [saving, setSaving] = useState(false);
+  useUnsavedChanges(editing && (draft !== state.value || draftSource !== (state.sourceUrl ?? "")));
 
   const isDraft = column.owner === "competitor" && !!state.value && !state.confirmed;
 

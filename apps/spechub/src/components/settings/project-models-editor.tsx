@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -70,11 +71,13 @@ export function ProjectModelsEditor() {
       .catch(() => toast.error("讀取失敗"));
   }, []);
 
-  if (!data || !pick) return <p className="text-sm text-muted-foreground">讀取中…</p>;
-
   // Compared over the steps rather than field by field, so adding a fourth
   // step cannot leave Save greyed out on a change it does not know about.
-  const dirty = STEPS.some((s) => pick![s.key] !== data![s.key]);
+  // Worked out before the loading return: the leave-page guard is a hook.
+  const dirty = !!data && !!pick && STEPS.some((s) => pick[s.key] !== data[s.key]);
+  useUnsavedChanges(dirty);
+
+  if (!data || !pick) return <p className="text-sm text-muted-foreground">讀取中…</p>;
 
   async function save() {
     setSaving(true);

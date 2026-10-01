@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -168,6 +169,7 @@ export function ProductTranslationEditor({
   );
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
   const [translatingHeadline, setTranslatingHeadline] = useState(false);
   const [translatingOverview, setTranslatingOverview] = useState(false);
   const [translatingFeatures, setTranslatingFeatures] = useState(false);

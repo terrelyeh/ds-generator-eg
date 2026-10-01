@@ -192,6 +192,11 @@ SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base�
 - **PDF 生成鎖** — 同一 model + locale 同時只能一人生成，DB flag 自動 5 分鐘過期
 - **Settings 樂觀鎖** — Typography / API Keys / Glossary 儲存時比對 `updated_at`，衝突回 409
 
+### Unsaved Changes（未存修改提醒）
+- 所有「改完要按儲存」的編輯器（翻譯、規格標籤翻譯、字型設定、標案編輯器與型號設定、詞庫、Battlecard 儲存格、圖片標註），以及需求貼上、來源擷取、審核意見、缺口回覆這幾個打字後送出的表單：**有還沒儲存的修改時，點連結離開或關分頁都會先問一次**
+- 開新分頁的連結（例如 Preview）、頁內錨點不會問；同一頁好幾個編輯器都有改也只問一次
+- ⚠️ 瀏覽器的「上一頁」攔不到（Next.js 沒有可以取消的換頁事件）
+
 ### Automated Sync
 - 每日 09:00（台灣時間）自動同步 Google Sheets → Supabase
 - Smart Sync：比對 Google Drive `modifiedTime`，未變動則跳過

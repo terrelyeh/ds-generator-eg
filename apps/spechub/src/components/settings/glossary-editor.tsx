@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -72,6 +73,15 @@ export function GlossaryEditor({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTranslated, setEditTranslated] = useState("");
   const [editNotes, setEditNotes] = useState("");
+
+  // Unsaved = the add form has something typed in it, or the row being edited
+  // no longer matches what is stored.
+  const editingEntry = editingId ? glossary.find((g) => g.id === editingId) : undefined;
+  useUnsavedChanges(
+    (showAdd && [newEnglish, newTranslated, newNotes].some((v) => v.trim() !== "")) ||
+      (!!editingEntry &&
+        (editTranslated !== editingEntry.translated_term || editNotes !== (editingEntry.notes ?? ""))),
+  );
 
   const fetchGlossary = useCallback(async () => {
     setLoading(true);

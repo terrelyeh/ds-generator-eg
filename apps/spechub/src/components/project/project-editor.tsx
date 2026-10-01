@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -320,6 +321,7 @@ export function ProjectEditor({
     drafts.map((d) => [d.model_name, d.display_name, d.raw, d.rules]),
   ]);
   const dirty = current !== initial;
+  useUnsavedChanges(dirty);
 
   /**
    * Rules that match nothing at all.

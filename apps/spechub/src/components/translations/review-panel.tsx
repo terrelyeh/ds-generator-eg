@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -69,6 +70,7 @@ export function ReviewPanel({
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [comment, setComment] = useState("");
+  useUnsavedChanges(comment.trim() !== "");
   const [targetField, setTargetField] = useState<string>("general");
   const [targetIndex, setTargetIndex] = useState<string>("");
   const [busy, setBusy] = useState(false);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
@@ -38,6 +39,7 @@ export function SpecLabelTranslationsEditor({
   const [translations, setTranslations] = useState<Record<string, string>>(initialTranslations);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
   const [aiTranslating, setAiTranslating] = useState(false);
   const [aiNotes, setAiNotes] = useState("");
 
