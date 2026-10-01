@@ -403,7 +403,7 @@ npm run lint
 > 以上每條的全文、以及只有動到特定東西才需要的
 > #50（分頁常數）/ #60（NOT NULL 圖片欄位）/ #61（category 精確比對）/ #63（版型 locale prop）/
 > #64（CJK 字型）/ #66（圖片用框不用像素）/ #67（陣列長度對齊）/ #68（CJK_LOCALES）/
-> #71（`/auth/probe`）,全在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> #71（`/auth/probe`）/ #80（預覽頁的專用版型要一條一條接資料）,全在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 > #54–#58（RAG/聊天）在 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 ## 詳細文件

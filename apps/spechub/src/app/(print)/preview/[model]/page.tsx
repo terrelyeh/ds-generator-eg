@@ -138,7 +138,9 @@ export default async function PreviewPage({
   searchParams: Promise<{ lang?: string; mode?: string; toolbar?: string; version?: string }>;
 }) {
   const { model } = await params;
-  const { lang = "en", mode = "light", toolbar, version: versionOverride } = await searchParams;
+  // `mode` is still accepted (old links and queued PDF jobs carry it) but no
+  // longer read — see the spec label block below.
+  const { lang = "en", toolbar, version: versionOverride } = await searchParams;
   const showToolbar = toolbar !== "false";
 
   const dict = getDict(lang);
@@ -206,23 +208,28 @@ export default async function PreviewPage({
       translatedSpecNotes = pt.spec_notes;
     }
 
-    // Per-product-line spec label translations (only if full mode)
-    if (mode === "full") {
-      const { data: slt } = await supabase
-        .from("spec_label_translations")
-        .select("original_label, translated_label, label_type")
-        .eq("product_line_id", product.product_line_id)
-        .eq("locale", lang) as { data: { original_label: string; translated_label: string | null; label_type: string }[] | null };
+    // Per-product-line spec label translations. The rule is the same for
+    // every line and every layout: a label with a translation prints in the
+    // locale, one without (or with a blank one) prints in English.
+    //
+    // This used to load only under `?mode=full`, a leftover of the Light/Full
+    // translation modes whose picker was removed on 2026-08-07. Every real
+    // entry point passed `full`, so the condition hid in plain sight — except
+    // for the typography settings preview, which passed `light` and showed
+    // English labels to someone tuning Japanese type. `?mode=` is ignored
+    // now; old links that still carry it render the same.
+    const { data: slt } = await supabase
+      .from("spec_label_translations")
+      .select("original_label, translated_label, label_type")
+      .eq("product_line_id", product.product_line_id)
+      .eq("locale", lang) as { data: { original_label: string; translated_label: string | null; label_type: string }[] | null };
 
-      if (slt) {
-        for (const row of slt) {
-          if (!row.translated_label) continue;
-          if (row.label_type === "spec") {
-            specLabelMap[row.original_label] = row.translated_label;
-          } else {
-            sectionLabelMap[row.original_label] = row.translated_label;
-          }
-        }
+    for (const row of slt ?? []) {
+      if (!row.translated_label?.trim()) continue;
+      if (row.label_type === "spec") {
+        specLabelMap[row.original_label] = row.translated_label;
+      } else {
+        sectionLabelMap[row.original_label] = row.translated_label;
       }
     }
   }
@@ -262,6 +269,7 @@ export default async function PreviewPage({
         userRole={userRole}
         versionOverride={versionOverride ?? null}
         locale={lang}
+        specLabels={specLabelMap}
         translation={
           isTranslated
             ? {
@@ -334,6 +342,8 @@ export default async function PreviewPage({
       <DataCenterPreview
         product={product}
         specNotes={specNotes}
+        specLabels={specLabelMap}
+        sectionLabels={sectionLabelMap}
         showToolbar={showToolbar}
         userRole={userRole}
         versionOverride={versionOverride ?? null}

@@ -17,7 +17,7 @@ src/
       settings/                        # hub + glossary / typography / users
     auth/                              # Google OAuth flow（與 engenie 各持一份）
     (print)/                           # ✅ 帶 bypass header 可 headless 抓
-      preview/[model]/page.tsx         # Per-model datasheet（?lang=ja&mode=full&toolbar=false）
+      preview/[model]/page.tsx         # Per-model datasheet（?lang=ja&toolbar=false;`?mode=` 已不讀）
         ├ datacenter-preview.tsx       #   Data Center 變體
         └ broadband-preview.tsx        #   Broadband 鋼藍，per-model + series 雙 scope
       preview/series/[line]/page.tsx   # Series datasheet，依 category 分派

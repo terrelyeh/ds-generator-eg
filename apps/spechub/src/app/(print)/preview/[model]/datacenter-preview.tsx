@@ -195,6 +195,8 @@ export function DataCenterPreview({
   translation,
   translationConfirmed = true,
   specNotes = [],
+  specLabels = {},
+  sectionLabels = {},
 }: {
   product: DcQueryRow;
   showToolbar: boolean;
@@ -213,6 +215,11 @@ export function DataCenterPreview({
    *  (lib/datasheet/spec-notes). Printed under the table on the last
    *  spec page. */
   specNotes?: string[];
+  /** Per-line spec label translations for `locale` (English → localized),
+   *  from spec_label_translations. Empty for English. */
+  specLabels?: Record<string, string>;
+  /** The same table's section (band) titles, kept apart from row labels. */
+  sectionLabels?: Record<string, string>;
 }) {
   const dict = getDict(locale);
   const line = product.product_lines;
@@ -238,10 +245,14 @@ export function DataCenterPreview({
   // Every spec group prints under a grey band — "General" first, as in layout
   // A — and the model's identity opens that first group as ordinary rows.
   // See lib/datasheet/dc-spec-table.
-  const specBlocks = buildDcSpecBlocks(product.spec_sections ?? [], [
-    { label: "Model Name", value: product.subtitle || "" },
-    { label: "Model Number", value: product.model_name },
-  ]);
+  const specBlocks = buildDcSpecBlocks(
+    product.spec_sections ?? [],
+    [
+      { label: "Model Name", value: product.subtitle || "" },
+      { label: "Model Number", value: product.model_name },
+    ],
+    { rows: specLabels, sections: sectionLabels },
+  );
 
   // First spec page: title(70) + title band(22) → ~630pt of blocks. The two
   // identity rows are blocks now, so they come out of this budget instead of

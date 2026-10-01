@@ -6,6 +6,7 @@ import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datashee
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT, LADDER, BROADBAND_HEADLINE } from "@/lib/datasheet/scale";
 import { estimateSpecNotesHeight } from "@/lib/datasheet/spec-notes";
+import { buildBroadbandSpecRows } from "@/lib/datasheet/broadband-spec-table";
 import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@eg/db/types";
 
 /**
@@ -134,6 +135,7 @@ export function BroadbandPreview({
   translation,
   translationConfirmed = true,
   specNotes = [],
+  specLabels = {},
 }: {
   scope: "model" | "series";
   line: ProductLine;
@@ -160,6 +162,13 @@ export function BroadbandPreview({
   } | null;
   /** False blocks generation while the translation is still a Draft. */
   translationConfirmed?: boolean;
+  /**
+   * Per-line spec label translations for `locale` (English → localized), from
+   * `spec_label_translations`. Empty for English and for series sheets, which
+   * stay English. Applied inside buildBroadbandSpecRows, deliberately after
+   * the rules that match on the English label — see that file.
+   */
+  specLabels?: Record<string, string>;
 }) {
   const dict = getDict(locale);
   const isSeries = scope === "series";
@@ -233,27 +242,10 @@ export function BroadbandPreview({
       })
     : products;
   const columns = isSeries ? orderedProducts : focusModel ? [focusModel] : [];
-  const rowOrder: string[] = [];
-  const rowMap = new Map<string, Map<string, string>>();
-  for (const p of columns) {
-    for (const sec of [...(p.spec_sections ?? [])].sort((a, b) => a.sort_order - b.sort_order)) {
-      for (const item of [...(sec.spec_items ?? [])].sort((a, b) => a.sort_order - b.sort_order)) {
-        if (!rowMap.has(item.label)) {
-          rowMap.set(item.label, new Map());
-          rowOrder.push(item.label);
-        }
-        rowMap.get(item.label)!.set(p.model_name, item.value);
-      }
-    }
-  }
-  const specRows: SpecRow[] = rowOrder
-    .map((label) => ({
-      label,
-      values: columns.map((p) => rowMap.get(label)?.get(p.model_name) ?? ""),
-    }))
-    .filter((r) => r.values.some((v) => v.trim() && v.trim().toUpperCase() !== "N/A"))
-    // These already ride the dark header bands above the table body.
-    .filter((r) => !/^model\s*(name|#|number)/i.test(r.label.trim()));
+  // Rows, the identity filter and the label translation all live in
+  // lib/datasheet/broadband-spec-table — including why the translation is the
+  // last step and not the first.
+  const specRows: SpecRow[] = buildBroadbandSpecRows(columns, specLabels);
 
   const valueWidth = isSeries ? Math.max(70, 440 / Math.max(1, columns.length)) : 440;
   const specPages = paginate(specRows, valueWidth, 560, 640, estimateSpecNotesHeight(specNotes));

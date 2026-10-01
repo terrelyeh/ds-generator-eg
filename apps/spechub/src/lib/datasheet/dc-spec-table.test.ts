@@ -151,3 +151,40 @@ describe("withStripes", () => {
     expect(page.map((b) => b.alt)).toEqual([false, true, false, false, false, true]);
   });
 });
+
+describe("buildDcSpecBlocks — translated labels", () => {
+  const sections = [
+    {
+      category: "General",
+      sort_order: 0,
+      spec_items: [
+        { label: "CPU", value: "Xeon", sort_order: 0 },
+        { label: "Power", value: "N/A", sort_order: 1 },
+      ],
+    },
+    { category: "Power", sort_order: 1, spec_items: [{ label: "Power", value: "800 W", sort_order: 0 }] },
+  ];
+
+  it("translates row labels and band titles from their own maps", () => {
+    // "Power" is both a group and a spec here; layout A keeps the two apart
+    // (label_type), so a group can be 電源 while the spec reads 消費電力.
+    const blocks = buildDcSpecBlocks(sections, [{ label: "Model Number", value: "S41" }], {
+      rows: { CPU: "CPU（プロセッサ）", Power: "消費電力", "Model Number": "型番" },
+      sections: { General: "一般", Power: "電源" },
+    });
+    expect(blocks).toEqual([
+      { kind: "section", title: "一般" },
+      { kind: "row", label: "型番", value: "S41" },
+      { kind: "row", label: "CPU（プロセッサ）", value: "Xeon" },
+      { kind: "section", title: "電源" },
+      { kind: "row", label: "消費電力", value: "800 W" },
+    ]);
+  });
+
+  it("keeps English where a translation is missing or blank", () => {
+    const blocks = buildDcSpecBlocks(sections, [], { rows: { CPU: " " }, sections: {} });
+    expect(blocks[0]).toEqual({ kind: "section", title: "General" });
+    expect(blocks[1]).toEqual({ kind: "row", label: "CPU", value: "Xeon" });
+  });
+});
+

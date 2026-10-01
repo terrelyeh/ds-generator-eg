@@ -672,11 +672,12 @@ export function ProductTranslationEditor({
 
           {/* The Light/Full picker used to live here. It set
               product_translations.translation_mode, which no render path
-              reads: the preview takes ?mode= from the URL and
-              /api/generate-pdf hardcodes "full" for localised PDFs. It was
-              a control that changed nothing while looking like it chose
-              whether spec labels get translated. Spec labels are managed
-              per product line at /translations/[line] instead. */}
+              reads. It was a control that changed nothing while looking
+              like it chose whether spec labels get translated — and since
+              2026-10-01 nothing chooses that at all: the preview prints a
+              line's translated labels whenever they exist (the old ?mode=
+              URL switch is ignored). Spec labels are managed per product
+              line at /translations/[line]. */}
 
           <Separator orientation="vertical" className="h-6" />
 
