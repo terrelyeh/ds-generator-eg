@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
+import { sameContent } from "@/lib/unsaved-changes";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
@@ -304,6 +306,31 @@ function LabelEditor({
      and splitting on save keeps blank lines from becoming empty bullets. */
   const [body, setBody] = useState((prefill?.body ?? image.body ?? []).join("\n"));
   const [labels, setLabels] = useState<ImageLabel[]>(image.labels ?? []);
+
+  /**
+   * What Save writes — and therefore what "unsaved" is measured against.
+   * One object for both, so the guard can never disagree with the button.
+   * A drafted write-up (prefill) counts as unsaved until it is saved.
+   */
+  const pending = {
+    caption: caption.trim() || null,
+    prompt: prompt.trim() || null,
+    body: body
+      .split("\n")
+      .map((l) => l.replace(/^[-•*]\s*/, "").trim())
+      .filter(Boolean),
+    // A label with no text prints as an empty white box. Dropping it here is
+    // what the author meant by leaving it blank.
+    labels: labels.filter((l) => l.text.trim()),
+  };
+  useUnsavedChanges(
+    !sameContent(pending, {
+      caption: image.caption?.trim() || null,
+      prompt: image.prompt?.trim() || null,
+      body: image.body ?? [],
+      labels: (image.labels ?? []).filter((l) => l.text.trim()),
+    }),
+  );
   /** which label is being dragged, and whether by its dot or its text */
   const [drag, setDrag] = useState<{ i: number; part: "dot" | "label" } | null>(null);
   /**
@@ -573,19 +600,7 @@ function LabelEditor({
       <Button
         size="sm"
         disabled={busy}
-        onClick={() =>
-          onSave({
-            caption: caption.trim() || null,
-            prompt: prompt.trim() || null,
-            body: body
-              .split("\n")
-              .map((l) => l.replace(/^[-•*]\s*/, "").trim())
-              .filter(Boolean),
-            // A label with no text prints as an empty white box. Dropping it
-            // here is what the author meant by leaving it blank.
-            labels: labels.filter((l) => l.text.trim()),
-          })
-        }
+        onClick={() => onSave(pending)}
       >
         {busy ? "儲存中…" : "儲存圖說、標註與提示詞"}
       </Button>

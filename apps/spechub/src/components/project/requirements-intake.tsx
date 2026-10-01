@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -34,6 +35,7 @@ export function RequirementsIntake({
   onApplied?: () => void;
 }) {
   const [text, setText] = useState("");
+  useUnsavedChanges(text.trim() !== "");
   const [parsing, setParsing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [sourceId, setSourceId] = useState<string | null>(null);

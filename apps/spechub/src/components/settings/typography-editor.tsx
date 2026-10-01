@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useUnsavedChanges } from "@/lib/use-unsaved-changes";
 import Link from "next/link";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -38,6 +39,7 @@ export function TypographyEditor() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+  useUnsavedChanges(dirty);
   const [serverUpdatedAt, setServerUpdatedAt] = useState<string | null>(null);
 
   // Custom fonts
