@@ -4,7 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SUPPORTED_LOCALES } from "@/lib/datasheet/locales";
 import { useProviders } from "@/lib/translate/use-providers";
@@ -176,46 +177,54 @@ export function SpecLabelTranslationsEditor({
 
   return (
     <div className="space-y-6">
-      {/* Controls bar */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <label className="text-sm font-medium text-muted-foreground">Language:</label>
-          <div className="flex gap-1 rounded-lg bg-muted p-1">
-            {localeOptions.map((l) => (
-              <button
-                key={l.value}
-                onClick={() => handleLocaleChange(l.value)}
-                className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
-                  locale === l.value
-                    ? "bg-engenius-blue text-white shadow-sm"
-                    : "text-muted-foreground hover:text-foreground hover:bg-background"
-                }`}
-              >
-                {l.flag} {l.label}
-              </button>
-            ))}
+      {/* Controls — two rows, one job each. The first says what is being
+          edited (which language, how much of it is done); the second holds
+          what can be done to it. On one row the six controls squeezed the
+          Preview link into three lines and pushed Save All off the edge. */}
+      <div className="rounded-xl border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 px-4 py-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-muted-foreground">Language</span>
+            <div className="flex gap-1 rounded-lg bg-muted p-1">
+              {localeOptions.map((l) => (
+                <button
+                  key={l.value}
+                  onClick={() => handleLocaleChange(l.value)}
+                  className={`cursor-pointer rounded-md px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-all ${
+                    locale === l.value
+                      ? "bg-engenius-blue text-white shadow-sm"
+                      : "text-muted-foreground hover:text-foreground hover:bg-background"
+                  }`}
+                >
+                  {l.flag} {l.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          {/* Progress */}
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-32 overflow-hidden rounded-full bg-muted">
+          {/* Live progress — it moves as fields are filled, so this is the
+              one place the count lives (the page header used to show a
+              second, server-side copy that went stale while typing). */}
+          <div className="flex items-center gap-2.5">
+            <div className="h-2 w-40 overflow-hidden rounded-full bg-muted">
               <div
                 className="h-full rounded-full bg-engenius-blue transition-all"
                 style={{ width: `${totalLabels > 0 ? (filledLabels / totalLabels) * 100 : 0}%` }}
               />
             </div>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {filledLabels}/{totalLabels}
+            <span className="text-sm whitespace-nowrap tabular-nums text-muted-foreground">
+              <span className="font-medium text-foreground">{filledLabels}</span>/{totalLabels} translated
             </span>
           </div>
+        </div>
 
+        <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 border-t px-4 py-3">
           <div className="flex items-center gap-2">
             <select
               value={selectedProvider}
               onChange={(e) => setSelectedProvider(e.target.value)}
-              className="rounded-md border border-input bg-background px-2 py-1 text-xs"
+              aria-label="AI model"
+              className="h-8 rounded-lg border border-border bg-background px-2.5 text-sm"
             >
               {models.map((m) => (
                 <option key={m.slug} value={m.slug}>
@@ -226,7 +235,6 @@ export function SpecLabelTranslationsEditor({
             <Button
               onClick={handleAiTranslateEmpty}
               disabled={aiTranslating || !hasAnyProvider}
-              size="default"
               className={`transition-all ${
                 aiTranslating
                   ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse"
@@ -246,49 +254,54 @@ export function SpecLabelTranslationsEditor({
             </Button>
           </div>
 
-          {sampleModel && (
-            <Link
-              href={`/preview/${encodeURIComponent(sampleModel)}?lang=${locale}&mode=full`}
-              target="_blank"
-              className={`inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs transition-colors ${
-                dirty
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-accent"
-              }`}
-              title={
-                dirty
-                  ? "You have unsaved changes. Save first, then preview."
-                  : `Preview translated Datasheet using ${sampleModel} as a sample`
-              }
-              onClick={(e) => {
-                if (dirty) {
-                  e.preventDefault();
-                  toast.info("Save your changes first — preview shows saved translations only.");
+          <div className="flex items-center gap-2">
+            {sampleModel && (
+              <Link
+                href={`/preview/${encodeURIComponent(sampleModel)}?lang=${locale}`}
+                target="_blank"
+                className={cn(
+                  buttonVariants({ variant: "outline" }),
+                  dirty && "cursor-not-allowed opacity-50 hover:bg-background",
+                )}
+                title={
+                  dirty
+                    ? "You have unsaved changes. Save first, then preview."
+                    : `Preview translated Datasheet using ${sampleModel} as a sample`
                 }
-              }}
+                onClick={(e) => {
+                  if (dirty) {
+                    e.preventDefault();
+                    toast.info("Save your changes first — preview shows saved translations only.");
+                  }
+                }}
+              >
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
+                  <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
+                  <circle cx="8" cy="8" r="2" />
+                </svg>
+                Preview
+                <span className="font-normal text-muted-foreground">· {sampleModel}</span>
+              </Link>
+            )}
+
+            <Link
+              href={`/settings/glossary?locale=${locale}`}
+              // Through cn(), like <Button> does internally: the raw variant
+              // string carries the base `border-transparent` AND the outline
+              // `border-border`, and without the merge the transparent one wins.
+              className={cn(buttonVariants({ variant: "outline" }))}
+              title="Translation Glossary"
             >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M1 8s2.5-5 7-5 7 5 7 5-2.5 5-7 5-7-5-7-5z" />
-                <circle cx="8" cy="8" r="2" />
+              <svg viewBox="0 0 16 16" fill="currentColor">
+                <path d="M1 3.5A1.5 1.5 0 012.5 2h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 009.62 4H13.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z" />
               </svg>
-              Preview in {sampleModel}
+              Glossary
             </Link>
-          )}
 
-          <Link
-            href={`/settings/glossary?locale=${locale}`}
-            className="inline-flex items-center gap-1 rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent transition-colors"
-            title="Translation Glossary"
-          >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-              <path d="M1 3.5A1.5 1.5 0 012.5 2h3.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 009.62 4H13.5A1.5 1.5 0 0115 5.5v7a1.5 1.5 0 01-1.5 1.5h-11A1.5 1.5 0 011 12.5v-9z" />
-            </svg>
-            Glossary
-          </Link>
-
-          <Button onClick={handleSave} disabled={saving || !dirty} size="default">
-            {saving ? "Saving..." : "Save All"}
-          </Button>
+            <Button onClick={handleSave} disabled={saving || !dirty}>
+              {saving ? "Saving..." : "Save All"}
+            </Button>
+          </div>
         </div>
       </div>
 

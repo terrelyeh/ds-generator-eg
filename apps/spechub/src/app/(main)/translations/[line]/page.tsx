@@ -102,10 +102,6 @@ export default async function TranslationsPage({
     }
   }
 
-  // Count progress
-  const totalLabels = sectionNames.size + specLabels.size;
-  const filledLabels = Object.keys(translationMap).length;
-
   return (
     <div className="mx-auto max-w-[1400px] px-6 py-8 space-y-6">
       {/* Breadcrumb */}
@@ -120,14 +116,9 @@ export default async function TranslationsPage({
         <span className="font-medium text-foreground">Spec Label Translations</span>
       </nav>
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">
-          {productLine.label} — Spec Label Translations
-        </h1>
-        <div className="text-sm text-muted-foreground tabular-nums">
-          {filledLabels}/{totalLabels} translated
-        </div>
-      </div>
+      <h1 className="text-2xl font-bold tracking-tight">
+        {productLine.label} — Spec Label Translations
+      </h1>
 
       {/* key={locale} forces a remount when the language tab switches.
           Without it, the editor's `translations` useState (seeded once from
