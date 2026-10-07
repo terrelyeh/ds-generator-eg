@@ -1,33 +1,40 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Plus_Jakarta_Sans, Inter, Source_Serif_4 } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 
-const geistSans = Geist({
+// Self-hosted (src/app/fonts/, see the README there). With next/font/google
+// every build downloaded these from Google Fonts, and a slow response failed
+// the whole build — twice in one week. Variable files, latin subset, same
+// variable names as before, so nothing that reads them changed.
+const geistSans = localFont({
+  src: "./fonts/geist.woff2",
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const geistMono = Geist_Mono({
+const geistMono = localFont({
+  src: "./fonts/geist-mono.woff2",
   variable: "--font-geist-mono",
-  subsets: ["latin"],
+  weight: "100 900",
 });
 
-const plusJakarta = Plus_Jakarta_Sans({
+const plusJakarta = localFont({
+  src: "./fonts/plus-jakarta-sans.woff2",
   variable: "--font-plus-jakarta",
-  subsets: ["latin"],
-  weight: ["700", "800"],
+  weight: "200 800",
 });
 
-const inter = Inter({
+const inter = localFont({
+  src: "./fonts/inter.woff2",
   variable: "--font-inter",
-  subsets: ["latin"],
+  weight: "100 900",
   display: "swap",
 });
 
-const sourceSerif = Source_Serif_4({
+const sourceSerif = localFont({
+  src: "./fonts/source-serif-4.woff2",
   variable: "--font-serif-display",
-  subsets: ["latin"],
-  weight: ["400", "500", "600"],
+  weight: "200 900",
   display: "swap",
 });
 
