@@ -16,6 +16,8 @@ interface SpecLabelTranslationsEditorProps {
   productLineLabel: string;
   locale: string;
   sectionNames: string[];
+  /** Optional note under a section header row, e.g. what the line title is. */
+  sectionHints?: Record<string, string>;
   sectionLabelsMap: Record<string, string[]>;
   initialTranslations: Record<string, string>; // "spec:label" or "section:label" → translated
   /** A representative model in this product line used for the "Preview
@@ -30,6 +32,7 @@ export function SpecLabelTranslationsEditor({
   productLineLabel,
   locale,
   sectionNames,
+  sectionHints = {},
   sectionLabelsMap,
   initialTranslations,
   sampleModel = null,
@@ -363,7 +366,12 @@ export function SpecLabelTranslationsEditor({
                 const value = translations[key] ?? "";
                 return (
                   <tr key={key} className="border-b border-border/50">
-                    <td className="py-2 pr-4 text-sm font-medium text-muted-foreground">{name}</td>
+                    <td className="py-2 pr-4 text-sm font-medium text-muted-foreground">
+                      {name}
+                      {sectionHints[name] && (
+                        <div className="mt-0.5 text-xs font-normal text-muted-foreground/70">{sectionHints[name]}</div>
+                      )}
+                    </td>
                     <td className="py-2 pr-4">
                       <input
                         type="text"
