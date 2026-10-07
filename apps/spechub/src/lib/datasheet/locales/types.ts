@@ -7,6 +7,14 @@ export interface DatasheetDict {
   featuresAndBenefits: string;
   /** Spec pages title */
   technicalSpecifications: string;
+  /**
+   * Label of the model-number band over a Broadband spec table. Only the
+   * fallback: a line that translated its own "Model #" label prints that
+   * instead (lib/datasheet/broadband-spec-table.ts, identityBandLabel).
+   */
+  modelNumber: string;
+  /** Label of the description band (the model's headline) under it. */
+  description: string;
   /** Last page title */
   hardwareOverview: string;
   /** Antennas Patterns page title (AP products with uploaded radio pattern images) */

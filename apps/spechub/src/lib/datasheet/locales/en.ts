@@ -5,6 +5,8 @@ export const en: DatasheetDict = {
   overview: "Overview",
   featuresAndBenefits: "Features & Benefits",
   technicalSpecifications: "Technical Specifications",
+  modelNumber: "Model Number",
+  description: "Description",
   hardwareOverview: "Hardware Overview",
   antennasPatterns: "Antennas Patterns",
   defaultQrLabel: "Quick Start Guide",

@@ -75,3 +75,34 @@ export function buildBroadbandSpecRows(
     // or not.
     .map((r) => (labels[r.label]?.trim() ? { ...r, label: labels[r.label] } : r));
 }
+
+/**
+ * Label for the model-number band over the table.
+ *
+ * The band stands in for the sheet's own model-number row (the identity
+ * filter above drops that row because the band already shows it), so it
+ * follows that row's translation: on EOC the sheet says `Model #`, and a PM
+ * who translated `Model #` → 型番 should see 型番 here. It used to be the
+ * literal "Model Number" in every language — 76/76 labels translated, and the
+ * first row of the Japanese table still English (2026-10-07).
+ *
+ * Falls back to the locale dictionary, so a line with no label translations
+ * still gets a localized band.
+ */
+export function identityBandLabel(
+  columns: ColumnInput[],
+  labels: Record<string, string>,
+  fallback: string,
+): string {
+  for (const p of columns) {
+    for (const sec of p.spec_sections ?? []) {
+      for (const item of sec.spec_items ?? []) {
+        if (!/^model\s*(#|number)/i.test(item.label.trim())) continue;
+        const translated = labels[item.label]?.trim();
+        if (translated) return translated;
+      }
+    }
+  }
+  return fallback;
+}
+

@@ -6,7 +6,7 @@ import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datashee
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT, LADDER, BROADBAND_HEADLINE } from "@/lib/datasheet/scale";
 import { estimateSpecNotesHeight } from "@/lib/datasheet/spec-notes";
-import { buildBroadbandSpecRows } from "@/lib/datasheet/broadband-spec-table";
+import { buildBroadbandSpecRows, identityBandLabel } from "@/lib/datasheet/broadband-spec-table";
 import type { Product, ProductLine, SpecSection, SpecItem, ImageAsset } from "@eg/db/types";
 
 /**
@@ -246,6 +246,15 @@ export function BroadbandPreview({
   // lib/datasheet/broadband-spec-table — including why the translation is the
   // last step and not the first.
   const specRows: SpecRow[] = buildBroadbandSpecRows(columns, specLabels);
+
+  // The two bands over the table. They used to be literal English in every
+  // language. The number band follows the sheet's own (translated) label; the
+  // description band is layout wording, so it comes from the dictionary — and
+  // its value is the model's headline, which a per-model sheet has translated
+  // already (the cover prints it), so print that one.
+  const modelNumberLabel = identityBandLabel(columns, specLabels, dict.modelNumber);
+  const describe = (p: BroadbandProduct) =>
+    (isTranslated && p === focusModel && translation?.headline?.trim()) || p.headline || p.subtitle;
 
   const valueWidth = isSeries ? Math.max(70, 440 / Math.max(1, columns.length)) : 440;
   const specPages = paginate(specRows, valueWidth, 560, 640, estimateSpecNotesHeight(specNotes));
@@ -758,15 +767,15 @@ ${bulletDotCss(".benefit .dot")}
                 {pi === 0 && (
                   <>
                     <tr className="model-row">
-                      <td>Model Number</td>
+                      <td>{modelNumberLabel}</td>
                       {columns.map((p) => (
                         <td key={p.id}>{p.model_name}</td>
                       ))}
                     </tr>
                     <tr className="desc-row">
-                      <td>Description</td>
+                      <td>{dict.description}</td>
                       {columns.map((p) => (
-                        <td key={p.id}>{p.headline || p.subtitle}</td>
+                        <td key={p.id}>{describe(p)}</td>
                       ))}
                     </tr>
                   </>
