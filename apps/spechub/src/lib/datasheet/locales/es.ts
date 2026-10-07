@@ -24,6 +24,8 @@ export const es: DatasheetDict = {
   overview: "Descripción general",
   featuresAndBenefits: "Características y ventajas",
   technicalSpecifications: "Especificaciones técnicas",
+  modelNumber: "Número de modelo",
+  description: "Descripción",
   hardwareOverview: "Descripción del hardware",
   antennasPatterns: "Patrones de antena",
   defaultQrLabel: "Guía de inicio rápido",

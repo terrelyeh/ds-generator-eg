@@ -5,6 +5,8 @@ export const zhTW: DatasheetDict = {
   overview: "\u7522\u54C1\u6982\u8FF0",
   featuresAndBenefits: "\u529F\u80FD\u4ECB\u7D39",
   technicalSpecifications: "\u6280\u8853\u898F\u683C",
+  modelNumber: "\u578B\u865F",
+  description: "\u7522\u54C1\u8AAA\u660E",
   hardwareOverview: "\u7522\u54C1\u5916\u89C0",
   antennasPatterns: "\u5929\u7DDA\u8F3B\u5C04\u5834\u578B",
   defaultQrLabel: "Contact Us",

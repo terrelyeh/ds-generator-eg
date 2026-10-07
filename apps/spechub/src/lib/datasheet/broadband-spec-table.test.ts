@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildBroadbandSpecRows } from "./broadband-spec-table";
+import { buildBroadbandSpecRows, identityBandLabel } from "./broadband-spec-table";
 
 function model(model_name: string, items: [string, string][]) {
   return {
@@ -59,3 +59,27 @@ describe("buildBroadbandSpecRows", () => {
     ]);
   });
 });
+
+describe("identityBandLabel", () => {
+  // EOC's sheet calls the row "Model #"; the PM translated exactly that.
+  const eoc = model("EOC610", [["Model Name", "Broadband Outdoor CPE"], ["Model #", "EOC610"], ["Chipset", "IPQ5018"]]);
+
+  it("uses the translation of the sheet's own model-number label", () => {
+    expect(identityBandLabel([eoc], { "Model #": "型番", "Model Name": "製品名" }, "Model Number")).toBe("型番");
+  });
+
+  it("falls back to the locale's word when the line never translated it", () => {
+    expect(identityBandLabel([eoc], {}, "型番")).toBe("型番");
+    expect(identityBandLabel([eoc], { "Model #": "  " }, "型號")).toBe("型號");
+  });
+
+  it("does not take the Model Name translation — that row is not the number", () => {
+    expect(identityBandLabel([eoc], { "Model Name": "製品名" }, "Model Number")).toBe("Model Number");
+  });
+
+  it("reads any spelling of the number row", () => {
+    const other = model("X1", [["Model Number", "X1"]]);
+    expect(identityBandLabel([other], { "Model Number": "型號" }, "Model Number")).toBe("型號");
+  });
+});
+
