@@ -64,8 +64,20 @@ export default async function TranslationsPage({
         .in("product_id", productIds)
     : { data: null };
 
+  // The line-wide title over the spec table (Broadband / Edge AI layouts print
+  // line_datasheets.headline in the band above the first row). It is not a
+  // sheet label, so it never showed up here and stayed English in every
+  // language. Listed first among the section headers and saved like one
+  // (label_type 'section'); the layout looks it up the same way.
+  const { data: lineDoc } = (await supabase
+    .from("line_datasheets")
+    .select("headline")
+    .eq("product_line_id", productLine.id)
+    .maybeSingle()) as { data: { headline: string | null } | null };
+  const bandTitle = lineDoc?.headline?.trim() || null;
+
   // Build unique section names and spec labels
-  const sectionNames = new Set<string>();
+  const sectionNames = new Set<string>(bandTitle ? [bandTitle] : []);
   const specLabels = new Set<string>();
   const sectionLabelsMap: Record<string, string[]> = {};
 
@@ -132,6 +144,7 @@ export default async function TranslationsPage({
         productLineLabel={productLine.label}
         locale={locale}
         sectionNames={[...sectionNames]}
+        sectionHints={bandTitle ? { [bandTitle]: "規格表最上方的系列標題（整條產品線共用）" } : {}}
         sectionLabelsMap={sectionLabelsMap}
         initialTranslations={translationMap}
         sampleModel={sampleModel}

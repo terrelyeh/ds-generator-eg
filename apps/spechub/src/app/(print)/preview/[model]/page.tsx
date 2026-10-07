@@ -270,6 +270,7 @@ export default async function PreviewPage({
         versionOverride={versionOverride ?? null}
         locale={lang}
         specLabels={specLabelMap}
+        sectionLabels={sectionLabelMap}
         translation={
           isTranslated
             ? {

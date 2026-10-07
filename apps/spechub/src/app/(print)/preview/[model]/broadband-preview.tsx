@@ -136,6 +136,7 @@ export function BroadbandPreview({
   translationConfirmed = true,
   specNotes = [],
   specLabels = {},
+  sectionLabels = {},
 }: {
   scope: "model" | "series";
   line: ProductLine;
@@ -169,6 +170,8 @@ export function BroadbandPreview({
    * the rules that match on the English label — see that file.
    */
   specLabels?: Record<string, string>;
+  /** The same table's section titles — here only the band over it. */
+  sectionLabels?: Record<string, string>;
 }) {
   const dict = getDict(locale);
   const isSeries = scope === "series";
@@ -187,6 +190,9 @@ export function BroadbandPreview({
       lineContent?.headline ||
       line.label;
   const headline = lineContent?.headline || focusModel?.headline || line.label;
+  // The band over the spec table. Translated through the line's section
+  // labels — the translation page lists it first under Section Headers.
+  const bandTitle = sectionLabels[headline]?.trim() || headline;
   const modelOverview =
     ((isTranslated ? translation?.overview : null) ?? focusModel?.overview ?? "").trim();
   const modelFeatures = (
@@ -760,7 +766,7 @@ ${bulletDotCss(".benefit .dot")}
               </colgroup>
               <thead>
                 <tr className="band-row">
-                  <th colSpan={columns.length + 1}>{headline}</th>
+                  <th colSpan={columns.length + 1}>{bandTitle}</th>
                 </tr>
               </thead>
               <tbody>
