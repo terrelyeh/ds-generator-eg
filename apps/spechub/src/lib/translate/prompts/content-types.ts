@@ -15,6 +15,18 @@ You are translating a product TITLE — this appears as the main heading on a da
 - Restructure word order if it reads more naturally in the target language
 - Output: a single line of translated title text`,
 
+  subtitle: `## Content Type: Product Subtitle
+
+You are translating a product SUBTITLE — a short category name printed under the
+model number on a datasheet cover (e.g. "Cloud Managed Wi-Fi 7 Access Point").
+- It names WHAT the product is, not what it does: a short noun phrase, never a sentence
+- Keep it as short as the source or shorter — it sits on one line next to the model number
+- Use the target market's standard term for the product category
+- Keep brand and technology names in their original form (Wi-Fi 7, PoE, Cloud Managed → the
+  market's usual rendering of the managed-by-cloud idea is fine)
+- NO sentence endings (です/ます for Japanese; 的/了 for Chinese)
+- Output: a single line of translated subtitle text`,
+
   overview: `## Content Type: Product Overview
 
 You are translating a product overview paragraph (2-3 sentences).

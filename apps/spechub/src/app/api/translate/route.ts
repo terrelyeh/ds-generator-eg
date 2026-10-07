@@ -12,7 +12,7 @@ export const maxDuration = 30;
  * Body: {
  *   source: string,           // Text to translate
  *   target_locale: string,    // "ja" | "zh-TW"
- *   content_type: "headline" | "overview" | "features" | "spec_labels",
+ *   content_type: "headline" | "subtitle" | "overview" | "features" | "spec_labels" | "spec_notes",
  *   product_line?: string,    // e.g. "Cloud Camera"
  *   provider?: string,        // OpenRouter slug; omit for the catalog default
  * }
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
   } = body as {
     source: string;
     target_locale: string;
-    content_type: "headline" | "overview" | "features" | "spec_labels" | "spec_notes";
+    content_type: "headline" | "subtitle" | "overview" | "features" | "spec_labels" | "spec_notes";
     product_line?: string;
     provider?: string;
     ref?: string;

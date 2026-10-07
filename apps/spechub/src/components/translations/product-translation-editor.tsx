@@ -171,6 +171,7 @@ export function ProductTranslationEditor({
   const [dirty, setDirty] = useState(false);
   useUnsavedChanges(dirty);
   const [translatingHeadline, setTranslatingHeadline] = useState(false);
+  const [translatingSubtitle, setTranslatingSubtitle] = useState(false);
   const [translatingOverview, setTranslatingOverview] = useState(false);
   const [translatingFeatures, setTranslatingFeatures] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -292,6 +293,39 @@ export function ProductTranslationEditor({
     updated[index] = value;
     setFeatures(updated);
     setDirty(true);
+  }
+
+  async function handleAiTranslateSubtitle() {
+    if (!englishSubtitle.trim()) return;
+    setTranslatingSubtitle(true);
+    try {
+      const res = await fetch("/api/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          source: englishSubtitle,
+          target_locale: activeLocale,
+          content_type: "subtitle",
+          product_line: productLineName,
+          provider: selectedProvider,
+          ref: modelName,
+        }),
+      });
+      const data = await safeJson(res);
+      if (data.ok) {
+        // One line: a model that answers with two would print two on the cover.
+        setSubtitleTrans(String(data.translated ?? "").split("\n")[0].trim());
+        setDirty(true);
+        if (data.model) setLastModel(data.model);
+        toast.success(`Subtitle translated by ${data.provider}`);
+      } else {
+        toast.error(`Translation failed: ${data.error}`);
+      }
+    } catch (err) {
+      toast.error(`Translation failed: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setTranslatingSubtitle(false);
+    }
   }
 
   async function handleAiTranslateOverview() {
@@ -923,8 +957,27 @@ export function ProductTranslationEditor({
 
       {/* Subtitle */}
       <Card className="shadow-sm">
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="text-base">Subtitle</CardTitle>
+          <Button
+            size="sm"
+            onClick={handleAiTranslateSubtitle}
+            disabled={translatingSubtitle || !englishSubtitle?.trim() || !hasAnyProvider}
+            className={`text-xs transition-all ${
+              translatingSubtitle ? "bg-amber-500 hover:bg-amber-500 text-white animate-pulse" : ""
+            }`}
+          >
+            {translatingSubtitle ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="h-3 w-3 animate-spin" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M8 1a7 7 0 1 0 7 7" />
+                </svg>
+                正在翻譯中...
+              </span>
+            ) : (
+              "AI Translate"
+            )}
+          </Button>
         </CardHeader>
         <CardContent className="space-y-3">
           <div>
