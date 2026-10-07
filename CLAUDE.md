@@ -75,6 +75,10 @@
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）
 - 兩個 app 共用同一個 Supabase（project `xzolvtlqafwkxfuaryec`）；Vercel 各自一個專案、Root Directory 指到 `apps/<name>`，region 都釘 `hnd1`
+- **介面字型是自帶的**（2026-10-07,#121）:Geist / Geist Mono / Plus Jakarta Sans / Inter / Source Serif 4 的
+  woff2 放在 `apps/<app>/src/app/fonts/`,用 `next/font/local` 載入。**不要改回 `next/font/google`** ——
+  那會讓每次建置都去 Google Fonts 下載,對方慢一下整個 build 就失敗（`Can't resolve
+  '@vercel/turbopack-next/internal/font/google/font'`,一週內兩次）。兩個 app 各一份,更新要一起換（見 fonts/README.md）
 - **兩個 app 都走 Vercel 原生 Git 整合部署**（2026-08-06 統一）。engenie 曾經因為
   「Vercel 雲端建置對新專案會失敗」而改用 GitHub Actions 建好再上傳（`deploy-engenie.yml`），
   Ignored Build Step 設成永遠跳過。**實測後發現真正的原因是 `apps/engenie` import 了

@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-10-01。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-10-07。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
