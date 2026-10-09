@@ -3,6 +3,78 @@
 How to add a new solution / product line, the Google Sheet contract, and how
 the datasheet output varies by product-line `category`.
 
+## 0. The process at a glance
+
+The PM-facing guide is the doc
+[新產品線接入 Datasheet Generator 指南（PM 版）](https://claude.ai/code/artifact/9b2b4ee6-a503-4f6a-ac0a-30bd5d357347).
+It covers only what a PM does **before handing the line over** (layout check,
+the decisions below, sheet / Drive / image prep, a checklist) and stops there —
+everything after the handoff is done here, with AI. Send PMs there; this file
+stays the engineering reference. **Change one, change the other.**
+
+**Size the job first.** Trace the reference PDF (§4) before deciding:
+
+| Kind | Tell | Example | Code |
+|---|---|---|---|
+| A. Data only | Cloud skeleton, default blue | Cloud PDU | none — a `product_lines` row + sync |
+| B. Recolor + traits | Cloud skeleton, own colour / QR / antenna split | Station AP, Transceiver | a `getTheme()` entry + Set entries in `qr.ts` / `radio-patterns.ts` |
+| C. New layout | different structure, or a series datasheet | Data Center, Broadband EOC, Orin Box | a preview component branched by category (§4, §5) |
+
+**Stages** (owner → output). Stage 0 comes first on purpose: the layout
+decides which extra inputs the PM has to prepare (table further down), so a PM
+holding a datasheet that doesn't match an existing layout talks to us before
+preparing anything.
+
+| # | Stage | Owner | Output | See |
+|---|---|---|---|---|
+| 0 | Layout check | PM → eng | PM's existing datasheet compared with ours; if it differs, kind B/C agreed with the reference PDF in hand | §4 |
+| 1 | Decisions | PM (+ eng) | the decision table below answered | — |
+| 2 | Sources | PM | sheet shared with the service account, line folder + `DS Images`, images, extra inputs for B/C | §2, §3 |
+| — | **Handoff** | PM → eng | sheet link, Drive link, decisions | the PM guide's checklist |
+| 3 | Config + first sync | eng ↔ PM | `solutions` row if new, `product_lines` row; models import cleanly; sheet fixed | §1, §2 |
+| 4 | Layout (B/C only) | eng, PM reviews | mockup on a prod page agreed → `feat/*` branch → preview clicked through → merge | §4, §5, §6 |
+| 5 | EN PDF | signed-in user generates | `DS_<model>/…_v1.0.pdf` in Drive | §3, [`pending-assets.md`](pending-assets.md) |
+| 6 | Locales + website | PM | translations Confirmed, locale PDFs, `website_marks` set to ready | [`datasheet-rendering.md`](datasheet-rendering.md), [`website-datasheet-check.md`](website-datasheet-check.md) |
+
+**Decisions that land in config or file names** — settle them before stage 2;
+most are painful to change once files exist:
+
+| Decision | Lands in |
+|---|---|
+| Solution | `product_lines.solution_id` (new `solutions` row, `kind='product'`, only if no placeholder fits) |
+| Category | `product_lines.category` — **drives every variant trait; reuse an existing name only if the line should inherit ALL of its behaviour** (EOC chose `Broadband APs`, not `APs`) |
+| PDF prefix | `product_lines.ds_prefix` (spaces allowed: `DS_AI Server`) |
+| Model / series / both | `product_lines.ds_scope`; a series continuing an old number needs `line_datasheets.current_version` seeded |
+| QR target | QSG by default; Contact Us = add the category to `CONTACT_US_CATEGORIES` (`lib/datasheet/qr.ts`); a custom URL = `qr_url_template` |
+| Antenna plots | **Wireless lines only** — `hasRadioPatterns()` is true for `APs` / `Broadband APs` / `Station APs`; every other category has no antenna page and asks for no plots. A new wireless category = `lib/datasheet/radio-patterns.ts`. **Ask the PM for the band/port split — don't infer it** (§4). The slot label is the file-name stem |
+| Hardware images | 1, or 2 = add the category to `TWO_HARDWARE_IMAGE_CATEGORIES` (`qr.ts`) |
+| Locales | no config — per-line spec-label translations + per-product translations; artwork with baked-in text needs a per-locale file |
+
+**Extra inputs that depend on the layout** — none for kind A. The PM guide
+lists these so a PM knows what may be asked for; confirm the actual set while
+agreeing the layout:
+
+| When the layout has… | The PM also prepares | Lands in | Example |
+|---|---|---|---|
+| a full-bleed photo cover | one cover photo, uploaded via **Cover Photo** | `product_lines.cover_hero_image` (§5) | Data Center, Orin Box |
+| grouped cover selling points | a `DS Feature Groups` row on Web Overview | `products.ds_features` (§2) | Data Center |
+| a series datasheet | `[For DS]` tabs + `series_*.png` art | `line_datasheets` (§5) | Orin Box, Broadband EOC |
+| artwork with baked-in text | a per-locale copy, or the text-free original | `public/<line>/…_<locale>.png` (§4) | Broadband EOC |
+| no Hardware Overview page | nothing — no hardware image | — | Transceiver |
+
+**Drive: the PM creates two folders, the system the rest.** The PM makes the
+line folder (sitting beside the other lines, e.g. under `Model Datasheet/`) and
+its `DS Images`. Per-model `DS_<prefix>_<model>/` folders are created on first
+PDF generation; locale folders on first use of that locale, as a **sibling** of
+the line folder, with their own `DS Images` (`resolveLocaleLineFolder`,
+`drive-images.ts`). Product shots and antenna plots are shared across locales
+and live only in the English `DS Images`; only artwork with printed text (the
+hardware render) needs `{model}_hardware_<suffix>.png` in the locale folder.
+⚠️ The sibling is named **`product_lines.name` + `_ja` / `_zh` / `_es`**, not
+after the English Drive folder — if those two names differ, a PM who pre-creates
+`<Drive folder name>_ja` gets a second, auto-created folder next to it. Give
+the PM the exact name if they want to upload locale art early.
+
 ## 1. Adding a product line (no UI — DB row + sync)
 
 1. **Inspect the line's Google Sheet** to get the tab **GIDs** + verify
@@ -312,4 +384,4 @@ plus one entry there — content loading, generation and versioning are shared.
 | **Data Center ▸ AI Server** | S41, S21, S11 | Data Center variant; S21/S11 images pending |
 | **Broadband Outdoor ▸ Broadband EOC** | EOC655/-C18/-C23, EOC600/610/620 | steel, `ds_scope='both'`; ja translated (Draft); images pending |
 | **Cloud ▸ Cloud PDU** | ECP106/214, ECP106-INT/212-INT | default blue, no antenna page, keeps the QSG QR; images pending |
-| **Station Outdoor ▸ Station AP** | ENH500-AX, EnStation6, ENS621EXT | steel navy; Contact-Us QR; ENH500-AX/EnStation6 plot `Port1/Port2`, ENS621EXT `2.4G/5G`; images pending |
+| **Station Outdoor ▸ Station AP** | ENH500-AX, EnStation6, ENS621EXT | steel navy; Contact-Us QR; every model plots `Port1/Port2` (ENS621EXT included — see §4); images pending |
