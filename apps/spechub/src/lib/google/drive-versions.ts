@@ -385,7 +385,7 @@ export async function uploadPdfToDrive(
   existingVersion: VersionInfo | null,
   locale?: string,
   lineName?: string,            // required for locale uploads (e.g. "Cloud Camera")
-): Promise<{ fileId: string; webViewLink: string }> {
+): Promise<{ fileId: string; webViewLink: string; folderId: string }> {
   const auth = getGoogleAuth();
   const drive = google.drive({ version: "v3", auth });
 
@@ -566,6 +566,7 @@ export async function uploadPdfToDrive(
     return {
       fileId: updateRes.data.id!,
       webViewLink: updateRes.data.webViewLink ?? "",
+      folderId: targetFolderId,
     };
   }
 
@@ -586,5 +587,6 @@ export async function uploadPdfToDrive(
   return {
     fileId: fileRes.data.id!,
     webViewLink: fileRes.data.webViewLink ?? "",
+    folderId: targetFolderId,
   };
 }
