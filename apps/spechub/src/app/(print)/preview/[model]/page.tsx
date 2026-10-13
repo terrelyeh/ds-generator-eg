@@ -835,7 +835,12 @@ ${bulletDotCss(".feature-bullet")}
 
 /* Hardware overview */
 .hardware-page { padding: 0 35pt; }
-.hardware-title { padding-top: 31pt; margin-bottom: 16pt; }
+/* 48pt, not 16: the trimmed renders start right at the chassis, so 16pt
+   (which collapses with the container's 10pt) left the photo crowding the
+   title. The InDesign originals ran 30-78pt; 48pt still leaves the tallest
+   render (ECW536) 122pt clear of the footer. Agreed on a prod mockup,
+   2026-10-13. */
+.hardware-title { padding-top: 31pt; margin-bottom: 48pt; }
 .hardware-image-container { text-align: center; margin: 10pt auto; }
 /* Same fix as the cover: width is set, not capped, so the box decides the
    scale instead of the PNG's pixel count. 49 of the 50 Cloud-template
