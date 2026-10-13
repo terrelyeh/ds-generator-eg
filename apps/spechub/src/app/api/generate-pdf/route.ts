@@ -10,6 +10,7 @@ import {
   uploadPdfToDrive,
   getLocaleSuffix,
 } from "@/lib/google/drive-versions";
+import { pruneSupersededPdfs } from "@/lib/google/prune-storage-pdfs";
 import type { ProductLine } from "@eg/db/types";
 import type { Page } from "puppeteer-core";
 
@@ -648,6 +649,21 @@ export async function POST(request: Request) {
 
     // --- Release lock ---
     await releaseLock();
+
+    // Storage only needs the current copy (and any version marked on the
+    // 官網 tab). Older ones filled the Free plan's 1 GB on 2026-10-12 and
+    // took both apps down. Only prunes what Drive also holds; never fails
+    // the request.
+    if (driveResult) {
+      await pruneSupersededPdfs(supabase, {
+        productId: product.id,
+        model,
+        locale: lang,
+        suffix: isLocalized ? getLocaleSuffix(lang) : null,
+        currentName: fileName,
+        driveFolderId: driveResult.folderId,
+      });
+    }
 
     return NextResponse.json({
       ok: true,

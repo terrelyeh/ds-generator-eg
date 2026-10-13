@@ -46,6 +46,7 @@
 - **Drive folder auto-create**：`uploadPdfToDrive` 透過 `resolveLocaleLineFolder()` 自動建立缺失的 sibling locale line folder（`Cloud Camera_zh`）。容忍 PM typo（`_zh-TW`、`_ZH`、`_jp` 等），找到任何一個就用 + warn
 - **Legacy folder migration**：找不到 canonical 的 `DS_Cloud_<model>_<suffix>` 時，會搜尋 legacy `_v<X>.<Y>` 後綴版本，把最高版號那個 rename 成 canonical，舊 PDF 留在裡面。EN/locale 雙路徑都生效
 - **Drive overwrite + dedupe**：同名 PDF 找到就 update content + trash 多餘重複（非 hard delete — Shared Drive 通常 `canTrash=true canDelete=false`，hard delete 會 404）
+- **Storage 只留現行版**（2026-10-13）：每次 Generate 成功上傳 Drive 後，`pruneSupersededPdfs()` 會刪掉同型號、同語言的舊版 Storage PDF，並把那幾筆 `versions.pdf_storage_path` 清成 null（版本紀錄的 Download 連結隨之隱藏）。**保留**：這次產的檔、官網分頁標記過的版本（`lib/website/baseline.ts` 要讀它的 Storage 大小）、以及 **Drive 同一資料夾沒有同名檔的任何舊版** —— Drive 不是完整的封存，2026-10-12 清理時 179 份舊版裡有 53 份只存在 Storage（已封存到 Drive `Model Datasheet/_SpecHub Storage 封存 2026-10-13/`）。起因：舊版從沒清過，Storage 衝過 Free 方案 1 GB，Supabase 對所有 API 回 402、兩個 app 全掛。規則在 `lib/datasheet/prune-pdfs.ts`（有測試）；失敗只記 log，不影響產 PDF。系列版（`_series/`）沒有清，量很小
 - **Locale Draft 阻擋**：`product_translations.confirmed = false` 時 API 回 409；UI 也擋（顯示「⚠️ Translation in Draft」黃字警告）
 - **Role gating**：PM/Viewer 角色看 preview link 時，Regenerate 按鈕整塊隱藏，顯示「Preview only · PM」
 - **Puppeteer 自我認證**：`/api/generate-pdf` 內部的 Puppeteer 會 fetch 自己的 `/preview/[model]`，proxy 看 `x-vercel-protection-bypass` header（已存在的 `VERCEL_AUTOMATION_BYPASS_SECRET` env var）放行，否則 Puppeteer 會抓到 sign-in 頁印成 PDF
