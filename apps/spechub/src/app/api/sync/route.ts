@@ -26,6 +26,7 @@ import {
 } from "@/lib/google/sheets-extra";
 import type { ChangeEntry } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
+import { diffSpecTables } from "@/lib/sync/spec-diff";
 import type { ProductLine } from "@eg/db/types";
 
 // Hobby plan limit: 60s. Pro plan: up to 300s. Setting to plan-safe 60s.
@@ -339,55 +340,26 @@ export async function POST(request: Request) {
               });
             }
 
-            // Spec-level diff
+            // Spec-level diff. Sorted on both levels: diffSpecTables compares
+            // the tables in sequence too, so an unordered read would report a
+            // "layout change" on every sync.
             const { data: oldSections } = await supabase
               .from("spec_sections")
-              .select("category, spec_items (label, value)")
+              .select("category, spec_items (label, value, sort_order)")
               .eq("product_id", existing.id)
               .order("sort_order");
 
-            const oldSpecMap = new Map<string, Map<string, string>>();
-            for (const s of oldSections ?? []) {
-              const items = new Map<string, string>();
-              for (const i of (s.spec_items as { label: string; value: string }[]) ?? [])
-                items.set(i.label, i.value);
-              oldSpecMap.set(s.category, items);
-            }
-
-            const newSpecMap = new Map<string, Map<string, string>>();
-            for (const s of sheetData.spec_sections) {
-              const items = new Map<string, string>();
-              for (const i of s.items) items.set(i.label, i.value);
-              newSpecMap.set(s.category, items);
-            }
-
-            // New / removed sections
-            for (const cat of newSpecMap.keys()) {
-              if (!oldSpecMap.has(cat))
-                details.push({ field: `Section: ${cat}`, from: null, to: "(new section)", type: "added" });
-            }
-            for (const cat of oldSpecMap.keys()) {
-              if (!newSpecMap.has(cat))
-                details.push({ field: `Section: ${cat}`, from: "(removed)", to: null, type: "removed" });
-            }
-
-            // Changed items within shared sections
-            for (const [cat, newItems] of newSpecMap) {
-              const oldItems = oldSpecMap.get(cat);
-              if (!oldItems) continue;
-              for (const [label, newVal] of newItems) {
-                const oldVal = oldItems.get(label);
-                if (oldVal === undefined) {
-                  details.push({ field: `${cat} > ${label}`, from: null, to: newVal, type: "added" });
-                } else if (oldVal !== newVal) {
-                  details.push({ field: `${cat} > ${label}`, from: oldVal, to: newVal, type: "modified" });
-                }
-              }
-              for (const [label, oldVal] of oldItems) {
-                if (!newItems.has(label))
-                  details.push({ field: `${cat} > ${label}`, from: oldVal, to: null, type: "removed" });
-              }
-            }
+            details.push(
+              ...diffSpecTables(
+                (oldSections ?? []).map((s) => ({
+                  category: s.category,
+                  items: ((s.spec_items as { label: string; value: string; sort_order: number }[]) ?? [])
+                    .slice()
+                    .sort((a, b) => a.sort_order - b.sort_order),
+                })),
+                sheetData.spec_sections,
+              ),
+            );
           }
 
           const hasChanges = isNew || details.length > 0;
