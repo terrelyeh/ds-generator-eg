@@ -24,9 +24,9 @@ import {
   loadLineDatasheetContent,
   loadSeriesSpecs,
 } from "@/lib/google/sheets-extra";
-import type { ChangeEntry } from "@/lib/notifications";
+import type { ChangeEntry, SyncWarning } from "@/lib/notifications";
 import type { SheetSpecSection } from "@/lib/google/sheets";
-import { diffSpecTables } from "@/lib/sync/spec-diff";
+import { diffSpecTables, findDuplicateSections } from "@/lib/sync/spec-diff";
 import type { ProductLine } from "@eg/db/types";
 
 // Hobby plan limit: 60s. Pro plan: up to 300s. Setting to plan-safe 60s.
@@ -194,10 +194,13 @@ export async function POST(request: Request) {
      * decides — which is also the only way anyone finds out at all.
      */
     orphaned?: string[];
+    /** Problems to fix in the sheet (e.g. a duplicated spec section). Also sent with the notification. */
+    warnings?: string[];
   }[] = [];
 
   // Collect changes for notifications
   const allChanges: ChangeEntry[] = [];
+  const allWarnings: SyncWarning[] = [];
   // One Drive listing per folder for the whole run — see DriveListingCache.
   const listing = new DriveListingCache();
 
@@ -265,6 +268,7 @@ export async function POST(request: Request) {
 
       const modelNames = [...allProducts.keys()];
       const changesStart = allChanges.length;
+      const warningsStart = allWarnings.length;
 
       /**
        * One product, start to finish. Products on a line share no rows —
@@ -276,6 +280,17 @@ export async function POST(request: Request) {
         modelName: string,
         sheetData: import("@/lib/google/sheets").SheetProduct,
       ): Promise<void> => {
+        // A section printed twice is a sheet mistake sync can't judge — the
+        // sheet is the source of truth — so it stores it and says so.
+        const duplicates = findDuplicateSections(sheetData.spec_sections);
+        if (duplicates.length > 0) {
+          const message = `規格表有重複分類：${duplicates
+            .map((d) => `「${d.category}」出現 ${d.count} 次`)
+            .join("、")}`;
+          allWarnings.push({ product_line: pl.name, product_name: modelName, message });
+          (lineResult.warnings ??= []).push(`${modelName}: ${message}`);
+        }
+
         try {
           // Check if product already exists (for deep change detection)
           const { data: existing } = await supabase
@@ -584,6 +599,10 @@ export async function POST(request: Request) {
       allChanges.push(
         ...allChanges.splice(changesStart).sort((a, b) => byOrder(a.product_name, b.product_name)),
       );
+      allWarnings.push(
+        ...allWarnings.splice(warningsStart).sort((a, b) => byOrder(a.product_name, b.product_name)),
+      );
+      lineResult.warnings?.sort((a, b) => byOrder(a.split(":")[0], b.split(":")[0]));
 
       fullLineRead = true;
     } catch (err) {
@@ -841,11 +860,12 @@ export async function POST(request: Request) {
 
   // Send notifications for synced changes (non-blocking)
   let notifyResult = null;
-  if (allChanges.length > 0) {
+  if (allChanges.length > 0 || allWarnings.length > 0) {
     try {
-      notifyResult = await sendNotifications(allChanges);
-      // Mark change logs as notified if at least one channel succeeded
-      if (notifyResult.sent.length > 0) {
+      notifyResult = await sendNotifications(allChanges, allWarnings);
+      // Mark change logs as notified if at least one channel succeeded.
+      // A warnings-only message carried no change, so it marks nothing.
+      if (notifyResult.sent.length > 0 && allChanges.length > 0) {
         throwIfDbError("change_logs notified")(
           await supabase.from("change_logs").update({ notified: true }).eq("notified", false),
         );

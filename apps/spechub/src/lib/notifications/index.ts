@@ -16,11 +16,32 @@ export interface ChangeEntry {
   edited_at: string | null;
 }
 
+/**
+ * Something sync noticed in a sheet that a person should fix there — not a
+ * change, so it isn't in change_logs. Sent with the change report, listed
+ * first, and sent even when nothing changed: a duplicate section that is
+ * already in the database matches the sheet, so it produces no change.
+ */
+export interface SyncWarning {
+  product_line: string;
+  product_name: string;
+  message: string;
+}
+
+function warningLines(warnings: SyncWarning[]): string[] {
+  if (warnings.length === 0) return [];
+  return [
+    "⚠️ 請檢查 Sheet",
+    ...warnings.map((w) => `  • ${w.product_line} / ${w.product_name} — ${w.message}`),
+    "",
+  ];
+}
+
 // ---------------------------------------------------------------------------
 // Message formatting
 // ---------------------------------------------------------------------------
 
-function formatPlainText(changes: ChangeEntry[]): string {
+export function formatPlainText(changes: ChangeEntry[], warnings: SyncWarning[] = []): string {
   const grouped = new Map<string, ChangeEntry[]>();
   for (const c of changes) {
     const key = c.product_line || "Other";
@@ -31,6 +52,7 @@ function formatPlainText(changes: ChangeEntry[]): string {
   const lines: string[] = [
     `📋 Datasheet Sync Report — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`,
     "",
+    ...warningLines(warnings),
   ];
 
   let totalProducts = 0;
@@ -52,12 +74,12 @@ function formatPlainText(changes: ChangeEntry[]): string {
 
   const compCount = changes.filter((c) => c.product_name === "[Comparison]").length;
   const compSuffix = compCount > 0 ? ` + ${compCount} comparison${compCount > 1 ? "s" : ""}` : "";
-  lines.push(`Total: ${totalProducts} product(s) updated${compSuffix}`);
+  if (changes.length > 0) lines.push(`Total: ${totalProducts} product(s) updated${compSuffix}`);
   lines.push(`🔗 Details → https://ds-generator-eg.vercel.app/changelog`);
   return lines.join("\n");
 }
 
-function formatDiscordEmbed(changes: ChangeEntry[]) {
+function formatDiscordEmbed(changes: ChangeEntry[], warnings: SyncWarning[] = []) {
   const grouped = new Map<string, ChangeEntry[]>();
   for (const c of changes) {
     const key = c.product_line || "Other";
@@ -66,6 +88,13 @@ function formatDiscordEmbed(changes: ChangeEntry[]) {
   }
 
   const fields = [];
+  if (warnings.length > 0) {
+    fields.push({
+      name: "⚠️ 請檢查 Sheet",
+      value: warnings.map((w) => `• **${w.product_line} / ${w.product_name}** — ${w.message}`).join("\n"),
+      inline: false,
+    });
+  }
   for (const [line, entries] of grouped) {
     const lines: string[] = [];
     for (const e of entries) {
@@ -96,11 +125,11 @@ function formatDiscordEmbed(changes: ChangeEntry[]) {
 // Senders
 // ---------------------------------------------------------------------------
 
-async function sendDiscord(changes: ChangeEntry[]): Promise<void> {
+async function sendDiscord(changes: ChangeEntry[], warnings: SyncWarning[]): Promise<void> {
   const url = process.env.DISCORD_WEBHOOK_URL;
   if (!url) return;
 
-  const body = formatDiscordEmbed(changes);
+  const body = formatDiscordEmbed(changes, warnings);
   const res = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -112,12 +141,12 @@ async function sendDiscord(changes: ChangeEntry[]): Promise<void> {
   }
 }
 
-async function sendTelegram(changes: ChangeEntry[]): Promise<void> {
+async function sendTelegram(changes: ChangeEntry[], warnings: SyncWarning[]): Promise<void> {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;
   if (!token || !chatId) return;
 
-  let text = formatPlainText(changes);
+  let text = formatPlainText(changes, warnings);
   // Telegram message limit is 4096 chars
   if (text.length > 4000) {
     text = text.slice(0, 3950) + "\n\n… (truncated)";
@@ -140,11 +169,11 @@ async function sendTelegram(changes: ChangeEntry[]): Promise<void> {
   }
 }
 
-async function sendLine(changes: ChangeEntry[]): Promise<void> {
+async function sendLine(changes: ChangeEntry[], warnings: SyncWarning[]): Promise<void> {
   const token = process.env.LINE_NOTIFY_TOKEN;
   if (!token) return;
 
-  const message = formatPlainText(changes);
+  const message = formatPlainText(changes, warnings);
   const res = await fetch("https://notify-api.line.me/api/notify", {
     method: "POST",
     headers: {
@@ -173,16 +202,17 @@ export interface NotifyResult {
  * Returns which channels succeeded/failed.
  */
 export async function sendNotifications(
-  changes: ChangeEntry[]
+  changes: ChangeEntry[],
+  warnings: SyncWarning[] = [],
 ): Promise<NotifyResult> {
-  if (changes.length === 0) return { sent: [], errors: [] };
+  if (changes.length === 0 && warnings.length === 0) return { sent: [], errors: [] };
 
   const result: NotifyResult = { sent: [], errors: [] };
 
   const channels: { name: string; send: () => Promise<void> }[] = [
-    { name: "Discord", send: () => sendDiscord(changes) },
-    { name: "Telegram", send: () => sendTelegram(changes) },
-    { name: "LINE", send: () => sendLine(changes) },
+    { name: "Discord", send: () => sendDiscord(changes, warnings) },
+    { name: "Telegram", send: () => sendTelegram(changes, warnings) },
+    { name: "LINE", send: () => sendLine(changes, warnings) },
   ];
 
   // Check which channels are configured

@@ -76,3 +76,17 @@ function signature(sections: SpecSectionLike[]): string {
 function outline(sections: SpecSectionLike[]): string {
   return sections.map((s) => `${s.category} (${s.items.length})`).join(" · ");
 }
+
+/**
+ * Categories that appear more than once in one product's spec table.
+ *
+ * Almost always a PM copy-paste on the Detail Specs tab — the ESG sheets
+ * briefly carried two Compliance blocks on 2026-10-16, and nobody knew until
+ * the PDFs printed both. Sync still stores what the sheet says (the sheet is
+ * the source of truth); this only lets it say so in the notification.
+ */
+export function findDuplicateSections(sections: SpecSectionLike[]): { category: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const s of sections) counts.set(s.category, (counts.get(s.category) ?? 0) + 1);
+  return [...counts].filter(([, n]) => n > 1).map(([category, count]) => ({ category, count }));
+}
