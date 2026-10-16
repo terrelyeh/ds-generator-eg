@@ -492,7 +492,7 @@ export function DashboardContent({
       let data: {
         ok?: boolean;
         error?: string;
-        results?: Array<{ synced?: string[]; errors?: string[] }>;
+        results?: Array<{ synced?: string[]; errors?: string[]; warnings?: string[] }>;
       } | null = null;
       try {
         data = rawText ? JSON.parse(rawText) : null;
@@ -530,6 +530,12 @@ export function DashboardContent({
               : `${errors.length} errors`,
             duration: 8000,
           });
+        }
+        // Sheet problems sync stored anyway (e.g. a section pasted twice) —
+        // the person who just synced is the one who can fix the sheet.
+        const warnings: string[] = result?.warnings ?? [];
+        if (warnings.length > 0) {
+          toast.warning("請檢查 Sheet", { description: warnings.join("\n"), duration: 15000 });
         }
         router.refresh();
       } else {

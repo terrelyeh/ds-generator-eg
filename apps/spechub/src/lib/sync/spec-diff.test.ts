@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { diffSpecTables, type SpecSectionLike } from "./spec-diff";
+import { diffSpecTables, findDuplicateSections, type SpecSectionLike } from "./spec-diff";
 
 const compliance: SpecSectionLike = {
   category: "Compliance",
@@ -49,5 +49,20 @@ describe("diffSpecTables", () => {
     expect(diffSpecTables([dims, compliance], [dims])).toEqual([
       { field: "Section: Compliance", from: "(removed)", to: null, type: "removed" },
     ]);
+  });
+});
+
+describe("findDuplicateSections", () => {
+  it("names each repeated category once, with how many times it appears", () => {
+    expect(findDuplicateSections([dims, compliance, compliance])).toEqual([{ category: "Compliance", count: 2 }]);
+    expect(findDuplicateSections([compliance, dims, compliance, dims, compliance])).toEqual([
+      { category: "Compliance", count: 3 },
+      { category: "Dimensions & Weight", count: 2 },
+    ]);
+  });
+
+  it("is empty for a normal table", () => {
+    expect(findDuplicateSections([dims, compliance])).toEqual([]);
+    expect(findDuplicateSections([])).toEqual([]);
   });
 });
