@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-10-07。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-10-16。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -116,6 +116,10 @@ Spec Comparison、Change Log，並能生成 PDF Datasheet（多語言）。
 Google Sheets → Supabase 同步(欄位映射)、Product Status(active/upcoming/pending)、
 Smart Sync(Drive modifiedTime + deep diff)、sync 後觸發 EnGenie re-index、
 locale-aware 圖片雙向同步。另見 [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md)。
+**規格比對在 `lib/sync/spec-diff.ts`**:逐項比之外,還會**依順序比整張表**——用分類名當 Map key
+會把資料庫裡兩個同名分類收成一個,判成「沒變」就永遠不重寫(pitfall #83)。同一分類出現兩次以上
+照存,但會在 Telegram 與 Sync 提示裡列「⚠️ 請檢查 Sheet」。⚠️ **Dashboard 的 Sync 按鈕預設是
+Smart Sync(不帶 `force`)**,Sheet 沒改過就整條線跳過;強制要從 `Sync ▾` 選 Force full re-sync。
 
 ### Datasheet 渲染:PDF / 版面 / 多語言 → [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md)
 
@@ -130,7 +134,9 @@ metrics 常數須對齊 preview CSS — pitfall #50/#51**)、多語言 datasheet
 最後一頁規格表下方,**A/B/C 的分頁器會預留備註高度** —— 頁面是 `overflow:hidden`,沒預留就是
 無聲切掉;產品頁與翻譯頁各有一個入口,記號對不上會提醒;
 語系版本存 `product_translations.spec_notes`,**編輯器的 Save 和 Preview 共用同一個
-`editorPayload()`** —— Preview 曾因為 payload 少一個欄位就把剛翻好的備註清成 null,見 #79)。
+`editorPayload()`** —— Preview 曾因為 payload 少一個欄位就把剛翻好的備註清成 null,見 #79)、
+**Storage 只留現行版 PDF**(Generate 後 `pruneSupersededPdfs()` 刪同型號同語言的舊版,
+但保留官網標記版與 **Drive 同資料夾找不到同名檔的**——Drive 不是完整封存,見 pitfall #82)。
 **改 PDF/版面/翻譯前先讀該檔。**
 
 ### Authentication & RBAC → [`docs/auth-rbac.md`](docs/auth-rbac.md)
@@ -346,6 +352,9 @@ npm run lint
   `lib/monitoring/health.ts` 的純函式，有測試）、**`/api/cron/website-check` 週一到週五 09:30**。
   ⚠️ **新增 `/api/cron/*` 的路由不用改 proxy**（`SERVICE_PATHS` 放行整個前綴,handler 自己 `requireCron`）——
   2026-09-16 以前沒放行,`/api/cron/health` 一直被導到登入頁,健康檢查從沒跑過;**新排程記得寫心跳並登記 `EXPECTED_JOBS`**
+- **Supabase org 是 Pro 方案**（2026-10-13 起）。之前 Free 方案 Storage 衝過 1 GB,
+  Supabase 對 REST / Storage / Auth **全部回 402**,兩個 app 一起掛,而且 Storage API 也被鎖、
+  沒辦法刪檔自救（pitfall #82）。現在 ~730 MB,PDF 有自動清,圖片沒有
 - **⚠️ Vercel function region 釘在 `hnd1`（東京）— 不要改**。Supabase 在 ap-northeast-1，
   跨區每 query +170ms
 - **Server component query 並行化** — 互相獨立的 query 塞同一個 `Promise.all`
@@ -361,7 +370,7 @@ npm run lint
 
 ## Common Pitfalls
 
-> **這裡只留「改任何東西都可能踩到」的八條。** 其餘只有動到特定東西才需要,
+> **這裡只留「改任何東西都可能踩到」的九條。** 其餘只有動到特定東西才需要,
 > 全文在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 
 45. **Supabase 的 write 不 throw** — 回 `{ data, error }`，沒人讀 `error` 的寫入是隱形的：
@@ -411,7 +420,8 @@ npm run lint
 > 以上每條的全文、以及只有動到特定東西才需要的
 > #50（分頁常數）/ #60（NOT NULL 圖片欄位）/ #61（category 精確比對）/ #63（版型 locale prop）/
 > #64（CJK 字型）/ #66（圖片用框不用像素）/ #67（陣列長度對齊）/ #68（CJK_LOCALES）/
-> #71（`/auth/probe`）/ #80（預覽頁的專用版型要一條一條接資料）/ #81（編輯器要接 `useUnsavedChanges`）,全在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
+> #71（`/auth/probe`）/ #80（預覽頁的專用版型要一條一條接資料）/ #81（編輯器要接 `useUnsavedChanges`）/
+> #82（Storage 只增不減、Drive 不是完整封存）/ #83（用名稱當 key 的比對看不到重複）,全在 [`docs/common-pitfalls.md`](docs/common-pitfalls.md)。
 > #54–#58（RAG/聊天）在 [apps/engenie/CLAUDE.md](../engenie/CLAUDE.md)。
 
 ## 詳細文件
@@ -420,7 +430,7 @@ npm run lint
 - [`docs/file-structure.md`](docs/file-structure.md) — 完整檔案地圖 + 放東西的規則
 - [`docs/schema.md`](docs/schema.md) — DB schema:關係圖、擁有權、各表欄位語意
 - [`docs/common-pitfalls.md`](docs/common-pitfalls.md) — Pitfalls 全文。**CLAUDE.md 只留
-  #45 / #62 / #69 / #70**（改任何東西都可能踩到的四條）,其餘都在這裡
+  改任何東西都可能踩到的九條**,其餘都在這裡
 - [`docs/pending-assets.md`](docs/pending-assets.md) — 待補圖 / 待 PM 處理的庫存清單（某台產不出 PDF 先查這裡）
 - [`docs/sync-and-notifications.md`](docs/sync-and-notifications.md) — Sync 機制 + Telegram 通知
 - [`docs/datasheet-sync.md`](docs/datasheet-sync.md) — Sheets 同步、product status、圖片雙向同步

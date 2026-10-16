@@ -22,7 +22,10 @@ CLAUDE.md 只留「現在就該做、而且會影響下一個 session 怎麼寫�
    5 份 DC PDF 要 Regenerate 才是新版。
    2026-09-16 的**規格備註**（#99/#100）也一樣:ESG320 / ESG510 / ESG610 / ESG620 的備註已經進系統
    （2026-09-18 起 ja / zh-TW 也有,5 列,已在 prod 的 print preview 驗過兩條備註都印得出來）,
-   但要 Regenerate 才會印在 PDF 上,官網上的檔案還要重新上傳。**這四份由 Terrel 自己重產**（2026-09-18 說的）。
+   但要 Regenerate 才會印在 PDF 上,官網上的檔案還要重新上傳。
+7c. **（可選）Storage 舊版清理多看一層 `Archive/`** — `pruneSupersededPdfs()` 只檢查產 PDF 時寫入的
+   `DS_<model>/` 資料夾。PM 把舊版移進裡面的 `Archive/` 時,Drive 其實有備份,但會被當成「沒有」而保留
+   （ESG320 v1.5,722 kB）。要清就讓 Drive 檢查多列一層子資料夾。見 pitfall #82
 **系統**：
 8. **Auto invite email** — admin 邀請後自動通知（Resend / Supabase email）
 8a. **標案編輯器有一顆 outline 按鈕沒有外框** — `components/project/project-editor.tsx:538` 直接用了
