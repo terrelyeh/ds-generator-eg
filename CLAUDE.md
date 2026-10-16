@@ -74,7 +74,7 @@
   先讀那幾支 migration 的註解和兩個 app 的 CLAUDE.md 開頭
 
 - 套件管理：**npm workspaces**（root `npm install`；`npm run dev|build|lint` 預設轉發到 spechub，或 `-w <app>` 指定）
-- 兩個 app 共用同一個 Supabase（project `xzolvtlqafwkxfuaryec`）；Vercel 各自一個專案、Root Directory 指到 `apps/<name>`，region 都釘 `hnd1`
+- 兩個 app 共用同一個 Supabase（project `xzolvtlqafwkxfuaryec`,**Pro 方案**,2026-10-13 起——Free 的 1 GB Storage 曾衝爆,所有 API 回 402、兩個 app 一起掛,見 spechub pitfall #82）；Vercel 各自一個專案、Root Directory 指到 `apps/<name>`，region 都釘 `hnd1`
 - **介面字型是自帶的**（2026-10-07,#121）:Geist / Geist Mono / Plus Jakarta Sans / Inter / Source Serif 4 的
   woff2 放在 `apps/<app>/src/app/fonts/`,用 `next/font/local` 載入。**不要改回 `next/font/google`** ——
   那會讓每次建置都去 Google Fonts 下載,對方慢一下整個 build 就失敗（`Can't resolve

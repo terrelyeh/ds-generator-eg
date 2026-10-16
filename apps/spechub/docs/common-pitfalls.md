@@ -568,3 +568,33 @@ PM 改了規格標籤翻譯裡一個錯字（`MBTF` → `MTBF`），說「早改
   硬去攔 popstate 會跟 Next 自己的路由打架。攔得到的是：點任何 `<a>`（含 next/link，在 window 的
   capture 階段，比 React 掛在 document 上的監聽早）、關分頁、重新整理、在網址列打新網址。
 
+
+## 82. Storage 只增不減,超過方案上限時整個專案一起停;而 Drive 不是完整的封存（2026-10-12,已修）
+
+每次 Generate 都在 Storage 留一份 PDF,舊版從沒清過。Free 方案上限 1 GB,衝到 1,163 MB 時
+Supabase 對 **REST、Storage、Auth 全部回 402** —— 不是「上傳失敗」,是兩個 app 連登入都不行。
+而且 **Storage API 也一起被鎖,沒辦法靠刪檔自救**;用 SQL 刪 `storage.objects` 只刪掉紀錄、
+不會釋放空間。最後是升級 Pro 才恢復,再清掉 179 份舊版（466 MB）。
+
+清理前以為「Drive 是正本,Storage 刪了沒關係」—— 核對才發現 **53 份舊版只存在 Storage**
+（同一天連續重產的中間版,Drive 只留最後一份;另有 7 份同名但大小不同）。那 60 份先封存到
+Drive `Model Datasheet/_SpecHub Storage 封存 2026-10-13/` 才刪。
+
+- 現在 `api/generate-pdf` 產完會自動清同型號同語言的舊版（`lib/datasheet/prune-pdfs.ts`）,
+  **只刪 Drive 同一資料夾有同名檔的**。PM 把舊版移進 `DS_<model>/Archive/` 的話,那份會被保留
+  （ESG320 v1.5 就是這樣）—— 偏保守,不是故障
+- **圖片沒有自動清**,`images/` 約 300 MB 會隨同步慢慢長
+- 要刪任何「看起來 Drive 也有」的檔案前,**先逐一核對 Drive**,別信「Drive 是正本」這句話
+
+## 83. 用名稱當 Map key 的比對,看不到重複（2026-10-16,已修）
+
+同步的規格比對把資料庫和 Sheet 都轉成 `Map<分類, Map<標籤, 值>>` 再比。PM 在 ESG 的 Sheet 上
+短暫複製出兩個 Compliance,剛好被同步存成兩個 section;Sheet 復原後,資料庫那兩個 Compliance
+在 Map 裡收成一個、內容又跟 Sheet 一樣 → 判定「沒變」→ 不重寫。**強制同步也沒用**,`force`
+只跳過「Sheet 有沒有改過」那關,比對這關照樣說沒變。四台 ESG 的 PDF 就一直印兩個 Compliance。
+
+修法（`lib/sync/spec-diff.ts`）:逐項比對照舊（變更紀錄要好讀）,沒抓到差異時再**依順序比整張表**,
+不同就回報一筆 `Spec table layout`。讀資料庫時兩層都要依 `sort_order` 排序,否則每次同步都會
+誤判成版面變更 —— 上線前用正式資料對 109 台跑過,只有那四台 ESG 被判定。
+
+**通則:Map / Set 會把重複吃掉。** 拿它來判斷「兩邊一不一樣」時,要另外確認數量和順序。

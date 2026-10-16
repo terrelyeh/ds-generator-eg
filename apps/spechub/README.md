@@ -208,6 +208,8 @@ SpecHub 原本的 **AI 問答（Ask）、知識庫索引管理（Knowledge Base�
 - **Auto Re-index RAG**：sync 完成後自動重建有變動 product 的向量索引，讓 Ask SpecHub 馬上能回答新內容
 - **Resync versions from Drive**（Dashboard `Sync ▾` 選項）— 一鍵重新掃 Drive 把 DB 版號拉到跟實際 PDF 一致，PM 手動動 Drive 後可修正
 - Telegram 通知：按產品線分組的精簡摘要格式
+- **「請檢查 Sheet」警告** — 規格表同一個分類出現兩次（例如不小心複製了一整塊），同步完成時會跳黃色提示，Telegram 報告最上方也會列出型號與重複的分類
+- **Storage 只留最新版 PDF** — 產新版 PDF 後，雲端上同型號同語言的舊版會自動清掉（Drive 上的歷史版本不受影響）
 
 ### Documentation
 - `/docs/sync` — 資料同步與通知機制說明頁

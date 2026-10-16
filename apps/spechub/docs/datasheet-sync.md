@@ -31,7 +31,13 @@ Dashboard 預設只顯示 Active，有 Active/All toggle。
 
 - Vercel Cron 每天 01:00 UTC (09:00 Taiwan) → `POST /api/sync`
 - Smart Sync：Drive `modifiedTime` vs `product_lines.last_synced_at`
-- Dashboard Sync 按鈕只同步**當前 tab 的產品線**（`?force=true&line=Cloud+Camera`）
+- Dashboard Sync 按鈕只同步**當前 tab 的產品線**（`?line=Cloud+Camera`）。⚠️ **預設是 Smart Sync,不帶 `force`**:
+  Sheet 沒改過就整條線跳過、`last_synced_at` 也不會動。要強制重讀得從 `Sync ▾` 選 **Force full re-sync**
+  （`?force=true&line=…`）。產品頁的 Resync 才是一律帶 `force`
+- **規格比對**（`lib/sync/spec-diff.ts` 的 `diffSpecTables()`）:逐項比之外,沒抓到差異時會**依順序比整張表**,
+  所以重複分類、分類或列的順序變動都會觸發重寫（pitfall #83）
+- **重複分類警告**（`findDuplicateSections()`）:同一分類出現兩次以上照存,但回應的 `results[].warnings`、
+  Sync 完成的黃色提示、Telegram 報告最上方「⚠️ 請檢查 Sheet」都會列出來
 - Deep diff 含 status 欄位 — status-only 變更也會觸發 upsert
 - **圖片同步**：即使內容無變更，若 product_image 或 hardware_image 缺失仍會從 Drive 拉取
 - **PNG 自動裁透明邊**（2026-07-23，sharp `.trim()`）：PM 給的去背圖常放在巨大透明畫布上

@@ -111,6 +111,10 @@ Sheet 是否有被修改：
 | 功能列表 | features | JSON array 比對，找出新增/移除的項目 |
 | 規格表 | spec_sections → spec_items | 逐 section、逐 item 比對 label + value |
 
+逐項比對沒抓到差異時,會再**依順序比整張規格表**(`lib/sync/spec-diff.ts`)。重複分類、分類或列的順序對調,
+在「分類名 → 項目」的 Map 裡是看不出來的,這一步補上;有差異就記一筆 `Spec table layout`
+(from/to 是「分類 (列數) · …」的大綱)。
+
 ### 變更紀錄格式
 
 每次偵測到變更，會同時寫入兩種格式：
@@ -136,6 +140,12 @@ Sheet 是否有被修改：
 - 不會寫入 `change_logs`
 - 不會觸發通知
 - 仍算作 "synced"（出現在同步結果中）
+
+### 「請檢查 Sheet」警告
+
+同步讀到某台產品的規格表裡**同一分類出現兩次以上**,會照存(Sheet 是唯一來源),但另外產生一筆警告:
+放在 Telegram／Discord／LINE 報告最上方的「⚠️ 請檢查 Sheet」區塊,**就算這次沒有任何變更也會發**;
+按 Sync 的人也會看到黃色提示。只有警告時不會把 `change_logs` 標成已通知。
 
 ---
 
