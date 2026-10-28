@@ -1,3 +1,5 @@
+import { REG_MARK_FAMILY } from "./reg-mark-font";
+
 export interface TypographySettings {
   font_family: string;
   headline_size: number;
@@ -255,6 +257,16 @@ export const MANROPE_IMPORT_URL =
  * CJK glyphs, and Vercel's chromium has no system font to fall back on, so
  * a heading without the locale's face prints blank rather than tofu.
  */
+/**
+ * Prefix a BODY stack with the one-glyph ® font so the mark prints as a
+ * superscript (Roboto draws it full-size on the baseline). The layout must
+ * also emit REG_MARK_FONT_FACE in its <style>. Not used on the display
+ * stack — Manrope's own ® is already superscript-sized.
+ */
+export function withRegMark(stack: string): string {
+  return `'${REG_MARK_FAMILY}', ${stack}`;
+}
+
 export function displayFontStack(cjkFamily?: string | null): string {
   return cjkFamily ? `'${cjkFamily}', 'Manrope', sans-serif` : "'Manrope', sans-serif";
 }

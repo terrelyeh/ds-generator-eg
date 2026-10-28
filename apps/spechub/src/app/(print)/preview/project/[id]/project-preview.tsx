@@ -1,6 +1,7 @@
 import React from "react";
 import { ProjectPrintToolbar } from "@/components/preview/project-print-toolbar";
-import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
+import { displayFontStack, MANROPE_IMPORT_URL, withRegMark } from "@/lib/datasheet/typography";
+import { REG_MARK_FONT_FACE } from "@/lib/datasheet/reg-mark-font";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT } from "@/lib/datasheet/scale";
 import { getDict } from "@/lib/datasheet/locales";
@@ -486,11 +487,12 @@ export function ProjectPreview({
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 @import url('${MANROPE_IMPORT_URL}');
+${REG_MARK_FONT_FACE}
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
 body {
-  font-family: Roboto, system-ui, sans-serif; color: ${MUTED};
+  font-family: ${withRegMark("Roboto, system-ui, sans-serif")}; color: ${MUTED};
   font-size: ${PT.table}pt; line-height: 1.4; background: #e0e0e0;
   padding-top: ${showToolbar ? "48px" : "0"};
 }
