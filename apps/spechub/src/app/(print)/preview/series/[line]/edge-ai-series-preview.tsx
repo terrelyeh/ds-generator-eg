@@ -1,7 +1,8 @@
 import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
-import { displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
+import { displayFontStack, MANROPE_IMPORT_URL, withRegMark } from "@/lib/datasheet/typography";
+import { REG_MARK_FONT_FACE } from "@/lib/datasheet/reg-mark-font";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { COVER_PHOTO_POLICIES } from "@/lib/datasheet/cover-photo";
 import { PT, WT } from "@/lib/datasheet/scale";
@@ -239,6 +240,7 @@ export function EdgeAiSeriesPreview({
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;600;700&display=swap');
 @import url('${MANROPE_IMPORT_URL}');
+${REG_MARK_FONT_FACE}
 
 @page { size: letter; margin: 0; }
 
@@ -251,7 +253,7 @@ html, body {
 }
 
 body {
-  font-family: 'Roboto', sans-serif;
+  font-family: ${withRegMark("'Roboto', sans-serif")};
   color: #6f6f6f;
   font-size: ${PT.tableSm}pt;
   line-height: 1.4;

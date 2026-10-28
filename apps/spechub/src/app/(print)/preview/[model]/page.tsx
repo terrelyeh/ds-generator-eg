@@ -11,7 +11,9 @@ import {
   isCjkLocale,
   displayFontStack,
   MANROPE_IMPORT_URL,
+  withRegMark,
 } from "@/lib/datasheet/typography";
+import { REG_MARK_FONT_FACE } from "@/lib/datasheet/reg-mark-font";
 import type { TypographySettings } from "@/lib/datasheet/typography";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT } from "@/lib/datasheet/scale";
@@ -556,9 +558,9 @@ export default async function PreviewPage({
       : []),
   ];
 
-  const fontFamily = chosenFont
+  const fontFamily = withRegMark(chosenFont
     ? `'${chosenFont}', 'Roboto', sans-serif`
-    : "'Roboto', sans-serif";
+    : "'Roboto', sans-serif");
 
   // Headings are Manrope in every layout. On a CJK locale `chosenFont` is
   // that locale's face and has to lead the stack (pitfall #64) — on a Latin
@@ -595,6 +597,7 @@ export default async function PreviewPage({
         dangerouslySetInnerHTML={{
           __html: `
 ${fontImports.map((url) => `@import url('${url}');`).join("\n")}
+${REG_MARK_FONT_FACE}
 
 @page { size: letter; margin: 0; }
 

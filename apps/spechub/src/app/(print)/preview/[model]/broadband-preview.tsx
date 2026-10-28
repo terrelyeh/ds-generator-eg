@@ -2,7 +2,8 @@ import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
 import { radioPatternSlots } from "@/lib/datasheet/radio-patterns";
-import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL } from "@/lib/datasheet/typography";
+import { cjkFontFor, displayFontStack, MANROPE_IMPORT_URL, withRegMark } from "@/lib/datasheet/typography";
+import { REG_MARK_FONT_FACE } from "@/lib/datasheet/reg-mark-font";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { PT, WT, LADDER, BROADBAND_HEADLINE } from "@/lib/datasheet/scale";
 import { estimateSpecNotesHeight } from "@/lib/datasheet/spec-notes";
@@ -221,7 +222,7 @@ export function BroadbandPreview({
   // Roboto has no CJK glyphs — a ja sheet rendered as tofu boxes. Put the
   // locale's face in front of it so Latin still sets in Roboto.
   const cjk = cjkFontFor(locale);
-  const bodyFont = cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif";
+  const bodyFont = withRegMark(cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif");
   const displayFont = displayFontStack(cjk?.family);
 
   const seriesName = lineContent?.series_name || line.label;
@@ -410,6 +411,7 @@ export function BroadbandPreview({
 @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap');
 @import url('${MANROPE_IMPORT_URL}');
 ${cjk ? `@import url('${cjk.importUrl}');` : ""}
+${REG_MARK_FONT_FACE}
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }

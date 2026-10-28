@@ -23,6 +23,14 @@ logo 怎麼換、Cloud 封面的置中是綁在哪一顆圖示上。
   不一致 exit 1),`--update` 重抓快照後要再跑一次產生器。
   **設定頁改值不會經過任何發版,所以這張表是全頁最容易悄悄過期的地方。**
   （產生器本身在重生時也會非阻斷地跑這個比對,漂移就印警告、連不到 DB 就跳過。）
+- **內文的 ® 是上標**（2026-10-28）：Roboto 把 ® 畫成跟大寫字母一樣大、貼在基線上，
+  「Intel® Atom®」看起來像兩個多出來的字。作法不是到處包 `<sup>`，而是一個**只含 ® 的字型**
+  （`lib/datasheet/reg-mark-font.ts`，Roboto 的 ® 縮 0.55 倍、頂端對齊 cap height，woff2 以 data URI 內嵌）
+  放在每個**內文** stack 的最前面（`withRegMark()`）；其他字元照樣落到 Roboto / 語系字型。
+  行高不變、字寬變窄，所以分頁估算不受影響。標題的 Manrope 本來就是上標樣式，不套。
+  五個版型（A/B/C/D + Tender）都要在 `<style>` 的 `@import` 後面放 `REG_MARK_FONT_FACE`、
+  內文 stack 包 `withRegMark()` —— **新增版型或新的內文 font-family 時兩件都要做**，漏了不會報錯，只是 ® 又變大。
+  要調大小：改 `scripts/design/build-reg-mark-font.py` 的 `SCALE` 再跑一次（不要手改產出的 .ts）。
 - **Datasheet logo**（2026-08-13 換新 ®）：`public/logo/` 的 `EnGenius-Logo-white.png`（封面）
   與 `-gray.png`（頁尾,現為近黑 #363333）是從 checked-in 的來源 SVG（`-white`/`-black`/`-blue.svg`）
   **高解析轉出**的。**不要手改 PNG，要改 logo 就改 SVG 再轉**。

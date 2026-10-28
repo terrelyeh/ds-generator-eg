@@ -1,7 +1,8 @@
 import React from "react";
 import { PrintToolbar } from "@/components/preview/print-toolbar";
 import { getDict } from "@/lib/datasheet/locales";
-import { cjkFontFor, displayFontStack } from "@/lib/datasheet/typography";
+import { cjkFontFor, displayFontStack, withRegMark } from "@/lib/datasheet/typography";
+import { REG_MARK_FONT_FACE } from "@/lib/datasheet/reg-mark-font";
 import { bulletDotCss } from "@/lib/datasheet/bullet";
 import { COVER_PHOTO_POLICIES } from "@/lib/datasheet/cover-photo";
 import { PT, WT, LADDER } from "@/lib/datasheet/scale";
@@ -230,7 +231,7 @@ export function DataCenterPreview({
   const isTranslated = locale !== "en";
   // Neither Roboto nor Manrope carries CJK glyphs (pitfall #64).
   const cjk = cjkFontFor(locale);
-  const bodyFont = cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif";
+  const bodyFont = withRegMark(cjk ? `'${cjk.family}', 'Roboto', sans-serif` : "'Roboto', sans-serif");
   const displayFont = displayFontStack(cjk?.family);
   const headline = (isTranslated ? translation?.headline : null) || product.headline;
   const overview = (isTranslated ? translation?.overview : null) ?? product.overview;
@@ -334,6 +335,7 @@ export function DataCenterPreview({
           __html: `
 @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
 ${cjk ? `@import url('${cjk.importUrl}');` : ""}
+${REG_MARK_FONT_FACE}
 
 @page { size: letter; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
