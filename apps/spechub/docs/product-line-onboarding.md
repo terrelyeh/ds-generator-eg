@@ -134,7 +134,11 @@ Datasheet/`), so walk the tree before filling them in.
     Chip Label | Bold Title:
     - One-sentence description.
     ```
-    Lines ending `:` open a group; `- ` lines are its bullets. NULL here →
+    A group opens at a line ending `:`, a `Chip | Title` line, or the
+    first plain line after a blank line — **the trailing `:` is optional**
+    (SE110/SE210 dropped it on most titles and their 8 groups collapsed
+    into 3 until #131). `- ` lines are its bullets; any other plain line
+    continues the previous bullet (soft wrap). NULL here →
     the layout falls back to the flat `Key Feature Lists` bullets. The
     website keeps consuming `Key Feature Lists` either way.
 - **`(2) Detail Specs`** tab: `Model #` row + category headers + label/value
@@ -285,7 +289,7 @@ a single-column key-value sheet read by `loadLineDatasheetContent`:
 | row | feeds |
 |---|---|
 | `Headline` / `Product Series` / `Category Label` | cover identity |
-| `DS Feature Groups` | cover marketing blocks (`Title:` + `- body`) |
+| `DS Feature Groups` | cover marketing blocks (`Chip \| Title` + `- body`, `:` optional) |
 | `Features & Benefits` | flat bullet list |
 | `Software Architecture` / `Footnote` | optional blocks |
 
