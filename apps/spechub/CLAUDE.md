@@ -1,6 +1,6 @@
 # CLAUDE.md — Product SpecHub (apps/spechub)
 
-> Last updated: 2026-10-16。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
+> Last updated: 2026-10-28。**本檔只留「改任何東西都可能踩到」的內容**;只有動到特定
 > 模組才需要的細節在 `docs/` 下,每一段結尾都有指標。
 >
 > Monorepo 拆分完成（Phase 1–5, 2026-06-13 cutover;剩藍圖 §6 登入驗收、repo rename
@@ -120,6 +120,8 @@ locale-aware 圖片雙向同步。另見 [`docs/sync-and-notifications.md`](docs
 會把資料庫裡兩個同名分類收成一個,判成「沒變」就永遠不重寫(pitfall #83)。同一分類出現兩次以上
 照存,但會在 Telegram 與 Sync 提示裡列「⚠️ 請檢查 Sheet」。⚠️ **Dashboard 的 Sync 按鈕預設是
 Smart Sync(不帶 `force`)**,Sheet 沒改過就整條線跳過;強制要從 `Sync ▾` 選 Force full re-sync。
+**改了 sheet 的解析規則也一樣**:部署後資料庫裡還是舊解析的結果,要對受影響的線 Force re-sync、再重產 PDF
+(#131 的 `DS Feature Groups` 就是這樣補的)。
 
 ### Datasheet 渲染:PDF / 版面 / 多語言 → [`docs/datasheet-rendering.md`](docs/datasheet-rendering.md)
 
