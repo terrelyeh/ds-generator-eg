@@ -366,15 +366,23 @@ export interface SeriesFeatureGroup {
 /**
  * Parse a grouped-features cell. Contract: a line ending with ":" starts a
  * group; lines starting with a bullet marker ("-", "•", "*", "–") are
- * bullets of the current group. A plain line with no open group starts a
- * group of its own (tolerant); other plain lines continue the previous
- * bullet (soft wrap).
+ * bullets of the current group. A plain line also starts a group when it
+ * has the "Chip | Title" shape or follows a blank line — PMs often drop the
+ * trailing ":" (SE110/SE210), and without this the title was glued onto the
+ * previous bullet. Remaining plain lines continue the previous bullet (soft
+ * wrap).
  */
 export function parseFeatureGroups(text: string): SeriesFeatureGroup[] {
   const groups: SeriesFeatureGroup[] = [];
-  for (const rawLine of text.split("\n")) {
+  let afterBlank = false;
+  for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line) continue;
+    if (!line) {
+      afterBlank = true;
+      continue;
+    }
+    const startsGroup = afterBlank || line.includes("|");
+    afterBlank = false;
     const bulletMatch = line.match(/^[-•*–]\s*(.*)$/);
     if (bulletMatch) {
       const bullet = bulletMatch[1].trim();
@@ -383,7 +391,7 @@ export function parseFeatureGroups(text: string): SeriesFeatureGroup[] {
       groups[groups.length - 1].bullets.push(bullet);
     } else if (line.endsWith(":")) {
       groups.push({ title: line.slice(0, -1).trim(), bullets: [] });
-    } else if (groups.length === 0) {
+    } else if (groups.length === 0 || startsGroup) {
       groups.push({ title: line, bullets: [] });
     } else {
       const g = groups[groups.length - 1];
