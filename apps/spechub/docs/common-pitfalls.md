@@ -183,7 +183,7 @@ Cloud 封面版面的內部細節,以及在 `product-line-onboarding.md` 已完�
     和 sync 那支只裁 PNG 透明邊的 `trimTransparentEdges` 分開;Drive 仍存 PM 原檔,
     Storage 存渲染用的裁切版）。既有 72 張已用
     `scripts/trim-radio-pattern-margins.mjs` 補跑（原檔備份在 repo 外的
-    `~/dev/DS-system/radio-pattern-originals-2026-08-05/`）。
+    `~/dev/DS-system/_archive/radio-pattern-originals-2026-08-05/`）。
     ⚠️ 覆蓋 Storage 後 **CDN 會續發舊 bytes 一段時間** —— 量測前記得
     `page.setCacheEnabled(false)`,否則會以為 backfill 沒生效。
 
